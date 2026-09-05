@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Teacher Portal &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Good {% if hour < 12 %}morning{% elif hour < 17 %}afternoon{% else %}evening{% endif %}, {{ user.get_full_name|default:user.username }}{% endblock %}
+{% block topbar_date %}{{ today_display }} &middot; {{ term_label }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Mockup specific styles */
+  .ev-widget { background: #F7F9FC; border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 20px; }
+  .ev-title { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
+  .ev-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 0.5px solid var(--border); }
+  .ev-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .ev-date { flex-shrink: 0; width: 44px; text-align: center; background: #fff; border: 1px solid var(--border); border-radius: 7px; padding: 5px 3px; }
+  .ev-day { font-size: 17px; font-weight: 700; color: var(--hodari-blue); font-family: var(--font-mono); line-height: 1; }
+  .ev-mon { font-size: 9px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; margin-top: 1px; }
+  .ev-body { flex: 1; min-width: 0; }
+  .ev-name { font-size: 12.5px; font-weight: 600; color: var(--text-primary); line-height: 1.3; }
+  .ev-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .ev-badge { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 99px; font-size: 10px; font-weight: 700; margin-top: 5px; border: 1px solid transparent; }
+  .ev-today { background: var(--green-bg); color: var(--green); border-color: var(--green-bd); }
+  .ev-soon  { background: var(--amber-bg); color: var(--amber); border-color: var(--amber-bd); }
+  .ev-normal{ background: var(--blue-st-bg); color: var(--blue-st); border-color: var(--blue-st-bd); }
+
+  .rejected-card { margin-bottom:16px; border-left:4px solid #DC2626; background:#FEF2F2; border-radius:10px; padding: 18px 20px; border: 1px solid var(--red-bd); border-left-width: 4px; }
+  .rejected-label { font-size:10.5px; font-weight:700; color:#9B1C1C; text-transform:uppercase; letter-spacing:.07em; margin-bottom:4px; }
+  .rejected-title { font-size:14px; font-weight:600; color:var(--text-primary); }
+  .rejected-body { font-size:12.5px; color:#474747; margin-top:6px; line-height:1.55; }
+  
+  .queue-item { display: flex; align-items: flex-start; gap: 11px; padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid transparent; }
+  .qi-amber { background: var(--amber-bg); border-left-color: #D97706; }
+  .qi-green { background: var(--green-bg); border-left-color: #16a34a; }
+  .qi-blue  { background: var(--blue-st-bg); border-left-color: var(--hodari-blue); }
+  .qi-body  { flex: 1; }
+  .qi-label { font-size: 13px; font-weight: 600; color: var(--text-primary); line-height: 1.3; }
+  .qi-sub   { font-size: 11.5px; color: var(--text-muted); margin-top: 3px; }
+  .qi-btn   { font-size: 11.5px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border-strong); background: #fff; color: var(--text-secondary); cursor: pointer; flex-shrink: 0; margin-top: 1px; font-weight: 500; }
+  .qi-btn:hover { background: var(--hodari-blue); color: #fff; border-color: var(--hodari-blue); }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Number Overviews on Top (As requested) -->
+<div class="metrics" style="margin-bottom: 24px;">
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Today's lessons</span></div>
+    <div class="mc-val" style="color:#023AA5">{{ today_slots|length }}</div>
+    <div class="mc-sub" style="color:#5A697D">Scheduled classes</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FFF8ED,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Daily Attendance</span></div>
+    <div class="mc-val" style="color:#B45309">{{ att_present }}<span class="mc-currency" style="margin-left:4px;vertical-align:middle">/{{ att_total }}</span></div>
+    <div class="mc-sub" style="color:#B45309">Students present today</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#F3E8FF,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Daily Welfare</span></div>
+    <div class="mc-val" style="color:#7C3AED">{{ welfare_today }}</div>
+    <div class="mc-sub" style="color:#6D28D9">Observations recorded today</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FFF0F0,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Daily Behavior</span></div>
+    <div class="mc-val" style="color:#DC2626">{{ discipline_today }}</div>
+    <div class="mc-sub" style="color:#DC2626">Incidents recorded today</div>
+  </div>
+</div>
+
+{% if is_primary_teacher %}
+  <!-- Rejected Plan Alert (If any) -->
+  {% for plan in rejected_plans %}
+  <div class="rejected-card">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+      <div>
+        <div class="rejected-label">Lesson plan rejected</div>
+        <div class="rejected-title">{{ plan.subject_name }} &middot; {{ plan.class_name }} &middot; {{ plan.week_start_date|date:"F Y" }}</div>
+        <div class="rejected-body">&ldquo;{{ plan.reviewer_feedback }}&rdquo; &middot; Reviewed by {{ plan.reviewed_by.get_full_name|default:"HOD" }}</div>
+      </div>
+      <a href="{% url 'academics:lesson_plan_edit' plan.pk %}" style="padding:8px 16px;background:var(--hodari-blue);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap;flex-shrink:0">Resubmit plan</a>
+    </div>
+  </div>
+  {% endfor %}
+{% endif %}
+
+{% if unconfirmed_students and hour >= 9 %}
+<div style="background:#FFFBEB;border:1px solid #FCD34D;border-left:4px solid #D97706;border-radius:10px;padding:16px 20px;margin-bottom:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span style="font-size:13px;font-weight:700;color:#92400E;text-transform:uppercase;letter-spacing:.05em">9:00 AM Attendance Alert</span>
+      </div>
+      <span style="background:#FDE68A;color:#92400E;font-size:11px;font-weight:700;padding:3px 10px;border-radius:99px">{{ unconfirmed_students|length }} unconfirmed</span>
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:12.5px;color:#78716C;margin-bottom:8px">The following students have not checked in by 9:00 AM:</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        {% for item in unconfirmed_students %}
+          <span style="display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #FDE68A;border-radius:6px;padding:4px 10px;font-size:12px;color:#44403C">
+            <span style="font-weight:600">{{ item.student.first_name }} {{ item.student.last_name }}</span>
+            <span style="color:#A8A29E;font-size:11px">{{ item.class_name }}</span>
+          </span>
+        {% endfor %}
+      </div>
+    </div>
+    <a href="/attendance/" style="display:inline-block;padding:7px 18px;background:#D97706;color:#fff;border:none;border-radius:7px;font-size:12.5px;font-weight:600;text-decoration:none">Mark Attendance Now →</a>
+</div>
+{% endif %}
+
+<div class="{% if is_ecd_teacher %}grid-5-5{% else %}grid-6-4{% endif %}">
+  <div class="left-col">
+    <!-- Today's Timetable -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title">Today's timetable</div>
+      {% for slot in today_slots %}
+        <div class="trow">
+          <div>
+            <div class="trow-name">{{ slot.start_time|time:"H:i" }} &middot; {{ slot.end_time|time:"H:i" }} {{ slot.start_time|time:"a" }}</div>
+            <div class="trow-sub">{{ slot.subject_name }} &middot; {{ slot.class_name }}{% if slot.room %} &middot; {{ slot.room.name }}{% endif %}</div>
+          </div>
+          <span class="trow-right">
+            <!-- Simple logic for Now/Next -->
+            {% if forloop.first %}
+              <span class="chip chip-blue">Current</span>
+            {% elif forloop.counter == 2 %}
+              <span class="chip chip-grey">Next</span>
+            {% else %}
+              <span class="chip chip-grey">Later</span>
+            {% endif %}
+          </span>
+        </div>
+      {% empty %}
+        <div style="padding:24px;text-align:center">{% include '_partials/empty_state.html' with title='No classes scheduled for today' desc='Check the full timetable for your weekly schedule.' icon='calendar' icon_color='grey' %}</div>
+      {% endfor %}
+      <div style="margin-top:12px"><a href="/timetable/" class="section-link">View full timetable →</a></div>
+    </div>
+
+    {% if is_ecd_teacher %}
+    <!-- Attendance to mark today (Moved to left for ECD to fill space) -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title">Attendance to mark</div>
+      {% for cls in class_attendance_status %}
+        <div class="queue-item {% if cls.marked %}qi-green{% else %}qi-amber{% endif %}">
+          <div class="qi-body">
+            <div class="qi-label">{{ cls.class_name }}</div>
+            {% if cls.marked %}
+              <div class="qi-sub">{{ cls.present }}/{{ cls.total }} present ({{ cls.pct }}%)</div>
+            {% else %}
+              <div class="qi-sub">{{ cls.total }} student(s) &middot; Not yet marked</div>
+            {% endif %}
+          </div>
+          <a href="/attendance/?class_name={{ cls.class_name }}" class="qi-btn" style="text-decoration:none">{% if cls.marked %}Review{% else %}Mark now{% endif %}</a>
+        </div>
+      {% empty %}
+        {% for slot in today_slots %}
+          <div class="queue-item qi-blue">
+            <div class="qi-body">
+              <div class="qi-label">{{ slot.class_name }} &middot; {{ slot.subject_name }}</div>
+              <div class="qi-sub">Scheduled: {{ slot.start_time|time:"H:i" }}</div>
+            </div>
+            <a href="/attendance/?class_name={{ slot.class_name }}" class="qi-btn" style="text-decoration:none">Open</a>
+          </div>
+        {% empty %}
+          {% include '_partials/empty_state.html' with title='All clear for today' desc='No attendance marking needed.' icon='check' icon_color='green' %}
+        {% endfor %}
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if is_primary_teacher %}
+      <!-- Lesson Plan Status -->
+      <div class="card">
+        <div class="card-title-row">
+          <span class="card-title" style="margin-bottom:0">Lesson plan status</span>
+          <a href="{% url 'academics:lesson_plans' %}" class="section-link">View all →</a>
+        </div>
+        {% for plan in my_plans|slice:":4" %}
+          <div class="trow">
+            <div>
+              <div class="trow-name">{{ plan.subject_name }} &middot; {{ plan.class_name }}</div>
+              <div class="trow-sub">{{ plan.get_status_display }} &middot; Week starting {{ plan.week_start_date|date:"d M" }}</div>
+            </div>
+            <span class="trow-right">
+              <span class="chip {% if plan.status == 'approved' %}chip-green{% elif plan.status == 'rejected' %}chip-red{% elif plan.status == 'submitted' %}chip-amber{% else %}chip-grey{% endif %}">
+                  {% if plan.status == 'rejected' %}Resubmit{% else %}{{ plan.get_status_display }}{% endif %}
+              </span>
+            </span>
+          </div>
+        {% empty %}
+          <div style="padding:24px;text-align:center">{% include '_partials/empty_state.html' with title='No lesson plans found' desc='Create a lesson plan to get started.' icon='doc' icon_color='grey' %}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="right-col">
+    <!-- Upcoming Events Widget -->
+    <div class="ev-widget">
+      <div class="ev-title">Upcoming events
+        <a href="{% url 'events:list' %}" class="ev-link">View calendar →</a>
+      </div>
+      {% for ev in upcoming_events %}
+        <div class="ev-item">
+          <div class="ev-date"><div class="ev-day">{{ ev.start_date|date:"d" }}</div><div class="ev-mon">{{ ev.start_date|date:"M" }}</div></div>
+          <div class="ev-body">
+            <div class="ev-name">{{ ev.title }}</div>
+            <div class="ev-meta">{{ ev.get_category_display }}</div>
+            <div class="ev-badge {% if forloop.first %}ev-soon{% else %}ev-normal{% endif %}">
+                {% if forloop.first %}Soon{% else %}{{ ev.start_date|date:"M d" }}{% endif %}
+            </div>
+          </div>
+        </div>
+      {% empty %}
+        <div style="padding:16px;text-align:center">{% include '_partials/empty_state.html' with title='No upcoming events' desc='Events will appear here once scheduled.' icon='calendar' icon_color='grey' %}</div>
+      {% endfor %}
+    </div>
+
+    {% if is_primary_teacher %}
+    <!-- Attendance to mark today -->
+    <div class="card">
+      <div class="card-title">Attendance to mark</div>
+      {% for cls in class_attendance_status %}
+        <div class="queue-item {% if cls.marked %}qi-green{% else %}qi-amber{% endif %}">
+          <div class="qi-body">
+            <div class="qi-label">{{ cls.class_name }}</div>
+            {% if cls.marked %}
+              <div class="qi-sub">{{ cls.present }}/{{ cls.total }} present ({{ cls.pct }}%)</div>
+            {% else %}
+              <div class="qi-sub">{{ cls.total }} student(s) &middot; Not yet marked</div>
+            {% endif %}
+          </div>
+          <a href="/attendance/?class_name={{ cls.class_name }}" class="qi-btn" style="text-decoration:none">{% if cls.marked %}Review{% else %}Mark now{% endif %}</a>
+        </div>
+      {% empty %}
+        {% for slot in today_slots %}
+          <div class="queue-item qi-blue">
+            <div class="qi-body">
+              <div class="qi-label">{{ slot.class_name }} &middot; {{ slot.subject_name }}</div>
+              <div class="qi-sub">Scheduled: {{ slot.start_time|time:"H:i" }}</div>
+            </div>
+            <a href="/attendance/?class_name={{ slot.class_name }}" class="qi-btn" style="text-decoration:none">Open</a>
+          </div>
+        {% empty %}
+          {% include '_partials/empty_state.html' with title='All clear for today' desc='No attendance marking needed.' icon='check' icon_color='green' %}
+        {% endfor %}
+      {% endfor %}
+    </div>
+    {% endif %}
+    
+    <!-- Quick Actions -->
+    <div class="card" style="margin-top:14px">
+        <div class="card-title">Quick Actions</div>
+        <div style="display:flex; flex-direction:column; gap:8px">
+            {% has_perm user "academics.add_lessonplan" as can_add_lesson %}
+            {% if is_primary_teacher and can_add_lesson %}
+                <a href="{% url 'academics:new_lesson_plan' %}" class="qi-btn" style="text-align:center; padding:10px; background:var(--hodari-blue); color:#fff; border:none">+ New Lesson Plan</a>
+            {% endif %}
+            {% if is_ecd_teacher %}
+                <a href="{{ ecd_eval_url }}" class="qi-btn" style="text-align:center; padding:10px">Enter ECD evaluations &rarr;</a>
+                {% has_perm user "communications.add_weeklyfocus" as can_submit_focus %}
+                {% if can_submit_focus %}
+                <a href="{% url 'communications:weekly_focus_submit' %}" class="qi-btn" style="text-align:center; padding:10px">Submit Weekly Focus →</a>
+                {% endif %}
+                {% has_perm user "welfare.add_welfareobservation" as can_welfare %}
+                {% if can_welfare %}
+                <a href="/welfare/submit/" class="qi-btn" style="text-align:center; padding:10px">Welfare Observation →</a>
+                {% endif %}
+            {% else %}
+                {% has_perm user "academics.add_examscore" as can_exam %}
+                {% if can_exam %}
+                <a href="/academics/exam-scores/" class="qi-btn" style="text-align:center; padding:10px">Enter Exam Scores →</a>
+                {% endif %}
+                {% has_perm user "academics.add_lessonplan" as can_comments %}
+                {% if can_comments %}
+                <a href="{% url 'academics:primary_comments_entry' %}" class="qi-btn" style="text-align:center; padding:10px">Enter Narrative Comments →</a>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

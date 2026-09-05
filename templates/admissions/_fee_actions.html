@@ -1,0 +1,155 @@
+{% load role_tags %}
+{% has_perm user "admissions.confirm_assessment_fee" as can_confirm_fee %}
+{% has_perm user "admissions.send_assessment_logistics" as can_logistics %}
+{% has_perm user "admissions.reverse_assessment_fee" as can_reverse_fee %}
+<div id="fee-actions" style="display:flex;flex-direction:column;gap:12px">
+  {% if not applicant.assessment %}
+    <div style="padding:4px 0">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        <span style="font-size:13px;font-weight:600;color:var(--text-muted)">Locked</span>
+      </div>
+      <p style="margin:0;font-size:12px;color:var(--text-muted);line-height:1.6">Fee collection is only available after an assessment is scheduled. Current stage: <strong style="color:var(--text-secondary)">{{ applicant.get_status_display }}</strong></p>
+    </div>
+
+  {% elif not applicant.assessment.assessment_fee_confirmed_paid %}
+    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--hodari-gold-light);border:1px solid var(--hodari-gold);border-radius:10px">
+      <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--hodari-gold);color:#fff">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--amber)">Awaiting fee payment</div>
+        <div style="font-size:11px;color:var(--amber);margin-top:2px">Fee: <span style="font-family:var(--font-mono);font-weight:600">{{ applicant.assessment.assessment_fee_amount }}</span> -- awaiting confirmation from Finance.</div>
+      </div>
+    </div>
+    {% if can_confirm_fee %}
+    <form
+      method="post"
+      action="{% url 'admissions:fee_confirm' applicant.id %}"
+      hx-post="{% url 'admissions:fee_confirm' applicant.id %}"
+      hx-target="#fee-actions"
+      hx-swap="innerHTML"
+    >
+      {% csrf_token %}
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <select name="payment_method" class="hf2-select" required style="flex:1">
+          <option value="">Select method</option>
+          <option value="cash">Cash</option>
+          <option value="bank_transfer">Bank Transfer</option>
+          <option value="mobile_money">Mobile Money</option>
+          <option value="card">Card</option>
+          <option value="cheque">Cheque</option>
+        </select>
+        <input type="text" name="payment_reference" class="hf2-input" placeholder="Reference (optional)" style="flex:1">
+      </div>
+      <button type="submit" class="btn-primary" style="width:100%;background:var(--hodari-gold);border-color:var(--hodari-gold);position:relative">
+        <span class="htmx-indicator" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="animation:btn-spin 1s linear infinite"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
+        </span>
+        <span class="hx-hide-on-request">Confirm fee paid (Finance)</span>
+      </button>
+    </form>
+    {% else %}
+    <button type="button" class="btn-secondary" style="width:100%;opacity:0.5;cursor:not-allowed" disabled>
+      Awaiting fee confirmation
+    </button>
+    {% endif %}
+
+  {% else %}
+    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--green-bg);border:1px solid var(--green-bd);border-radius:10px">
+      <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--green);color:#fff">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--green)">Fee confirmed</div>
+        <div style="font-size:11px;color:var(--green);margin-top:2px">Paid <span style="font-family:var(--font-mono);font-weight:600">{{ applicant.assessment.assessment_fee_amount }}</span> -- confirmed by {{ applicant.assessment.assessment_fee_confirmed_by.get_username }}.</div>
+      </div>
+    </div>
+
+    {% if applicant.assessment.logistics_sent_at %}
+      <button type="button" class="btn-secondary" style="width:100%" onclick="openFeeGateModal()">Update</button>
+
+      <div id="feeGateModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);backdrop-filter:blur(2px);align-items:center;justify-content:center">
+        <div style="background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.2);max-width:420px;width:92%;overflow:hidden;animation:modalSlideIn 0.25s cubic-bezier(0.16,1,0.3,1)">
+          <div style="padding:20px 24px;border-bottom:1px solid #E5E7EB;display:flex;align-items:center;justify-content:space-between">
+            <h3 style="margin:0;font-size:16px;font-weight:700">Fee Actions</h3>
+            <button type="button" onclick="closeFeeGateModal()" style="border:none;background:none;font-size:22px;color:#8492A6;cursor:pointer">&times;</button>
+          </div>
+          <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg-metric);border:1px solid var(--border);border-radius:8px">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span style="font-size:12px;color:#64748B">Logistics sent {{ applicant.assessment.logistics_sent_at|date:"d M Y, H:i" }}</span>
+            </div>
+            {% if can_logistics %}
+            <form method="post" action="{% url 'admissions:logistics_send' applicant.id %}"
+              hx-post="{% url 'admissions:logistics_send' applicant.id %}"
+              hx-target="#fee-actions"
+              hx-swap="innerHTML">
+              {% csrf_token %}
+              <button type="submit" class="btn-primary" style="width:100%;position:relative">
+                <span class="htmx-indicator" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="animation:btn-spin 1s linear infinite"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
+                </span>
+                <span class="hx-hide-on-request">Resend logistics to parent</span>
+              </button>
+            </form>
+            {% endif %}
+            {% if can_reverse_fee %}
+            <form method="post" action="{% url 'admissions:fee_unconfirm' applicant.id %}"
+              hx-post="{% url 'admissions:fee_unconfirm' applicant.id %}"
+              hx-target="#fee-actions"
+              hx-swap="innerHTML">
+              {% csrf_token %}
+              <button type="submit" class="btn-secondary" style="width:100%;color:var(--red);border-color:var(--red);position:relative">
+                <span class="htmx-indicator" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="animation:btn-spin 1s linear infinite"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
+                </span>
+                <span class="hx-hide-on-request">Reverse fee confirmation</span>
+              </button>
+            </form>
+            {% endif %}
+          </div>
+          <div style="display:flex;border-top:1px solid #E2E8F0">
+            <button type="button" onclick="closeFeeGateModal()" style="flex:1;padding:14px;font-size:14px;font-weight:600;color:#475569;background:none;border:none;cursor:pointer">Close</button>
+          </div>
+        </div>
+      </div>
+    {% else %}
+      {% if can_logistics %}
+      <form
+        method="post"
+        action="{% url 'admissions:logistics_send' applicant.id %}"
+        hx-post="{% url 'admissions:logistics_send' applicant.id %}"
+        hx-target="#fee-actions"
+        hx-swap="innerHTML"
+      >
+        {% csrf_token %}
+        <button type="submit" class="btn-primary" style="width:100%;position:relative">
+          <span class="htmx-indicator" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="animation:btn-spin 1s linear infinite"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
+          </span>
+          <span class="hx-hide-on-request">Send logistics to parent</span>
+        </button>
+      </form>
+      {% else %}
+      <button type="button" class="btn-primary" style="width:100%;opacity:0.5;cursor:not-allowed" disabled>
+        Send logistics to parent
+      </button>
+      {% endif %}
+    {% endif %}
+  {% endif %}
+</div>
+
+<style>
+  .htmx-request .hx-hide-on-request { visibility: hidden; }
+</style>
+
+<script>
+function openFeeGateModal() {
+  document.getElementById('feeGateModal').style.display = 'flex';
+}
+function closeFeeGateModal() {
+  document.getElementById('feeGateModal').style.display = 'none';
+}
+document.getElementById('feeGateModal').addEventListener('click', function(e){ if(e.target===this) closeFeeGateModal(); });
+</script>

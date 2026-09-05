@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Register</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #f8fafc;
+            margin: 0;
+            padding: 24px;
+            color: #0f172a;
+        }
+        .page {
+            background: #fff;
+            padding: 32px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px -10px rgba(30, 58, 138, 0.15);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            border-bottom: 3px solid #023AA5;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+        .school-name { font-size: 18px; font-weight: 800; color: #023AA5; margin: 0; }
+        .class-line { font-size: 14px; font-weight: 700; color: #334155; margin-top: 4px; }
+        .term-line { font-size: 12px; color: #64748b; margin-top: 2px; }
+        .register-title { font-size: 13px; font-weight: 800; color: #023AA5; text-transform: uppercase; letter-spacing: 0.1em; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            table-layout: fixed;
+        }
+        th, td {
+            border: 1px solid #cbd5e1;
+            padding: 6px 4px;
+            font-size: 10.5px;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+        th {
+            background: #023AA5;
+            color: #fff;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 9.5px;
+            letter-spacing: 0.05em;
+        }
+        td.name-cell {
+            text-align: left;
+            font-weight: 600;
+            font-size: 11px;
+        }
+        td.adm-cell { text-align: left; color: #475569; font-size: 10px; width: 70px; }
+        tbody tr:nth-child(even) { background: #f8fafc; }
+        .foot-note { margin-top: 12px; font-size: 10.5px; color: #94a3b8; }
+        .signatures {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 48px;
+            margin-top: 48px;
+        }
+        .signature { font-size: 11px; color: #64748b; }
+        .signature .line { border-top: 1px solid #cbd5e1; margin-top: 40px; padding-top: 6px; }
+        .print-controls { position: fixed; top: 24px; right: 24px; z-index: 100; }
+        .btn-print {
+            background: #023AA5; color: #fff; border: none; padding: 14px 28px;
+            border-radius: 16px; font-weight: 700; font-family: 'Segoe UI', system-ui, sans-serif;
+            font-size: 14px; cursor: pointer; box-shadow: 0 10px 20px rgba(30, 58, 138, 0.2);
+        }
+        @page { size: A4 landscape; margin: 12mm; }
+        @media print {
+            body { background: #fff; padding: 0; }
+            .print-controls { display: none; }
+            .page { box-shadow: none; padding: 0; }
+            th { background: #023AA5; color: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+    </style>
+</head>
+<body>
+    <div class="print-controls">
+        <button class="btn-print" onclick="window.print()">Print Register</button>
+    </div>
+
+    <div class="page">
+        <div class="header">
+            <div>
+                <p class="school-name">{{ brand.school_name }}</p>
+                <div class="class-line">{% if class_name %}{{ class_name }}{% else %}All Classes{% endif %}</div>
+                <div class="term-line">{{ term_name|default:"" }}</div>
+            </div>
+            <div class="register-title">Attendance Register</div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:26px">#</th>
+                    <th style="width:180px">Student Name</th>
+                    <th style="width:70px">Adm. No.</th>
+                    {% for d in "1" %}
+                    {% endfor %}
+                    {% for day in "1234567890123456789012345678901" %}
+                    <th style="width:14px">{{ forloop.counter }}</th>
+                    {% endfor %}
+                    <th style="width:26px">P</th>
+                    <th style="width:26px">A</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in students %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td class="name-cell">{{ student.first_name }} {{ student.last_name }}</td>
+                    <td class="adm-cell">{{ student.admission_no }}</td>
+                    {% for day in "1234567890123456789012345678901" %}
+                    <td></td>
+                    {% endfor %}
+                    <td></td>
+                    <td></td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="35" style="text-align:center;padding:24px;color:#94a3b8">
+                        No students found{% if class_name %} for {{ class_name }}{% endif %}.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="foot-note">P = Present &nbsp;&middot;&nbsp; A = Absent &nbsp;&middot;&nbsp; Mark daily attendance for each student.</div>
+
+        <div class="signatures">
+            <div class="signature">
+                Class Teacher
+                <div class="line">Name &amp; Signature</div>
+            </div>
+            <div class="signature">
+                Head of Department / Head of School
+                <div class="line">Name &amp; Signature</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

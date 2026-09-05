@@ -1,0 +1,23 @@
+<!-- Attendance marking is disabled - all attendance is recorded via mobile app check-in/check-out -->
+<div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; color:var(--text-muted); font-size:11px">
+  <svg style="width:14px; height:14px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v2m0 4v2m7.26-4.26a10 10 0 11-14.52 0m10.26 0L9 9m6 6l-6-6"/></svg>
+  Mobile app only
+</div>
+
+<style>
+.hidden { display: none !important; }
+.att-grade-btn {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:32px; height:32px; border-radius:8px; font-size:13px; font-weight:700;
+  cursor:pointer; border:2px solid transparent; transition:all .15s;
+}
+.att-grade-P { background:var(--green-bg, #E8F5EC); color:var(--green, #1B7B34); border-color:var(--green-bd, #B7DFBF); }
+.att-grade-A { background:var(--red-bg, #FEF2F2); color:var(--red, #9B1C1C); border-color:var(--red-bd, #FECACA); }
+.att-grade-L { background:var(--amber-bg, #FEF3C7); color:var(--amber, #92550A); border-color:var(--amber-bd, #FCD34D); }
+.att-grade-E { background:var(--blue-st-bg, #E8EEF9); color:var(--blue-st, #023AA5); border-color:var(--blue-st-bd, #BFCFE9); }
+.att-grade-btn.selected-P { background:var(--green, #1B7B34); color:#fff; border-color:var(--green, #1B7B34); }
+.att-grade-btn.selected-A { background:var(--red, #9B1C1C); color:#fff; border-color:var(--red, #9B1C1C); }
+.att-grade-btn.selected-L { background:#D97706; color:#fff; border-color:#D97706; }
+.att-grade-btn.selected-E { background:var(--blue-st, #023AA5); color:#fff; border-color:var(--blue-st, #023AA5); }
+.att-grade-btn:hover { opacity: 0.8; }
+</style>

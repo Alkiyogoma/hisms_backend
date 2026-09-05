@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Delete Event — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Delete Event{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:500px; margin:40px auto; text-align:center">
+  <div style="margin-bottom:16px;"></div>
+  <div class="card-title" style="font-size:18px">Delete Event</div>
+  <p style="color:var(--text-secondary); font-size:14px; margin:12px 0 24px">
+    Are you sure you want to delete <strong>"{{ object.title }}"</strong>?
+  </p>
+
+  <div style="background:#F9FAFB; border-radius:8px; padding:12px 16px; text-align:left; margin-bottom:24px">
+    <div style="font-size:12px; color:var(--text-muted)">Date: {{ object.start_date }}
+      {% if object.end_date %} — {{ object.end_date }}{% endif %}</div>
+    <div style="font-size:12px; color:var(--text-muted)">Category: {{ object.get_category_display }}</div>
+  </div>
+
+  <form method="post" style="display:flex; gap:12px; justify-content:center">
+    {% csrf_token %}
+    <a href="{% url 'events:list' %}" class="hf-btn hf-btn-secondary">Cancel</a>
+    <button type="submit" class="hf-btn hf-btn-danger" style="background:#9B1C1C; color:#fff; border:none; padding:10px 24px; border-radius:8px; font-weight:600; cursor:pointer">
+      Delete Event
+    </button>
+  </form>
+</div>
+{% endblock %}

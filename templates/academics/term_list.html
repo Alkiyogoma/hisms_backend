@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Academic Terms &mdash; {{ brand.school_name }}{% endblock %}
+
+{% block content %}
+<div class="section-hdr">
+    <div style="display:flex;align-items:center;gap:12px">
+        <span class="section-title">Academic Year Configuration</span>
+        <span class="chip chip-blue">Terms</span>
+        <a href="{% url 'academics:academic_year_list' %}" style="padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;color:#023AA5;background:#ebf4ff;border:1px solid #bee3f8;text-decoration:none">Manage Academic Years</a>
+    </div>
+    <a href="{% url 'academics:term_create' %}" class="hf-btn hf-btn-primary">+ Create New Term</a>
+</div>
+
+<div class="card">
+    <div class="card-title">Manage School Terms</div>
+    <div class="trow" style="background:var(--bg-page);border-radius:8px;margin-bottom:12px;font-weight:700;color:var(--text-secondary);font-size:11px;text-transform:uppercase;letter-spacing:0.05em">
+        <div style="flex:2">Term Name</div>
+        <div style="flex:1">Start Date</div>
+        <div style="flex:1">End Date</div>
+        <div style="flex:1;text-align:center">Status</div>
+    </div>
+    {% for term in terms %}
+    <div class="trow">
+        <div style="flex:2">
+            <div class="trow-name">{{ term.name }}</div>
+            <div class="trow-sub">{% if term.is_locked %}Archived academic period{% else %}Active academic period{% endif %}</div>
+        </div>
+        <div style="flex:1" class="trow-name">{{ term.start_date|date:"d M Y" }}</div>
+        <div style="flex:1" class="trow-name">{{ term.end_date|date:"d M Y" }}</div>
+        <div style="flex:1;display:flex;justify-content:center">
+            {% if term.is_locked %}
+                <span class="chip chip-grey">Locked</span>
+            {% else %}
+                <span class="chip chip-green">Current</span>
+            {% endif %}
+        </div>
+    </div>
+    {% empty %}
+    {% include '_partials/empty_state.html' with title='No academic terms configured' desc='Create an academic year first, then add terms.' icon='calendar' icon_color='blue' %}
+    
+    {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% load role_tags %}
+<div class="sub-nav">
+  {% if perms.academics.view_lessonplan %}
+  <a href="{% url 'academics:lesson_plans' %}" class="sub-tab {% if academics_tab == 'lesson_plans' %}active{% endif %}">Lesson Plans</a>
+  {% endif %}
+  <div style="margin-left:auto; display:flex; align-items:center; gap:8px">
+    {% if lp_form_view %}
+      <a href="{% url 'academics:lesson_plans' %}" class="btn-secondary" style="padding:7px 16px; text-decoration:none; display:inline-flex; align-items:center; gap:5px; font-size:12px; border-radius:8px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Back
+      </a>
+    {% else %}
+      {% has_perm user "academics.add_lessonplan" as can_create %}
+      {% if can_create and has_timetable_slots != False %}
+        <a href="{% url 'academics:new_lesson_plan' %}" class="btn-primary" style="padding:7px 16px; text-decoration:none; display:inline-flex; align-items:center; gap:5px; font-size:12px; border-radius:8px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Plan
+        </a>
+      {% endif %}
+      <div class="view-controls">
+        <button type="button" class="view-btn" id="btn-list" onclick="setView('list')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          List
+        </button>
+        <button type="button" class="view-btn" id="btn-grid" onclick="setView('grid')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Grid
+        </button>
+      </div>
+    {% endif %}
+  </div>
+</div>

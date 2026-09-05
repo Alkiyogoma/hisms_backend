@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Offboarding &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Staff Management{% endblock %}
+{% block topbar_date %}{% now "d F Y" %}{% endblock %}
+
+{% block content %}
+{% include "hr/_top_tabs.html" %}
+<style>
+  .section-hdr { display:flex; align-items:center; justify-content:space-between; margin:0 0 16px }
+  .section-title { font-size:16px; font-weight:700; color:var(--text-primary) }
+  .section-link { font-size:12px; color:var(--hodari-blue); text-decoration:none; font-weight:500 }
+  .section-link:hover { text-decoration:underline }
+
+  .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px 24px; margin-bottom:24px }
+  .detail-field { }
+  .detail-label { font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--text-muted); margin-bottom:2px }
+  .detail-value { font-size:14px; font-weight:500; color:var(--text-primary) }
+
+  .status-badge { display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:99px; font-size:12px; font-weight:600 }
+  .status-draft { background:var(--amber-bg); color:var(--amber); border:1px solid var(--amber-bd) }
+  .status-completed { background:var(--green-bg); color:var(--green); border:1px solid var(--green-bd) }
+  .status-cancelled { background:var(--red-bg); color:var(--red); border:1px solid var(--red-bd) }
+
+  .timeline { position:relative; padding-left:28px; margin:16px 0 }
+  .timeline::before { content:''; position:absolute; left:10px; top:4px; bottom:4px; width:2px; background:var(--border) }
+  .tl-item { position:relative; padding-bottom:20px }
+  .tl-item:last-child { padding-bottom:0 }
+  .tl-dot { position:absolute; left:-18px; top:4px; width:14px; height:14px; border-radius:50%; border:2px solid var(--hodari-blue); background:#fff }
+  .tl-dot.completed { background:var(--green); border-color:var(--green) }
+  .tl-dot.current { background:var(--hodari-blue); border-color:var(--hodari-blue); box-shadow:0 0 0 3px var(--hodari-blue-light) }
+  .tl-title { font-size:13px; font-weight:600; color:var(--text-primary); margin-bottom:2px }
+  .tl-meta { font-size:11.5px; color:var(--text-muted) }
+
+  .btn { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:6px; font-size:13px; font-weight:500; cursor:pointer; border:none; text-decoration:none; transition:all .12s }
+  .btn-primary { background:var(--hodari-blue); color:#fff }
+  .btn-primary:hover { background:var(--hodari-blue-dark) }
+  .btn-danger { background:var(--red); color:#fff }
+  .btn-danger:hover { background:#7a1616 }
+  .btn-secondary { background:#fff; color:var(--hodari-blue); border:1px solid var(--border) }
+  .btn-secondary:hover { background:var(--hodari-blue-light) }
+
+  .card { background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:20px; margin-bottom:16px }
+  .card-title { font-size:13px; font-weight:700; color:var(--text-primary); margin-bottom:12px }
+  .card-title-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px }
+</style>
+
+<div class="section-hdr">
+  <span class="section-title">Offboarding &middot; {{ staff.full_name|default:staff.user.get_full_name }}</span>
+  <div style="display:flex;gap:8px">
+    <a href="{% url 'hr:staff_list' %}" class="btn btn-secondary">&larr; Back to Staff</a>
+  </div>
+</div>
+
+<!-- Status Banner -->
+<div class="card" style="{% if offboarding.status == 'draft' %}border-left:4px solid var(--amber);{% elif offboarding.status == 'completed' %}border-left:4px solid var(--green);{% else %}border-left:4px solid var(--red);{% endif %}">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">Status</div>
+      <span class="status-badge status-{{ offboarding.status }}">{{ offboarding.get_status_display }}</span>
+    </div>
+    <div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">Offboarding Date</div>
+      <div style="font-size:14px;font-weight:500">{{ offboarding.offboarding_date|date:"d M Y"|default:"Not set" }}</div>
+    </div>
+    <div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">Exit Type</div>
+      <div style="font-size:14px;font-weight:500">{{ offboarding.get_exit_type_display|default:"Not specified" }}</div>
+    </div>
+    <div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">Last Working Day</div>
+      <div style="font-size:14px;font-weight:500">{{ offboarding.last_working_day|date:"d M Y"|default:"Not set" }}</div>
+    </div>
+    {% has_perm user "hr.change_offboardingrecord" as can_complete_offboarding %}
+    {% if offboarding.status == 'draft' and can_complete_offboarding %}
+    <form method="post" action="{% url 'hr:offboarding_detail' pk=offboarding.pk %}" style="display:inline">
+      {% csrf_token %}
+      <input type="hidden" name="resignation_received" value="on">
+      <input type="hidden" name="clearance_assets_returned" value="on">
+      <input type="hidden" name="clearance_library" value="on">
+      <input type="hidden" name="clearance_finance" value="on">
+      <input type="hidden" name="final_payslip_generated" value="on">
+      <input type="hidden" name="exit_interview_completed" value="on">
+      <input type="hidden" name="system_account_deactivated" value="on">
+      <button type="button" class="btn btn-primary" onclick="confirmDeleteModal({title:'Complete Offboarding?',body:'Mark this offboarding as complete? All clearance items will be marked as cleared and the staff account will be deactivated.',confirmText:'Complete Offboarding',url:'{% url 'hr:offboarding_detail' pk=offboarding.pk %}',type:'info',extraData:[{name:'resignation_received',value:'on'},{name:'clearance_assets_returned',value:'on'},{name:'clearance_library',value:'on'},{name:'clearance_finance',value:'on'},{name:'final_payslip_generated',value:'on'},{name:'exit_interview_completed',value:'on'},{name:'system_account_deactivated',value:'on'}]})">Complete Offboarding</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+  <!-- Staff Details -->
+  <div class="card">
+    <div class="card-title">Staff Details</div>
+    <div class="detail-grid">
+      <div class="detail-field">
+        <div class="detail-label">Full Name</div>
+        <div class="detail-value">{{ staff.full_name|default:staff.user.get_full_name }}</div>
+      </div>
+      <div class="detail-field">
+        <div class="detail-label">Staff ID</div>
+        <div class="detail-value">{{ staff.staff_id|default:"N/A" }}</div>
+      </div>
+      <div class="detail-field">
+        <div class="detail-label">Department</div>
+        <div class="detail-value">{{ staff.department|default:"N/A" }}</div>
+      </div>
+      <div class="detail-field">
+        <div class="detail-label">Position</div>
+        <div class="detail-value">{{ staff.position|default:"N/A" }}</div>
+      </div>
+      <div class="detail-field">
+        <div class="detail-label">Employment Type</div>
+        <div class="detail-value">{{ staff.get_employment_type_display|default:"N/A" }}</div>
+      </div>
+      <div class="detail-field">
+        <div class="detail-label">{{ offboarding.exit_type|yesno:"Resignation Date,Exit Date" }}</div>
+        <div class="detail-value">{{ offboarding.offboarding_date|date:"d M Y"|default:"N/A" }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exit Details -->
+  <div class="card">
+    <div class="card-title">Exit Details</div>
+    <div class="detail-grid">
+      <div class="detail-field">
+        <div class="detail-label">Exit Type</div>
+        <div class="detail-value">{{ offboarding.get_exit_type_display|default:"Not specified" }}</div>
+      </div>
+      {% if offboarding.reason %}
+      <div class="detail-field" style="grid-column:1/-1">
+        <div class="detail-label">Reason</div>
+        <div class="detail-value">{{ offboarding.reason }}</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Clearance Checklist -->
+<div class="card">
+  <div class="card-title-row">
+    <span class="card-title">Clearance Checklist</span>
+  </div>
+  {% if offboarding.clearance_items %}
+  <div style="display:grid;gap:8px">
+    {% for item in offboarding.clearance_items %}
+    <div style="display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:6px;background:{% if item.is_cleared %}var(--green-bg){% else %}var(--bg-page){% endif %};border:1px solid {% if item.is_cleared %}var(--green-bd){% else %}var(--border){% endif %}">
+      <span style="font-size:13px;font-weight:600;color:{% if item.is_cleared %}var(--green){% else %}var(--text-muted){% endif %}">{% if item.is_cleared %}Yes{% else %}No{% endif %}</span>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:500;color:var(--text-primary)">{{ item.item_name }}</div>
+        {% if item.notes %}<div style="font-size:11.5px;color:var(--text-muted)">{{ item.notes }}</div>{% endif %}
+      </div>
+      <div style="font-size:11.5px;color:var(--text-muted)">
+        {% if item.cleared_by %}Cleared by {{ item.cleared_by.get_full_name }}{% endif %}
+        {% if item.cleared_at %}<br>{{ item.cleared_at|date:"d M Y" }}{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px">
+    No clearance items recorded for this offboarding.
+  </div>
+  {% endif %}
+</div>
+
+<!-- Assets Returned -->
+<div class="card">
+  <div class="card-title">Assets &amp; Documents Returned</div>
+  {% if offboarding.assets_returned %}
+  <div style="display:flex;flex-wrap:wrap;gap:6px">
+    {% for asset in offboarding.assets_returned %}
+    <span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:var(--green-bg);color:var(--green);border:1px solid var(--green-bd);border-radius:6px;font-size:12px">
+      {{ asset }}
+    </span>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="color:var(--text-muted);font-size:13px">No assets recorded as returned.</div>
+  {% endif %}
+</div>
+
+<!-- Audit Trail -->
+{% if audit_trail %}
+<div class="card">
+  <div class="card-title">Offboarding Timeline</div>
+  <div class="timeline">
+    {% for entry in audit_trail %}
+    <div class="tl-item">
+      <div class="tl-dot completed"></div>
+      <div class="tl-title">{{ entry.get_action_type_display }}</div>
+      <div class="tl-meta">{{ entry.created_at|date:"d M Y H:i" }} by {{ entry.actor.get_full_name|default:entry.actor.username }}</div>
+      {% if entry.description %}<div style="font-size:12px;color:var(--text-secondary);margin-top:2px">{{ entry.description }}</div>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

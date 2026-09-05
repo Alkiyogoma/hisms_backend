@@ -1,0 +1,29 @@
+[Unit]
+Description=HODARI Celery Beat Scheduler
+After=network.target postgresql.service redis.service
+Wants=postgresql.service redis.service
+
+[Service]
+User=hodari
+Group=hodari
+WorkingDirectory=/opt/hodari/hisms_backend
+ExecStart=/opt/hodari/venv/bin/celery -A config beat \
+    --loglevel=warning \
+    --pidfile=/var/run/hodari/celerybeat.pid \
+    --scheduler django_celery_beat.schedulers:DatabaseScheduler
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=on-failure
+RestartSec=10
+KillMode=mixed
+TimeoutStopSec=30
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/hodari/hisms_backend /var/log/hodari /var/run/hodari
+PrivateTmp=yes
+
+Environment="DJANGO_SETTINGS_MODULE=config.settings"
+
+[Install]
+WantedBy=multi-user.target

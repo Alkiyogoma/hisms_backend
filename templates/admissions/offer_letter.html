@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admission Offer - {{ applicant.child_full_name }}</title>
+  {% include "includes/hodari_print_styles.html" %}
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px;
+    }
+    .date {
+      text-align: right;
+      margin-bottom: 20px;
+    }
+    .content {
+      margin-bottom: 40px;
+    }
+    .checklist {
+      background: #f9fafb;
+      padding: 20px;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+    }
+    .checklist h3 {
+      margin-top: 0;
+    }
+    .checklist ul {
+      margin-bottom: 0;
+    }
+    .footer {
+      margin-top: 60px;
+    }
+    @media print {
+      body {
+        padding: 0;
+      }
+      .no-print {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+{% load static %}
+  <div class="no-print" style="margin-bottom: 20px; text-align: right;">
+    <button onclick="window.print()" style="padding: 8px 16px; background: #023AA5; color: white; border: none; border-radius: 4px; cursor: pointer;">Print Offer Letter</button>
+    <a href="{% url 'admissions:detail' applicant.id %}" style="margin-left: 10px; color: #666; text-decoration: none;">&larr; Back</a>
+  </div>
+
+  {% include "includes/hodari_print_header.html" %}
+  <div class="date">Date: {% now "d F Y" %}</div>
+
+  <div class="content">
+    <p>Dear <strong>{{ applicant.parent_full_name }}</strong>,</p>
+    
+    <p>We are delighted to formally offer <strong>{{ applicant.child_full_name }}</strong> a place at {{ brand.school_name }} in <strong>{{ applicant.grade_applying_for }}</strong>.</p>
+    
+    <p>This offer is {{ applicant.status|lower }} based on the assessment results and space availability. We are excited to welcome your family to our community.</p>
+
+    <div class="checklist">
+      <h3>Next Steps to Complete Enrolment</h3>
+      <p>Before your child's first day, the following must be completed:</p>
+      <ul>
+        <li>Return the signed Admission Form</li>
+        <li>Provide a copy of the Birth Certificate</li>
+        <li>Submit the Clearance Form from the previous school (Mandatory)</li>
+        <li>Complete fee payment arrangements with the Finance Office</li>
+        <li>Attend the Parent Orientation Visit at the school</li>
+      </ul>
+    </div>
+
+    <p style="margin-top: 20px;">Please contact the Admissions Office if you have any questions regarding these requirements or the enrolment process.</p>
+  </div>
+
+  <div class="footer">
+    <p>Sincerely,</p>
+    <br><br>
+    <p>_______________________</p>
+    <p><strong>Head of School</strong><br>{{ brand.school_name }}</p>
+  </div>
+</body>
+</html>

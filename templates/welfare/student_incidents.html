@@ -1,0 +1,478 @@
+{% extends "base.html" %}
+{% block title %}Student Incidents &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Student Incidents{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  .si-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .si-metric { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .si-metric-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+  .si-metric-value { font-size: 28px; font-weight: 800; color: #1E293B; line-height: 1; }
+  .si-metric-sub { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+  .si-metric-change { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 99px; margin-top: 6px; }
+  .si-metric-change.up { background: #FEF2F2; color: #DC2626; }
+  .si-metric-change.down { background: #F0FDF4; color: #16A34A; }
+  .si-metric-change.flat { background: #F3F4F6; color: #6B7280; }
+  .si-charts { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .si-charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .si-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; }
+  .si-card-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #F3F4F6; }
+  .si-card-title { font-size: 14px; font-weight: 700; color: #1E293B; }
+  .si-card-body { padding: 20px; }
+  .si-filters { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; }
+  .si-filters-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  .si-filter-group { display: flex; flex-direction: column; gap: 4px; }
+  .si-filter-group label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+  .si-filter-group input, .si-filter-group select { border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px; font-size: 13px; color: #1E293B; background: #fff; min-width: 150px; }
+  .si-filter-group input:focus, .si-filter-group select:focus { outline: none; border-color: var(--hodari-blue); box-shadow: 0 0 0 3px rgba(2,58,165,0.08); }
+  .si-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: background .15s; }
+  .si-btn-primary { background: var(--hodari-blue); color: #fff; }
+  .si-btn-primary:hover { background: #012A80; }
+  .si-btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+  .si-btn-ghost:hover { background: #F9FAFB; }
+  .si-table { width: 100%; border-collapse: collapse; }
+  .si-table th { padding: 12px 14px; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; text-align: left; border-bottom: 2px solid #F3F4F6; background: #FAFBFC; }
+  .si-table td { padding: 12px 14px; font-size: 13px; color: #1E293B; border-bottom: 1px solid #F3F4F6; }
+  .si-table tr:hover td { background: #F8FAFC; }
+  .si-chip { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 99px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .si-chip-red { background: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }
+  .si-chip-amber { background: #FFFBEB; color: #D97706; border: 1px solid #FDE68A; }
+  .si-chip-blue { background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; }
+  .si-chip-grey { background: #F3F4F6; color: #6B7280; border: 1px solid #E5E7EB; }
+  .si-chip-green { background: #F0FDF4; color: #16A34A; border: 1px solid #BBF7D0; }
+  .si-empty { text-align: center; padding: 48px 20px; color: var(--text-muted); }
+  .si-top-students { list-style: none; padding: 0; margin: 0; }
+  .si-top-students li { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #F3F4F6; font-size: 13px; }
+  .si-top-students li:last-child { border-bottom: none; }
+  .si-student-name { font-weight: 600; color: #1E293B; }
+  .si-student-class { font-size: 11px; color: var(--text-muted); }
+  .si-observation-text { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #4B5563; }
+  .si-pagination { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 20px; }
+  .si-page-btn { padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; font-weight: 600; color: #4B5563; background: #fff; cursor: pointer; text-decoration: none; }
+  .si-page-btn:hover { background: #F9FAFB; }
+  .si-page-btn.active { background: var(--hodari-blue); color: #fff; border-color: var(--hodari-blue); }
+  .si-page-btn:disabled { opacity: .4; cursor: not-allowed; }
+  @media (max-width: 1100px) {
+    .si-grid { grid-template-columns: repeat(2, 1fr); }
+    .si-charts { grid-template-columns: 1fr; }
+    .si-charts-row { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .si-grid { grid-template-columns: 1fr; }
+    .si-filters-row { flex-direction: column; }
+    .si-filter-group input, .si-filter-group select { min-width: 100%; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "welfare/_top_tabs.html" %}
+
+<div class="section-hdr">
+  <span class="section-title">Student Incidents</span>
+  <span class="chip chip-blue">{{ total_count }} total</span>
+</div>
+
+<!-- Key Metrics -->
+<div class="metrics si-grid">
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff);cursor:default">
+    <div class="mc-lbl-row"><span class="mc-lbl">Total Incidents</span></div>
+    <div class="mc-val" style="color:#023AA5">{{ total_count }}</div>
+    <div class="mc-sub" style="color:#5A697D">All recorded incidents</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff);cursor:default">
+    <div class="mc-lbl-row"><span class="mc-lbl">This Month</span></div>
+    <div class="mc-val" style="color:#023AA5">{{ this_month_count }}</div>
+    <div class="mc-sub" style="color:#5A697D">
+      {% if month_change > 0 %}+{{ month_change }} from last month{% elif month_change < 0 %}{{ month_change }} from last month{% else %}Same as last month{% endif %}
+    </div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,{% if open_count > 0 %}#FFF8ED{% else %}#EEF9F0{% endif %},#fff);cursor:default">
+    <div class="mc-lbl-row"><span class="mc-lbl">Open Cases</span></div>
+    <div class="mc-val" style="color:{% if open_count > 0 %}#B45309{% else %}#059669{% endif %}">{{ open_count }}</div>
+    <div class="mc-sub" style="color:{% if open_count > 0 %}#B45309{% else %}#059669{% endif %}">{{ resolved_pct }}% resolved overall</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF9F0,#fff);cursor:default">
+    <div class="mc-lbl-row"><span class="mc-lbl">Parent Contact</span></div>
+    <div class="mc-val" style="color:#059669">{{ contact_pct }}%</div>
+    <div class="mc-sub" style="color:#059669">{{ parent_contacted_count }} of {{ total_count }} incidents</div>
+    <div style="height:4px;background:#E5E7EB;border-radius:2px;margin-top:10px;overflow:hidden">
+      <div style="height:100%;width:{{ contact_pct }}%;background:#16A34A;border-radius:2px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Search Filters -->
+<form method="get" class="si-filters">
+  <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px">Filters</div>
+  <div class="si-filters-row">
+    <div class="si-filter-group" style="flex:1;min-width:200px">
+      <label>Search</label>
+      <input type="text" name="q" placeholder="Student name, admission no, or keyword" value="{{ filter_q }}">
+    </div>
+    <div class="si-filter-group">
+      <label>Severity</label>
+      <select name="severity">
+        <option value="">All severities</option>
+        {% for val, label in severity_choices %}
+          <option value="{{ val }}" {% if filter_severity == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="si-filter-group">
+      <label>Concern</label>
+      <select name="concern">
+        <option value="">All concerns</option>
+        {% for val, label in concern_choices %}
+          <option value="{{ val }}" {% if filter_concern == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="si-filter-group">
+      <label>Status</label>
+      <select name="status">
+        <option value="">All statuses</option>
+        {% for val, label in status_choices %}
+          <option value="{{ val }}" {% if filter_status == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="si-filter-group">
+      <label>Class</label>
+      <select name="class_name">
+        <option value="">All classes</option>
+        {% for cls in available_classes %}
+          <option value="{{ cls }}" {% if filter_class == cls %}selected{% endif %}>{{ cls }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="si-filter-group">
+      <label>From</label>
+      <input type="date" name="date_from" value="{{ filter_date_from }}">
+    </div>
+    <div class="si-filter-group">
+      <label>To</label>
+      <input type="date" name="date_to" value="{{ filter_date_to }}">
+    </div>
+    <div style="display:flex;gap:8px;align-self:flex-end">
+      <button type="submit" class="si-btn si-btn-primary">Apply</button>
+      <a href="{% if is_ecd_welfare %}{% url 'welfare:student_incidents_ecd' %}{% else %}{% url 'welfare:student_incidents_primary' %}{% endif %}" class="si-btn si-btn-ghost">Clear</a>
+    </div>
+  </div>
+</form>
+
+<!-- Charts Row 1: Trend + Severity -->
+<div class="si-charts">
+  <div class="si-card">
+    <div class="si-card-header">
+      <span class="si-card-title">Incident Trend</span>
+      <span style="font-size:11px;color:var(--text-muted)">Last 6 months</span>
+    </div>
+    <div class="si-card-body">
+      <canvas id="trendChart" height="200"></canvas>
+    </div>
+  </div>
+  <div class="si-card">
+    <div class="si-card-header">
+      <span class="si-card-title">Severity Breakdown</span>
+    </div>
+    <div class="si-card-body" style="display:flex;align-items:center;justify-content:center">
+      <canvas id="severityChart" height="200"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Charts Row 2: Concern Types + Top Students -->
+<div class="si-charts-row">
+  <div class="si-card">
+    <div class="si-card-header">
+      <span class="si-card-title">Concern Types</span>
+    </div>
+    <div class="si-card-body">
+      <canvas id="concernChart" height="180"></canvas>
+    </div>
+  </div>
+  <div class="si-card">
+    <div class="si-card-header">
+      <span class="si-card-title">Most Incidents</span>
+      <span style="font-size:11px;color:var(--text-muted)">Students with highest frequency</span>
+    </div>
+    <div class="si-card-body">
+      {% if top_students %}
+        <ul class="si-top-students">
+          {% for s in top_students %}
+            <li>
+              <div>
+                <a href="{% url 'students:detail' s.student_pk %}" class="si-student-name" style="text-decoration:none;color:#1E293B;cursor:pointer">{{ s.student__first_name }} {{ s.student__last_name }}</a>
+                <span class="si-student-class">{{ s.student__class_name }}</span>
+              </div>
+              <span class="si-chip si-chip-blue">{{ s.incident_count }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        {% include '_partials/empty_state.html' with icon='users' icon_color='grey' title='No data available' desc='Incident data will appear here.' %}
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Recent Incidents Table -->
+<div class="si-card" style="margin-bottom:24px">
+  <div class="si-card-header">
+    <span class="si-card-title">Recent Incidents</span>
+    <span class="chip chip-blue">{{ total_filtered }} record{{ total_filtered|pluralize }}</span>
+  </div>
+  {% if recent_incidents %}
+  <div style="overflow-x:auto">
+    <table class="si-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Student</th>
+          <th>Class</th>
+          <th>Severity</th>
+          <th>Concern</th>
+          <th>Observation</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inc in recent_incidents %}
+        <tr>
+          <td style="white-space:nowrap">{{ inc.observation_date|date:"d M Y" }}</td>
+          <td style="font-weight:600"><a href="{% url 'students:detail' inc.student.pk %}" style="text-decoration:none;color:var(--hodari-blue)">{{ inc.student.first_name }} {{ inc.student.last_name }}</a></td>
+          <td>{{ inc.student.class_name }}</td>
+          <td>
+            {% if inc.severity == 'critical' %}
+              <span class="si-chip si-chip-red">Critical</span>
+            {% elif inc.severity == 'high' %}
+              <span class="si-chip si-chip-amber">High</span>
+            {% elif inc.severity == 'medium' %}
+              <span class="si-chip si-chip-blue">Medium</span>
+            {% else %}
+              <span class="si-chip si-chip-grey">Low</span>
+            {% endif %}
+          </td>
+          <td>{{ inc.get_concern_type_display }}</td>
+          <td><span class="si-observation-text" title="{{ inc.observation_text }}">{{ inc.observation_text|truncatewords:15 }}</span></td>
+          <td>
+            {% if inc.hod_status == 'resolved' %}
+              <span class="si-chip si-chip-green">Resolved</span>
+            {% elif inc.hod_status == 'in_progress' %}
+              <span class="si-chip si-chip-amber">In progress</span>
+            {% else %}
+              <span class="si-chip si-chip-grey">Pending</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right"><a href="{% url 'welfare:detail' pk=inc.pk %}" class="btn-secondary btn-sm" style="font-size:11px">View</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if total_pages > 1 %}
+  <div class="si-pagination">
+    {% if page > 1 %}
+      <a class="si-page-btn" href="?page={{ page|add:"-1" }}&q={{ filter_q }}&severity={{ filter_severity }}&concern={{ filter_concern }}&status={{ filter_status }}&class_name={{ filter_class }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">Previous</a>
+    {% endif %}
+    {% if show_first_ellipsis %}
+      <a class="si-page-btn" href="?page=1&q={{ filter_q }}&severity={{ filter_severity }}&concern={{ filter_concern }}&status={{ filter_status }}&class_name={{ filter_class }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">1</a>
+      <span style="padding:0 4px;color:var(--text-muted)">...</span>
+    {% endif %}
+    {% for pnum in page_range %}
+      <a class="si-page-btn {% if pnum == page %}active{% endif %}" href="?page={{ pnum }}&q={{ filter_q }}&severity={{ filter_severity }}&concern={{ filter_concern }}&status={{ filter_status }}&class_name={{ filter_class }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">{{ pnum }}</a>
+    {% endfor %}
+    {% if show_last_ellipsis %}
+      <span style="padding:0 4px;color:var(--text-muted)">...</span>
+      <a class="si-page-btn" href="?page={{ total_pages }}&q={{ filter_q }}&severity={{ filter_severity }}&concern={{ filter_concern }}&status={{ filter_status }}&class_name={{ filter_class }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">{{ total_pages }}</a>
+    {% endif %}
+    {% if page < total_pages %}
+      <a class="si-page-btn" href="?page={{ page|add:"1" }}&q={{ filter_q }}&severity={{ filter_severity }}&concern={{ filter_concern }}&status={{ filter_status }}&class_name={{ filter_class }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">Next</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="si-empty">
+    {% include '_partials/empty_state.html' with icon='search' icon_color='grey' title='No incidents match your filters' desc='Try adjusting your search criteria.' %}
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+  var severityData = {{ severity_data|safe }};
+  var concernData = {{ concern_data|safe }};
+  var monthlyTrend = {{ monthly_trend|safe }};
+
+  // --- Monthly Trend Bar Chart ---
+  var trendCtx = document.getElementById('trendChart');
+  if (trendCtx) {
+    new Chart(trendCtx, {
+      type: 'bar',
+      data: {
+        labels: monthlyTrend.map(function(d) { return d.month; }),
+        datasets: [{
+          label: 'Incidents',
+          data: monthlyTrend.map(function(d) { return d.count; }),
+          backgroundColor: '#023AA5',
+          borderRadius: 6,
+          borderSkipped: false,
+          maxBarThickness: 40
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1E293B',
+            titleFont: { size: 12, weight: '600' },
+            bodyFont: { size: 12 },
+            padding: 10,
+            cornerRadius: 8,
+            callbacks: {
+              title: function(items) {
+                var idx = items[0].dataIndex;
+                return monthlyTrend[idx].month_full;
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { stepSize: 1, font: { size: 11 }, color: '#6B7280' },
+            grid: { color: '#F3F4F6' }
+          },
+          x: {
+            ticks: { font: { size: 11 }, color: '#6B7280' },
+            grid: { display: false }
+          }
+        }
+      }
+    });
+  }
+
+  // --- Severity Doughnut ---
+  var sevCtx = document.getElementById('severityChart');
+  if (sevCtx) {
+    var sevLabels = [];
+    var sevValues = [];
+    var sevColors = [];
+    var colorMap = { critical: '#DC2626', high: '#D97706', medium: '#2563EB', low: '#6B7280' };
+    var labelMap = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low' };
+    ['critical', 'high', 'medium', 'low'].forEach(function(k) {
+      if (severityData[k]) {
+        sevLabels.push(labelMap[k] || k);
+        sevValues.push(severityData[k]);
+        sevColors.push(colorMap[k] || '#9CA3AF');
+      }
+    });
+    if (sevValues.length > 0) {
+      new Chart(sevCtx, {
+        type: 'doughnut',
+        data: {
+          labels: sevLabels,
+          datasets: [{
+            data: sevValues,
+            backgroundColor: sevColors,
+            borderWidth: 2,
+            borderColor: '#fff',
+            hoverOffset: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '60%',
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { padding: 12, font: { size: 11 }, usePointStyle: true, pointStyleWidth: 8 }
+            },
+            tooltip: {
+              backgroundColor: '#1E293B',
+              titleFont: { size: 12, weight: '600' },
+              bodyFont: { size: 12 },
+              padding: 10,
+              cornerRadius: 8
+            }
+          }
+        }
+      });
+    }
+  }
+
+  // --- Concern Types Bar ---
+  var concCtx = document.getElementById('concernChart');
+  if (concCtx) {
+    var concLabels = [];
+    var concValues = [];
+    var concColors = [];
+    var concColorArr = ['#023AA5', '#2563EB', '#60A5FA', '#93C5FD', '#BFDBFE', '#DBEAFE'];
+    var concLabelMap = {
+      behavioral: 'Behavioral', health: 'Health', attendance: 'Attendance',
+      academic: 'Academic', home_situation: 'Home situation', other: 'Other'
+    };
+    var sortedKeys = Object.keys(concernData).sort(function(a, b) { return concernData[b] - concernData[a]; });
+    sortedKeys.forEach(function(k, i) {
+      concLabels.push(concLabelMap[k] || k);
+      concValues.push(concernData[k]);
+      concColors.push(concColorArr[i % concColorArr.length]);
+    });
+    if (concValues.length > 0) {
+      new Chart(concCtx, {
+        type: 'bar',
+        data: {
+          labels: concLabels,
+          datasets: [{
+            label: 'Incidents',
+            data: concValues,
+            backgroundColor: concColors,
+            borderRadius: 6,
+            borderSkipped: false,
+            maxBarThickness: 36
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#1E293B',
+              titleFont: { size: 12, weight: '600' },
+              bodyFont: { size: 12 },
+              padding: 10,
+              cornerRadius: 8
+            }
+          },
+          scales: {
+            x: {
+              beginAtZero: true,
+              ticks: { stepSize: 1, font: { size: 11 }, color: '#6B7280' },
+              grid: { color: '#F3F4F6' }
+            },
+            y: {
+              ticks: { font: { size: 12 }, color: '#1E293B' },
+              grid: { display: false }
+            }
+          }
+        }
+      });
+    }
+  }
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% load hodari_forms %}
+{% block title %}Assessment Fee Invoice &mdash; Finance &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Finance{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+<div class="section-hdr">
+  <span class="section-title">Assessment Fee Invoice</span>
+  <a href="{% url 'finance:invoice_list' %}" class="section-link">&larr; Back to invoices</a>
+</div>
+
+{% if existing_invoice %}
+<div class="card" style="max-width:640px;text-align:center;padding:32px">
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--hodari-blue)" stroke-width="1.5" style="margin-bottom:12px">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+  </svg>
+  <h3 style="margin:0 0 8px;font-size:16px">Invoice already exists</h3>
+  <p style="margin:0 0 16px;color:var(--text-muted);font-size:13px">
+    An assessment fee invoice already exists for <strong>{{ applicant.child_full_name }}</strong>.
+  </p>
+  <a href="{% url 'finance:invoice_detail' existing_invoice.pk %}" class="btn btn-primary">
+    View Invoice #{{ existing_invoice.invoice_number }}
+  </a>
+</div>
+{% else %}
+{% has_perm user "finance.add_invoice" as can_create %}
+{% if can_create %}
+<form method="post" style="max-width:640px">
+  {% csrf_token %}
+
+  <div class="card">
+    <div class="card-title">Create Assessment Fee Invoice</div>
+
+    <!-- Applicant Summary -->
+    <div style="background:var(--bg-metric);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:20px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px">
+        <div>
+          <div style="color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em">Applicant</div>
+          <div style="font-weight:600;margin-top:2px">{{ applicant.child_full_name }}</div>
+        </div>
+        <div>
+          <div style="color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em">Grade Applying For</div>
+          <div style="font-weight:600;margin-top:2px">{{ applicant.grade_applying_for }}</div>
+        </div>
+        <div>
+          <div style="color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em">Parent / Guardian</div>
+          <div style="font-weight:600;margin-top:2px">{{ applicant.parent_full_name }}</div>
+        </div>
+        <div>
+          <div style="color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em">Phone</div>
+          <div style="font-weight:600;margin-top:2px">{{ applicant.parent_phone }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hf2-group">
+      <label class="hf2-label">Amount (TZS) <span class="hf2-req">*</span></label>
+      <input type="number" name="amount" step="0.01" min="0.01" required class="hf2-input" value="{{ assessment_fee|floatformat:0 }}" placeholder="e.g. 50000">
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+        Default assessment fee: TZS {{ assessment_fee|floatformat:0 }}. Adjust if needed.
+      </div>
+    </div>
+
+    <div class="hf2-group">
+      <label class="hf2-label">Due date</label>
+      <input type="date" name="due_date" class="hf2-input hf2-date" value="{{ today|date:'Y-m-d' }}">
+    </div>
+
+    <div class="hf2-group">
+      <label class="hf2-label">Description</label>
+      <textarea name="description" rows="2" class="hf2-textarea" placeholder="Assessment fee — {{ applicant.grade_applying_for }}">Assessment fee — {{ applicant.grade_applying_for }}</textarea>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+        This invoice will be linked to the applicant. When paid, the admissions pipeline will update automatically.
+      </div>
+    </div>
+
+    <div class="hf2-actions" style="display:flex;align-items:center;gap:12px">
+      <button type="submit" class="btn btn-primary">Generate Invoice</button>
+      <a href="{% url 'admissions:detail' applicant.pk %}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </div>
+</form>
+{% endif %}
+{% endif %}
+{% endblock %}

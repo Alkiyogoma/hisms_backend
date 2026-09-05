@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}PTC Calendar Configuration{% endblock %}
+
+{% block topbar_greeting %}
+<h1 class="topbar-title">PTC Calendar Configuration</h1>
+{% endblock %}
+
+{% block content %}
+{% has_perm user "ptc.change_ptcwindow" as can_change %}
+{% include "ptc/_top_tabs.html" %}
+<div style="max-width:900px;margin:0 auto">
+
+  <div class="page-hdr">
+    <h2>PTC Calendar Setup</h2>
+    <p>Configure two PTC dates per academic year: Term 1 and Term 3.</p>
+  </div>
+
+  {% if ptc_windows %}
+  <div class="card" style="padding:0;overflow:hidden;margin-bottom:20px">
+    <div style="padding:12px 20px;background:var(--hodari-blue);color:#fff;font-size:14px;font-weight:700">Configured PTC Windows</div>
+    <table class="h-table">
+      <thead>
+        <tr>
+          <th>Academic Year</th>
+          <th>Term</th>
+          <th>PTC Date</th>
+          <th>Comment Window</th>
+          <th style="text-align:center">Status</th>
+          <th style="text-align:center">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for w in ptc_windows %}
+        <tr>
+          <td style="font-weight:600">{{ w.academic_year.name }}</td>
+          <td>{{ w.get_term_slot_display }}</td>
+          <td style="font-weight:700;color:var(--hodari-blue)">{{ w.ptc_date|date:"d M Y" }}</td>
+          <td style="font-size:12px;color:var(--text-secondary)">
+            {{ w.comment_entry_window_opens_at|date:"d M" }} - {{ w.comment_entry_window_closes_at|date:"d M Y" }}
+          </td>
+          <td style="text-align:center">
+            {% if w.is_published %}
+            <span class="chip chip-green">Published</span>
+            {% else %}
+            <span class="chip chip-amber">Draft</span>
+            {% endif %}
+          </td>
+          <td style="text-align:center">
+            {% if can_change %}
+            <button type="button" class="hf-btn" style="padding:4px 10px;font-size:11px;margin-right:4px" onclick="openEditModal('{{ w.id }}', '{{ w.ptc_date|date:'Y-m-d' }}')">Edit Date</button>
+            {% if not w.is_published %}
+            <form method="post" style="display:inline">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="publish">
+              <input type="hidden" name="window_id" value="{{ w.id }}">
+              <button type="submit" class="hf-btn" style="padding:4px 10px;font-size:11px;background:#E8F5EC;color:#1B7B34;border:1px solid #B7DFBF">Publish</button>
+            </form>
+            {% endif %}
+            {% else %}
+            <span style="font-size:11px;color:var(--text-secondary)">Read only</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if can_change %}
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-title-row">
+      <span class="card-title">Create New PTC Window</span>
+    </div>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="create">
+      <div class="grid-3">
+        <div>
+          <label class="hf-label">Academic Year</label>
+          <select name="academic_year_id" required class="hf-select">
+            <option value="">Select Year</option>
+            {% for ay in academic_years %}
+            <option value="{{ ay.id }}">{{ ay.name }}{% if ay.is_current %} (Current){% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="hf-label">Term Slot</label>
+          <select name="term_slot" required class="hf-select">
+            <option value="term_1">Term 1</option>
+            <option value="term_3">Term 3</option>
+          </select>
+        </div>
+        <div>
+          <label class="hf-label">PTC Date</label>
+          <input type="date" name="ptc_date" required class="hf-input">
+        </div>
+      </div>
+      <div style="margin-top:14px;text-align:right">
+        <button type="submit" class="hf-btn hf-btn-primary" style="padding:10px 24px;font-size:14px">Create PTC Window</button>
+      </div>
+    </form>
+  </div>
+  {% else %}
+  <div class="card" style="margin-bottom:20px;padding:20px;color:var(--text-secondary);font-size:13px">
+    You can view PTC windows, but creating or modifying them requires the
+    <code>ptc.change_ptcwindow</code> permission (Super Admin / Admin Officer by default).
+  </div>
+  {% endif %}
+
+</div>
+
+{% if can_change %}
+<div id="editModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;max-width:420px;width:92%;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <h3 style="font-size:16px;font-weight:700;margin-bottom:14px">Edit PTC Date</h3>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="edit_date">
+      <input type="hidden" name="window_id" id="edit_window_id">
+      <div style="margin-bottom:12px">
+        <label class="hf-label">New PTC Date</label>
+        <input type="date" name="new_ptc_date" id="edit_new_date" required class="hf-input">
+      </div>
+      <div style="margin-bottom:14px">
+        <label class="hf-label">Reason for Change</label>
+        <textarea name="reason" rows="2" required class="hf-input" style="resize:vertical" placeholder="Required for audit trail"></textarea>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button type="button" class="hf-btn hf-btn-secondary" onclick="closeEditModal()">Cancel</button>
+        <button type="submit" class="hf-btn hf-btn-primary">Save Change</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function openEditModal(windowId, currentDate) {
+  document.getElementById('edit_window_id').value = windowId;
+  document.getElementById('edit_new_date').value = currentDate;
+  document.getElementById('editModal').style.display = 'flex';
+}
+function closeEditModal() {
+  document.getElementById('editModal').style.display = 'none';
+}
+</script>
+{% endblock %}

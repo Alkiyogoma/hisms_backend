@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+{% block title %}Review Queue — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Lesson Plan Review Queue{% endblock %}
+{% block extra_head %}
+<style>
+  .rq-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:24px }
+  .rq-stat { text-align:center; border-radius:14px; padding:18px 12px; cursor:pointer; transition:all 0.2s; border:2px solid transparent }
+  .rq-stat:hover { transform:translateY(-2px); box-shadow:0 6px 16px rgba(0,0,0,0.06) }
+  .rq-stat.active-stat { border-color:currentColor }
+  .rq-stat .val { font-size:28px; font-weight:800; line-height:1 }
+  .rq-stat .lbl { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-top:4px }
+
+  .rq-filters { display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; align-items:center }
+  .rq-filter { padding:7px 14px; border-radius:8px; font-size:12px; font-weight:600; text-decoration:none; transition:all 0.15s; border:1px solid transparent }
+  .rq-filter.active { background:var(--hodari-blue); color:#fff }
+  .rq-filter:not(.active) { background:#F1F5F9; color:#475569 }
+  .rq-filter:not(.active):hover { background:#E2E8F0 }
+
+  .plan-card { background:#fff; border:1px solid #E2E8F0; border-radius:14px; padding:16px; transition:all 0.2s }
+  .plan-card:hover { border-color:var(--hodari-blue); box-shadow:0 4px 16px rgba(2,58,165,0.07) }
+
+  #plans-list { display:grid; grid-template-columns:1fr 1fr; gap:14px }
+  #plans-list .plan-card { margin-bottom:0 }
+
+  #plans-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px }
+  #plans-grid .plan-card { margin-bottom:0 }
+
+  @media(max-width:1200px){ #plans-grid{grid-template-columns:1fr 1fr} }
+  @media(max-width:900px){ #plans-list{grid-template-columns:1fr} #plans-grid{grid-template-columns:1fr} }
+
+  .status-tag { display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:99px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.02em }
+  .st-submitted { background:#EEF2FF; color:#3730A3 }
+  .st-approved { background:#E8F5EC; color:#1B7B34 }
+  .st-rejected { background:#FEF2F2; color:#9B1C1C }
+  .st-revision-requested { background:#FFFBEB; color:#B45309 }
+  .st-draft { background:#F1F5F9; color:#475569 }
+
+  .att-chip { display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:600; background:#F1F5F9; color:#475569; border:1px solid #E2E8F0; cursor:pointer; transition:all 0.15s }
+  .att-chip:hover { background:#E2E8F0; border-color:#CBD5E1 }
+  .att-chip.has-files { background:#EFF6FF; color:#1E40AF; border-color:#BFDBFE }
+
+  .feedback-input { width:100%; padding:8px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:12px; resize:vertical; min-height:44px; font-family:inherit; transition:border-color 0.15s }
+  .feedback-input:focus { outline:none; border-color:var(--hodari-blue) }
+
+  .action-row { display:flex; gap:6px; margin-top:8px }
+  .action-row button { flex:1; padding:8px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; border:none; transition:all 0.15s; display:inline-flex; align-items:center; justify-content:center; gap:4px }
+  .action-row button:hover { filter:brightness(0.95) }
+
+  .att-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:10000; display:none; align-items:center; justify-content:center; backdrop-filter:blur(2px) }
+  .att-overlay.active { display:flex }
+  .att-panel { background:#fff; border-radius:16px; width:90%; max-width:600px; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.3); overflow:hidden }
+  .att-panel-head { padding:16px 20px; border-bottom:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:center }
+  .att-panel-body { padding:16px 20px; overflow-y:auto; flex:1 }
+  .att-file-row { display:flex; align-items:center; gap:12px; padding:10px 14px; border:1px solid #E2E8F0; border-radius:10px; margin-bottom:8px; transition:all 0.15s }
+  .att-file-row:hover { border-color:var(--hodari-blue); background:#F8FAFC }
+  .att-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; flex-shrink:0 }
+  .att-icon.img { background:#EFF6FF; color:#1E40AF }
+  .att-icon.pdf { background:#FEF2F2; color:#9B1C1C }
+  .att-icon.doc { background:#EFF6FF; color:#1E40AF }
+  .att-icon.xls { background:#F0FDF4; color:#166534 }
+  .att-icon.other { background:#F1F5F9; color:#475569 }
+
+  .fp-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:10001; display:none; flex-direction:column }
+  .fp-overlay.active { display:flex }
+  .fp-bar { padding:10px 20px; display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.6); color:#fff }
+  .fp-body { flex:1; display:flex; align-items:center; justify-content:center; overflow:auto; padding:20px }
+  .fp-body img { max-width:100%; max-height:100%; object-fit:contain; border-radius:8px }
+  .fp-body iframe { width:100%; height:100%; border:none; border-radius:8px; min-height:70vh }
+
+  .pagination { display:flex; justify-content:center; align-items:center; gap:6px; margin-top:24px }
+  .pagination a, .pagination span { padding:7px 12px; border-radius:8px; font-size:12px; font-weight:600; text-decoration:none; transition:all 0.15s }
+  .pagination a { background:#F1F5F9; color:#475569; border:1px solid #E2E8F0 }
+  .pagination a:hover { background:#E2E8F0 }
+  .pagination .active { background:var(--hodari-blue); color:#fff }
+  .pagination .disabled { color:#CBD5E1; pointer-events:none }
+
+  .plan-meta-row { font-size:12px; color:#64748B; font-weight:600; display:flex; gap:6px; align-items:center; flex-wrap:wrap }
+  .plan-content-box { padding:8px 12px; background:#F8FAFC; border-radius:8px; margin-bottom:10px }
+</style>
+{% endblock %}
+{% block content %}
+{% include "academics/_lesson_plan_tabs.html" %}
+
+{% if not term %}
+<div style="text-align:center;padding:60px 20px;background:#fff;border-radius:16px;border:1px solid #E2E8F0">
+  <h3 style="margin:0 0 8px;font-size:16px;color:#1E293B;font-weight:700">No active term</h3>
+  <p style="margin:0;font-size:13px;color:#64748B">Configure an active term to review lesson plans.</p>
+</div>
+{% else %}
+
+<!-- Stats - Gradient Cards -->
+<div class="rq-stats">
+  <a href="?status=submitted" class="rq-stat {% if status_filter == 'submitted' or status_filter == 'all_pending' %}active-stat{% endif %}"
+     style="background:linear-gradient(135deg,#EEF4FF,#fff);text-decoration:none;color:inherit;{% if status_filter == 'submitted' or status_filter == 'all_pending' %}border-color:#2563EB{% endif %}">
+    <div class="val" style="color:#023AA5">{{ stats.submitted|default:"0" }}</div>
+    <div class="lbl" style="color:#023AA5">Pending Review</div>
+  </a>
+  <a href="?status=all_pending" class="rq-stat {% if status_filter == 'all_pending' %}active-stat{% endif %}"
+     style="background:linear-gradient(135deg,#FFF8ED,#fff);text-decoration:none;color:inherit;{% if status_filter == 'all_pending' %}border-color:#B45309{% endif %}">
+    <div class="val" style="color:#B45309">{{ stats.revision|default:"0" }}</div>
+    <div class="lbl" style="color:#B45309">Revision</div>
+  </a>
+  <a href="?status=reviewed" class="rq-stat {% if status_filter == 'reviewed' %}active-stat{% endif %}"
+     style="background:linear-gradient(135deg,#EEF9F0,#fff);text-decoration:none;color:inherit;{% if status_filter == 'reviewed' %}border-color:#059669{% endif %}">
+    <div class="val" style="color:#059669">{{ stats.approved|default:"0" }}</div>
+    <div class="lbl" style="color:#059669">Approved</div>
+  </a>
+  <a href="?status=all" class="rq-stat {% if status_filter == 'all' %}active-stat{% endif %}"
+     style="background:linear-gradient(135deg,#FFF0F0,#fff);text-decoration:none;color:inherit;{% if status_filter == 'all' %}border-color:#DC2626{% endif %}">
+    <div class="val" style="color:#DC2626">{{ stats.rejected|default:"0" }}</div>
+    <div class="lbl" style="color:#DC2626">Rejected</div>
+  </a>
+</div>
+
+<!-- Plans: List View (2-col) -->
+<div id="plans-list">
+  {% for p in plans %}{% include "academics/_lp_review_card.html" %}{% empty %}
+  <div style="grid-column:1/-1;text-align:center;padding:60px 20px;background:#fff;border-radius:16px;border:1px solid #E2E8F0">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5" style="margin-bottom:16px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+    <h3 style="margin:0 0 8px;font-size:16px;color:#1E293B;font-weight:700">All caught up!</h3>
+    <p style="margin:0;font-size:13px;color:#64748B">No lesson plans match the current filter.</p>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Plans: Grid View (3-col) -->
+<div id="plans-grid" style="display:none">
+  {% for p in plans %}{% include "academics/_lp_review_card.html" %}{% empty %}
+  <div style="grid-column:1/-1;text-align:center;padding:60px 20px;background:#fff;border-radius:16px;border:1px solid #E2E8F0">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5" style="margin-bottom:16px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+    <h3 style="margin:0 0 8px;font-size:16px;color:#1E293B;font-weight:700">All caught up!</h3>
+    <p style="margin:0;font-size:13px;color:#64748B">No lesson plans match the current filter.</p>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Pagination -->
+{% if total_pages > 1 %}
+<div class="pagination">
+  {% if has_prev %}
+  <a href="?status={{ status_filter }}&page={{ page|add:'-1' }}">&larr; Prev</a>
+  {% else %}
+  <span class="disabled">&larr; Prev</span>
+  {% endif %}
+  {% for pg in page_numbers %}
+    {% if pg == page %}
+    <span class="active">{{ pg }}</span>
+    {% elif pg == -1 %}
+    <span style="color:#94A3B8;padding:7px 4px">...</span>
+    {% else %}
+    <a href="?status={{ status_filter }}&page={{ pg }}">{{ pg }}</a>
+    {% endif %}
+  {% endfor %}
+  {% if has_next %}
+  <a href="?status={{ status_filter }}&page={{ page|add:'1' }}">Next &rarr;</a>
+  {% else %}
+  <span class="disabled">Next &rarr;</span>
+  {% endif %}
+  <span style="font-size:11px;color:#94A3B8;margin-left:8px">{{ total_count }} total</span>
+</div>
+{% endif %}
+
+<!-- Attachment Modal -->
+<div class="att-overlay" id="attOverlay" onclick="if(event.target===this)closeAttModal()">
+  <div class="att-panel">
+    <div class="att-panel-head">
+      <h3 id="attTitle" style="margin:0;font-size:15px;font-weight:700">Attachments</h3>
+      <button onclick="closeAttModal()" style="background:none;border:none;cursor:pointer;padding:4px">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="att-panel-body" id="attBody"></div>
+  </div>
+</div>
+
+<!-- Full-screen File Preview -->
+<div class="fp-overlay" id="fpOverlay">
+  <div class="fp-bar">
+    <span id="fpTitle" style="font-size:13px;font-weight:600"></span>
+    <div style="display:flex;gap:8px;align-items:center">
+      <a id="fpDownload" href="#" target="_blank" style="padding:5px 12px;font-size:12px;text-decoration:none;color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:6px;display:inline-flex;align-items:center;gap:4px">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download
+      </a>
+      <button onclick="closeFP()" style="background:none;border:none;cursor:pointer;padding:4px;color:#fff">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="fp-body" id="fpBody"></div>
+</div>
+
+<script>
+var attData = {
+  {% for p in plans %}
+  "{{ p.id }}": {
+    "label": "{{ p.class_name|escapejs }} — {{ p.subject_name|escapejs }}",
+    "files": [
+      {% for att in p.attachments.all %}
+        {"url": "{{ att.file.url|escapejs }}", "name": "{{ att.filename|escapejs }}"}{% if not forloop.last %},{% endif %}
+      {% endfor %}
+    ]
+  }{% if not forloop.last %},{% endif %}
+  {% endfor %}
+};
+
+function setView(mode) {
+  document.getElementById('plans-list').style.display = mode === 'list' ? 'grid' : 'none';
+  document.getElementById('plans-grid').style.display = mode === 'grid' ? 'grid' : 'none';
+  var btnList = document.getElementById('btn-list');
+  var btnGrid = document.getElementById('btn-grid');
+  if (mode === 'list') {
+    btnList.style.background = '#fff';
+    btnList.style.color = '#023AA5';
+    btnList.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)';
+    btnGrid.style.background = 'transparent';
+    btnGrid.style.color = '#64748B';
+    btnGrid.style.boxShadow = 'none';
+  } else {
+    btnGrid.style.background = '#fff';
+    btnGrid.style.color = '#023AA5';
+    btnGrid.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)';
+    btnList.style.background = 'transparent';
+    btnList.style.color = '#64748B';
+    btnList.style.boxShadow = 'none';
+  }
+}
+
+function getFileExt(n) { var p=n.split('.'); return p.length>1?p.pop().toLowerCase():''; }
+function getIconInfo(ext) {
+  if(['jpg','jpeg','png','gif','webp','svg'].indexOf(ext)!==-1) return {cls:'img',lbl:'IMG'};
+  if(ext==='pdf') return {cls:'pdf',lbl:'PDF'};
+  if(['doc','docx'].indexOf(ext)!==-1) return {cls:'doc',lbl:'DOC'};
+  if(['xls','xlsx'].indexOf(ext)!==-1) return {cls:'xls',lbl:'XLS'};
+  return {cls:'other',lbl:ext.toUpperCase().slice(0,3)||'FILE'};
+}
+
+function openAttModal(planId) {
+  var data = attData[planId];
+  if (!data || !data.files.length) return;
+  document.getElementById('attTitle').textContent = data.label + ' — Attachments';
+  var body = document.getElementById('attBody');
+  body.innerHTML = '';
+  data.files.forEach(function(f, idx) {
+    var ext = getFileExt(f.name);
+    var info = getIconInfo(ext);
+    var isPreviewable = ['pdf','jpg','jpeg','png','gif','webp','svg'].indexOf(ext) !== -1;
+    var row = document.createElement('div');
+    row.className = 'att-file-row';
+    row.innerHTML = '<div class="att-icon ' + info.cls + '">' + info.lbl + '</div>'
+      + '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:#1E293B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + f.name + '</div></div>'
+      + '<div style="display:flex;gap:6px;flex-shrink:0">'
+      + (isPreviewable ? '<button onclick="previewFile(\'' + f.url.replace(/'/g,"\\'") + '\',\'' + f.name.replace(/'/g,"\\'") + '\',\'' + ext + '\')" style="padding:5px 12px;border-radius:6px;font-size:11px;font-weight:600;background:#EFF6FF;color:#1E40AF;border:1px solid #BFDBFE;cursor:pointer">Preview</button>' : '')
+      + '<a href="' + encodeURI(f.url) + '" download style="padding:5px 12px;border-radius:6px;font-size:11px;font-weight:600;background:#F1F5F9;color:#475569;border:1px solid #E2E8F0;text-decoration:none">Download</a>'
+      + '</div>';
+    body.appendChild(row);
+  });
+  document.getElementById('attOverlay').classList.add('active');
+}
+function closeAttModal() { document.getElementById('attOverlay').classList.remove('active'); }
+
+function previewFile(url, name, ext) {
+  closeAttModal();
+  document.getElementById('fpTitle').textContent = name;
+  document.getElementById('fpDownload').href = encodeURI(url);
+  var body = document.getElementById('fpBody');
+  body.innerHTML = '';
+  if (ext === 'pdf') {
+    body.innerHTML = '<iframe src="' + encodeURI(url) + '"></iframe>';
+  } else if (['jpg','jpeg','png','gif','webp','svg'].indexOf(ext) !== -1) {
+    body.innerHTML = '<img src="' + encodeURI(url) + '" alt="' + name + '">';
+  }
+  document.getElementById('fpOverlay').classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+function closeFP() {
+  document.getElementById('fpOverlay').classList.remove('active');
+  document.getElementById('fpBody').innerHTML = '';
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') { closeFP(); closeAttModal(); } });
+</script>
+{% endif %}
+{% endblock %}

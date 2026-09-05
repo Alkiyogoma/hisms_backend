@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Budgets &mdash; Finance &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Budget Management{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+<div class="section-hdr">
+  <span class="section-title">Budget allocations</span>
+  <div style="display:flex;align-items:center;gap:8px">
+    <a href="{% url 'finance:dashboard' %}" class="btn btn-secondary btn-sm">&larr; Dashboard</a>
+    {% has_perm user "finance.add_budget" as can_add_budget %}
+    {% has_perm user "finance.change_budget" as can_change_budget %}
+    {% if can_add_budget %}
+    <a href="{% url 'finance:budget_create' %}" class="btn btn-primary btn-sm">+ New budget</a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Term selector -->
+<form method="get" class="hf2-toolbar">
+  <span class="hf2-toolbar-label">Term</span>
+  <select name="term" class="hf2-select" onchange="this.form.submit()">
+    <option value="">All terms</option>
+    {% for term in terms %}
+    <option value="{{ term.pk }}" {% if selected_term|stringformat:"s" == term.pk|stringformat:"s" %}selected{% endif %}>
+      {{ term.name }} &middot; {{ term.academic_year.name }}
+    </option>
+    {% endfor %}
+  </select>
+</form>
+
+<!-- Summary metric cards -->
+<div class="metrics" style="grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px">
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Allocated</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#023AA5">{{ total_allocated|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#5A697D">Across {{ budgets|length }} categories</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FFF8ED,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Spent</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#B45309">{{ total_spent|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#B45309">{{ overall_utilization }}% utilized</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF9F0,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Remaining</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#059669">{{ total_remaining|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#059669">Budget buffer</div>
+  </div>
+</div>
+
+<!-- Budget cards grid -->
+{% if budgets %}
+<div class="grid-5-5">
+  {% for budget in budgets %}
+  {% with spent=budget.spent_amount remaining=budget.remaining_amount util=budget.utilization_pct %}
+  <div class="card">
+    <div class="card-title-row">
+      <span class="card-title" style="margin-bottom:0;font-size:14px">{{ budget.get_category_display }}</span>
+      {% if util >= 90 %}<span class="chip chip-red">Critical</span>
+      {% elif util >= 75 %}<span class="chip chip-amber">Warning</span>
+      {% else %}<span class="chip chip-green">On track</span>{% endif %}
+    </div>
+    <div style="margin-top:8px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+        <span style="color:var(--text-muted)">{{ budget.term.name }}</span>
+        <span style="font-weight:600;font-family:var(--font-mono)">{{ util }}% used</span>
+      </div>
+      <div style="height:8px;background:#EDF1F7;border-radius:99px;overflow:hidden">
+        <div style="height:100%;border-radius:99px;width:{{ util }}%;background:{% if util >= 90 %}#DC2626{% elif util >= 75 %}#E0A800{% else %}var(--green){% endif %};transition:width .6s ease"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:6px;font-family:var(--font-mono)">
+        <span style="color:var(--text-secondary)">TZS {{ spent|floatformat:0 }}</span>
+        <span style="color:var(--text-muted)">/ TZS {{ budget.allocated_amount|floatformat:0 }}</span>
+      </div>
+    </div>
+    {% if budget.notes %}
+    <div style="font-size:11.5px;color:var(--text-muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+      {{ budget.notes|truncatechars:80 }}
+    </div>
+    {% endif %}
+    <div style="margin-top:10px;display:flex;gap:6px">
+      {% if can_change_budget and not budget.is_frozen %}
+      <a href="{% url 'finance:budget_edit' budget.pk %}" class="btn btn-secondary btn-sm" style="padding:4px 10px;font-size:11px">Edit</a>
+      {% endif %}
+      {% if remaining > 0 %}
+      <span style="font-size:11px;color:var(--text-muted);align-self:center;margin-left:auto">
+        TZS {{ remaining|floatformat:0 }} remaining
+      </span>
+      {% else %}
+      <span class="chip chip-red" style="margin-left:auto">Exceeded</span>
+      {% endif %}
+    </div>
+  </div>
+  {% endwith %}
+  {% endfor %}
+</div>
+{% else %}
+<div style="text-align:center;padding:48px 24px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px">
+  {% url 'finance:budget_create' as budget_create_url %}
+  {% if can_change_budget %}
+  {% include '_partials/empty_state.html' with title='No budgets configured' desc='Set budget allocations per category to track spending vs plan.' icon='doc' icon_color='blue' action_url=budget_create_url action_text='Create First Budget' action_btn='true' %}
+  {% else %}
+  {% include '_partials/empty_state.html' with title='No budgets configured' desc='Budget allocations will appear here once created.' icon='doc' icon_color='grey' %}
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

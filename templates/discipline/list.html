@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% load static role_tags %}
+
+{% block title %}Discipline Incidents — {{ brand.school_name }}{% endblock %}
+
+{% block topbar_greeting %}Discipline Incidents{% endblock %}
+{% block topbar_date %}{{ today_date }}{% endblock %}
+
+{% block content %}
+{% include "discipline/_top_tabs.html" %}
+<div class="section-hdr">
+  <span class="section-title">Discipline incidents</span>
+  <div style="display:flex;gap:8px">
+    {% has_perm user "discipline.add_disciplineincident" as can_report %}
+    {% if can_report %}
+    <a href="{% url 'discipline:submit' %}" class="hf-btn hf-btn-primary" style="padding:7px 16px;font-size:12.5px;text-decoration:none">+ Report Incident</a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Stats Overview -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px">
+  {% include '_partials/stat_card.html' with label='Pending Review' value=stats.pending sub='Awaiting HOD action' variant='red' link='?status=pending_review' %}
+  {% include '_partials/stat_card.html' with label='Resolved' value=stats.resolved sub='Closed incidents' variant='green' link='?status=resolved' %}
+  {% include '_partials/stat_card.html' with label='Total Reported' value=stats.total sub='All time' variant='blue' link='?' %}
+</div>
+
+<!-- Filters -->
+<form method="get" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
+  <select name="status" class="form-select" style="width:auto;min-width:140px">
+    <option value="">All statuses</option>
+    {% for val, lbl in status_choices %}
+      <option value="{{ val }}" {% if current_filters.status == val %}selected{% endif %}>{{ lbl }}</option>
+    {% endfor %}
+  </select>
+  <select name="severity" class="form-select" style="width:auto;min-width:120px">
+    <option value="">All severities</option>
+    {% for val, lbl in severity_choices %}
+      <option value="{{ val }}" {% if current_filters.severity == val %}selected{% endif %}>{{ lbl }}</option>
+    {% endfor %}
+  </select>
+  <select name="class_name" class="form-select" style="width:auto;min-width:120px">
+    <option value="">All classes</option>
+    {% for c in available_classes %}
+      <option value="{{ c }}" {% if current_filters.class_name == c %}selected{% endif %}>{{ c }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="hf-btn hf-btn-secondary" style="padding:6px 14px;font-size:12px">Filter</button>
+  {% if current_filters %}
+    <a href="{% url 'discipline:list' %}" class="section-link" style="font-size:12px">Clear filters</a>
+  {% endif %}
+</form>
+
+<!-- Incidents List -->
+<div class="card">
+  {% for inc in incidents %}
+    <a href="{% url 'discipline:detail' inc.pk %}" class="trow" style="text-decoration:none;color:inherit;display:flex;align-items:center">
+      <div style="flex:1;min-width:0">
+        <div class="trow-name">
+          {{ inc.student.first_name }} {{ inc.student.last_name }}
+          <span style="font-weight:400;color:#64748B">&middot; {{ inc.student.class_name }}</span>
+        </div>
+        <div class="trow-sub">
+          {{ inc.summary|truncatechars:100 }}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <span class="chip {% if inc.severity == 'critical' or inc.severity == 'high' %}chip-red{% elif inc.severity == 'medium' %}chip-amber{% else %}chip-blue{% endif %}" style="font-size:10px">
+          {{ inc.get_severity_display }}
+        </span>
+        <span class="chip {% if inc.status == 'pending_review' %}chip-amber{% elif inc.status == 'resolved' %}chip-green{% elif inc.status == 'dismissed' %}chip-grey{% else %}chip-blue{% endif %}" style="font-size:10px">
+          {{ inc.get_status_display }}
+        </span>
+        <span style="font-size:11px;color:#94A3B8;white-space:nowrap">{{ inc.created_at|date:"d M" }}</span>
+      </div>
+    </a>
+  {% empty %}
+    {% include '_partials/empty_state.html' with icon='alert' icon_color='blue' title='No behaviour incidents yet' desc='Record an incident to get started.' action_url='/behaviour/submit/' action_text='+ Record Incident' %}
+  {% endfor %}
+</div>
+
+<!-- Pagination -->
+{% if page_obj.has_other_pages %}
+<div style="display:flex;justify-content:center;gap:10px;margin-top:20px">
+  {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}" class="hf-btn hf-btn-secondary" style="padding:6px 14px;font-size:12px;text-decoration:none">← Previous</a>
+  {% endif %}
+  <span style="font-size:12px;color:#64748B;padding:6px 0">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+  {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}" class="hf-btn hf-btn-secondary" style="padding:6px 14px;font-size:12px;text-decoration:none">Next →</a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

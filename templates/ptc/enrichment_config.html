@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}PTC - Enrichment Configuration{% endblock %}
+
+{% block topbar_greeting %}
+<h1 class="topbar-title">Enrichment Subject Configuration</h1>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+  .ec-row { display:flex; align-items:center; padding:14px 20px; border-bottom:1px solid #F0F4FB; transition:background .1s; }
+  .ec-row:hover { background:#F7F9FC; }
+  .ec-row:last-child { border-bottom:none; }
+  .ec-name { font-weight:700; color:var(--hodari-blue); min-width:160px; }
+  .ec-teacher, .ec-class { flex:1; font-size:13px; color:var(--text-primary); }
+  .ec-teacher.muted, .ec-class.muted { color:var(--text-muted); font-style:italic; }
+  .ec-weight { width:80px; text-align:center; font-weight:700; font-size:13px; }
+  .ec-status { width:90px; text-align:center; }
+  .ec-actions { display:flex; gap:6px; justify-content:flex-end; min-width:170px; }
+  .ec-empty { padding:32px; text-align:center; color:var(--text-muted); font-size:13px; }
+  .ec-form-row { display:grid; grid-template-columns:1fr 1fr 1fr 140px auto; gap:14px; align-items:end; }
+  @media (max-width:900px) { .ec-form-row { grid-template-columns:1fr 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+{% has_perm user "ptc.manage_enrichment_config" as can_manage %}
+{% include "ptc/_top_tabs.html" %}
+<div style="max-width:1100px;margin:0 auto">
+
+  <div class="page-hdr">
+    <h2>Enrichment Subject Setup</h2>
+    <p>Configure enrichment subjects, assign specialist teachers, classes, and exam weightings.</p>
+  </div>
+
+  <div class="card" style="padding:0;overflow:hidden;margin-bottom:20px">
+    <div style="padding:12px 20px;background:var(--hodari-blue);color:#fff;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:space-between">
+      <span>Configured Enrichment Subjects</span>
+      <span style="font-size:11px;opacity:.8">{{ subjects|length }} subject{{ subjects|length|pluralize }}</span>
+    </div>
+
+    <div style="padding:0 20px;background:#F7F9FC;border-bottom:1px solid #E8ECF2">
+      <div style="display:flex;align-items:center;padding:8px 0;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">
+        <span style="min-width:160px">Subject</span>
+        <span style="flex:1">Assigned Teacher</span>
+        <span style="flex:1">Assigned Class</span>
+        <span style="width:80px;text-align:center">Weight</span>
+        <span style="width:90px;text-align:center">Status</span>
+        {% if can_manage %}
+        <span style="min-width:170px;text-align:right">Actions</span>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if subjects %}
+    {% for s in subjects %}
+    <div class="ec-row">
+      <span class="ec-name">{{ s.subject.name }}</span>
+      <span class="ec-teacher {% if not s.assigned_teacher %}muted{% endif %}">
+        {% if s.assigned_teacher %}{{ s.assigned_teacher.get_full_name }}{% else %}Unassigned{% endif %}
+      </span>
+      <span class="ec-class {% if not s.assigned_class %}muted{% endif %}">
+        {% if s.assigned_class %}{{ s.assigned_class.name }}{% else %}All classes{% endif %}
+      </span>
+      <span class="ec-weight" style="{% if s.weight_percentage > 0 %}color:var(--hodari-blue){% else %}color:var(--text-muted){% endif %}">
+        {% if s.weight_percentage > 0 %}{{ s.weight_percentage }}%{% else %}&mdash;{% endif %}
+      </span>
+      <span class="ec-status">
+        {% if s.is_active %}
+          <span class="chip chip-green">Active</span>
+        {% else %}
+          <span class="chip chip-amber">Inactive</span>
+        {% endif %}
+      </span>
+      {% if can_manage %}
+      <span class="ec-actions">
+        <button type="button" class="hf-btn" style="padding:4px 12px;font-size:11px"
+                onclick="openEditModal('{{ s.id }}', '{{ s.subject.name }}', '{{ s.assigned_teacher_id|default:"" }}', '{{ s.assigned_class_id|default:"" }}', '{{ s.weight_percentage }}', '{{ s.is_active }}')">Edit</button>
+        <form method="post" style="display:inline">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="toggle_active">
+          <input type="hidden" name="subject_id" value="{{ s.id }}">
+          <button type="submit" class="hf-btn" style="padding:4px 12px;font-size:11px;{% if s.is_active %}background:#FEF2F2;color:#9B1C1C;border:1px solid #FECACA{% else %}background:#E8F5EC;color:#1B7B34;border:1px solid #B7DFBF{% endif %}">
+            {% if s.is_active %}Deactivate{% else %}Activate{% endif %}
+          </button>
+        </form>
+      </span>
+      {% endif %}
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="ec-empty">No enrichment subjects configured yet. Add one below.</div>
+    {% endif %}
+  </div>
+
+  {% if can_manage %}
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-title-row">
+      <span class="card-title">Add New Enrichment Subject</span>
+    </div>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="create">
+      <div class="ec-form-row">
+        <div>
+          <label class="hf-label">Subject</label>
+          {{ form.subject }}
+        </div>
+        <div>
+          <label class="hf-label">Assigned Teacher</label>
+          {{ form.assigned_teacher }}
+        </div>
+        <div>
+          <label class="hf-label">Assigned Class</label>
+          {{ form.assigned_class }}
+        </div>
+        <div>
+          <label class="hf-label">Weight (%)</label>
+          {{ form.weight_percentage }}
+        </div>
+        <div style="padding-bottom:4px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;padding-top:22px">
+            {{ form.is_active }}
+            <span>Active</span>
+          </label>
+        </div>
+      </div>
+      <div style="margin-top:14px;text-align:right">
+        <button type="submit" class="hf-btn hf-btn-primary" style="padding:10px 24px;font-size:14px">Add Subject</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+</div>
+
+{% if can_manage %}
+<div id="editModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;max-width:520px;width:92%;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
+      <div style="width:36px;height:36px;border-radius:10px;background:var(--hodari-blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700">E</div>
+      <div>
+        <h3 style="font-size:16px;font-weight:700;margin:0" id="editModalTitle">Edit Subject</h3>
+        <span style="font-size:12px;color:var(--text-muted)" id="editModalSub"></span>
+      </div>
+    </div>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="update">
+      <input type="hidden" name="subject_id" id="edit_subject_id">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div>
+          <label class="hf-label">Assigned Teacher</label>
+          <select name="assigned_teacher" id="edit_teacher" class="hf-select">
+            <option value="">Unassigned</option>
+            {% for t in teachers %}
+            <option value="{{ t.pk }}">{{ t.get_full_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="hf-label">Assigned Class</label>
+          <select name="assigned_class" id="edit_class" class="hf-select">
+            <option value="">All classes</option>
+            {% for c in classes %}
+            <option value="{{ c.pk }}">{{ c.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="hf-label">Weight (%)</label>
+          <input type="number" name="weight_percentage" id="edit_weight" class="hf-input" min="0" max="100" step="0.01" value="0">
+          <span style="font-size:11px;color:var(--text-muted);margin-top:3px;display:block">0 = letter grade only</span>
+        </div>
+        <div style="padding-top:22px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600">
+            <input type="checkbox" name="is_active" id="edit_active" value="true" checked style="width:16px;height:16px;accent-color:var(--hodari-blue)">
+            <span>Active</span>
+          </label>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid #F0F4FB">
+        <button type="button" class="hf-btn hf-btn-secondary" onclick="closeEditModal()" style="padding:8px 18px">Cancel</button>
+        <button type="submit" class="hf-btn hf-btn-primary" style="padding:8px 20px">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function openEditModal(id, name, teacherId, classId, weight, isActive) {
+  document.getElementById('edit_subject_id').value = id;
+  document.getElementById('edit_teacher').value = teacherId;
+  document.getElementById('edit_class').value = classId;
+  document.getElementById('edit_weight').value = weight || '0';
+  document.getElementById('edit_active').checked = isActive === 'True';
+  document.getElementById('editModalTitle').textContent = 'Edit ' + name;
+  document.getElementById('editModalSub').textContent = 'Update teacher, class, weight, or status';
+  document.getElementById('editModal').style.display = 'flex';
+}
+function closeEditModal() {
+  document.getElementById('editModal').style.display = 'none';
+}
+</script>
+{% endblock %}

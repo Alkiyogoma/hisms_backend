@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Classes &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Academic{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start">
+  <div class="card">
+    <div class="card-title-row">
+      <div class="card-title" style="margin:0">Grade Classes</div>
+      <span style="font-size:12px;color:var(--text-muted)">{{ classes|length }} class{{ classes|length|pluralize }}</span>
+    </div>
+    <div style="border-top:1px solid var(--border);margin-top:12px">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="border-bottom:1px solid #F3F4F6">
+            <th style="padding:10px 8px;font-size:11px;color:var(--text-muted);font-weight:600;text-align:left;text-transform:uppercase">Class Name</th>
+            <th style="padding:10px 8px;font-size:11px;color:var(--text-muted);font-weight:600;text-align:left;text-transform:uppercase">Department</th>
+            <th style="padding:10px 8px;font-size:11px;color:var(--text-muted);font-weight:600;text-align:center;text-transform:uppercase">Order</th>
+            <th style="padding:10px 8px;font-size:11px;color:var(--text-muted);font-weight:600;text-align:center;text-transform:uppercase">Capacity</th>
+            <th style="padding:10px 8px;font-size:11px;color:var(--text-muted);font-weight:600;text-align:center;text-transform:uppercase">Exit Grade</th>
+            <th style="padding:10px 8px;font-size:11px;color:var(--text-muted);font-weight:600;text-align:right;text-transform:uppercase">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for gc in classes %}
+          <tr style="border-bottom:1px solid #F3F4F6;font-size:13px">
+            <td style="padding:10px 8px;font-weight:600">{{ gc.name }}</td>
+            <td style="padding:10px 8px"><span class="chip {% if gc.department == 'ECD' %}chip-amber{% elif gc.department == 'PRIMARY' %}chip-blue{% else %}chip-grey{% endif %}">{{ gc.get_department_display }}</span></td>
+            <td style="padding:10px 8px;text-align:center;color:var(--text-muted)">{{ gc.sort_order }}</td>
+            <td style="padding:10px 8px;text-align:center;color:var(--text-muted)">{{ gc.max_capacity }}</td>
+            <td style="padding:10px 8px;text-align:center">{% if gc.is_exit_grade %}<span class="chip chip-red">Exit</span>{% else %}<span style="color:var(--text-muted)">&mdash;</span>{% endif %}</td>
+            <td style="padding:10px 8px;text-align:right;white-space:nowrap">
+              {% has_perm request.user "academics.change_gradeclass" as can_edit_class %}
+              {% has_perm request.user "academics.delete_gradeclass" as can_delete_class %}
+              {% if can_edit_class %}<a href="{% url 'academics:class_edit' gc.pk %}" class="hf-btn hf-btn-secondary hf-btn-sm">Edit</a>{% endif %}
+              {% if can_delete_class %}<button type="button" class="hf-btn hf-btn-danger hf-btn-sm" onclick="confirmDeleteModal({title:'Delete Class?',body:'Are you sure you want to delete <strong>{{ gc.name }}</strong>?',detail:'This grade class will be permanently removed. This action cannot be undone.',confirmText:'Delete Class',url:'{% url 'academics:class_delete' gc.pk %}'})">Delete</button>{% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6">{% include '_partials/empty_state.html' with title='No classes yet' desc='Add the first class using the form below.' icon='doc' icon_color='blue' %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% has_perm request.user "academics.add_gradeclass" as can_add_class %}
+  {% if can_add_class or edit_class %}
+  <div class="card">
+    <div class="card-title" style="margin-bottom:16px">{% if edit_class %}Edit Class{% else %}Add New Class{% endif %}</div>
+    <form method="post" action="{% if edit_class %}{% url 'academics:class_edit' edit_class.pk %}{% else %}{% url 'academics:class_management' %}{% endif %}">
+      {% csrf_token %}
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div><label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Class Name *</label><input type="text" name="name" value="{{ edit_class.name|default:'' }}" required class="hf-input" placeholder="e.g. Grade 10, Form 2, Grade 1"></div>
+        <div><label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Department *</label>
+          <select name="department" class="hf-select" required><option value="">Select Department</option>{% for value, label in departments %}<option value="{{ value }}" {% if edit_class and edit_class.department == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+        <div><label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Max Capacity</label><input type="number" name="max_capacity" value="{{ edit_class.max_capacity|default:'25' }}" min="1" class="hf-input" placeholder="e.g. 30"></div>
+        <div><label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Promotion Order</label><input type="number" name="sort_order" value="{{ edit_class.sort_order|default:'' }}" min="0" class="hf-input" placeholder="Auto: next after last class"></div>
+        <div><label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary);cursor:pointer"><input type="checkbox" name="is_exit_grade" value="on" {% if edit_class.is_exit_grade %}checked{% endif %} style="width:16px;height:16px;accent-color:var(--hodari-blue)"> Exit grade (graduating class, students cannot be promoted past it)</label></div>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <button type="submit" class="hf-btn hf-btn-primary hf-btn-full">{% if edit_class %}Save Changes{% else %}Add Class{% endif %}</button>
+          {% if edit_class %}<a href="{% url 'academics:class_management' %}" class="hf-btn hf-btn-secondary hf-btn-full">Cancel</a>{% endif %}
+        </div>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+{% endblock %}

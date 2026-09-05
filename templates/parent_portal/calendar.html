@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% load static hodari_forms %}
+
+{% block title %}Parent Portal - Calendar{% endblock %}
+
+{% block content %}
+<div class="page-hdr">
+  <h1>Calendar</h1>
+  <p>School events and important dates</p>
+</div>
+
+<!-- Month Navigation -->
+<div class="cal-nav">
+  <a href="?year={{ prev_year }}&month={{ prev_month }}" class="cal-nav-btn">&larr;</a>
+  <span class="cal-nav-title">{{ month_name }} {{ year }}</span>
+  <a href="?year={{ next_year }}&month={{ next_month }}" class="cal-nav-btn">&rarr;</a>
+</div>
+
+<!-- Calendar Grid -->
+<div class="card" style="padding:0;overflow:hidden">
+  <div class="cal-grid">
+    <div class="cal-header">Mon</div>
+    <div class="cal-header">Tue</div>
+    <div class="cal-header">Wed</div>
+    <div class="cal-header">Thu</div>
+    <div class="cal-header">Fri</div>
+    <div class="cal-header">Sat</div>
+    <div class="cal-header">Sun</div>
+
+    {% for week in month_days %}
+      {% for day in week %}
+        <div class="cal-cell {% if day == today.day and month == today.month and year == today.year %}cal-today{% endif %} {% if day == 0 %}cal-empty{% endif %}">
+          {% if day != 0 %}
+            <span class="cal-day-num">{{ day }}</span>
+            {% if day in events_by_day %}
+              {% for ev in events_by_day|get_item:day %}
+                <div class="cal-event cal-{{ ev.category }}">
+                  <span class="cal-event-dot"></span>
+                  <span class="cal-event-text">{{ ev.title|truncatechars:18 }}</span>
+                </div>
+              {% endfor %}
+            {% endif %}
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Event Legend -->
+<div style="display:flex;gap:12px;flex-wrap:wrap;margin:12px 0;font-size:11px;color:var(--text-muted)">
+  <span><span class="cal-event-dot" style="background:#023AA5;display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>Academic</span>
+  <span><span class="cal-event-dot" style="background:#16a34a;display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>Social</span>
+  <span><span class="cal-event-dot" style="background:#dc2626;display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>Holiday</span>
+  <span><span class="cal-event-dot" style="background:#9333ea;display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>Other</span>
+</div>
+
+<!-- Upcoming Events -->
+{% if upcoming %}
+<div class="card" style="margin-top:14px">
+  <div class="card-title">Upcoming Events</div>
+  {% for ev in upcoming %}
+  <div class="trow" style="padding:8px 0">
+    <div style="flex:1;min-width:0">
+      <div class="trow-name" style="font-size:13px">{{ ev.title }}</div>
+      <div class="trow-sub">
+        {{ ev.start_date|date:"D, d M Y" }}
+        {% if ev.end_date %} &ndash; {{ ev.end_date|date:"d M Y" }}{% endif %}
+        {% if ev.description %} &middot; {{ ev.description|truncatechars:60 }}{% endif %}
+      </div>
+    </div>
+    <div class="trow-right">
+      <span class="chip chip-{% if ev.category == 'academic' %}blue{% elif ev.category == 'social' %}green{% elif ev.category == 'holiday' %}red{% else %}grey{% endif %}">
+        {{ ev.get_category_display }}
+      </span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- All Events This Month -->
+{% if events %}
+<div class="card" style="margin-top:14px">
+  <div class="card-title">All Events in {{ month_name }}</div>
+  {% for ev in events %}
+  <div class="trow" style="padding:8px 0">
+    <div style="flex:1;min-width:0">
+      <div class="trow-name" style="font-size:13px">{{ ev.title }}</div>
+      <div class="trow-sub">
+        {{ ev.start_date|date:"D, d M" }}
+        {% if ev.end_date %} &ndash; {{ ev.end_date|date:"d M" }}{% endif %}
+      </div>
+    </div>
+    <div class="trow-right">
+      <span class="chip chip-{% if ev.category == 'academic' %}blue{% elif ev.category == 'social' %}green{% elif ev.category == 'holiday' %}red{% else %}grey{% endif %}">
+        {{ ev.get_category_display }}
+      </span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<style>
+  .cal-nav {
+    display: flex; align-items: center; justify-content: center; gap: 16px;
+    margin-bottom: 14px;
+  }
+  .cal-nav-btn {
+    width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border);
+    background: #fff; color: var(--text-primary); font-size: 16px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; text-decoration: none;
+  }
+  .cal-nav-btn:active { background: var(--hodari-blue-pale); }
+  .cal-nav-title { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+  .cal-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    border-top: 1px solid var(--border); border-left: 1px solid var(--border);
+  }
+  .cal-header {
+    padding: 6px 2px; text-align: center; font-size: 9px; font-weight: 700;
+    text-transform: uppercase; color: var(--text-muted);
+    background: #F7F9FC; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  }
+  .cal-cell {
+    min-height: 48px; padding: 2px; border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border); font-size: 10px; vertical-align: top;
+  }
+  .cal-empty { background: #FAFBFD; }
+  .cal-today { background: #EBF5FF; }
+  .cal-day-num { font-weight: 600; color: var(--text-primary); font-size: 10px; }
+  .cal-today .cal-day-num {
+    background: var(--hodari-blue); color: #fff; border-radius: 50%;
+    width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px;
+  }
+  .cal-event {
+    display: flex; align-items: center; gap: 3px; margin-top: 2px;
+    padding: 1px 4px; border-radius: 3px; background: #F0F4FB;
+  }
+  .cal-event-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+  .cal-event-text { font-size: 8px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cal-academic .cal-event-dot { background: #023AA5; }
+  .cal-social .cal-event-dot { background: #16a34a; }
+  .cal-holiday .cal-event-dot { background: #dc2626; }
+  .cal-other .cal-event-dot { background: #9333ea; }
+
+  @media(min-width: 541px) {
+    .cal-header { font-size: 10px; padding: 8px 4px; }
+    .cal-cell { min-height: 60px; padding: 4px; }
+    .cal-day-num { font-size: 12px; }
+    .cal-event-text { font-size: 9px; }
+    .cal-today .cal-day-num { width: 20px; height: 20px; font-size: 11px; }
+  }
+</style>
+{% endblock %}

@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}PAYE Tax Bands — {{ brand.school_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  :root {
+    --hodari-blue: #023AA5; --hodari-blue-dark: #012880; --hodari-blue-mid: #1A56C4;
+    --hodari-blue-light: #E8EEF9; --hodari-blue-pale: #F0F4FB;
+    --hodari-gold: #FBBC05; --hodari-gold-light: #FEF3C7;
+    --bg-page: #F2F5FA; --bg-card: #FFFFFF;
+    --text-primary: #1A1A2E; --text-secondary: #474747; --text-muted: #8492A6;
+    --border: #DDE3EE; --border-strong: #B8C4D8;
+    --green: #1B7B34; --green-bg: #E8F5EC; --green-bd: #B7DFBF;
+    --amber: #92550A; --amber-bg: #FEF3C7; --amber-bd: #FCD34D;
+    --red: #9B1C1C; --red-bg: #FEF2F2; --red-bd: #FECACA;
+    --blue-st: #023AA5; --blue-st-bg: #E8EEF9; --blue-st-bd: #93C5FD;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Roboto', sans-serif; background: var(--bg-page); color: var(--text-primary); }
+  .tax-page { padding: 24px 28px; max-width: 1000px; margin: 0 auto; }
+  .section-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); font-weight: 500; margin-bottom: 12px; }
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 24px; }
+  .badge-pill { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 11px; font-weight: 500; }
+  .badge-pill.green { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-bd); }
+  .badge-pill.amber { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-bd); }
+  .badge-pill.blue { background: var(--blue-st-bg); color: var(--blue-st); border: 1px solid var(--blue-st-bd); }
+  .badge-pill.muted { background: var(--bg-page); color: var(--text-muted); border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { background: var(--bg-page); font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; padding: 10px; text-align: left; border-bottom: 1px solid var(--border); }
+  tbody td { padding: 10px; font-size: 13px; border-bottom: 1px solid var(--border); }
+  tbody tr:hover { background: var(--hodari-blue-pale); }
+  .hf2-input { width: 100%; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 13px; }
+  .hf2-input:focus { outline: none; border-color: var(--hodari-blue); box-shadow: 0 0 0 3px rgba(2,58,165,0.1); }
+  .hf2-select { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
+  .btn-primary { background: var(--hodari-blue); color: #fff; border: none; padding: 8px 18px; border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: none; }
+  .btn-primary:hover { background: var(--hodari-blue-dark); }
+  .btn-secondary { background: #fff; color: var(--hodari-blue); border: 1px solid var(--border-strong); padding: 8px 18px; border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: none; }
+  .btn-secondary:hover { border-color: var(--hodari-blue); }
+  .btn-danger { background: var(--red); color: #fff; border: none; padding: 5px 12px; border-radius: 6px; font-size: 11px; cursor: pointer; }
+  .btn-sm { padding: 5px 12px; font-size: 12px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr auto; gap: 8px; align-items: end; }
+  .info-note { background: var(--hodari-blue-light); border: 1px solid var(--blue-st-bd); border-radius: 8px; padding: 12px 16px; font-size: 13px; color: var(--hodari-blue); margin-bottom: 20px; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "hr/_top_tabs.html" %}
+<div class="tax-page">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+    <div>
+      <h1 style="font-family:'Merriweather',serif;font-size:22px;font-weight:700;color:var(--text-primary);margin-bottom:4px;">PAYE Tax Bands</h1>
+      <p style="font-size:13px;color:var(--text-muted);">
+        Active version: <strong>{{ active_version }}</strong>
+        · <a href="{% url 'hr:payroll_config' %}" style="color:var(--hodari-blue);">Payroll Settings</a>
+      </p>
+    </div>
+    <a href="{% url 'hr:payroll_list' %}" class="btn-secondary btn-sm">← Back to Payroll</a>
+  </div>
+
+  <div class="info-note">
+    <strong> Configurable PAYE Bands</strong><br>
+    Tax bands are stored in the database so they can be updated without a code release when the Finance Act changes.
+    Previous versions are retained for historical payroll recalculation. Only active bands are used for current payroll runs.
+  </div>
+
+  <!-- Add New Band Form -->
+  {% if perms.hr.add_payetaxband %}
+  <div class="card">
+    <div class="section-label">Add New Tax Band</div>
+    <form method="POST" action="{% url 'hr:paye_tax_band_create' %}">
+      {% csrf_token %}
+      <div class="form-row">
+        <div>
+          <label style="font-size:11px;color:var(--text-muted);margin-bottom:4px;display:block;">Band From (TZS)</label>
+          <input type="number" name="band_from" class="hf2-input" placeholder="e.g. 270001" required>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text-muted);margin-bottom:4px;display:block;">Band To (TZS)</label>
+          <input type="number" name="band_to" class="hf2-input" placeholder="e.g. 520000 (blank = ∞)">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text-muted);margin-bottom:4px;display:block;">Base Tax (TZS)</label>
+          <input type="number" name="base_tax" class="hf2-input" placeholder="e.g. 0" value="0" step="0.01">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text-muted);margin-bottom:4px;display:block;">Rate (%)</label>
+          <input type="number" name="rate_percentage" class="hf2-input" placeholder="e.g. 8" step="0.01" required>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text-muted);margin-bottom:4px;display:block;">Version</label>
+          <input type="text" name="version" class="hf2-input" value="2024/2025" style="width:100px;">
+        </div>
+        <div>
+          <button type="submit" class="btn-primary btn-sm">+ Add Band</button>
+        </div>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- Tax Bands Table -->
+  <div class="card">
+    <div class="section-label">Current Tax Bands</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Version</th>
+          <th>From (TZS)</th>
+          <th>To (TZS)</th>
+          <th>Base Tax</th>
+          <th>Rate</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for band in bands %}
+        <tr>
+          <td><strong>{{ band.version }}</strong></td>
+          <td style="font-family:'Roboto Mono',monospace;">TZS {{ band.band_from|floatformat:0|intcomma }}</td>
+          <td style="font-family:'Roboto Mono',monospace;">{% if band.band_to %}TZS {{ band.band_to|floatformat:0|intcomma }}{% else %}∞{% endif %}</td>
+          <td style="font-family:'Roboto Mono',monospace;">TZS {{ band.base_tax|floatformat:0|intcomma }}</td>
+          <td style="font-family:'Roboto Mono',monospace;font-weight:500;">{{ band.rate_percentage|floatformat:1 }}%</td>
+          <td>
+            {% if band.is_active %}
+            <span class="badge-pill green">Active</span>
+            {% else %}
+            <span class="badge-pill muted">Inactive</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if band.is_active and perms.hr.change_payetaxband %}
+            <button type="button" class="btn-danger btn-sm" onclick="confirmDeleteModal({title:'Deactivate Band?',body:'Are you sure you want to deactivate this PAYE tax band?',detail:'The band will no longer be used for current payroll runs.',confirmText:'Deactivate',url:'{% url 'hr:paye_tax_band_delete' band.pk %}',type:'warning'})">Deactivate</button>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7">{% include '_partials/empty_state.html' with title='No PAYE tax bands configured' desc='Add the first band using the form above.' icon='doc' icon_color='grey' %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

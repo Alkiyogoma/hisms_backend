@@ -1,0 +1,17 @@
+<div class="sub-nav">
+  {% if perms.academics.view_reportcard %}
+  <a href="{% url 'academics:ecd_assessment' %}" class="sub-tab {% if academics_tab == 'ecd_evaluations' %}active{% endif %}">ECD Evaluation</a>
+  {% endif %}
+  {% if perms.academics.change_examscore %}
+  <a href="{% url 'academics:primary_assessment' %}" class="sub-tab {% if academics_tab == 'primary_assessment' %}active{% endif %}">Primary Assessment</a>
+  {% endif %}
+  {% if perms.academics.change_examscore %}
+  <a href="{% url 'academics:lower_secondary_assessment' %}" class="sub-tab {% if academics_tab == 'lower_secondary_assessment' %}active{% endif %}">Lower Secondary Assessment</a>
+  {% endif %}
+  {% if perms.academics.view_examscore %}
+  <a href="{% url 'academics:exam_score_approval_queue' %}" class="sub-tab {% if academics_tab == 'approval_queue' %}active{% endif %}">Grade Approval</a>
+  {% endif %}
+  {% if perms.academics.change_examscore %}
+  <a href="{% url 'academics:cambridge_checkpoint_entry' %}" class="sub-tab {% if academics_tab == 'cambridge' %}active{% endif %}">Checkpoint</a>
+  {% endif %}
+</div>

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Unmatched Payments &mdash; Finance{% endblock %}
+{% block topbar_greeting %}Unmatched Payments{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+<div class="section-hdr">
+  <span class="section-title">Unmatched Payments Queue</span>
+  <a href="{% url 'finance:dashboard' %}" class="btn btn-secondary btn-sm">&larr; Dashboard</a>
+</div>
+
+<div class="card" style="padding:0;overflow:hidden">
+  <div style="padding:14px 16px;border-bottom:1px solid var(--border)">
+    <div class="card-title" style="margin:0">Pending Resolutions</div>
+  </div>
+  {% if unmatched_payments %}
+  <table style="width:100%;border-collapse:collapse">
+    <thead>
+      <tr style="text-align:left;background:var(--bg-metric);border-bottom:1px solid var(--border)">
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Date</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Reference</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Method</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Amount</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Details</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in unmatched_payments %}
+      <tr style="border-bottom:1px solid var(--border);font-size:13px;transition:background .1s" onmouseover="this.style.background='var(--bg-metric)'" onmouseout="this.style.background=''">
+        <td style="padding:10px 14px;color:var(--text-muted);font-size:12px">{{ p.payment_date|date:"d M Y" }}</td>
+        <td style="padding:10px 14px;font-weight:600;font-family:var(--font-mono)">{{ p.reference }}</td>
+        <td style="padding:10px 14px"><span class="chip chip-grey">{{ p.method|title }}</span></td>
+        <td style="padding:10px 14px;font-weight:700;font-family:var(--font-mono)">TZS {{ p.amount|floatformat:2 }}</td>
+        <td style="padding:10px 14px;font-size:12px;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.bank_statement_details|truncatechars:50 }}</td>
+        <td style="padding:10px 14px">
+          {% has_perm user "finance.change_payment" as can_match %}
+          {% if can_match %}
+          <form method="post" action="{% url 'finance:unmatched_payments' %}" style="display:flex;gap:6px;align-items:center">
+            {% csrf_token %}
+            <input type="hidden" name="payment_id" value="{{ p.id }}">
+            <input type="hidden" name="action" value="match">
+            <select name="invoice_id" required class="hf2-select" style="width:160px;height:32px;padding:0 8px;font-size:12px">
+              <option value="">Select invoice…</option>
+              {% for inv in invoicelist %}
+              <option value="{{ inv.id }}">{{ inv.invoice_number|default:inv.id }} — {{ inv.student.first_name }} {{ inv.student.last_name }} ({{ inv.student.class_name }})</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-primary" style="padding:5px 10px;font-size:11px">Match</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="text-align:center;padding:48px 24px">
+    <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" style="margin-bottom:8px"><path d="M20 6L9 17l-5-5"/></svg>
+    <div style="font-size:15px;font-weight:600;color:var(--text-primary)">All clear!</div>
+    <div style="font-size:13px;color:var(--text-muted);margin-top:4px">No unmatched payments in the queue.</div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,587 @@
+{% extends "base.html" %}
+{% load role_tags hodari_forms %}
+{% block title %}Narrative Comments — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Narrative Comments{% endblock %}
+{% block topbar_date %}{{ today_display }}{% endblock %}
+
+{% block extra_head %}
+<style>
+.class-tabs-container {
+    background: #fff;
+    border-bottom: 1px solid #E2E8F0;
+    margin: 0 -28px 24px -28px;
+    padding: 0 28px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    position: sticky;
+    top: 108px;
+    z-index: 39;
+}
+.class-tabs-container::-webkit-scrollbar { display: none; }
+.class-tab {
+    padding: 16px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #64748B;
+    text-decoration: none;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+.class-tab:hover { color: #023AA5; background: #F8FAFC; }
+.class-tab.active { color: #023AA5; border-bottom-color: #023AA5; }
+
+.grading-grid {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 24px;
+    align-items: start;
+}
+.student-sidebar {
+    background: #fff;
+    border: 1px solid #E2E8F0;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    position: sticky;
+    top: 80px;
+    align-self: start;
+}
+.sidebar-header {
+    padding: 20px;
+    background: #F8FAFC;
+    border-bottom: 1px solid #E2E8F0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.student-list {
+    max-height: calc(100vh - 180px);
+    overflow-y: auto;
+}
+.student-card {
+    padding: 16px 20px;
+    border-bottom: 1px solid #F1F5F9;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.student-card:hover { background: #F8FAFC; }
+.student-card.active {
+    background: #F0F7FF;
+    border-left: 4px solid #023AA5;
+    padding-left: 16px;
+}
+.status-chip {
+    padding: 4px 10px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+.status-pending { background: #F1F5F9; color: #64748B; }
+.status-saved { background: #E0F2FE; color: #0369A1; }
+.status-done { background: #D1FAE5; color: #065F46; }
+.status-progress { background: #FEF3C7; color: #92400E; }
+
+.progress-bar-container {
+    background: #fff;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 16px 24px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+.comment-section {
+    background: #fff;
+    border: 1px solid #E2E8F0;
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+.comment-textarea {
+    width: 100%;
+    min-height: 160px;
+    border: 2px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+    transition: border-color 0.2s;
+    line-height: 1.6;
+    color: #1E293B;
+}
+.comment-textarea:focus {
+    outline: none;
+    border-color: #023AA5;
+    box-shadow: 0 0 0 3px rgba(2,58,165,0.08);
+}
+.comment-textarea::placeholder { color: #94A3B8; }
+
+.hf-btn {
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.hf-btn-primary { background: #023AA5; color: #fff; }
+.hf-btn-primary:hover { background: #012980; }
+.hf-btn-success { background: #059669; color: #fff; }
+.hf-btn-success:hover { background: #047857; }
+
+.save-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #059669;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+.save-indicator.visible { opacity: 1; }
+.save-indicator.saving { color: #64748B; }
+@keyframes btn-spin { to { transform: rotate(360deg); } }
+
+.pill-group { display:inline-flex; gap:0; border:1px solid var(--border); border-radius:6px; overflow:hidden }
+.pill-group input[type="radio"] { display:none }
+.pill-group label {
+    display:inline-block; padding:4px 10px; font-size:11px; font-weight:600; cursor:pointer;
+    background:var(--bg-card); color:var(--text-muted); border-right:1px solid var(--border); transition:all 0.15s;
+    user-select:none;
+}
+.pill-group label:last-child { border-right:none }
+.pill-group input[type="radio"]:checked + label { background:var(--hodari-blue); color:#fff }
+.pill-group label:hover { background:var(--hodari-blue-light); color:var(--hodari-blue) }
+.pill-group input[type="radio"]:checked + label:hover { background:var(--hodari-blue); color:#fff }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "academics/_top_tabs_reports.html" %}
+
+{% if comment_window_status == "closed_early" and comment_window_endterm_end %}
+<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:14px 20px;margin:16px 0;display:flex;align-items:center;gap:12px">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+    <div>
+        <div style="font-size:13px;font-weight:700;color:#1E40AF">Comment entry opens after endterm exams</div>
+        <div style="font-size:12px;color:#3B82F6;margin-top:2px">Endterm exam window ends: <strong>{{ comment_window_endterm_end|date:"d M Y" }}</strong>. You can draft comments now, but submission is blocked until then.</div>
+    </div>
+</div>
+{% endif %}
+
+{% if comment_window_status == "closed_late" and comment_window_grading_deadline %}
+<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:14px 20px;margin:16px 0;display:flex;align-items:center;gap:12px">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+    <div>
+        <div style="font-size:13px;font-weight:700;color:#991B1B">Grading deadline has passed</div>
+        <div style="font-size:12px;color:#DC2626;margin-top:2px">The grading deadline was <strong>{{ comment_window_grading_deadline|date:"d M Y" }}</strong>. Comments are now locked for editing. Contact your admin to reopen.</div>
+    </div>
+</div>
+{% endif %}
+
+<div class="class-tabs-container">
+    {% for cls in classes %}
+    <a href="?class_name={{ cls }}" class="class-tab {% if selected_class == cls %}active{% endif %}">{{ cls }}</a>
+    {% endfor %}
+</div>
+
+{% if selected_class and student_reports %}
+<div class="progress-bar-container">
+    <div style="flex:1">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+            <span style="font-size:13px;font-weight:600;color:#64748B">Comment Progress &middot; {{ selected_class }}</span>
+            <span id="comment-progress-text" style="font-size:13px;font-weight:700;color:#023AA5">0 of {{ student_reports|length }} students complete</span>
+        </div>
+        <div style="height:10px;background:#F1F5F9;border-radius:5px;overflow:hidden">
+            <div id="comment-progress-fill" style="width:0%;height:100%;background:#023AA5;transition:width 0.5s ease"></div>
+        </div>
+    </div>
+    <div style="display:flex;gap:12px;align-items:center;flex-shrink:0">
+        <div style="text-align:right">
+            <div style="font-size:11px;color:#64748B;font-weight:700;text-transform:uppercase">Active Term</div>
+            <div style="font-size:14px;font-weight:700;color:#1E293B">{{ current_term.name }}</div>
+        </div>
+        <div style="display:flex;gap:8px">
+            {% if all_submitted %}
+            <span class="status-chip status-done" style="padding:8px 16px;font-size:13px">All Submitted</span>
+            {% elif comment_window_status != "open" %}
+            <span class="status-chip status-pending" style="padding:8px 16px;font-size:13px">Window Closed</span>
+            {% else %}
+            <button type="submit" id="btn-submit-top" class="hf-btn hf-btn-success" onclick="showSubmitConfirm()">Submit for Review</button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="grading-grid">
+    <div class="student-sidebar">
+        <div class="sidebar-header">
+            <span style="font-size:12px;font-weight:700;color:#64748B;text-transform:uppercase">Students</span>
+            <span id="student-count" class="status-chip status-pending">{{ student_reports|length }}</span>
+        </div>
+        <div id="student-list" class="student-list">
+            {% for row in student_reports %}
+            <div class="student-card {% if forloop.first %}active{% endif %}" id="card-{{ row.report.id }}" onclick="scrollToStudent({{ row.report.id }})">
+                <div style="width:40px;height:40px;background:#023AA5;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0">
+                    {{ row.student.first_name|first }}{{ row.student.last_name|first }}
+                </div>
+                <div style="flex:1;min-width:0">
+                    <div style="font-size:14px;font-weight:700;color:#1E293B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ row.student.get_full_name }}</div>
+                    <div style="font-size:11px;color:#64748B">{{ row.student.admission_no }}</div>
+                </div>
+                <span id="chip-{{ row.report.id }}" class="status-chip {% if row.comment|length >= 50 %}status-done{% elif row.comment %}status-progress{% else %}status-pending{% endif %}">
+                    {% if row.comment|length >= 50 %}Done{% elif row.comment %}In Progress{% else %}Pending{% endif %}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div>
+        <form method="post" id="comment-form">
+            {% csrf_token %}
+            <input type="hidden" name="term_id" value="{{ current_term.id }}">
+            <input type="hidden" name="class_name" value="{{ selected_class }}">
+
+            <div style="background:#fff;border:1px solid #E2E8F0;border-radius:16px;padding:24px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center">
+                <div>
+                    <h2 style="margin:0;font-size:26px;color:#1E293B">{{ selected_class }}</h2>
+                    <div style="color:#64748B;font-size:14px;margin-top:4px">Primary Department &middot; Narrative Comments &middot; {{ current_term.name }}</div>
+                </div>
+                <div style="background:#1E293B;border-radius:12px;padding:12px 24px;text-align:center;color:#fff;min-width:140px">
+                    <div style="font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;margin-bottom:2px">Complete</div>
+                    <div id="complete-count" style="font-size:24px;font-weight:800;font-family:'JetBrains Mono',monospace">0/{{ student_reports|length }}</div>
+                </div>
+            </div>
+
+            {% for row in student_reports %}
+            <div class="comment-section" id="student-{{ row.report.id }}">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+                    <div style="display:flex;align-items:center;gap:12px">
+                        <div style="width:44px;height:44px;background:linear-gradient(135deg,#023AA5,#1e5cc8);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px">
+                            {{ row.student.first_name|first }}{{ row.student.last_name|first }}
+                        </div>
+                        <div>
+                            <div style="font-size:16px;font-weight:700;color:#1E293B">{{ row.student.get_full_name }}</div>
+                            <div style="font-size:12px;color:#64748B">{{ row.student.admission_no }} &middot; {{ selected_class }}</div>
+                        </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <span id="save-ind-{{ row.report.id }}" class="save-indicator">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+                            Saved
+                        </span>
+                        {% if row.report.comments_submitted %}
+                        <span class="status-chip status-done">Submitted</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <label style="display:block;font-size:12px;font-weight:700;color:#64748B;text-transform:uppercase;margin-bottom:8px">Class Teacher Remark</label>
+                <textarea name="comment_{{ row.report.id }}"
+                          class="comment-textarea"
+                          data-report-id="{{ row.report.id }}"
+                          placeholder="Write a detailed narrative comment about this student's performance, behavior, and areas for improvement..."
+                          {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled style="background:#F8FAFC;cursor:not-allowed;opacity:0.8"{% else %}oninput="onCommentInput({{ row.report.id }}, this)"{% endif %}>{{ row.comment }}</textarea>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+                    <div id="char-count-{{ row.report.id }}" style="font-size:12px;font-weight:600;color:{% if row.comment|length >= 50 %}#059669{% else %}#DC2626{% endif %}">
+                        {{ row.comment|length }} / 50 minimum characters
+                    </div>
+                    {% if row.comment|length >= 50 %}
+                    <div style="display:flex;align-items:center;gap:4px;color:#059669;font-size:12px;font-weight:600">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+                        Meets minimum requirement
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- General Traits Section -->
+                <div style="margin-top:20px;padding-top:20px;border-top:1px solid #E2E8F0">
+                    <div style="font-size:13px;font-weight:700;color:var(--hodari-blue);padding:6px 10px;background:var(--hodari-blue-light);border-radius:6px;margin-bottom:8px">General Traits</div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">Key: <strong>E</strong> Excellent &nbsp; <strong>G</strong> Good &nbsp; <strong>S</strong> Satisfactory &nbsp; <strong>N</strong> Needs Improvement</div>
+
+                    <!-- Work Habits -->
+                    <div style="margin-bottom:12px">
+                        <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:4px">Work Habits</div>
+                        <table style="width:100%;border-collapse:collapse">
+                            <tr>
+                                {% for trait in work_habits %}
+                                <td style="text-align:center;padding:4px 6px;border:1px solid var(--border);width:{{ forloop.counter|floatformat:0 }}%;background:{% cycle 'var(--bg-metric)' 'var(--bg-card)' %}">
+                                    <div style="font-size:11px;font-weight:600;color:var(--text-primary);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ trait.label }}</div>
+                                    <div class="pill-group">
+                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="wh_{{ row.report.id }}_{{ trait.key }}_e" value="E" {% if row.traits|dict_get:trait.key == "E" %}checked{% endif %} {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="wh_{{ row.report.id }}_{{ trait.key }}_e">E</label>
+                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="wh_{{ row.report.id }}_{{ trait.key }}_g" value="G" {% if row.traits|dict_get:trait.key == "G" %}checked{% endif %} {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="wh_{{ row.report.id }}_{{ trait.key }}_g">G</label>
+                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="wh_{{ row.report.id }}_{{ trait.key }}_s" value="S" {% if row.traits|dict_get:trait.key == "S" %}checked{% endif %} {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="wh_{{ row.report.id }}_{{ trait.key }}_s">S</label>
+                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="wh_{{ row.report.id }}_{{ trait.key }}_n" value="N" {% if row.traits|dict_get:trait.key == "N" %}checked{% endif %} {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="wh_{{ row.report.id }}_{{ trait.key }}_n">N</label>
+                                    </div>
+                                </td>
+                                {% endfor %}
+                            </tr>
+                        </table>
+                    </div>
+
+                    <!-- Personal Traits -->
+                    <div style="margin-bottom:12px">
+                        <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:4px">Personal Traits</div>
+                        <table style="width:100%;border-collapse:collapse">
+                            <tr>
+                                {% for trait in personal_traits %}
+                                <td style="text-align:center;padding:4px 6px;border:1px solid var(--border);width:{{ forloop.counter|floatformat:0 }}%;background:{% cycle 'var(--bg-metric)' 'var(--bg-card)' %}">
+                                    <div style="font-size:11px;font-weight:600;color:var(--text-primary);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ trait.label }}</div>
+                                    <div class="pill-group">
+                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="pt_{{ row.report.id }}_{{ trait.key }}_e" value="E" {% if row.traits|dict_get:trait.key == "E" %}checked{% endif %} {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="pt_{{ row.report.id }}_{{ trait.key }}_e">E</label>
+                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="pt_{{ row.report.id }}_{{ trait.key }}_g" value="G" {% if row.traits|dict_get:trait.key == "G" %}checked{% endif %} {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="pt_{{ row.report.id }}_{{ trait.key }}_g">G</label>
+                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="pt_{{ row.report.id }}_{{ trait.key }}_s" value="S" {% if row.traits|dict_get:trait.key == "S" %}checked{% endif %} {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="pt_{{ row.report.id }}_{{ trait.key }}_s">S</label>
+                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="pt_{{ row.report.id }}_{{ trait.key }}_n" value="N" {% if row.traits|dict_get:trait.key == "N" %}checked{% endif %} {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="pt_{{ row.report.id }}_{{ trait.key }}_n">N</label>
+                                    </div>
+                                </td>
+                                {% endfor %}
+                            </tr>
+                        </table>
+                    </div>
+
+                    <!-- Social Traits -->
+                    <div style="margin-bottom:12px">
+                        <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:4px">Social Traits</div>
+                        <table style="width:100%;border-collapse:collapse">
+                            <tr>
+                                {% for trait in social_traits %}
+                                <td style="text-align:center;padding:4px 6px;border:1px solid var(--border);width:{{ forloop.counter|floatformat:0 }}%;background:{% cycle 'var(--bg-metric)' 'var(--bg-card)' %}">
+                                    <div style="font-size:11px;font-weight:600;color:var(--text-primary);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ trait.label }}</div>
+                                    <div class="pill-group">
+                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="st_{{ row.report.id }}_{{ trait.key }}_e" value="E" {% if row.traits|dict_get:trait.key == "E" %}checked{% endif %} {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="st_{{ row.report.id }}_{{ trait.key }}_e">E</label>
+                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="st_{{ row.report.id }}_{{ trait.key }}_g" value="G" {% if row.traits|dict_get:trait.key == "G" %}checked{% endif %} {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="st_{{ row.report.id }}_{{ trait.key }}_g">G</label>
+                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="st_{{ row.report.id }}_{{ trait.key }}_s" value="S" {% if row.traits|dict_get:trait.key == "S" %}checked{% endif %} {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="st_{{ row.report.id }}_{{ trait.key }}_s">S</label>
+                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="st_{{ row.report.id }}_{{ trait.key }}_n" value="N" {% if row.traits|dict_get:trait.key == "N" %}checked{% endif %} {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="st_{{ row.report.id }}_{{ trait.key }}_n">N</label>
+                                    </div>
+                                </td>
+                                {% endfor %}
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+
+            <div style="background:#fff;border:1px solid #E2E8F0;border-radius:16px;padding:24px;display:flex;justify-content:space-between;align-items:center">
+                <div style="font-size:13px;color:#64748B;font-weight:600">
+                    <span id="complete-count-bottom">0</span> of {{ student_reports|length }} comments complete
+                </div>
+                <div style="display:flex;align-items:center;gap:12px">
+                    <span id="global-save-status" class="save-indicator">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+                        All changes saved
+                    </span>
+                    {% if all_submitted %}
+                    <span class="status-chip status-done" style="padding:8px 16px;font-size:13px">All Submitted</span>
+                    {% elif comment_window_status != "open" %}
+                    <span class="status-chip status-pending" style="padding:8px 16px;font-size:13px">Window Closed</span>
+                    {% else %}
+                    <button type="submit" id="btn-save" class="hf-btn hf-btn-primary">Save All Comments</button>
+                    <button type="button" id="btn-submit" class="hf-btn hf-btn-success" onclick="showSubmitConfirm()">Submit for Review</button>
+                    {% endif %}
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+var CSRF = "{{ csrf_token }}";
+var CLASS_NAME = "{{ selected_class }}";
+var saveTimers = {};
+var traitSaveTimers = {};
+
+function showSubmitConfirm() {
+    confirmDeleteModal({
+        title: "Submit for HOD/HOS Review?",
+        body: 'Submit all completed comments for <strong>' + CLASS_NAME + '</strong> to HOD/HOS for review?',
+        detail: "Students with comments under 50 characters will be skipped. Reports will be locked for editing after submission.",
+        confirmText: "Submit for Review",
+        type: "info",
+        onConfirm: function() {
+            var btnSub = document.getElementById('btn-submit');
+            var btnTop = document.getElementById('btn-submit-top');
+            if (btnSub) btnSub.disabled = true;
+            if (btnTop) btnTop.disabled = true;
+            var spinner = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="animation:btn-spin 1s linear infinite"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> Submitting...';
+            if (btnSub) btnSub.innerHTML = spinner;
+            if (btnTop) btnTop.innerHTML = spinner;
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'action';
+            input.value = 'submit_for_review';
+            document.getElementById('comment-form').appendChild(input);
+            document.getElementById('comment-form').submit();
+        }
+    });
+}
+
+function onCommentInput(reportId, textarea) {
+    updateLocalUI(reportId, textarea);
+    debounceSave(reportId, textarea);
+}
+
+function updateLocalUI(reportId, textarea) {
+    var len = textarea.value.trim().length;
+    var chip = document.getElementById('chip-' + reportId);
+    var count = document.getElementById('char-count-' + reportId);
+
+    if (len >= 50) {
+        chip.className = 'status-chip status-done';
+        chip.textContent = 'Done';
+        count.style.color = '#059669';
+        count.innerHTML = len + ' / 50 minimum characters <span style="color:#059669;margin-left:4px">&#10003;</span>';
+    } else if (len > 0) {
+        chip.className = 'status-chip status-progress';
+        chip.textContent = 'In Progress';
+        count.style.color = '#DC2626';
+        count.textContent = len + ' / 50 minimum characters';
+    } else {
+        chip.className = 'status-chip status-pending';
+        chip.textContent = 'Pending';
+        count.style.color = '#DC2626';
+        count.textContent = '0 / 50 minimum characters';
+    }
+    updateProgress();
+}
+
+function debounceSave(reportId, textarea) {
+    if (saveTimers[reportId]) clearTimeout(saveTimers[reportId]);
+    var ind = document.getElementById('save-ind-' + reportId);
+    ind.className = 'save-indicator saving visible';
+    ind.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="animation:btn-spin 1s linear infinite"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> Saving...';
+
+    saveTimers[reportId] = setTimeout(function() {
+        autoSave(reportId, textarea.value);
+    }, 800);
+}
+
+function autoSave(reportId, comment) {
+    var ind = document.getElementById('save-ind-' + reportId);
+    fetch(window.location.pathname + '?class_name=' + encodeURIComponent(CLASS_NAME), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': CSRF,
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ report_id: reportId, comment: comment })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.ok) {
+            ind.className = 'save-indicator visible';
+            ind.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Saved';
+            setTimeout(function() { ind.classList.remove('visible'); }, 2000);
+            updateProgress();
+        } else {
+            ind.className = 'save-indicator visible';
+            ind.style.color = '#DC2626';
+            ind.innerHTML = 'Save failed';
+        }
+    }).catch(function() {
+        ind.className = 'save-indicator visible';
+        ind.style.color = '#DC2626';
+        ind.innerHTML = 'Network error';
+    });
+}
+
+function onTraitChange(reportId) {
+    var ind = document.getElementById('save-ind-' + reportId);
+    ind.className = 'save-indicator saving visible';
+    ind.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="animation:btn-spin 1s linear infinite"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> Saving...';
+    if (traitSaveTimers[reportId]) clearTimeout(traitSaveTimers[reportId]);
+    traitSaveTimers[reportId] = setTimeout(function() {
+        var allTraits = {};
+        document.querySelectorAll('input[name^="trait_' + reportId + '_"]:checked').forEach(function(radio) {
+            var key = radio.name.replace('trait_' + reportId + '_', '');
+            allTraits[key] = radio.value;
+        });
+        fetch(window.location.pathname + '?class_name=' + encodeURIComponent(CLASS_NAME), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CSRF,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ report_id: reportId, traits: allTraits })
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            if (d.ok) {
+                ind.className = 'save-indicator visible';
+                ind.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Saved';
+                setTimeout(function() { ind.classList.remove('visible'); }, 2000);
+            } else {
+                ind.className = 'save-indicator visible';
+                ind.style.color = '#DC2626';
+                ind.innerHTML = 'Save failed';
+            }
+        }).catch(function() {
+            ind.className = 'save-indicator visible';
+            ind.style.color = '#DC2626';
+            ind.innerHTML = 'Network error';
+        });
+    }, 800);
+}
+
+function updateProgress() {
+    var total = {{ student_reports|length }};
+    var complete = 0;
+    document.querySelectorAll('.comment-textarea').forEach(function(ta) {
+        if (ta.value.trim().length >= 50) complete++;
+    });
+    document.getElementById('complete-count').textContent = complete + '/' + total;
+    document.getElementById('complete-count-bottom').textContent = complete;
+    document.getElementById('comment-progress-text').textContent = complete + ' of ' + total + ' students complete';
+    document.getElementById('comment-progress-fill').style.width = (total > 0 ? (complete / total * 100) : 0) + '%';
+}
+
+function scrollToStudent(reportId) {
+    var el = document.getElementById('student-' + reportId);
+    if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.querySelectorAll('.student-card').forEach(function(c) { c.classList.remove('active'); });
+        document.getElementById('card-' + reportId).classList.add('active');
+    }
+}
+
+document.getElementById('btn-save').addEventListener('click', function() {
+    var btn = this;
+    btn.disabled = true;
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="animation:btn-spin 1s linear infinite"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> Saving...';
+});
+
+updateProgress();
+</script>
+
+{% elif selected_class %}
+<div style="text-align:center;padding:60px 20px;background:#fff;border-radius:16px;border:1px solid #E2E8F0">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5" style="margin-bottom:16px"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+    <h3 style="margin:0 0 8px;font-size:16px;color:#1E293B;font-weight:700">No students found</h3>
+    <p style="margin:0;font-size:13px;color:#64748B">No students are enrolled in {{ selected_class }}.</p>
+</div>
+
+{% else %}
+<div style="text-align:center;padding:60px 20px;background:#fff;border-radius:16px;border:1px solid #E2E8F0">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5" style="margin-bottom:16px"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+    <h3 style="margin:0 0 8px;font-size:16px;color:#1E293B;font-weight:700">Select a class</h3>
+    <p style="margin:0;font-size:13px;color:#64748B">Choose a class above to enter narrative comments.</p>
+</div>
+{% endif %}
+{% endblock %}

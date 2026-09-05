@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Invoice {{ invoice.invoice_number|default:invoice.pk }} &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Invoice Detail{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+<div class="section-hdr">
+  <span class="section-title">Invoice {{ invoice.invoice_number|default:"N/A" }}</span>
+  <div style="display:flex;align-items:center;gap:10px">
+    <a href="{% url 'finance:invoice_print' invoice.pk %}" class="btn btn-secondary btn-sm" target="_blank" style="display:inline-flex;align-items:center;gap:5px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg> Download / print</a>
+    <span class="chip chip-{% if invoice.status == 'paid' %}green{% elif invoice.status == 'overdue' %}red{% else %}amber{% endif %}">
+      {{ invoice.get_status_display }}
+    </span>
+  </div>
+</div>
+
+<div class="card" style="max-width:600px">
+  <div class="card-title">Invoice details</div>
+  {% if invoice.student %}
+  <div class="trow">
+    <span style="font-size:12px;color:var(--text-muted)">Student</span>
+    <span class="trow-right" style="font-weight:600">{{ invoice.student.first_name }} {{ invoice.student.last_name }} <span style="font-weight:400;color:var(--text-muted);font-family:var(--font-mono)">{{ invoice.student.admission_no }}</span></span>
+  </div>
+  {% endif %}
+  {% if invoice.term %}
+  <div class="trow">
+    <span style="font-size:12px;color:var(--text-muted)">Term</span>
+    <span class="trow-right">{{ invoice.term.name }}</span>
+  </div>
+  {% endif %}
+  {% if invoice.due_date %}
+  <div class="trow">
+    <span style="font-size:12px;color:var(--text-muted)">Due date</span>
+    <span class="trow-right">{{ invoice.due_date|date:"d F Y" }}</span>
+  </div>
+  {% endif %}
+  <div class="trow">
+    <span style="font-size:12px;color:var(--text-muted)">Total due</span>
+    <span class="trow-right" style="font-size:18px;font-weight:700;font-family:var(--font-mono);color:var(--hodari-blue)">TZS {{ invoice.total_due|floatformat:0 }}</span>
+  </div>
+</div>
+
+<div style="margin-top:14px">
+  <a href="{% url 'finance:parent_invoices' %}" class="btn btn-secondary btn-sm">&larr; All invoices</a>
+</div>
+{% endblock %}

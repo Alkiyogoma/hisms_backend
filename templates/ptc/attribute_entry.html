@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+{% block title %}PTC - Learner Attributes{% endblock %}
+
+{% block extra_head %}
+<style>
+  .attr-grid { display:grid; grid-template-columns: 280px 1fr; gap:20px; align-items:start; }
+  .sidebar-card { background:#fff; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .sidebar-hdr { padding:12px 16px; background:var(--hodari-blue); color:#fff; font-size:13px; font-weight:700; display:flex; align-items:center; gap:8px; }
+  .sidebar-list { max-height:calc(100vh - 220px); overflow-y:auto; }
+  .s-item { display:flex; align-items:center; gap:10px; padding:10px 16px; cursor:pointer; border-bottom:1px solid #F0F4FB; transition:background .1s; }
+  .s-item:hover { background:#F7F9FC; }
+  .s-item.active { background:var(--hodari-blue-pale,#E8EEF9); border-left:3px solid var(--hodari-blue); }
+  .s-avatar { width:32px; height:32px; border-radius:50%; background:var(--hodari-blue-pale,#E8EEF9); color:var(--hodari-blue); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0; }
+  .s-name { flex:1; font-size:13px; font-weight:600; color:var(--text-primary); }
+  .s-class { font-size:10px; color:var(--text-muted); }
+  .s-status { font-size:10px; font-weight:700; padding:1px 8px; border-radius:99px; }
+  .s-done { background:#E8F5EC; color:#1B7B34; }
+  .s-pending { background:#FEF2F2; color:#9B1C1C; }
+  .content-card { background:#fff; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .content-hdr { padding:14px 20px; background:var(--hodari-blue); color:#fff; display:flex; align-items:center; gap:12px; }
+  .content-hdr h3 { margin:0; font-size:15px; font-weight:700; }
+  .content-hdr .sub { font-size:11px; opacity:.75; }
+  .r-row { display:flex; align-items:center; padding:12px 20px; border-bottom:1px solid #F0F4FB; gap:12px; }
+  .r-label { flex:1; font-size:13px; font-weight:600; color:var(--text-primary); }
+  .r-group { display:flex; gap:5px; }
+  .r-pill { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:50%; border:2px solid var(--border); background:#fff; cursor:pointer; font-size:12px; font-weight:700; transition:all .1s; }
+  .r-pill:hover { transform:scale(1.12); }
+  .r-pill.grade-E { border-color:#B7DFBF; color:#1B7B34; }
+  .r-pill.grade-E.selected { background:#E8F5EC; border-color:#1B7B34; box-shadow:0 0 0 2px rgba(27,123,52,.25); }
+  .r-pill.grade-G { border-color:#BFCFE9; color:var(--hodari-blue); }
+  .r-pill.grade-G.selected { background:#E8EEF9; border-color:var(--hodari-blue); box-shadow:0 0 0 2px rgba(26,86,196,.25); }
+  .r-pill.grade-S { border-color:#FCD34D; color:#92550A; }
+  .r-pill.grade-S.selected { background:#FEF3C7; border-color:#F59E0B; box-shadow:0 0 0 2px rgba(245,158,11,.25); }
+  .r-pill.grade-N { border-color:#FECACA; color:#9B1C1C; }
+  .r-pill.grade-N.selected { background:#FEF2F2; border-color:#DC2626; box-shadow:0 0 0 2px rgba(220,38,38,.25); }
+  .r-pill.unselected { opacity:.35; }
+  .r-pill.unselected:hover { opacity:.8; }
+  @media (max-width:768px) { .attr-grid { grid-template-columns:1fr; } .sidebar-list { max-height:200px; } }
+</style>
+{% endblock %}
+
+{% block topbar_greeting %}
+<h1 class="topbar-title">Learner Attributes</h1>
+{% endblock %}
+
+{% block content %}
+{% include "ptc/_top_tabs.html" %}
+<div style="max-width:1100px;margin:0 auto">
+
+  {% if message %}
+  <div style="background:var(--hodari-blue-pale);border:1px solid #BFCFE9;border-radius:10px;padding:16px 20px;font-size:13px;color:var(--hodari-blue)">{{ message }}</div>
+  {% endif %}
+
+  {% if not is_window_open and ptc_window %}
+  <div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;padding:14px 20px;font-size:13px;color:#92550A;margin-bottom:16px">
+    <strong>Window Closed.</strong> The attribute entry window is currently closed. Ratings are read-only.
+  </div>
+  {% endif %}
+
+  {% if students_data %}
+
+  <!-- Rating key -->
+  <div style="background:#F7F9FC;border:1px solid var(--border);border-radius:8px;padding:8px 16px;margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <span style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase">Key:</span>
+    <span style="padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;background:#E8F5EC;color:#1B7B34">E</span><span style="font-size:11px;color:var(--text-secondary)">Excellent</span>
+    <span style="padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;background:#E8EEF9;color:var(--hodari-blue)">G</span><span style="font-size:11px;color:var(--text-secondary)">Good</span>
+    <span style="padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;background:#FEF3C7;color:#92550A">S</span><span style="font-size:11px;color:var(--text-secondary)">Satisfactory</span>
+    <span style="padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;background:#FEF2F2;color:#9B1C1C">N</span><span style="font-size:11px;color:var(--text-secondary)">Needs Improvement</span>
+  </div>
+
+  <form method="post" id="attributeForm">
+    {% csrf_token %}
+    <div class="attr-grid">
+      <!-- Sidebar: student list -->
+      <div class="sidebar-card">
+        <div class="sidebar-hdr">
+          <span>Students</span>
+          <span style="margin-left:auto;font-size:11px;opacity:.8" id="completionBadge">{{ complete_count }}/{{ total_students }}</span>
+        </div>
+        <div class="sidebar-list" id="studentSidebar">
+          {% for item in students_data %}
+          <div class="s-item {% if forloop.first %}active{% endif %}" data-id="{{ item.student.id }}" onclick="selectStudent(this)">
+            <div class="s-avatar">{{ item.student.first_name|slice:":1" }}{{ item.student.last_name|slice:":1" }}</div>
+            <div style="flex:1;min-width:0">
+              <div class="s-name">{{ item.student.first_name }} {{ item.student.last_name|first }}.</div>
+              <div class="s-class">{{ item.student.class_name }}</div>
+            </div>
+            <span class="s-status {% if item.is_complete %}s-done{% else %}s-pending{% endif %}">
+              {% if item.is_complete %}Done{% else %}Pending{% endif %}
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Main panel: populated by JS -->
+      <div>
+        <div class="content-card" id="studentContent">
+          <div class="content-hdr">
+            <h3 id="contentName">Select a student</h3>
+            <span class="sub" id="contentMeta"></span>
+            <span style="margin-left:auto;font-size:12px;opacity:.85" id="contentStatus"></span>
+          </div>
+          <div id="contentRows"></div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:14px;justify-content:space-between">
+          <button type="button" class="hf-btn" id="prevBtn" onclick="prevStudent()" style="padding:8px 18px;font-size:13px">Previous</button>
+          {% if is_window_open %}
+          <button type="submit" style="padding:8px 24px;border-radius:7px;font-size:13px;font-weight:600;background:var(--hodari-blue);color:#fff;border:none;cursor:pointer">
+            Save All Ratings
+          </button>
+          {% endif %}
+          <button type="button" class="hf-btn hf-btn-primary" id="nextBtn" onclick="nextStudent()" style="padding:8px 18px;font-size:13px">Next</button>
+        </div>
+      </div>
+    </div>
+    <div id="hiddenInputs"></div>
+  </form>
+  {% elif not message %}
+  <div style="padding:20px">
+    {% include '_partials/empty_state.html' with icon='users' icon_color='grey' title='No students found' desc='Ensure you are assigned as a class teacher.' %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+var ATTRS = {{ learner_attributes_json|safe }};
+var DATA = {{ ratings_json|safe }};
+var isOpen = {{ is_window_open|yesno:"true,false" }};
+var activeId = null;
+
+function renderStudent(id) {
+  var d = DATA.find(function(x) { return x.id == id; });
+  if (!d) return;
+  activeId = id;
+  document.getElementById('contentName').textContent = d.first + ' ' + d.last;
+  document.getElementById('contentMeta').textContent = d.class + ' | ' + d.adm;
+  document.getElementById('contentStatus').textContent = d.ok ? 'All attributes rated' : 'Incomplete';
+  var rowsHtml = '';
+  for (var i = 0; i < ATTRS.length; i++) {
+    var num = ATTRS[i][0];
+    var label = ATTRS[i][1];
+    var val = d.r[num] || '';
+    rowsHtml += '<div class="r-row">';
+    rowsHtml += '<div class="r-label">' + num + '. ' + label + '</div>';
+    rowsHtml += '<div class="r-group">';
+    var grades = ['E', 'G', 'S', 'N'];
+    for (var g = 0; g < grades.length; g++) {
+      var grade = grades[g];
+      var selected = val === grade;
+      rowsHtml += '<div class="r-pill grade-' + grade + (selected ? ' selected' : ' unselected') + '" ' +
+                  'data-student="' + id + '" data-attr="' + num + '" data-grade="' + grade + '" ' +
+                  'onclick="setRating(this)"' +
+                  (isOpen ? '' : ' style="cursor:not-allowed;opacity:.35"') + '>' + grade + '</div>';
+    }
+    rowsHtml += '</div></div>';
+  }
+  document.getElementById('contentRows').innerHTML = rowsHtml;
+  document.getElementById('hiddenInputs').innerHTML = '';
+  document.querySelectorAll('.r-pill.selected').forEach(function(p) {
+    addHidden(p.getAttribute('data-student'), p.getAttribute('data-attr'), p.getAttribute('data-grade'));
+  });
+}
+
+function addHidden(student, attr, grade) {
+  var input = document.createElement('input');
+  input.type = 'hidden';
+  input.name = 'attr_' + student + '_' + attr;
+  input.value = grade;
+  document.getElementById('hiddenInputs').appendChild(input);
+}
+
+function selectStudent(el) {
+  document.querySelectorAll('.s-item').forEach(function(s) { s.classList.remove('active'); });
+  el.classList.add('active');
+  renderStudent(el.getAttribute('data-id'));
+}
+
+function nextStudent() {
+  var active = document.querySelector('.s-item.active');
+  var next = active ? active.nextElementSibling : null;
+  if (next) selectStudent(next);
+}
+
+function prevStudent() {
+  var active = document.querySelector('.s-item.active');
+  var prev = active ? active.previousElementSibling : null;
+  if (prev) selectStudent(prev);
+}
+
+function setRating(el) {
+  if (!isOpen) return;
+  var group = el.parentNode;
+  group.querySelectorAll('.r-pill').forEach(function(p) {
+    p.classList.remove('selected');
+    p.classList.add('unselected');
+  });
+  el.classList.remove('unselected');
+  el.classList.add('selected');
+  var student = el.getAttribute('data-student');
+  var attr = el.getAttribute('data-attr');
+  var grade = el.getAttribute('data-grade');
+  var existing = document.querySelector('input[name="attr_' + student + '_' + attr + '"]');
+  if (existing) { existing.value = grade; }
+  else { addHidden(student, attr, grade); }
+  updateSidebar();
+}
+
+function updateSidebar() {
+  document.querySelectorAll('.s-item').forEach(function(item) {
+    var sid = item.getAttribute('data-id');
+    var d = DATA.find(function(x) { return x.id == sid; });
+    if (!d) return;
+    var allDone = true;
+    for (var i = 0; i < ATTRS.length; i++) {
+      var num = ATTRS[i][0];
+      var pill = document.querySelector('.r-pill[data-student="' + sid + '"][data-attr="' + num + '"].selected');
+      if (!pill) { allDone = false; break; }
+    }
+    d.ok = allDone;
+    var status = item.querySelector('.s-status');
+    if (allDone) { status.className = 's-status s-done'; status.textContent = 'Done'; }
+    else { status.className = 's-status s-pending'; status.textContent = '-'; }
+  });
+  var done = DATA.filter(function(x) { return x.ok; }).length;
+  document.getElementById('completionBadge').textContent = done + '/' + DATA.length;
+  if (activeId) {
+    var ad = DATA.find(function(x) { return x.id == activeId; });
+    document.getElementById('contentStatus').textContent = ad && ad.ok ? 'All attributes rated' : 'Incomplete';
+  }
+}
+
+// Init: show first student
+document.addEventListener('DOMContentLoaded', function() {
+  if (DATA.length > 0) renderStudent(DATA[0].id);
+});
+</script>
+{% endblock %}

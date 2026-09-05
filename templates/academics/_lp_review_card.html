@@ -1,0 +1,82 @@
+{% load role_tags %}
+<div class="plan-card" id="plan-{{ p.id }}">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+    <div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+        <span class="status-tag {% if p.status == 'approved' %}st-approved{% elif p.status == 'rejected' %}st-rejected{% elif p.status == 'submitted' %}st-submitted{% elif p.status == 'revision_requested' %}st-revision-requested{% else %}st-draft{% endif %}">
+          {{ p.get_status_display }}
+        </span>
+        <span style="font-size:10px;color:#94A3B8;font-weight:600">#{{ p.id }}</span>
+      </div>
+      <div style="font-size:15px;font-weight:700;color:#1E293B;margin-bottom:2px">{{ p.subject_name }}</div>
+      <div class="plan-meta-row">
+        <span style="color:var(--hodari-blue);font-weight:700">{{ p.class_name }}</span>
+        <span style="color:#CBD5E1">&bull;</span>
+        <span>{{ p.teacher.get_full_name|default:p.teacher.username }}</span>
+        <span style="color:#CBD5E1">&bull;</span>
+        <span>Week of {{ p.week_start_date|date:"d M Y" }}</span>
+        {% if p.submitted_at %}
+        <span style="color:#CBD5E1">&bull;</span>
+        <span>{{ p.submitted_at|timesince }} ago</span>
+        {% endif %}
+      </div>
+    </div>
+    {% with att_count=p.attachments.all|length %}
+    <button type="button" class="att-chip {% if att_count > 0 %}has-files{% endif %}" onclick="openAttModal('{{ p.id }}')" {% if att_count == 0 %}disabled{% endif %}>
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+      {{ att_count }} file{{ att_count|pluralize }}
+    </button>
+    {% endwith %}
+  </div>
+
+  {% if p.lesson_title or p.objectives %}
+  <div class="plan-content-box">
+    {% if p.lesson_title %}<div style="font-size:12px;font-weight:700;color:#1E293B;margin-bottom:2px">{{ p.lesson_title }}</div>{% endif %}
+    {% if p.objectives %}<div style="font-size:11px;color:#475569;line-height:1.4">{{ p.objectives|truncatewords:20 }}</div>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if p.reviewer_feedback %}
+  <div style="padding:8px 12px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;margin-bottom:10px;font-size:11px;color:#92400E">
+    <strong>Feedback:</strong> {{ p.reviewer_feedback }}
+  </div>
+  {% endif %}
+
+  <div style="padding-top:10px;border-top:1px solid #F1F5F9">
+    {% if can_review and p.status == 'submitted' %}
+    <form method="post" action="{% url 'academics:review_lesson_plan' p.id %}">
+      {% csrf_token %}
+      <textarea name="feedback" class="feedback-input" placeholder="Feedback (required for rejection/revision)..."></textarea>
+      <div class="action-row">
+        <button name="decision" value="approved" style="background:#16A34A;color:#fff">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          Approve
+        </button>
+        <button name="decision" value="revision_requested" style="background:#FFFBEB;color:#B45309;border:1px solid #FDE68A">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+          Revision
+        </button>
+        <button name="decision" value="rejected" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          Reject
+        </button>
+      </div>
+    </form>
+    {% elif p.status == 'approved' %}
+    <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:#E8F5EC;border-radius:8px">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      <span style="font-size:12px;font-weight:700;color:#16A34A">Approved{% if p.reviewed_by %} by {{ p.reviewed_by.get_full_name|default:p.reviewed_by.username }}{% endif %}</span>
+    </div>
+    {% elif p.status == 'rejected' %}
+    <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:#FEF2F2;border-radius:8px">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+      <span style="font-size:12px;font-weight:700;color:#DC2626">Rejected{% if p.reviewed_by %} by {{ p.reviewed_by.get_full_name|default:p.reviewed_by.username }}{% endif %}</span>
+    </div>
+    {% elif p.status == 'revision_requested' %}
+    <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:#FFFBEB;border-radius:8px">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B45309" stroke-width="2.5"><path d="M1 4v6h6M23 20v-6h-6"/></svg>
+      <span style="font-size:12px;font-weight:700;color:#B45309">Revision requested</span>
+    </div>
+    {% endif %}
+  </div>
+</div>

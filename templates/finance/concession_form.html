@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}New Concession &mdash; Finance &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}New Concession{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+<div class="section-hdr">
+  <span class="section-title">Create fee concession / discount</span>
+  <a href="{% url 'finance:concession_list' %}" class="section-link">&larr; Back to concessions</a>
+</div>
+
+{% has_perm user "finance.add_concession" as can_create %}
+{% if can_create %}
+<form method="post" style="max-width:640px">
+  {% csrf_token %}
+
+  {% if form.non_field_errors %}
+  <div style="padding:10px 14px;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;color:#9B1C1C;font-size:13px;margin-bottom:16px">
+    {{ form.non_field_errors }}
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="card-title">Concession details</div>
+
+    <div class="hf2-group">
+      <label class="hf2-label">Student <span class="hf2-req">*</span></label>
+      <select name="student" required class="hf2-select">
+        <option value="">Select student...</option>
+        {% for value, label in form.fields.student.choices %}
+        <option value="{{ value }}" {% if form.student.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      {% if form.student.errors %}<div style="color:#9B1C1C;font-size:12px;margin-top:4px">{{ form.student.errors }}</div>{% endif %}
+    </div>
+
+    <div class="hf2-group">
+      <label class="hf2-label">Term <span class="hf2-req">*</span></label>
+      <select name="term" required class="hf2-select">
+        <option value="">Select term</option>
+        {% for value, label in form.fields.term.choices %}
+        <option value="{{ value }}" {% if form.term.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      {% if form.term.errors %}<div style="color:#9B1C1C;font-size:12px;margin-top:4px">{{ form.term.errors }}</div>{% endif %}
+    </div>
+
+    <div class="hf2-group">
+      <label class="hf2-label">Concession type <span class="hf2-req">*</span></label>
+      <select name="concession_type" required class="hf2-select">
+        {% for value, label in form.fields.concession_type.choices %}
+        <option value="{{ value }}" {% if form.concession_type.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      {% if form.concession_type.errors %}<div style="color:#9B1C1C;font-size:12px;margin-top:4px">{{ form.concession_type.errors }}</div>{% endif %}
+    </div>
+
+    <div class="hf2-group">
+      <label class="hf2-label">Reason</label>
+      <input type="text" name="reason" value="{{ form.reason.value|default:'' }}" class="hf2-input" placeholder="Reason or description for the concession">
+      {% if form.reason.errors %}<div style="color:#9B1C1C;font-size:12px;margin-top:4px">{{ form.reason.errors }}</div>{% endif %}
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="hf2-group">
+        <label class="hf2-label">Discount mode <span class="hf2-req">*</span></label>
+        <select name="discount_mode" required class="hf2-select">
+          {% for value, label in form.fields.discount_mode.choices %}
+          <option value="{{ value }}" {% if form.discount_mode.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        {% if form.discount_mode.errors %}<div style="color:#9B1C1C;font-size:12px;margin-top:4px">{{ form.discount_mode.errors }}</div>{% endif %}
+      </div>
+
+      <div class="hf2-group">
+        <label class="hf2-label">Discount value <span class="hf2-req">*</span></label>
+        <input type="number" name="discount_value" step="0.01" min="0.01" required class="hf2-input"
+          value="{{ form.discount_value.value|default:'' }}" placeholder="e.g. 25 (percentage) or 500000 (TZS)">
+        {% if form.discount_value.errors %}<div style="color:#9B1C1C;font-size:12px;margin-top:4px">{{ form.discount_value.errors }}</div>{% endif %}
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="hf2-group">
+        <label class="hf2-label">Valid from</label>
+        <input type="date" name="valid_from" class="hf2-input hf2-date" value="{{ form.valid_from.value|date:'Y-m-d'|default:'' }}">
+        {% if form.valid_from.errors %}<div style="color:#9B1C1C;font-size:12px;margin-top:4px">{{ form.valid_from.errors }}</div>{% endif %}
+      </div>
+
+      <div class="hf2-group">
+        <label class="hf2-label">Valid until</label>
+        <input type="date" name="valid_until" class="hf2-input hf2-date" value="{{ form.valid_until.value|date:'Y-m-d'|default:'' }}">
+        {% if form.valid_until.errors %}<div style="color:#9B1C1C;font-size:12px;margin-top:4px">{{ form.valid_until.errors }}</div>{% endif %}
+      </div>
+    </div>
+
+    <div class="hf2-group">
+      <label class="hf2-label">Notes</label>
+      <textarea name="notes" rows="3" class="hf2-textarea" placeholder="Internal notes about this concession">{{ form.notes.value|default:'' }}</textarea>
+      {% if form.notes.errors %}<div style="color:#9B1C1C;font-size:12px;margin-top:4px">{{ form.notes.errors }}</div>{% endif %}
+    </div>
+
+    <div class="hf2-actions">
+      <button type="submit" class="btn btn-primary">Create concession</button>
+      <a href="{% url 'finance:concession_list' %}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </div>
+</form>
+{% else %}
+<div style="max-width:640px;padding:40px;text-align:center">
+  <p style="color:var(--text-muted);font-size:14px">You do not have permission to create concessions.</p>
+  <a href="{% url 'finance:concession_list' %}" class="btn btn-secondary">Back to Concessions</a>
+</div>
+{% endif %}
+{% endblock %}

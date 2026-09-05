@@ -1,0 +1,475 @@
+{% extends "base.html" %}
+{% block title %}Submit Weekly Focus — {{ brand.school_name }}{% endblock %}
+
+{% block extra_head %}
+<!-- Quill.js Rich Text Editor -->
+<link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+<style>
+  /* === Tabs === */
+  .wf-tabs { display: flex; gap: 0; margin-bottom: 0; border-bottom: 2px solid var(--border); }
+  .wf-tab {
+    padding: 12px 22px; font-size: 13px; font-weight: 600; color: var(--text-muted);
+    cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px;
+    transition: all 0.15s; background: none; border-top: none; border-left: none; border-right: none;
+    font-family: var(--font-ui);
+  }
+  .wf-tab:hover { color: var(--text-primary); }
+  .wf-tab.active { color: var(--hodari-blue); border-bottom-color: var(--hodari-blue); }
+  .wf-tab-content { display: none; }
+  .wf-tab-content.active { display: block; }
+  .wf-tab-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px;
+    font-size: 11px; font-weight: 700; background: #eff6ff; color: var(--hodari-blue);
+    margin-left: 6px;
+  }
+
+  /* Two-column layout */
+  .wf-wrap { display: grid; grid-template-columns: 1fr 320px; gap: 28px; align-items: start; }
+  .wf-header { margin-bottom: 24px; }
+  .wf-header h1 { font-size: 22px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+  .wf-header p { font-size: 13px; color: var(--text-muted); }
+
+  /* Form card */
+  .wf-form-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 28px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  .wf-row { display: grid; gap: 16px; margin-bottom: 18px; }
+  .wf-row-3 { grid-template-columns: 2fr 1fr 1fr; }
+  .wf-row-1 { grid-template-columns: 1fr; }
+  .wf-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; letter-spacing: 0.02em; }
+  .wf-input, .wf-select {
+    width: 100%; padding: 10px 14px; font-size: 13.5px; font-family: var(--font-ui);
+    border: 1.5px solid var(--border); border-radius: 8px; background: #fff; color: var(--text-primary);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .wf-input:focus, .wf-select:focus {
+    outline: none; border-color: var(--hodari-blue);
+    box-shadow: 0 0 0 3px rgba(2,58,165,0.08);
+  }
+  .wf-help { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; line-height: 1.4; }
+  .wf-divider { height: 1px; background: var(--border); margin: 20px 0; }
+  .wf-section-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; }
+
+  /* Quill editor containers — fixed height, no overlap */
+  #activities-editor-wrap, #items-editor-wrap {
+    border: 1.5px solid var(--border); border-radius: 8px; overflow: hidden; background: #fff;
+    display: flex; flex-direction: column;
+  }
+  #activities-editor-wrap { height: 200px; }
+  #items-editor-wrap { height: 130px; }
+  #activities-editor, #items-editor { display: flex; flex-direction: column; height: 100%; }
+  #activities-editor .ql-toolbar.ql-snow, #items-editor .ql-toolbar.ql-snow {
+    border: none !important; border-bottom: 1px solid var(--border) !important; background: #fafbfc; flex-shrink: 0;
+  }
+  #activities-editor .ql-container.ql-snow, #items-editor .ql-container.ql-snow {
+    border: none !important; flex: 1; display: flex; flex-direction: column; overflow: hidden;
+  }
+  #activities-editor .ql-editor, #items-editor .ql-editor {
+    flex: 1; overflow-y: auto; color: var(--text-primary); line-height: 1.6; padding: 10px 14px;
+  }
+  #activities-editor .ql-editor.ql-blank::before, #items-editor .ql-editor.ql-blank::before {
+    color: var(--text-muted); font-style: normal;
+  }
+
+  /* Actions */
+  .wf-actions { display: flex; gap: 12px; justify-content: flex-end; padding-top: 8px; }
+  .wf-btn {
+    padding: 10px 24px; font-size: 13.5px; font-weight: 600; border-radius: 8px;
+    border: none; cursor: pointer; font-family: var(--font-ui); transition: all 0.15s;
+  }
+  .wf-btn-primary { background: var(--hodari-blue); color: #fff; }
+  .wf-btn-primary:hover { background: #012e8a; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(2,58,165,0.25); }
+  .wf-btn-secondary { background: #fff; color: var(--text-secondary); border: 1.5px solid var(--border); }
+  .wf-btn-secondary:hover { border-color: var(--hodari-blue); color: var(--hodari-blue); }
+
+  /* Preview sidebar — sticky */
+  .wf-sidebar { position: sticky; top: 20px; }
+  .wf-sidebar-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .wf-sidebar-header { padding: 14px 18px; border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 800; color: #64748B; text-transform: uppercase; background: #F8FAFC; letter-spacing: 0.05em; }
+  .wf-sidebar-body { padding: 18px; }
+
+  /* Format toggle */
+  .wf-format-toggle { display: flex; gap: 6px; margin-bottom: 14px; }
+  .wf-format-btn {
+    padding: 5px 12px; font-size: 11px; font-weight: 600; border-radius: 6px;
+    border: 1.5px solid var(--border); background: #fff; color: var(--text-secondary);
+    cursor: pointer; transition: all 0.15s;
+  }
+  .wf-format-btn:hover { border-color: var(--hodari-blue); color: var(--hodari-blue); }
+  .wf-format-btn.active { background: var(--hodari-blue); color: #fff; border-color: var(--hodari-blue); }
+
+  /* Preview content areas */
+  .wf-email-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 14px; font-size: 12.5px; color: #1e40af; line-height: 1.5; }
+  .wf-email-box p { margin: 0 0 6px; }
+  .wf-sms-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px; font-size: 12px; color: #166534; line-height: 1.5; font-family: var(--font-mono, monospace); white-space: pre-wrap; display: none; }
+
+  .wf-preview-empty { font-size: 12px; color: #94A3B8; text-align: center; padding: 20px 10px; font-style: italic; }
+
+  /* Recent entries card styles */
+  .wf-rendered {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+  }
+  .wf-rendered p {
+    margin: 0 0 6px;
+  }
+  .wf-rendered p:last-child {
+    margin-bottom: 0;
+  }
+  .wf-rendered ul, .wf-rendered ol {
+    margin: 4px 0;
+    padding-left: 20px;
+  }
+  .wf-rendered li {
+    margin-bottom: 3px;
+  }
+  .wf-rendered li:last-child {
+    margin-bottom: 0;
+  }
+  .wf-rendered strong, .wf-rendered b {
+    color: var(--text-primary);
+  }
+  .wf-entry-card {
+    transition: box-shadow 0.2s;
+    cursor: default;
+  }
+  .wf-entry-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  }
+
+  @media (max-width: 768px) {
+    .wf-wrap { grid-template-columns: 1fr; }
+    .wf-sidebar { position: static; }
+    .wf-row-3 { grid-template-columns: 1fr; }
+    .wf-form-card { padding: 18px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:1100px;margin:0 auto">
+  <div class="wf-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div>
+      <h1>Submit Weekly Focus</h1>
+      <p>Share this week's plan with parents &middot; {{ today_date }}</p>
+    </div>
+
+  </div>
+
+  <!-- Tab Bar -->
+  <div class="wf-tabs">
+    <button type="button" class="wf-tab active" data-tab="submit" onclick="switchTab('submit', this)">Submit Focus</button>
+    <button type="button" class="wf-tab" data-tab="recent" onclick="switchTab('recent', this)">
+      Recent Submissions
+      {% if recent_entries %}<span class="wf-tab-badge">{{ recent_entries|length }}</span>{% endif %}
+    </button>
+  </div>
+
+  <!-- Tab: Submit Focus -->
+  <div class="wf-tab-content active" id="tab-submit">
+  <div class="wf-wrap">
+
+    <!-- LEFT: Form -->
+    <div class="wf-form-card">
+      <form method="post" action="{% if is_edit %}{% url 'communications:weekly_focus_edit' pk=entry.pk %}{% else %}{% url 'communications:weekly_focus_submit' %}{% endif %}" id="weeklyFocusForm">
+        {% csrf_token %}
+
+        <!-- Class & Week Selection -->
+        <div class="wf-section-label">Class &amp; Week</div>
+        <div class="wf-row wf-row-3">            <div>
+              <label class="wf-label">Class *</label>
+              <select name="class_name" class="wf-select" id="class-select" required>
+                <option value="">Select class...</option>
+                {% for cls in assigned_classes %}
+                  <option value="{{ cls }}" {% if entry %}{% if cls == entry.class_name %}selected{% endif %}{% elif cls == default_class %}selected{% endif %}>{{ cls }}</option>
+                {% endfor %}
+              </select>
+              <div class="wf-help">Your assigned classes</div>
+            </div>
+            <div>
+              <label class="wf-label">Week *</label>
+              <input type="number" name="week_number" class="wf-input" value="{% if entry %}{{ entry.week_number }}{% else %}{{ current_week }}{% endif %}" min="1" max="52" required>
+            </div>
+            <div>
+              <label class="wf-label">Year *</label>
+              <input type="text" name="academic_year" class="wf-input" value="{% if entry %}{{ entry.academic_year }}{% else %}{{ current_year }}{% endif %}" required placeholder="e.g. 2026">
+            </div>
+        </div>
+
+        <div class="wf-divider"></div>
+
+        <!-- Theme -->
+        <div class="wf-section-label">Weekly Theme</div>
+        <div class="wf-row wf-row-1">
+          <div>
+            <label class="wf-label">Theme for the Week *</label>
+            <input type="text" name="theme" class="wf-input" required placeholder="e.g. Fruits, Community Helpers, Animals..." value="{% if entry %}{{ entry.theme }}{% endif %}">
+            <div class="wf-help">The topic or theme the class will focus on this week.</div>
+          </div>
+        </div>
+
+        <div class="wf-divider"></div>
+
+        <!-- Activities (Rich Text) -->
+        <div class="wf-section-label">Activities &amp; Details</div>
+        <div class="wf-row wf-row-1">
+          <div>
+            <label class="wf-label">Planned Activities *</label>
+            <div id="activities-editor-wrap">
+              <div id="activities-editor"></div>
+            </div>
+            <textarea name="planned_activities" id="activities-raw" style="display:none"></textarea>
+            <div class="wf-help">Describe activities, stories, songs, crafts, or lessons planned for the week.</div>
+          </div>
+        </div>
+
+        <div class="wf-row wf-row-1" style="margin-top:4px">
+          <div>
+            <label class="wf-label">Items for Parents to Prepare or Bring</label>
+            <div id="items-editor-wrap">
+              <div id="items-editor"></div>
+            </div>
+            <textarea name="items_to_bring" id="items-raw" style="display:none"></textarea>
+            <div class="wf-help">Optional (only fill in if parents need to bring or prepare something)</div>
+          </div>
+        </div>
+
+        <div class="wf-divider"></div>
+
+        <div class="wf-actions">
+          <a href="{% url 'communications:inbox' %}" class="wf-btn wf-btn-secondary">Cancel</a>
+          <button type="submit" class="wf-btn wf-btn-primary" id="submit-btn">{% if is_hod %}Publish to Parents{% else %}Submit for Review{% endif %}</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- RIGHT: Sticky Preview Sidebar -->
+    <div class="wf-sidebar">
+      <div class="wf-sidebar-card">
+        <div class="wf-sidebar-header">Message Preview</div>
+        <div class="wf-sidebar-body">
+          <div class="wf-format-toggle">
+            <button type="button" class="wf-format-btn active" onclick="showPreview('email',this)">Email</button>
+            <button type="button" class="wf-format-btn" onclick="showPreview('sms',this)">SMS</button>
+          </div>
+
+          <div class="wf-email-box" id="email-preview">
+            <div style="font-weight:700;margin-bottom:8px;font-size:13px;color:#1e40af">
+              {{ brand.school_name }} Weekly Focus &middot; Week <span id="prev-week">{{ current_week }}</span>
+            </div>
+            <div style="margin-bottom:6px"><strong>Theme:</strong> <span id="prev-theme" style="color:#94A3B8;font-style:italic">(not set)</span></div>
+            <div id="prev-activities" style="margin-top:8px"></div>
+            <div id="prev-items" style="margin-top:8px;display:none">
+              <strong>Items to bring:</strong>
+              <span id="prev-items-text"></span>
+            </div>
+            <div class="wf-preview-empty" id="preview-empty">Start typing to see a preview...</div>
+          </div>
+
+          <div class="wf-sms-box" id="sms-preview">{{ brand.school_name }} Weekly Focus - Week <span id="sms-week">{{ current_week }}</span>
+
+Theme: <span id="sms-theme">(not set)</span>
+
+<span id="sms-activities">(no activities)</span>
+
+<span id="sms-items"></span>
+
+Thank you!</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- Tab: Recent Submissions -->
+<div class="wf-tab-content" id="tab-recent">
+  {% if recent_entries %}
+    <div style="display:flex;flex-direction:column;gap:12px">
+      {% for entry in recent_entries %}
+        <div class="card wf-entry-card" style="padding:20px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+            <div>
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+                <span class="badge badge-blue">{{ entry.class_name }}</span>
+                <span style="font-size:12px;color:var(--text-muted)">Week {{ entry.week_number }} &middot; {{ entry.academic_year }}</span>
+                {% if entry.status == "approved" %}
+                  <span class="badge badge-green">Approved</span>
+                {% elif entry.status == "rejected" %}
+                  <span class="badge badge-red">Rejected</span>
+                {% elif entry.status == "submitted" %}
+                  <span class="badge badge-yellow">Pending Review</span>
+                {% else %}
+                  <span class="badge badge-grey">Draft</span>
+                {% endif %}
+              </div>
+              <h3 style="margin:0;font-size:15px;color:var(--text-primary)">{{ entry.theme }}</h3>
+              <p style="margin:6px 0 0;font-size:13px;color:var(--text-muted)">By {{ entry.teacher.get_full_name|default:entry.teacher.username }}</p>
+            </div>
+            <div style="font-size:12px;color:var(--text-muted);text-align:right">
+              {% if entry.published_at %}Published {{ entry.published_at|date:"d M Y H:i" }}{% endif %}
+            </div>
+          </div>
+
+          <div style="margin-top:14px;font-size:13px;color:var(--text-secondary);border-top:1px solid var(--border);padding-top:12px">
+            <p style="font-weight:600;margin-bottom:4px;color:var(--text-primary)">Planned Activities</p>
+            <div class="wf-rendered">{{ entry.planned_activities|safe }}</div>
+            {% if entry.items_to_bring %}
+              <p style="font-weight:600;margin:12px 0 4px;color:var(--text-primary)">Items to Bring / Prepare</p>
+              <div class="wf-rendered">{{ entry.items_to_bring|safe }}</div>
+            {% endif %}
+            {% if entry.reviewer_feedback %}
+              <div style="margin-top:10px;padding:10px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;font-size:12px;color:#991b1b">
+                <strong>Reviewer Feedback:</strong> {{ entry.reviewer_feedback }}
+              </div>
+            {% endif %}
+          </div>
+
+          <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+            {% if perms.communications.change_weeklyfocus %}
+              <a href="{% url 'communications:weekly_focus_edit' pk=entry.pk %}" class="wf-btn wf-btn-secondary" style="padding:6px 14px;font-size:12px">Edit</a>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    {% include '_partials/empty_state.html' with title='No weekly focus entries submitted yet' desc='Submit your first focus to get started.' icon='doc' icon_color='blue' action_url='../submit/' action_text='Submit Your First Focus' action_btn='true' %}
+  {% endif %}
+</div>
+
+</div>
+
+<script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+<script>
+{% if entry %}
+var EXISTING_ACTIVITIES = "{{ entry.planned_activities|escapejs }}";
+var EXISTING_ITEMS = "{{ entry.items_to_bring|escapejs }}";
+{% else %}
+var EXISTING_ACTIVITIES = "";
+var EXISTING_ITEMS = "";
+{% endif %}
+
+document.addEventListener('DOMContentLoaded', function() {
+  var activitiesQuill = new Quill('#activities-editor', {
+    theme: 'snow',
+    placeholder: 'Describe activities, stories, songs, crafts...\n\nUse bullet lists, bold, and italic for clarity.',
+    modules: {
+      toolbar: [
+        ['bold', 'italic', 'underline'],
+        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+        ['clean']
+      ]
+    }
+  });
+
+  var itemsQuill = new Quill('#items-editor', {
+    theme: 'snow',
+    placeholder: 'e.g. A clean egg carton, fruit for show-and-tell...',
+    modules: {
+      toolbar: [
+        ['bold', 'italic'],
+        [{ 'list': 'bullet' }],
+        ['clean']
+      ]
+    }
+  });
+
+  // Pre-fill Quill editors with existing content when editing
+  if (EXISTING_ACTIVITIES) {
+    activitiesQuill.root.innerHTML = EXISTING_ACTIVITIES;
+  }
+  if (EXISTING_ITEMS) {
+    itemsQuill.root.innerHTML = EXISTING_ITEMS;
+  }
+
+  // Sync Quill content to hidden textareas before submit
+  var form = document.getElementById('weeklyFocusForm');
+  form.addEventListener('submit', function(e) {
+    var actHtml = activitiesQuill.root.innerHTML.trim();
+    // Strip empty Quill content
+    if (actHtml === '<p><br></p>' || actHtml === '<p></p>') actHtml = '';
+    document.getElementById('activities-raw').value = actHtml;
+
+    var itemsHtml = itemsQuill.root.innerHTML.trim();
+    if (itemsHtml === '<p><br></p>' || itemsHtml === '<p></p>') itemsHtml = '';
+    document.getElementById('items-raw').value = itemsHtml;
+
+    // Validate that activities are not empty
+    if (!actHtml) {
+      e.preventDefault();
+      alert('Please describe at least one planned activity.');
+      return false;
+    }
+  });
+
+  // Live preview update
+  var weekInput = document.querySelector('input[name="week_number"]');
+  var themeInput = document.querySelector('input[name="theme"]');
+
+  function updatePreview() {
+    var week = weekInput.value || '?';
+    var theme = themeInput.value || '(not set)';
+    var activities = activitiesQuill.getText().trim();
+    var items = itemsQuill.getText().trim();
+
+    // Email preview
+    document.getElementById('prev-week').textContent = week;
+    var themeEl = document.getElementById('prev-theme');
+    themeEl.textContent = theme;
+    themeEl.style.color = theme === '(not set)' ? '#94A3B8' : '#1E293B';
+    themeEl.style.fontStyle = theme === '(not set)' ? 'italic' : 'normal';
+
+    document.getElementById('prev-activities').innerHTML = activities
+      ? '<strong>Activities:</strong><br>' + activitiesQuill.root.innerHTML
+      : '';
+
+    var itemsDiv = document.getElementById('prev-items');
+    if (items) {
+      itemsDiv.style.display = 'block';
+      document.getElementById('prev-items-text').innerHTML = itemsQuill.root.innerHTML;
+    } else {
+      itemsDiv.style.display = 'none';
+    }
+
+    var emptyEl = document.getElementById('preview-empty');
+    emptyEl.style.display = (activities || items || theme !== '(not set)') ? 'none' : 'block';
+
+    // SMS preview
+    document.getElementById('sms-week').textContent = week;
+    document.getElementById('sms-theme').textContent = theme;
+    var smsActivities = activities ? activities.substring(0, 200) : '(no activities)';
+    document.getElementById('sms-activities').textContent = smsActivities;
+    var smsItemsEl = document.getElementById('sms-items');
+    if (items) {
+      smsItemsEl.textContent = '\nItems: ' + items.substring(0, 100);
+      smsItemsEl.style.display = 'inline';
+    } else {
+      smsItemsEl.textContent = '';
+      smsItemsEl.style.display = 'none';
+    }
+  }
+
+  weekInput.addEventListener('input', updatePreview);
+  themeInput.addEventListener('input', updatePreview);
+  activitiesQuill.on('text-change', updatePreview);
+  itemsQuill.on('text-change', updatePreview);
+  updatePreview();
+});
+
+function switchTab(tab, btn) {
+  document.querySelectorAll('.wf-tab').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('.wf-tab-content').forEach(function(c) { c.classList.remove('active'); });
+  btn.classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+}
+
+function showPreview(format, btn) {
+  document.querySelectorAll('.wf-format-btn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  document.getElementById('email-preview').style.display = format === 'email' ? 'block' : 'none';
+  document.getElementById('sms-preview').style.display = format === 'sms' ? 'block' : 'none';
+}
+</script>
+{% endblock %}

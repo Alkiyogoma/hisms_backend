@@ -1,0 +1,53 @@
+{% load role_tags %}
+{% is_hod_like user as user_is_hod %}
+<div class="sub-nav">
+  {% has_dept user "ECD" as can_ecd %}
+  {% if can_ecd and perms.academics.view_examscore %}
+  <a href="{% url 'academics:ecd_assessment' %}" class="sub-tab {% if academics_tab == 'ecd_evaluations' %}active{% endif %}">ECD Evaluation</a>
+  {% endif %}
+  {% has_dept user "PRIMARY" as can_primary %}
+  {% if can_primary and perms.academics.change_examscore %}
+  <a href="{% url 'academics:primary_assessment' %}" class="sub-tab {% if academics_tab == 'primary_assessment' %}active{% endif %}">Primary Assessment</a>
+  {% endif %}
+  {% has_dept user "LOWER_SECONDARY" as can_ls %}
+  {% if can_ls and perms.academics.change_examscore %}
+  <a href="{% url 'academics:lower_secondary_assessment' %}" class="sub-tab {% if academics_tab == 'lower_secondary_assessment' %}active{% endif %}">Lower Secondary Assessment</a>
+  {% endif %}
+  {% if user_is_hod %}
+  <a href="{% url 'academics:exam_score_approval_queue' %}" class="sub-tab {% if academics_tab == 'approval_queue' %}active{% endif %}">Grade Approval</a>
+  {% endif %}
+  {% if user_is_hod %}
+  <a href="{% url 'academics:cambridge_checkpoint_entry' %}" class="sub-tab {% if academics_tab == 'cambridge' %}active{% endif %}">Checkpoint</a>
+  {% endif %}
+  {% if perms.academics.view_reportcard %}
+  <a href="{% url 'academics:report_card_list' %}" class="sub-tab {% if academics_tab == 'reports' %}active{% endif %}">Reports</a>
+  {% endif %}
+  {% if perms.academics.view_reportcard %}
+  <a href="{% url 'academics:report_review_queue' %}" class="sub-tab {% if academics_tab == 'review_queue' %}active{% endif %}">Review Queue</a>
+  {% endif %}
+  {% is_hos_signoff user as can_hos_signoff %}
+  {% if can_hos_signoff %}
+  <a href="{% url 'academics:hos_signoff_list' %}" class="sub-tab {% if academics_tab == 'hos_signoff' %}active{% endif %}">HOS Sign-Off</a>
+  {% endif %}
+  {% if can_hos_signoff %}
+  <a href="{% url 'academics:analytics' %}" class="sub-tab {% if academics_tab == 'analytics' %}active{% endif %}">Analytics</a>
+  {% endif %}
+  {% if perms.academics.view_progressionconfig %}
+  <a href="{% url 'academics:progression_config_list' %}" class="sub-tab {% if academics_tab == 'progression' %}active{% endif %}">Settings</a>
+  {% endif %}
+  {% if user_is_hod %}
+  <a href="{% url 'academics:progression_hod_review' %}" class="sub-tab {% if academics_tab == 'hod_review' %}active{% endif %}">HOD Review</a>
+  {% endif %}
+  {% if can_hos_signoff %}
+  <a href="{% url 'academics:progression_hos_decision' %}" class="sub-tab {% if academics_tab == 'hos_decision' %}active{% endif %}">HOS Decision</a>
+  {% endif %}
+  {% if perms.academics.view_progressioncase %}
+  <a href="{% url 'academics:progression_teacher_view' %}" class="sub-tab {% if academics_tab == 'progression_teacher' %}active{% endif %}">Progression</a>
+  {% endif %}
+  {% if perms.academics.view_progressioncase %}
+  <a href="{% url 'academics:progression_parent_view' %}" class="sub-tab {% if academics_tab == 'progression_parent' %}active{% endif %}">Progression</a>
+  {% endif %}
+  {% if perms.academics.view_lessonplan %}
+  <a href="{% url 'academics:lesson_plan_compliance' %}" class="sub-tab {% if academics_tab == 'compliance' %}active{% endif %}">Compliance</a>
+  {% endif %}
+</div>

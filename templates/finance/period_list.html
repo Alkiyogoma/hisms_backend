@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Finance Periods &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Finance Periods{% endblock %}
+{% block topbar_date %}{% now "d F Y" %}{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+
+{% has_perm user "finance.add_financeperiod" as can_add_period %}
+<div class="section-hdr">
+  <span class="section-title">Finance Periods</span>
+  <div style="display:flex;gap:8px">
+    {% if can_add_period %}
+    <a href="{% url 'finance:period_create' %}" class="btn btn-primary btn-sm" style="display:inline-flex;align-items:center;gap:5px;padding:6px 14px;font-size:12px">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      New Period
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<p style="font-size:13px;color:var(--text-muted);margin:0 0 16px 0">Manage fiscal periods, reconciliation, and opening balances</p>
+
+<!-- Summary Cards -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px">
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Total Periods</span></div>
+    <div class="mc-val">{{ page_obj.paginator.count|default:periods|length }}</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#ECFDF5,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Open</span></div>
+    <div class="mc-val" style="color:#059669">{{ open_count }}</div>
+    <div class="mc-sub" style="color:#059669">Active periods</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FFF8ED,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Reconciled</span></div>
+    <div class="mc-val" style="color:#B45309">{{ reconciled_count }}</div>
+    <div class="mc-sub" style="color:#B45309">Locked periods</div>
+  </div>
+</div>
+
+<!-- Period List -->
+<div class="card" style="padding:0;overflow:hidden">
+  <table style="width:100%;border-collapse:collapse">
+    <thead>
+      <tr style="text-align:left;background:var(--bg-metric);border-bottom:1px solid var(--border)">
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Period</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Date Range</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Status</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Invoices</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;text-align:right">Invoiced</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;text-align:right">Collected</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Reconciled</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in periods %}
+      <tr style="border-bottom:1px solid var(--border);font-size:13px;transition:background .1s;cursor:pointer"
+          onclick="window.location='{% url 'finance:period_detail' pk=p.pk %}'"
+          onmouseover="this.style.background='var(--bg-metric)'" onmouseout="this.style.background=''">
+        <td style="padding:10px 14px;font-weight:600;color:var(--hodari-blue)">
+          {{ p.name }}
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-left:3px"><polyline points="9 18 15 12 9 6"/></svg>
+        </td>
+        <td style="padding:10px 14px;color:var(--text-secondary);font-size:12px">
+          {% if p.start_date %}{{ p.start_date|date:"d M Y" }}{% else %}TBD{% endif %}
+          {% if p.end_date %}&rarr; {{ p.end_date|date:"d M Y" }}{% endif %}
+        </td>
+        <td style="padding:10px 14px">
+          {% if p.is_reconciled %}
+          <span class="period-status period-reconciled"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> Reconciled</span>
+          {% else %}
+          <span class="period-status period-open"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg> Open</span>
+          {% endif %}
+        </td>
+        <td style="padding:10px 14px;font-size:12px;color:var(--text-muted)">{{ p.invoice_count|default:0 }}</td>
+        <td style="padding:10px 14px;font-family:var(--font-mono);text-align:right;font-weight:600">TZS {{ p.total_invoiced|default:0|floatformat:0 }}</td>
+        <td style="padding:10px 14px;font-family:var(--font-mono);text-align:right;font-weight:600;color:var(--green)">TZS {{ p.total_collected|default:0|floatformat:0 }}</td>
+        <td style="padding:10px 14px">
+          {% if p.reconciled_at %}
+          <span style="font-size:11px;color:var(--text-muted)">{{ p.reconciled_at|date:"d M Y" }}</span>
+          {% else %}
+          <span style="font-size:11px;color:var(--text-muted)">Pending</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7" style="padding:40px;text-align:center">
+          {% url 'finance:period_create' as period_create_url %}
+    {% if can_add_period %}
+          {% include '_partials/empty_state.html' with title='No finance periods yet' desc='Create a period to start tracking finances.' icon='calendar' icon_color='blue' action_url=period_create_url action_text='Create Period' action_btn='true' %}
+          {% else %}
+          {% include '_partials/empty_state.html' with title='No finance periods yet' desc='Finance periods will appear here once created.' icon='calendar' icon_color='grey' %}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Navigation -->
+<div style="margin-top:16px">
+  <a href="{% url 'finance:dashboard' %}" class="btn btn-secondary btn-sm">&larr; Back to Dashboard</a>
+</div>
+{% endblock %}

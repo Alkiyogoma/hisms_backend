@@ -1,0 +1,391 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}ECD Reports — Pre-Kindergarten{% endblock %}
+{% block topbar_greeting %}ECD Reports — Pre-Kindergarten{% endblock %}
+{% block topbar_date %}{% if current_term %}{{ current_term.name }} &middot; {{ current_term.academic_year.name }} &middot; assessment entry{% else %}Assessment entry{% endif %} &middot; {{ brand.school_name }}{% endblock %}
+{% block topbar_badges %}<div class="topbar-badge badge-amber" id="topbar-progress-badge"><span class="badge-dot"></span><span id="topbar-badge-text">Loading...</span></div>{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'branding/ecd-assessment.css' %}">
+<style>
+.class-tabs-container{background:#fff;border-bottom:1px solid #E2E8F0;margin:0 -28px 24px -28px;padding:0 28px;display:flex;align-items:center;gap:8px;overflow-x:auto;scrollbar-width:none;position:sticky;top:108px;z-index:39}
+.class-tabs-container::-webkit-scrollbar{display:none}
+.class-tab{padding:16px 24px;font-size:14px;font-weight:600;color:#64748B;text-decoration:none;border-bottom:3px solid transparent;transition:all .2s ease;white-space:nowrap}
+.class-tab:hover{color:#023AA5;background:#F8FAFC}
+.class-tab.active{color:#023AA5;border-bottom-color:#023AA5}
+.ecd-grade-btn{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;border:2px solid transparent;transition:all .15s;user-select:none}
+.ecd-grade-E{background:var(--green-bg,#E8F5EC);color:var(--green,#1B7B34);border-color:var(--green-bd,#B7DFBF)}
+.ecd-grade-G{background:var(--hodari-blue-light,#E8EEF9);color:var(--hodari-blue,#023AA5);border-color:#BFCFE9}
+.ecd-grade-S{background:var(--amber-bg,#FEF3C7);color:var(--amber,#92550A);border-color:var(--amber-bd,#FCD34D)}
+.ecd-grade-N{background:#FEF2F2;color:#9B1C1C;border-color:#FECACA}
+.ecd-grade-btn.selected-E{background:var(--green,#1B7B34);color:#fff;border-color:var(--green,#1B7B34)}
+.ecd-grade-btn.selected-G{background:var(--hodari-blue,#023AA5);color:#fff;border-color:var(--hodari-blue,#023AA5)}
+.ecd-grade-btn.selected-S{background:#D97706;color:#fff;border-color:#D97706}
+.ecd-grade-btn.selected-N{background:#9B1C1C;color:#fff;border-color:#9B1C1C}
+.sec-hdr:first-of-type{margin-top:0;padding-top:0;border-top:none}
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "academics/_top_tabs_progress.html" %}
+<div class="content" style="padding:24px 28px">
+  {% if no_class_assigned %}
+  <div style="text-align:center; padding:60px 20px">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:16px"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+    <div style="font-size:16px; font-weight:600; color:#475569; margin-bottom:8px">No ECD classes assigned</div>
+    <div style="font-size:13px; color:#94A3B8; max-width:400px; margin:0 auto">You have no ECD class assignments for the current term. Contact your administrator to assign classes.</div>
+  </div>
+  {% else %}
+  <!-- Class tabs -->
+  <div class="class-tabs-container">
+    {% for tab in ecd_tabs %}
+    <a href="{% url 'academics:ecd_assessment' %}?class_name={{ tab.class_name }}" class="class-tab {% if ecd_class_name == tab.class_name %}active{% endif %}">{{ tab.display_name }}</a>
+    {% endfor %}
+
+  </div>
+
+  <!-- Progress bar -->
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+    <div style="flex:1;background:#EDF1F7;height:8px;border-radius:99px;overflow:hidden">
+      <div id="progress-bar" style="width:0%;height:100%;background:#023AA5;border-radius:99px;transition:width .3s"></div>
+    </div>
+    <span id="progress-text" style="font-size:12px;color:#8492A6;white-space:nowrap;font-weight:500">0 of 0 students complete</span>
+    <button onclick="submitAllToHOD()" style="padding:7px 14px;background:#1B7B34;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">Submit all to HOD</button>
+  </div>
+
+  <!-- Lock banner -->
+  <div id="lock-banner" style="display:none;background:#FEF2F2;border:2px solid #DC2626;border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:13px;color:#991B1B">
+    <strong>This report is locked</strong><br>
+    <span style="font-size:12px">This report cannot be edited. Contact the HOD if corrections are needed.</span>
+  </div>
+
+  <!-- Welfare warning banner -->
+  <div id="welfare-banner" style="display:none;background:#FEF3C7;border:2px solid #F59E0B;border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:13px;color:#92400E">
+    <strong>Welfare Alert</strong><br>
+    <span id="welfare-banner-text" style="font-size:12px"></span>
+  </div>
+
+  <!-- Grading scale -->
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+    <span style="font-size:11.5px;color:#8492A6;font-weight:500">Grading scale:</span>
+    <span class="chip chip-green">E: Excellent</span>
+    <span style="background:#E8EEF9;color:#023AA5;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:600;border:1px solid #BFCFE9">G: Good</span>
+    <span class="chip chip-amber">S: Satisfactory</span>
+    <span style="background:#FEF2F2;color:#9B1C1C;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:600;border:1px solid #FECACA">N: Not Yet</span>
+    <span style="font-size:11px;color:#8492A6;margin-left:8px">Click a letter to record the grade</span>
+  </div>
+
+  <!-- Main layout -->
+  <div style="display:grid;grid-template-columns:220px 1fr;gap:16px;align-items:start">
+    <!-- Student sidebar -->
+    <div class="card" style="background:#fff;border:1px solid #DDE3EE;border-radius:10px;padding:12px 0">
+      <div id="student-list-header" style="font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8492A6;padding:0 14px 8px">Students (0)</div>
+      <div id="student-list"></div>
+    </div>
+
+    <!-- Evaluation form -->
+    <div id="grading-form" class="card" style="background:#fff;border:1px solid #DDE3EE;border-radius:10px;padding:18px 20px;position:relative">
+      <!-- Lock overlay -->
+      <div id="lock-overlay" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.7);border-radius:10px;z-index:10;align-items:center;justify-content:center;flex-direction:column;gap:8px">
+        <span style="font-size:14px;color:#991B1B;font-weight:600">Report is locked</span>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div id="student-name-display" style="font-size:16px;font-weight:700;color:#1A1A2E;font-style:italic">Select a student</div>
+          <div id="student-meta" style="font-size:12px;color:#8492A6;margin-top:2px">Pre-Kindergarten &middot; {% if current_term %}{{ current_term.name }} &middot; {{ current_term.academic_year.name }}{% else %}Current term{% endif %}</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="movePrev()" style="padding:6px 12px;background:#fff;color:#8492A6;border:1px solid #DDE3EE;border-radius:7px;font-size:12px;cursor:pointer">Prev</button>
+          <button onclick="moveNext()" style="padding:6px 12px;background:#023AA5;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">Next</button>
+        </div>
+      </div>
+
+      <!-- Numeracy & Cognitive -->
+      <div class="sec-hdr">Numeracy &amp; Cognitive</div>
+      {% for label, fid in pre_k_fields_nc %}
+      <div class="domain-row"><div class="domain-label">{{ label }}</div><div class="domain-grade-group">
+        <div class="ecd-grade-btn ecd-grade-E" onclick="selectGrade(this,'{{ fid }}','E')" title="Excellent">E</div>
+        <div class="ecd-grade-btn ecd-grade-G" onclick="selectGrade(this,'{{ fid }}','G')" title="Good">G</div>
+        <div class="ecd-grade-btn ecd-grade-S" onclick="selectGrade(this,'{{ fid }}','S')" title="Satisfactory">S</div>
+        <div class="ecd-grade-btn ecd-grade-N" onclick="selectGrade(this,'{{ fid }}','N')" title="Not Yet">N</div>
+        <input type="hidden" id="{{ fid }}">
+      </div></div>
+      {% endfor %}
+
+      <!-- Communication Skills -->
+      <div class="sec-hdr">Communication Skills</div>
+      {% for label, fid in pre_k_fields_cs %}
+      <div class="domain-row"><div class="domain-label">{{ label }}</div><div class="domain-grade-group">
+        <div class="ecd-grade-btn ecd-grade-E" onclick="selectGrade(this,'{{ fid }}','E')" title="Excellent">E</div>
+        <div class="ecd-grade-btn ecd-grade-G" onclick="selectGrade(this,'{{ fid }}','G')" title="Good">G</div>
+        <div class="ecd-grade-btn ecd-grade-S" onclick="selectGrade(this,'{{ fid }}','S')" title="Satisfactory">S</div>
+        <div class="ecd-grade-btn ecd-grade-N" onclick="selectGrade(this,'{{ fid }}','N')" title="Not Yet">N</div>
+        <input type="hidden" id="{{ fid }}">
+      </div></div>
+      {% endfor %}
+
+      <!-- Motor Skills -->
+      <div class="sec-hdr">Motor Skills</div>
+      {% for label, fid in pre_k_fields_ms %}
+      <div class="domain-row"><div class="domain-label">{{ label }}</div><div class="domain-grade-group">
+        <div class="ecd-grade-btn ecd-grade-E" onclick="selectGrade(this,'{{ fid }}','E')" title="Excellent">E</div>
+        <div class="ecd-grade-btn ecd-grade-G" onclick="selectGrade(this,'{{ fid }}','G')" title="Good">G</div>
+        <div class="ecd-grade-btn ecd-grade-S" onclick="selectGrade(this,'{{ fid }}','S')" title="Satisfactory">S</div>
+        <div class="ecd-grade-btn ecd-grade-N" onclick="selectGrade(this,'{{ fid }}','N')" title="Not Yet">N</div>
+        <input type="hidden" id="{{ fid }}">
+      </div></div>
+      {% endfor %}
+
+      <!-- Social / Emotional -->
+      <div class="sec-hdr">Social / Emotional Skills</div>
+      {% for label, fid in pre_k_fields_se %}
+      <div class="domain-row"><div class="domain-label">{{ label }}</div><div class="domain-grade-group">
+        <div class="ecd-grade-btn ecd-grade-E" onclick="selectGrade(this,'{{ fid }}','E')" title="Excellent">E</div>
+        <div class="ecd-grade-btn ecd-grade-G" onclick="selectGrade(this,'{{ fid }}','G')" title="Good">G</div>
+        <div class="ecd-grade-btn ecd-grade-S" onclick="selectGrade(this,'{{ fid }}','S')" title="Satisfactory">S</div>
+        <div class="ecd-grade-btn ecd-grade-N" onclick="selectGrade(this,'{{ fid }}','N')" title="Not Yet">N</div>
+        <input type="hidden" id="{{ fid }}">
+      </div></div>
+      {% endfor %}
+
+      <!-- Swimming -->
+      <div class="sec-hdr">Swimming</div>
+      {% for label, fid in pre_k_fields_sw %}
+      <div class="domain-row"><div class="domain-label">{{ label }}</div><div class="domain-grade-group">
+        <div class="ecd-grade-btn ecd-grade-E" onclick="selectGrade(this,'{{ fid }}','E')" title="Excellent">E</div>
+        <div class="ecd-grade-btn ecd-grade-G" onclick="selectGrade(this,'{{ fid }}','G')" title="Good">G</div>
+        <div class="ecd-grade-btn ecd-grade-S" onclick="selectGrade(this,'{{ fid }}','S')" title="Satisfactory">S</div>
+        <div class="ecd-grade-btn ecd-grade-N" onclick="selectGrade(this,'{{ fid }}','N')" title="Not Yet">N</div>
+        <input type="hidden" id="{{ fid }}">
+      </div></div>
+      {% endfor %}
+
+      <!-- Teacher comment -->
+      <div class="sec-hdr">Class Teacher&#x2019;s Comment <span style="color:#DC2626">*</span></div>
+      <textarea id="teacher-comment" class="comment-area" onkeyup="checkComment()" placeholder="Required (minimum 50 characters)"></textarea>
+      <div id="char-count" class="char-count">0 / 50 minimum</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px">
+        <div style="font-size:12px;color:#8492A6">Save draft at any time. Submit when all students are complete.</div>
+        <div style="display:flex;gap:8px">
+          <button onclick="saveDraft()" style="padding:8px 16px;background:#fff;color:#474747;border:1px solid #DDE3EE;border-radius:8px;font-size:13px;cursor:pointer">Save draft</button>
+          <button onclick="saveAndNext()" style="padding:8px 16px;background:#023AA5;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Save &amp; next student</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script>
+const CLASS_NAME = "{{ ecd_class_name }}";
+const API = "/academics/api/ecd/";
+const CSRF = "{{ csrf_token }}";
+let students = [], current = null, isLocked = false;
+const WELFARE_FLAGS = {{ welfare_flags|default:"{}" }};
+
+async function init() {
+  const r = await fetch(API + "students/?class_name=" + encodeURIComponent(CLASS_NAME));
+  const d = await r.json();
+  students = d.students || [];
+  renderList();
+  if (students.length) loadStudent(students[0].id);
+  refreshProgress();
+}
+
+function renderList() {
+  document.getElementById("student-list-header").textContent = "Students (" + students.length + ")";
+  document.getElementById("student-list").innerHTML = students.map(s => {
+    const hasWelfare = WELFARE_FLAGS[s.id] && WELFARE_FLAGS[s.id].length > 0;
+    const welfareIcon = hasWelfare ? '<span title="Open welfare concern" style="color:#DC2626;font-size:13px;margin-left:4px">&#9888;</span>' : '';
+    return `<div class="student-item ${current && current.id===s.id?'active':''}" onclick="loadStudent(${s.id})" id="li-${s.id}">
+      <div><div style="font-size:12.5px;font-weight:${current && current.id===s.id?'600':'400'};color:#1A1A2E">${s.first_name} ${s.last_name}${welfareIcon}</div>
+      <div style="font-size:11px;color:#8492A6">Age ${s.age||''}</div></div>
+      <span class="chip chip-grey" id="st-${s.id}">Pending</span>
+    </div>`;
+  }).join('');
+}
+
+async function loadStudent(id) {
+  current = students.find(s => s.id === id);
+  renderList();
+  document.getElementById("student-name-display").textContent = current.first_name + " " + current.last_name;
+  clearFields();
+  const r = await fetch(API + "evaluation/" + id + "/");
+  const d = await r.json();
+  isLocked = d.is_locked || d.is_term_locked || false;
+  const lockBanner = document.getElementById("lock-banner");
+  const lockOverlay = document.getElementById("lock-overlay");
+  if (isLocked) {
+    lockBanner.style.display = "block";
+    lockOverlay.style.display = "flex";
+    document.querySelectorAll(".ecd-grade-btn").forEach(el => { el.style.pointerEvents = "none"; el.style.opacity = "0.5"; });
+    document.querySelectorAll("#teacher-comment").forEach(el => { el.disabled = true; el.style.background = "#f5f5f5"; });
+    document.querySelectorAll("button[onclick*='saveDraft'], button[onclick*='saveAndNext'], button[onclick*='submitAllToHOD']").forEach(el => {
+      el.disabled = true; el.style.opacity = "0.5"; el.style.cursor = "not-allowed";
+    });
+    document.querySelectorAll("button[onclick*='movePrev'], button[onclick*='moveNext']").forEach(el => {
+      el.disabled = false; el.style.opacity = "1"; el.style.cursor = "pointer";
+    });
+  } else {
+    lockBanner.style.display = "none";
+    lockOverlay.style.display = "none";
+    document.querySelectorAll(".ecd-grade-btn").forEach(el => { el.style.pointerEvents = "auto"; el.style.opacity = "1"; });
+    document.querySelectorAll("#teacher-comment").forEach(el => { el.disabled = false; el.style.background = "#fff"; });
+    document.querySelectorAll("button[onclick*='saveDraft'], button[onclick*='saveAndNext'], button[onclick*='submitAllToHOD']").forEach(el => {
+      el.disabled = false; el.style.opacity = "1"; el.style.cursor = "pointer";
+    });
+    document.querySelectorAll("button[onclick*='movePrev'], button[onclick*='moveNext']").forEach(el => {
+      el.disabled = false; el.style.opacity = "1"; el.style.cursor = "pointer";
+    });
+  }
+  const welfareBanner = document.getElementById("welfare-banner");
+  const welfareText = document.getElementById("welfare-banner-text");
+  const flags = WELFARE_FLAGS[id] || [];
+  if (flags.length > 0) {
+    const summaries = flags.map(f => f.severity + " severity: " + (f.concern_type || "concern") + " (" + f.observation_date + ")");
+    welfareText.textContent = "This student has " + flags.length + " open welfare observation(s): " + summaries.join("; ");
+    welfareBanner.style.display = "block";
+  } else {
+    welfareBanner.style.display = "none";
+  }
+  Object.keys(d.evaluations || {}).forEach(key => {
+    const inp = document.getElementById(key);
+    if (inp) {
+      inp.value = d.evaluations[key];
+      const grp = inp.parentElement;
+      grp.querySelectorAll(".ecd-grade-btn").forEach(b => b.className = b.className.replace(/selected-[EGSN]/g,"").trim());
+      const btn = grp.querySelector(`[onclick*="'${d.evaluations[key]}')"]`);
+      if (btn) btn.classList.add("selected-" + d.evaluations[key]);
+    }
+  });
+  const ta = document.getElementById("teacher-comment");
+  ta.value = d.teacher_comments || "";
+  checkComment();
+  const stEl = document.getElementById("st-" + id);
+  if (stEl && d.status) {
+    stEl.textContent = d.status === 'pending_sign_off' ? 'Submitted' : (d.status === 'draft' ? 'Draft' : 'Pending');
+    stEl.className = d.status === 'pending_sign_off' ? 'chip chip-green' : (d.status === 'draft' ? 'chip chip-amber' : 'chip chip-grey');
+  }
+}
+
+function clearFields() {
+  document.querySelectorAll(".domain-grade-group input[type=hidden]").forEach(i => i.value = "");
+  document.querySelectorAll(".ecd-grade-btn").forEach(b => b.className = b.className.replace(/selected-[EGSN]/g,"").trim());
+  document.getElementById("teacher-comment").value = "";
+  checkComment();
+}
+
+function selectGrade(el, fieldId, grade) {
+  if (isLocked) return;
+  const grp = el.parentElement;
+  grp.querySelectorAll(".ecd-grade-btn").forEach(b => b.className = b.className.replace(/selected-[EGSN]/g,"").trim());
+  el.classList.add("selected-" + grade);
+  const inp = document.getElementById(fieldId);
+  if (inp) inp.value = grade;
+  saveDraft();
+}
+
+function checkComment() {
+  const ta = document.getElementById("teacher-comment");
+  const cnt = document.getElementById("char-count");
+  if (ta && cnt) {
+    cnt.textContent = ta.value.length + " / 50 minimum";
+    cnt.style.color = ta.value.length >= 50 ? "#1B7B34" : "#9B1C1C";
+  }
+}
+
+async function saveDraft() {
+  if (isLocked) return;
+  if (!current) return;
+  const evals = {};
+  document.querySelectorAll(".domain-row input[type=hidden]").forEach(i => { if(i.value) evals[i.id] = i.value; });
+  await fetch(API + "evaluation/" + current.id + "/", {
+    method: "POST",
+    headers: {"Content-Type":"application/json","X-CSRFToken":CSRF},
+    body: JSON.stringify({evaluations: evals, teacher_comments: document.getElementById("teacher-comment").value})
+  });
+  if (typeof showToast === 'function') showToast("Draft saved", "success");
+  refreshProgress();
+}
+
+async function saveAndNext() {
+  if (isLocked) return;
+  var ta = document.getElementById("teacher-comment");
+  if (ta && ta.value.trim().length < 50) {
+    alert("A teacher comment of at least 50 characters is required before this student's assessment can be submitted.");
+    ta.focus();
+    return;
+  }
+  await saveDraft();
+  const idx = students.findIndex(s => s.id === current.id);
+  if (idx < students.length - 1) loadStudent(students[idx+1].id);
+}
+
+function movePrev() {
+  if (!current) return;
+  const idx = students.findIndex(s => s.id === current.id);
+  if (idx > 0) loadStudent(students[idx-1].id);
+}
+
+function moveNext() {
+  if (!current) return;
+  const idx = students.findIndex(s => s.id === current.id);
+  if (idx < students.length - 1) loadStudent(students[idx+1].id);
+}
+
+async function refreshProgress() {
+  const r = await fetch(API + "progress/?class_name=" + encodeURIComponent(CLASS_NAME));
+  const d = await r.json();
+  const p = d.progress || {};
+  const pct = p.percentage || 0;
+  document.getElementById("progress-bar").style.width = pct + "%";
+  document.getElementById("progress-text").textContent = (p.completed||0) + " of " + (p.total||0) + " students complete";
+  const badge = document.getElementById("topbar-progress-badge");
+  const txt = document.getElementById("topbar-badge-text");
+  if (badge && txt) {
+    txt.textContent = (p.completed||0) + " of " + (p.total||0) + " complete";
+    badge.className = "topbar-badge " + (p.completed > 0 && p.completed === p.total ? "badge-red" : "badge-amber");
+  }
+}
+
+async function submitAllToHOD() {
+  /* Validate each student before bulk submission */
+  var issues = [];
+  for (const s of students) {
+    /* Load current data for this student */
+    var r = await fetch(API + "evaluation/" + s.id + "/");
+    var d = await r.json();
+    var missing = [];
+    for (var key in d.evaluations) {
+      if (!d.evaluations[key]) missing.push(key);
+    }
+    var commentLen = (d.teacher_comments || "").trim().length;
+    if (commentLen < 50) {
+      issues.push(s.first_name + " " + s.last_name + ": A teacher comment of at least 50 characters is required before this student's assessment can be submitted.");
+    } else if (missing.length > 0) {
+      issues.push(s.first_name + " " + s.last_name + ": " + missing.length + " domain item(s) not yet graded.");
+    }
+  }
+  if (issues.length > 0) {
+    var msg = issues.slice(0, 5).join("\n\n");
+    if (issues.length > 5) msg += "\n\n...and " + (issues.length - 5) + " more issue(s).";
+    alert(msg);
+    return;
+  }
+  if (!confirm("Submit all " + students.length + " evaluations for this class to ECD HOD?")) return;
+  var submitted = 0, failed = 0;
+  for (const s of students) {
+    try {
+      r = await fetch(API + "submit/" + s.id + "/", {method:"POST", headers:{"X-CSRFToken":CSRF}});
+      if (r.ok) { submitted++; } else { failed++; }
+    } catch(e) { failed++; }
+  }
+  if (typeof showToast === 'function') {
+    if (failed === 0) showToast(submitted + " student(s) submitted successfully.", "success");
+    else showToast(submitted + " submitted, " + failed + " failed.", "error");
+  }
+  location.reload();
+}
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+{% endblock %}

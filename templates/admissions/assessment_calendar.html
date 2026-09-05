@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Assessment Calendar &mdash; Admissions &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Assessment Calendar{% endblock %}
+{% block topbar_date %}{{ today_display }}{% endblock %}
+{% block content %}
+  {% include "admissions/_top_tabs.html" %}
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;margin-bottom:16px">
+    <div>
+      <div class="section-title" style="font-size:16px;font-weight:800;color:var(--text-primary)">Assessment Calendar</div>
+      <div style="font-size:13px;color:var(--text-muted);margin-top:2px">
+        Scheduled entrance assessments, next 14 days highlighted.
+      </div>
+    </div>
+    <a href="{% url 'admissions:assessments' %}" class="btn btn-secondary btn-sm">&larr; Back to Assessments</a>
+  </div>
+
+  {% for day, assessments in days %}
+  <div class="card" style="margin-bottom:16px;{% for a in assessments %}{% if a.highlight %}border-color:#023AA5{% endif %}{% endfor %}">
+    <div class="card-title" style="display:flex;align-items:center;gap:10px;margin-bottom:0">
+      <span>{{ day|date:"l, j F Y" }}</span>
+      {% for a in assessments %}
+        {% if a.highlight %}
+        <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#EEF2FF;color:#023AA5;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">Next 14 days</span>
+        {% endif %}
+      {% endfor %}
+    </div>
+    <div style="border-top:1px solid var(--border)">
+      {% for a in assessments %}
+        <div class="trow">
+          <div style="flex:1">
+            <div class="trow-name">{{ a.applicant.child_full_name }}</div>
+            <div class="trow-sub">
+              {{ a.applicant.grade_applying_for }} &middot;
+              {{ a.assessment.scheduled_time|time:"g:i A" }} &middot;
+              {{ a.applicant.parent_full_name }}
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:0.05em;
+              {% if a.status_class == 'green' %}background:#ECFDF5;color:#065F46;
+              {% elif a.status_class == 'amber' %}background:#FFFBEB;color:#92400E;
+              {% elif a.status_class == 'grey' %}background:#F3F4F6;color:#4B5563;
+              {% else %}background:#FEF2F2;color:#9B1C1C;{% endif %}">
+              {{ a.status_label }}
+            </span>
+            <a href="{% url 'admissions:detail' a.applicant.id %}" style="padding:5px 12px;background:#F3F4F6;border-radius:6px;font-size:11.5px;font-weight:600;color:var(--text-secondary);text-decoration:none">Open</a>
+          </div>
+        </div>
+      {% empty %}
+        {% include '_partials/empty_state.html' with title='No assessments this day' desc='No entrance assessments are scheduled for this date.' icon='calendar' icon_color='grey' %}
+      {% endfor %}
+    </div>
+  </div>
+  {% empty %}
+  <div class="card">
+    {% include '_partials/empty_state.html' with title='No assessments scheduled' desc='Schedule entrance assessments for applicants to see them on this calendar.' icon='calendar' %}
+  </div>
+  {% endfor %}
+{% endblock %}

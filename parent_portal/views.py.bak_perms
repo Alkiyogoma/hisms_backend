@@ -1,0 +1,1316 @@
+"""
+Parent Portal views for viewing children's attendance and grades.
+
+FR-PARENT-001: Parent/guardian portal for viewing attendance and grades.
+"""
+import calendar
+from datetime import date, timedelta
+
+from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
+from core.permissions import RoleRequiredMixin
+from django.db.models import Q, Avg, Count, Sum
+from django.shortcuts import get_object_or_404, redirect
+from django.utils import timezone
+from django.views.generic import TemplateView
+from django.views import View
+
+from academics.models import (
+    GradeClass, ExamScore, ReportCard, ReportCardStatus, ExamTypeConfiguration, Subject, Term,
+)
+from attendance.models import AttendanceEntry, AttendanceStatus
+from core.models import TimeStampedModel
+from students.models import Student, StudentStatus, StudentGuardian, ParentGuardian, GuardianRelationship
+from users.models import User, UserRole
+
+
+def _get_parent_guardian(user):
+    """Return the ParentGuardian instance linked to this user, or None."""
+    return ParentGuardian.objects.filter(user=user).first()
+
+
+def _get_children(user):
+    """Return all students linked to this parent/guardian."""
+    guardian = _get_parent_guardian(user)
+    if not guardian:
+        return Student.objects.none()
+    return Student.objects.filter(
+        guardians=guardian,
+        status=StudentStatus.ACTIVE,
+    )
+
+
+def _base_ctx(user):
+    """Shared context for all parent portal views."""
+    now = timezone.now()
+    return {
+        "initials": (user.first_name[0] + user.last_name[0]).upper() if user.first_name and user.last_name else user.username[:2].upper(),
+        "today_display": now.strftime("%A, %B %d, %Y"),
+        "greeting": _greeting(),
+    }
+
+
+def _greeting():
+    hour = timezone.now().hour
+    if hour < 12:
+        return "Good Morning"
+    elif hour < 17:
+        return "Good Afternoon"
+    return "Good Evening"
+
+
+class ParentOnlyMixin(RoleRequiredMixin):
+    """Parent portal pages are Parent/Guardian-role pages.
+
+    Super Admin is also allowed (for testing/support purposes).
+    """
+
+    allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and request.user.role not in (UserRole.PARENT, UserRole.SUPER_ADMIN):
+            from django.core.exceptions import PermissionDenied
+            raise PermissionDenied("Parent portal access is restricted to the Parent/Guardian role.")
+        return super().dispatch(request, *args, **kwargs)
+
+
+def _valid_relationship(value):
+    """Return a valid GuardianRelationship value, falling back to OTHER."""
+    valid = {val for val, _ in GuardianRelationship.choices}
+    return value if value in valid else GuardianRelationship.OTHER
+
+
+# ---------------------------------------------------------------------------
+# Dashboard
+# ---------------------------------------------------------------------------
+
+class ParentDashboardView(RoleRequiredMixin, TemplateView):
+    allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
+    required_permission = "students.view_student"
+    """Parent portal main dashboard showing children overview."""
+    template_name = "parent_portal/dashboard.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return super().dispatch(request, *args, **kwargs)
+        if request.user.role not in (UserRole.PARENT, UserRole.SUPER_ADMIN):
+            return self.handle_no_permission()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(_base_ctx(self.request.user))
+
+        from decimal import Decimal
+        children = _get_children(self.request.user)
+        today = date.today()
+
+        # Attendance today for each child
+        today_entries = AttendanceEntry.objects.filter(
+            student__in=children, date=today
+        ).select_related("student")
+        attendance_map = {e.student_id: e for e in today_entries}
+
+        # Attendance summary (last 30 days)
+        thirty_days_ago = today - timedelta(days=30)
+        recent_entries = AttendanceEntry.objects.filter(
+            student__in=children,
+            date__gte=thirty_days_ago,
+            date__lte=today,
+        ).values("student_id", "status")
+        attendance_summary = {}
+        for entry in recent_entries:
+            sid = entry["student_id"]
+            if sid not in attendance_summary:
+                attendance_summary[sid] = {"present": 0, "absent": 0, "late": 0, "excused": 0, "total": 0}
+            status = entry["status"]
+            attendance_summary[sid]["total"] += 1
+            if status == AttendanceStatus.PRESENT:
+                attendance_summary[sid]["present"] += 1
+            elif status == AttendanceStatus.ABSENT:
+                attendance_summary[sid]["absent"] += 1
+            elif status == AttendanceStatus.LATE:
+                attendance_summary[sid]["late"] += 1
+            elif status == AttendanceStatus.EXCUSED:
+                attendance_summary[sid]["excused"] += 1
+
+        # Calculate attendance rates
+        for sid, stats in attendance_summary.items():
+            if stats["total"] > 0:
+                stats["rate"] = round((stats["present"] + stats["late"]) / stats["total"] * 100, 1)
+            else:
+                stats["rate"] = 0
+
+        # Latest grades for each child
+        latest_scores = {}
+
+        # Outstanding fees per child
+        from finance.models import Invoice
+        fee_summary = {}
+        for child in children:
+            invoices = Invoice.objects.filter(student=child)
+            total_outstanding = Decimal(0)
+            for inv in invoices:
+                total_paid = inv.payments.filter(is_reversal=False).aggregate(t=Sum("amount"))["t"] or 0
+                bal = inv.total_due - total_paid
+                if bal > 0:
+                    total_outstanding += bal
+            fee_summary[child.id] = total_outstanding
+        for child in children:
+            scores = ExamScore.objects.filter(
+                student=child
+            ).select_related("term").order_by("-term__start_date", "subject_name")
+            # Deduplicate by subject — keep latest score per subject
+            seen_subjects = set()
+            deduped = []
+            for s in scores:
+                if s.subject_name not in seen_subjects:
+                    seen_subjects.add(s.subject_name)
+                    deduped.append(s)
+                if len(deduped) >= 5:
+                    break
+            latest_scores[child.id] = deduped
+
+        # Active term
+        from academics.utils import get_current_term
+        active_term = get_current_term()
+
+        # Performance trend data (overall averages per term per child)
+        import json
+        from academics.grading_utils import compute_grade_with_gaps
+        from academics.models import get_exam_weights
+
+        performance_trend = {}
+        for child in children:
+            reports = ReportCard.objects.filter(
+                student=child,
+                status=ReportCardStatus.PUBLISHED,
+            ).select_related("term", "term__academic_year").order_by("term__start_date")
+            trend = []
+            for r in reports:
+                avg = r.overall_average
+                # Compute from scores if not stored
+                if avg is None:
+                    scores = ExamScore.objects.filter(student=child, term=r.term, status="approved")
+                    subj_scores = {}
+                    for s in scores:
+                        if s.subject_name not in subj_scores:
+                            subj_scores[s.subject_name] = {}
+                        subj_scores[s.subject_name][s.exam_type] = float(s.score)
+                    if subj_scores:
+                        exam_weights = get_exam_weights()
+                        total = Decimal(0)
+                        count = 0
+                        for subj, exams in subj_scores.items():
+                            gr = compute_grade_with_gaps(
+                                scores=exams,
+                                weights=exam_weights,
+                            )
+                            if gr["average"] is not None:
+                                total += Decimal(str(gr["average"]))
+                                count += 1
+                        if count > 0:
+                            avg = float(total / count)
+
+                if avg is not None:
+                    trend.append({
+                        "term": r.term.name if r.term else "?",
+                        "year": r.term.academic_year.name if r.term and r.term.academic_year else "",
+                        "average": round(float(avg), 1),
+                    })
+            performance_trend[child.id] = trend
+
+        # Parent tasks (about their children: welfare, attendance, finance, discipline, reports)
+        from tasks.models import Task
+        from django.contrib.contenttypes.models import ContentType
+        from finance.models import Invoice
+        student_ct = ContentType.objects.get_for_model(Student)
+        child_names = [c.get_full_name() for c in children]
+        child_pks = list(children.values_list('pk', flat=True))
+        parent_tasks = Task.objects.filter(
+            Q(assigned_to=self.request.user) | Q(created_by=self.request.user)
+            | (
+                Q(task_type__in=[
+                    'welfare_alert', 'welfare_followup', 'attendance_alert',
+                    'fee_payment_reminder', 'overdue_collection',
+                    'discipline_contact', 'report_card_ready', 'open_invoice',
+                ])
+                & (
+                    Q(content_type=student_ct, object_id__in=child_pks)
+                    | Q(metadata__student_name__in=child_names)
+                    | Q(metadata__student_id__in=child_pks)
+                )
+            )
+        ).filter(status__in=['pending', 'in_progress']).order_by('-priority', '-created_at')[:15]
+
+        # Open invoices summary for parent (included as tasks, not separate section)
+        open_invoices = Invoice.objects.filter(
+            student__in=children,
+            status__in=['unpaid', 'partial', 'overdue'],
+        ).select_related('term', 'student').order_by('due_date')
+
+        ctx.update({
+            "children": children,
+            "attendance_map": attendance_map,
+            "attendance_summary": attendance_summary,
+            "latest_scores": latest_scores,
+            "active_term": active_term,
+            "today": today,
+            "performance_trend": performance_trend,
+            "performance_trend_json": json.dumps(performance_trend),
+            "fee_summary": fee_summary,
+            "parent_tasks": parent_tasks,
+            "open_invoices": open_invoices,
+        })
+        return ctx
+
+
+# ---------------------------------------------------------------------------
+# Attendance History
+# ---------------------------------------------------------------------------
+
+class ParentAttendanceView(RoleRequiredMixin, TemplateView):
+    allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
+    required_permission = "attendance.view_attendanceentry"
+    """Calendar-style attendance history for parent's children."""
+    template_name = "parent_portal/attendance.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return super().dispatch(request, *args, **kwargs)
+        if request.user.role not in (UserRole.PARENT, UserRole.SUPER_ADMIN):
+            return self.handle_no_permission()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(_base_ctx(self.request.user))
+
+        children = _get_children(self.request.user)
+        today = date.today()
+
+        # Parse year/month from query params
+        try:
+            year = int(self.request.GET.get("year", today.year))
+            month = int(self.request.GET.get("month", today.month))
+        except (ValueError, TypeError):
+            year, month = today.year, today.month
+
+        month = max(1, min(12, month))
+
+        # Selected child
+        selected_student_id = self.request.GET.get("student")
+        if selected_student_id:
+            selected_student = children.filter(id=selected_student_id).first()
+        else:
+            selected_student = children.first()
+
+        # Calendar grid
+        cal = calendar.Calendar(firstweekday=0)  # Monday first
+        month_days = cal.monthdayscalendar(year, month)
+
+        # Fetch attendance for the month
+        month_start = date(year, month, 1)
+        if month == 12:
+            month_end = date(year + 1, 1, 1) - timedelta(days=1)
+        else:
+            month_end = date(year, month + 1, 1) - timedelta(days=1)
+
+        attendance_map = {}
+        if selected_student:
+            entries = AttendanceEntry.objects.filter(
+                student=selected_student,
+                date__gte=month_start,
+                date__lte=month_end,
+            )
+            for entry in entries:
+                attendance_map[entry.date.day] = entry
+
+        # Navigation months
+        if month == 1:
+            prev_month, prev_year = 12, year - 1
+        else:
+            prev_month, prev_year = month - 1, year
+
+        if month == 12:
+            next_month, next_year = 1, year + 1
+        else:
+            next_month, next_year = month + 1, year
+
+        # Monthly stats
+        stats = {"present": 0, "absent": 0, "late": 0, "excused": 0, "total": 0}
+        for entry in attendance_map.values():
+            stats["total"] += 1
+            status_key = entry.status.lower() if hasattr(entry.status, 'lower') else str(entry.status).lower()
+            if "present" in status_key:
+                stats["present"] += 1
+            elif "absent" in status_key:
+                stats["absent"] += 1
+            elif "late" in status_key:
+                stats["late"] += 1
+            elif "excus" in status_key:
+                stats["excused"] += 1
+
+        if stats["total"] > 0:
+            stats["rate"] = round((stats["present"] + stats["late"]) / stats["total"] * 100, 1)
+        else:
+            stats["rate"] = 0
+
+        ctx.update({
+            "children": children,
+            "selected_student": selected_student,
+            "month_days": month_days,
+            "attendance_map": attendance_map,
+            "year": year,
+            "month": month,
+            "month_name": calendar.month_name[month],
+            "prev_month": prev_month,
+            "prev_year": prev_year,
+            "next_month": next_month,
+            "next_year": next_year,
+            "stats": stats,
+            "today": today,
+            "day_names": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        })
+        return ctx
+
+
+# ---------------------------------------------------------------------------
+# Grades
+# ---------------------------------------------------------------------------
+
+class ParentGradesView(RoleRequiredMixin, TemplateView):
+    allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
+    required_permission = "academics.view_reportcard"
+    """Exam scores and report cards."""
+    template_name = "parent_portal/grades.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return super().dispatch(request, *args, **kwargs)
+        if request.user.role not in (UserRole.PARENT, UserRole.SUPER_ADMIN):
+            return self.handle_no_permission()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(_base_ctx(self.request.user))
+
+        children = _get_children(self.request.user)
+
+        # Selected child
+        selected_student_id = self.request.GET.get("student")
+        if selected_student_id:
+            selected_student = children.filter(id=selected_student_id).first()
+        else:
+            selected_student = children.first()
+
+        # Active term
+        from academics.utils import get_current_term
+        active_term = get_current_term()
+
+        # Exam scores grouped by subject
+        exam_scores = []
+        subject_averages = {}
+        if selected_student and active_term:
+            scores = ExamScore.objects.filter(
+                student=selected_student,
+                term=active_term,
+            ).select_related("exam_type_config").order_by("subject_name", "exam_type")
+
+            # Group by subject
+            grouped = {}
+            for score in scores:
+                subj_name = score.subject_name or "Unknown"
+                if subj_name not in grouped:
+                    grouped[subj_name] = {"subject_name": subj_name, "scores": [], "average": 0}
+                grouped[subj_name]["scores"].append(score)
+
+            # Calculate averages
+            for subj_name, data in grouped.items():
+                if data["scores"]:
+                    total = sum(s.score for s in data["scores"])
+                    data["average"] = round(total / len(data["scores"]), 1)
+                subject_averages[subj_name] = data["average"]
+
+            exam_scores = list(grouped.values())
+
+        # Report cards
+        report_cards = []
+        if selected_student:
+            report_cards = ReportCard.objects.filter(
+                student=selected_student,
+                status=ReportCardStatus.PUBLISHED,
+            ).select_related("term").order_by("-term__start_date")
+
+        # Cambridge Checkpoint scores
+        checkpoint_scores = []
+        if selected_student and active_term:
+            from academics.models import CambridgeCheckpointScore, AcademicYear
+            academic_year = active_term.academic_year
+            if academic_year:
+                cp_scores = CambridgeCheckpointScore.objects.filter(
+                    student=selected_student,
+                    academic_year=academic_year,
+                ).order_by("subject_name")
+                # Group by subject
+                cp_grouped = {}
+                for cs in cp_scores:
+                    subj = cs.subject_name
+                    if subj not in cp_grouped:
+                        cp_grouped[subj] = {"subject_name": subj, "scores": []}
+                    cp_grouped[subj]["scores"].append(cs)
+                checkpoint_scores = list(cp_grouped.values())
+
+        # Overall average
+        overall_average = 0
+        if subject_averages:
+            overall_average = round(sum(subject_averages.values()) / len(subject_averages), 1)
+
+        ctx.update({
+            "children": children,
+            "selected_student": selected_student,
+            "active_term": active_term,
+            "exam_scores": exam_scores,
+            "subject_averages": subject_averages,
+            "overall_average": overall_average,
+            "report_cards": report_cards,
+            "checkpoint_scores": checkpoint_scores,
+        })
+        return ctx
+
+
+class ParentChildDetailView(RoleRequiredMixin, TemplateView):
+    allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
+    required_permission = "students.view_student"
+    """Comprehensive single-child view: attendance, grades, comments, attributes."""
+    template_name = "parent_portal/child_detail.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return super().dispatch(request, *args, **kwargs)
+        if request.user.role not in (UserRole.PARENT, UserRole.SUPER_ADMIN):
+            return self.handle_no_permission()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        from academics.models import Term
+        ctx.update(_base_ctx(self.request.user))
+
+        children = _get_children(self.request.user)
+        student_id = self.kwargs.get("student_id")
+        student = children.filter(id=student_id).first()
+        if not student:
+            ctx["error"] = "Student not found or not linked to your account."
+            ctx["children"] = children
+            return ctx
+
+        from academics.utils import get_current_term
+        today = date.today()
+        active_term = get_current_term()
+
+        # Attendance: last 6 months
+        six_months_ago = today - timedelta(days=180)
+        attendance_entries = AttendanceEntry.objects.filter(
+            student=student, date__gte=six_months_ago, date__lte=today
+        ).order_by("-date")
+
+        # Attendance stats
+        att_stats = {"present": 0, "absent": 0, "late": 0, "excused": 0, "total": 0}
+        for e in attendance_entries:
+            att_stats["total"] += 1
+            s = str(e.status).lower()
+            if "present" in s: att_stats["present"] += 1
+            elif "absent" in s: att_stats["absent"] += 1
+            elif "late" in s: att_stats["late"] += 1
+            elif "excus" in s: att_stats["excused"] += 1
+        att_stats["rate"] = round((att_stats["present"] + att_stats["late"]) / max(att_stats["total"], 1) * 100, 1)
+
+        # Attendance by month (last 6 months)
+        monthly_attendance = []
+        for i in range(5, -1, -1):
+            m = today.month - i
+            y = today.year
+            while m <= 0: m += 12; y -= 1
+            month_entries = [e for e in attendance_entries if e.date.month == m and e.date.year == y]
+            present = sum(1 for e in month_entries if "present" in str(e.status).lower() or "late" in str(e.status).lower())
+            total = len(month_entries)
+            rate = round(present / max(total, 1) * 100, 1)
+            monthly_attendance.append({"month": calendar.month_abbr[m], "year": y, "rate": rate, "total": total})
+
+        # Exam scores for active term (all terms if no active)
+        score_qs = ExamScore.objects.filter(student=student).select_related("exam_type_config", "term")
+        if active_term:
+            score_qs = score_qs.filter(term=active_term)
+        score_qs = score_qs.order_by("subject_name", "exam_type")
+
+        grouped_scores = {}
+        for score in score_qs:
+            subj = score.subject_name or "Unknown"
+            if subj not in grouped_scores:
+                grouped_scores[subj] = {"subject_name": score.subject_name, "scores": [], "average": 0}
+            grouped_scores[subj]["scores"].append(score)
+        for data in grouped_scores.values():
+            if data["scores"]:
+                data["average"] = round(sum(s.score for s in data["scores"]) / len(data["scores"]), 1)
+        overall = round(sum(d["average"] for d in grouped_scores.values()) / max(len(grouped_scores), 1), 1)
+
+        # Report cards
+        report_cards = ReportCard.objects.filter(student=student, status=ReportCardStatus.PUBLISHED).select_related("term").order_by("-term__start_date")
+
+        # Recent attendance (last 10)
+        recent_attendance = attendance_entries[:10]
+
+        ctx.update({
+            "children": children,
+            "student": student,
+            "active_term": active_term,
+            "attendance_entries": recent_attendance,
+            "att_stats": att_stats,
+            "monthly_attendance": monthly_attendance,
+            "grouped_scores": grouped_scores,
+            "overall_average": overall,
+            "report_cards": report_cards,
+            "today": today,
+        })
+        return ctx
+
+
+# ---------------------------------------------------------------------------
+# Invoices / Fees
+# ---------------------------------------------------------------------------
+
+class ParentInvoicesView(RoleRequiredMixin, TemplateView):
+    allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
+    required_permission = "finance.view_invoice"
+    """Parent portal: view invoices and payment history for linked children.
+    FR-PARENT-001: Parents can view fee invoices and payment status.
+    """
+    template_name = "parent_portal/invoices.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return super().dispatch(request, *args, **kwargs)
+        if request.user.role not in (UserRole.PARENT, UserRole.SUPER_ADMIN):
+            return self.handle_no_permission()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(_base_ctx(self.request.user))
+
+        children = _get_children(self.request.user)
+
+        # Selected child
+        selected_student_id = self.request.GET.get("student")
+        if selected_student_id:
+            selected_student = children.filter(id=selected_student_id).first()
+        else:
+            selected_student = children.first()
+
+        from finance.models import Invoice, InvoiceStatus
+
+        invoices = []
+        total_outstanding = 0
+        if selected_student:
+            invoices = Invoice.objects.filter(
+                student=selected_student,
+            ).select_related("term").order_by("-created_at")
+
+            for inv in invoices:
+                total_paid = inv.payments.filter(is_reversal=False).aggregate(t=Sum("amount"))["t"] or 0
+                inv.balance = inv.total_due - total_paid
+                inv.total_paid = total_paid
+                total_outstanding += inv.balance
+
+        ctx.update({
+            "children": children,
+            "selected_student": selected_student,
+            "invoices": invoices,
+            "total_outstanding": total_outstanding,
+            "invoice_statuses": InvoiceStatus,
+        })
+        return ctx
+
+
+# ---------------------------------------------------------------------------
+# Communications / Notifications
+# ---------------------------------------------------------------------------
+
+class ParentCommunicationsView(RoleRequiredMixin, TemplateView):
+    allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
+    required_permission = "communications.view_broadcast"
+    """Parent portal: view school communications and notifications.
+    FR-PARENT-001: Parents can view school broadcasts and notifications.
+    """
+    template_name = "parent_portal/communications.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return super().dispatch(request, *args, **kwargs)
+        if request.user.role not in (UserRole.PARENT, UserRole.SUPER_ADMIN):
+            return self.handle_no_permission()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(_base_ctx(self.request.user))
+
+        # In-app notifications for this user
+        from communications.models import Notification
+
+        notif_qs = Notification.objects.filter(
+            recipient=self.request.user,
+        )
+
+        # Unread count (before slicing)
+        unread_count = notif_qs.filter(is_read=False).count()
+
+        notifications = notif_qs.order_by("-created_at")[:30]
+
+        # Published broadcasts
+        from communications.models import Broadcast, BroadcastStatus
+        from django.utils import timezone
+        today = timezone.now().date()
+
+        broadcasts = Broadcast.objects.filter(
+            status=BroadcastStatus.SENT,
+            sent_at__date__lte=today,
+        ).order_by("-sent_at")[:20]
+
+        ctx.update({
+            "notifications": notifications,
+            "broadcasts": broadcasts,
+            "unread_count": unread_count,
+        })
+        return ctx
+
+
+# ---------------------------------------------------------------------------
+# Calendar
+# ---------------------------------------------------------------------------
+
+class ParentCalendarView(ParentOnlyMixin, TemplateView):
+    allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
+    required_permission = "events.view_calendarevent"
+    """Parent portal: school calendar with events and term dates."""
+    template_name = "parent_portal/calendar.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(_base_ctx(self.request.user))
+
+        import calendar as cal_mod
+        from events.models import CalendarEvent, EventAcknowledgement
+
+        today = date.today()
+        year = int(self.request.GET.get("year", today.year))
+        month = int(self.request.GET.get("month", today.month))
+
+        # Clamp month
+        month = max(1, min(12, month))
+
+        # Build calendar grid
+        cal = cal_mod.Calendar(firstweekday=0)
+        month_days = cal.monthdayscalendar(year, month)
+
+        # Events for this month
+        from datetime import date as date_cls
+        month_start = date_cls(year, month, 1)
+        if month == 12:
+            month_end = date_cls(year + 1, 1, 1)
+        else:
+            month_end = date_cls(year, month + 1, 1)
+
+        events = CalendarEvent.objects.filter(
+            is_published=True,
+            start_date__gte=month_start,
+            start_date__lt=month_end,
+        ).order_by("start_date")
+
+        # Group events by day
+        events_by_day = {}
+        for ev in events:
+            day = ev.start_date.day
+            if day not in events_by_day:
+                events_by_day[day] = []
+            events_by_day[day].append(ev)
+
+        # Upcoming events (next 30 days)
+        upcoming = CalendarEvent.objects.filter(
+            is_published=True,
+            start_date__gte=today,
+            start_date__lte=today + timedelta(days=30),
+        ).order_by("start_date")[:10]
+
+        # Navigation
+        if month == 1:
+            prev_month, prev_year = 12, year - 1
+        else:
+            prev_month, prev_year = month - 1, year
+
+        if month == 12:
+            next_month, next_year = 1, year + 1
+        else:
+            next_month, next_year = month + 1, year
+
+        ctx.update({
+            "year": year,
+            "month": month,
+            "month_name": cal_mod.month_name[month],
+            "month_days": month_days,
+            "events_by_day": events_by_day,
+            "events": events,
+            "upcoming": upcoming,
+            "today": today,
+            "prev_month": prev_month,
+            "prev_year": prev_year,
+            "next_month": next_month,
+            "next_year": next_year,
+        })
+        return ctx
+
+
+class ParentGuardianListView(ParentOnlyMixin, TemplateView):
+    """List all guardians linked to a specific child."""
+    allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
+    required_permission = "students.view_student"
+    template_name = "parent_portal/child_guardians.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(_base_ctx(self.request.user))
+
+        student_id = self.kwargs["student_id"]
+        children = _get_children(self.request.user)
+        student = children.filter(id=student_id).first()
+        if not student:
+            ctx["error"] = "Student not found or not linked to your account."
+            ctx["children"] = children
+            return ctx
+
+        ctx["student"] = student
+        ctx["guardian_links"] = StudentGuardian.objects.filter(
+            student=student
+        ).select_related("guardian").order_by("-is_primary", "guardian__full_name")
+        return ctx
+
+
+class ParentGuardianLinkView(ParentOnlyMixin, TemplateView):
+    """Link an additional guardian (next of kin) to a child."""
+    allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
+    required_permission = "students.change_studentguardian"
+    template_name = "parent_portal/child_guardian_link.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(_base_ctx(self.request.user))
+
+        student_id = self.kwargs["student_id"]
+        children = _get_children(self.request.user)
+        student = children.filter(id=student_id).first()
+        if not student:
+            ctx["error"] = "Student not found or not linked to your account."
+            ctx["children"] = children
+            return ctx
+
+        ctx["student"] = student
+        ctx["relationship_choices"] = GuardianRelationship.choices
+        return ctx
+
+    def post(self, request, *args, **kwargs):
+        student_id = self.kwargs["student_id"]
+        children = _get_children(request.user)
+        student = children.filter(id=student_id).first()
+        if not student:
+            messages.error(request, "Student not found.")
+            return redirect("parent_portal:dashboard")
+
+        action = request.POST.get("action")
+
+        if action == "request_guardian":
+            guardian_name = request.POST.get("guardian_name", "").strip()
+            guardian_phone = request.POST.get("guardian_phone", "").strip()
+            relationship = _valid_relationship(request.POST.get("relationship", "other"))
+            notes = request.POST.get("notes", "").strip()
+
+            if not guardian_name or not guardian_phone:
+                messages.error(request, "Guardian name and phone are required.")
+                return redirect("parent_portal:guardian_link", student_id=student_id)
+
+            from users.models import User, UserRole
+            from communications.models import Notification
+
+            admin_users = User.objects.filter(role__in=[UserRole.SUPER_ADMIN, UserRole.ADMIN_OFFICER], is_active=True)
+            parent_name = request.user.get_full_name() or request.user.username
+            rel_display = dict(GuardianRelationship.choices).get(relationship, relationship)
+
+            notif_title = "Guardian Link Request"
+            notif_body = (
+                f"{parent_name} has requested a new guardian be created and linked to "
+                f"{student.first_name} {student.last_name}.\n\n"
+                f"Guardian Name: {guardian_name}\n"
+                f"Phone: {guardian_phone}\n"
+                f"Relationship: {rel_display}\n"
+            )
+            if notes:
+                notif_body += f"Notes: {notes}\n"
+            notif_body += f"\nPlease create the guardian record and link them to the student."
+
+            for admin in admin_users:
+                Notification.objects.create(
+                    recipient=admin,
+                    category="system",
+                    title=notif_title,
+                    body=notif_body,
+                    link=f"/students/guardians/",
+                )
+
+            messages.success(request, f"Request sent to the school office. They will create and link {guardian_name} shortly.")
+            return redirect("parent_portal:guardian_list", student_id=student_id)
+
+        guardian_id = request.POST.get("guardian_id")
+        relationship = _valid_relationship(request.POST.get("relationship", "other"))
+
+        if not guardian_id:
+            messages.error(request, "Please select a guardian to link.")
+            return redirect("parent_portal:guardian_link", student_id=student_id)
+
+        # IDOR guard: only allow linking guardians already associated with the
+        # requesting parent's own family (their children or their own record),
+        # never an arbitrary ParentGuardian PK from the whole system.
+        scoped_pks = set(
+            StudentGuardian.objects.filter(student__in=children).values_list("guardian_id", flat=True)
+        )
+        parent_guardian = _get_parent_guardian(request.user)
+        if parent_guardian:
+            scoped_pks.add(parent_guardian.pk)
+        guardian = ParentGuardian.objects.filter(pk=guardian_id, pk__in=scoped_pks).first()
+        if not guardian:
+            messages.error(request, "Guardian not found or not linked to your family.")
+            return redirect("parent_portal:guardian_link", student_id=student_id)
+
+        if StudentGuardian.objects.filter(student=student, guardian=guardian).exists():
+            messages.warning(request, f"{guardian.full_name} is already linked to {student.first_name}.")
+            return redirect("parent_portal:guardian_list", student_id=student_id)
+
+        StudentGuardian.objects.create(
+            student=student,
+            guardian=guardian,
+            relationship=relationship,
+            is_primary=False,
+        )
+        messages.success(request, f"{guardian.full_name} linked to {student.first_name} as {relationship}.")
+        return redirect("parent_portal:guardian_list", student_id=student_id)
+
+
+class ParentGuardianUnlinkView(ParentOnlyMixin, View):
+    """Remove a guardian link from a child. Parents cannot remove the primary guardian."""
+    allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
+    required_permission = "students.change_studentguardian"
+
+    def post(self, request, *args, **kwargs):
+        student_id = self.kwargs["student_id"]
+        sg_pk = self.kwargs["sg_pk"]
+        children = _get_children(request.user)
+        student = children.filter(id=student_id).first()
+        if not student:
+            messages.error(request, "Student not found.")
+            return redirect("parent_portal:dashboard")
+
+        sg = get_object_or_404(StudentGuardian, pk=sg_pk, student=student)
+
+        if sg.is_primary:
+            messages.error(request, "Cannot remove the primary guardian.")
+            return redirect("parent_portal:guardian_list", student_id=student_id)
+
+        guardian_name = sg.guardian.full_name
+        sg.delete()
+        messages.success(request, f"{guardian_name} unlinked from {student.first_name}.")
+        return redirect("parent_portal:guardian_list", student_id=student_id)
+
+
+class ParentChildrenListView(ParentOnlyMixin, TemplateView):
+    """List of children for the logged-in parent, styled like the teacher student list."""
+    allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
+    required_permission = "students.view_student"
+    template_name = "parent_portal/children_list.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(_base_ctx(self.request.user))
+        children = _get_children(self.request.user)
+        q = self.request.GET.get("q", "").strip()
+        if q:
+            children = children.filter(
+                Q(first_name__icontains=q) | Q(last_name__icontains=q) | Q(admission_no__icontains=q)
+            )
+        ctx["students"] = children.order_by("class_name", "last_name")
+        ctx["q"] = q
+        return ctx
+
+
+class ParentStudentDetailView(ParentOnlyMixin, TemplateView):
+    """Student detail for parents — same layout as teacher detail, filtered to own children."""
+    allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
+    required_permission = "students.view_student"
+    template_name = "parent_portal/child_detail_full.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(_base_ctx(self.request.user))
+
+        children = _get_children(self.request.user)
+        student_id = self.kwargs.get("student_id")
+        student = children.filter(id=student_id).first()
+        if not student:
+            ctx["error"] = "Student not found or not linked to your account."
+            ctx["children"] = children
+            return ctx
+
+        from academics.utils import get_current_term
+        today = date.today()
+        active_term = get_current_term()
+
+        # Attendance: last 30 days
+        thirty_days_ago = today - timedelta(days=30)
+        attendance_entries = AttendanceEntry.objects.filter(
+            student=student, date__gte=thirty_days_ago, date__lte=today
+        ).order_by("-date")
+
+        att_stats = {"present": 0, "absent": 0, "late": 0, "excused": 0, "total": 0}
+        for e in attendance_entries:
+            att_stats["total"] += 1
+            s = str(e.status).lower()
+            if "present" in s: att_stats["present"] += 1
+            elif "absent" in s: att_stats["absent"] += 1
+            elif "late" in s: att_stats["late"] += 1
+            elif "excus" in s: att_stats["excused"] += 1
+        att_stats["rate"] = round((att_stats["present"] + att_stats["late"]) / max(att_stats["total"], 1) * 100, 1)
+
+        # Exam scores for active term
+        score_qs = ExamScore.objects.filter(student=student).select_related("exam_type_config", "term")
+        if active_term:
+            score_qs = score_qs.filter(term=active_term)
+
+        grouped_scores = {}
+        for sc in score_qs:
+            subj = sc.subject_name or "General"
+            if subj not in grouped_scores:
+                grouped_scores[subj] = {"subject": subj, "quiz": None, "mid": None, "end": None, "average": 0, "count": 0}
+            exam_label = (sc.exam_type_config.label or "").lower() if sc.exam_type_config else ""
+            if "quiz" in exam_label:
+                grouped_scores[subj]["quiz"] = float(sc.score) if sc.score is not None else None
+            elif "mid" in exam_label:
+                grouped_scores[subj]["mid"] = float(sc.score) if sc.score is not None else None
+            else:
+                grouped_scores[subj]["end"] = float(sc.score) if sc.score is not None else None
+            if sc.score is not None:
+                grouped_scores[subj]["average"] += float(sc.score)
+                grouped_scores[subj]["count"] += 1
+        for d in grouped_scores.values():
+            if d["count"]:
+                d["average"] = round(d["average"] / d["count"], 1)
+
+        overall = round(sum(d["average"] for d in grouped_scores.values()) / max(len(grouped_scores), 1), 1)
+
+        # Report cards
+        report_cards = ReportCard.objects.filter(student=student, status=ReportCardStatus.PUBLISHED).select_related("term").order_by("-term__start_date")
+
+        # Guardian links
+        guardian_links = StudentGuardian.objects.filter(student=student).select_related("guardian").order_by("-is_primary", "guardian__full_name")
+
+        # Recent attendance (last 7)
+        recent_attendance = attendance_entries[:7]
+
+        ctx.update({
+            "student": student,
+            "active_term": active_term,
+            "attendance_entries": recent_attendance,
+            "att_stats": att_stats,
+            "grouped_scores": grouped_scores,
+            "overall_average": overall,
+            "report_cards": report_cards,
+            "guardian_links": guardian_links,
+            "today": today,
+        })
+        return ctx
+
+
+# ---------------------------------------------------------------------------
+# Welfare Observations (read-only for parents)
+# ---------------------------------------------------------------------------
+
+class ParentWelfareView(ParentOnlyMixin, TemplateView):
+    """Read-only welfare observations for a parent's children."""
+    allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
+    required_permission = "welfare.view_welfareobservation"
+    template_name = "parent_portal/welfare.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(_base_ctx(self.request.user))
+
+        children = _get_children(self.request.user)
+
+        # Optionally filter by student
+        student_id = self.request.GET.get("student")
+        if student_id:
+            children = children.filter(id=student_id)
+
+        from welfare.models import WelfareObservation
+        observations = WelfareObservation.objects.filter(
+            student__in=children
+        ).select_related("student", "submitted_by").order_by("-observation_date")
+
+        active = observations.exclude(hod_status="resolved")
+        resolved = observations.filter(hod_status="resolved")[:20]
+
+        ctx.update({
+            "children": children,
+            "active_observations": active,
+            "resolved_observations": resolved,
+            "selected_student_id": int(student_id) if student_id else None,
+        })
+        return ctx
+
+
+# ── Parent Admission Form + Invoice Generation (Spec Step 10) ──────────────
+
+class ParentAdmissionFormView(ParentOnlyMixin, TemplateView):
+    """Parent fills admission form after receiving an offer (step 10).
+
+    Accessible when applicant status is ADMITTED or CONDITIONAL.
+    On submit, transitions applicant to FORM_SUBMITTED.
+    """
+    template_name = "parent_portal/admission_form.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return super().dispatch(request, *args, **kwargs)
+        if request.user.role not in (UserRole.PARENT, UserRole.SUPER_ADMIN):
+            return self.handle_no_permission()
+        return super().dispatch(request, *args, **kwargs)
+
+    def _get_applicant(self):
+        """Find the applicant linked to this parent by email match."""
+        from admissions.models import Applicant, ApplicantStatus
+        user_email = (self.request.user.email or "").strip().lower()
+        if not user_email:
+            return None
+        return Applicant.objects.filter(
+            parent_email__iexact=user_email,
+            status__in=[ApplicantStatus.ADMITTED, ApplicantStatus.CONDITIONAL],
+        ).order_by("-created_at").first()
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(_base_ctx(self.request.user))
+        applicant = self._get_applicant()
+        if not applicant:
+            ctx["no_applicant"] = True
+            return ctx
+        ctx["applicant"] = applicant
+        return ctx
+
+    def post(self, request, *args, **kwargs):
+        import json
+        from admissions.models import Applicant, ApplicantStatus
+        from admissions.services import transition_applicant_status
+        from django.contrib import messages as django_messages
+
+        applicant = self._get_applicant()
+        if not applicant:
+            django_messages.error(request, "No active admission application found for your account.")
+            return redirect("parent_portal:dashboard")
+
+        if applicant.status not in [ApplicantStatus.ADMITTED, ApplicantStatus.CONDITIONAL]:
+            django_messages.warning(request, "This application is no longer at the admission form stage.")
+            return redirect("parent_portal:dashboard")
+
+        pdpa_consent = request.POST.get("pdpa_consent") == "on"
+        code_of_conduct = request.POST.get("code_of_conduct") == "on"
+
+        if not pdpa_consent:
+            django_messages.error(request, "You must provide data consent to proceed.")
+            return self.get(request, *args, **kwargs)
+
+        if not code_of_conduct:
+            django_messages.error(request, "You must accept the code of conduct to proceed.")
+            return self.get(request, *args, **kwargs)
+
+        notes_data = {
+            "submitted_via": "parent_portal_form",
+            "student": {
+                "name": request.POST.get("student_name", ""),
+                "dob": request.POST.get("student_dob", ""),
+                "nationality": request.POST.get("student_nationality", ""),
+                "religion": request.POST.get("student_religion", ""),
+                "languages": request.POST.get("student_languages", ""),
+            },
+            "health": {
+                "state": request.POST.get("health_state", ""),
+                "allergies": request.POST.get("allergies", ""),
+                "medications": request.POST.get("medications", ""),
+                "special_needs": request.POST.get("special_needs", ""),
+                "hospital": request.POST.get("hospital", ""),
+                "physician": request.POST.get("physician", ""),
+                "insurance": request.POST.get("insurance", ""),
+            },
+            "emergency": [
+                {"name": request.POST.get("emergency1_name", ""), "rel": request.POST.get("emergency1_rel", ""), "phone": request.POST.get("emergency1_phone", "")},
+                {"name": request.POST.get("emergency2_name", ""), "rel": request.POST.get("emergency2_rel", ""), "phone": request.POST.get("emergency2_phone", "")},
+            ],
+            "uniform": {
+                "size": request.POST.get("uniform_size", ""),
+                "measurements": request.POST.get("uniform_measurements", ""),
+            },
+            "meal_choice": request.POST.get("meal_choice", "pack"),
+            "transport_needed": request.POST.get("transport_needed", "no"),
+            "consent": {
+                "pdpa": True,
+                "media": request.POST.get("media_consent") == "on",
+                "code_of_conduct": True,
+            },
+        }
+
+        applicant.notes = json.dumps(notes_data)
+        applicant.save(update_fields=["notes", "updated_at"])
+
+        try:
+            transition_applicant_status(
+                applicant=applicant,
+                to_status=ApplicantStatus.FORM_SUBMITTED,
+                actor=request.user,
+                reason="Parent completed admission form online.",
+            )
+            django_messages.success(request, "Admission form submitted successfully. You can now generate your invoice.")
+        except Exception as e:
+            django_messages.error(request, f"Error submitting form: {e}")
+
+        return redirect("parent_portal:admission_form")
+
+
+class ParentGenerateInvoiceView(ParentOnlyMixin, View):
+    """Generate admission invoice after parent submits the form (step 10).
+
+    Creates the ADM- invoice and fires E18 to finance.
+    """
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return super().dispatch(request, *args, **kwargs)
+        if request.user.role not in (UserRole.PARENT, UserRole.SUPER_ADMIN):
+            return self.handle_no_permission()
+        return super().dispatch(request, *args, **kwargs)
+
+    def _get_applicant(self):
+        from admissions.models import Applicant, ApplicantStatus
+        user_email = (self.request.user.email or "").strip().lower()
+        if not user_email:
+            return None
+        return Applicant.objects.filter(
+            parent_email__iexact=user_email,
+            status=ApplicantStatus.FORM_SUBMITTED,
+        ).order_by("-created_at").first()
+
+    def post(self, request, *args, **kwargs):
+        from admissions.models import ApplicantStatus
+        from finance.models import Invoice, InvoiceLineItem, InvoiceStatus, FinancePeriod
+        from admissions.services import transition_applicant_status
+        from communications.email_service import dispatch_notification, send_email_safe
+        from users.models import User, UserRole
+        from core.models import SchoolSettings
+        from django.contrib import messages as django_messages
+
+        applicant = self._get_applicant()
+        if not applicant:
+            django_messages.error(request, "No admission form found that is ready for invoicing.")
+            return redirect("parent_portal:dashboard")
+
+        existing = Invoice.objects.filter(applicant=applicant, invoice_number__startswith="ADM-").first()
+        if existing:
+            django_messages.info(request, f"Invoice {existing.invoice_number} already exists. Amount: TZS {existing.total_due:,.0f}")
+            return redirect("parent_portal:dashboard")
+
+        settings = SchoolSettings.get_settings()
+        admission_fee = settings.admission_fee or 700000
+        period = FinancePeriod.objects.filter(is_reconciled=False).first()
+        inv_no = f"ADM-{applicant.id:04d}-{timezone.now().strftime('%y%m%d')}"
+
+        invoice = Invoice.objects.create(
+            applicant=applicant,
+            amount_due=admission_fee,
+            total_due=admission_fee,
+            due_date=timezone.now().date() + timezone.timedelta(days=14),
+            status=InvoiceStatus.UNPAID,
+            period=period,
+            invoice_number=inv_no,
+        )
+        InvoiceLineItem.objects.create(
+            invoice=invoice,
+            description=f"Admission Fee for {applicant.child_full_name}",
+            amount=admission_fee,
+        )
+
+        try:
+            transition_applicant_status(
+                applicant=applicant,
+                to_status=ApplicantStatus.INVOICE_GENERATED,
+                actor=request.user,
+                reason=f"Invoice {inv_no} generated by parent.",
+            )
+        except Exception:
+            pass
+
+        contact = settings.get_admissions_contact()
+        fo_users = User.objects.filter(role=UserRole.FINANCE_OFFICER, is_active=True)
+        for fo in fo_users:
+            dispatch_notification(
+                user=fo, title="Admission Fee Invoice Generated",
+                message=f"Admission fee invoice {inv_no} (TZS {admission_fee:,.0f}) generated for {applicant.child_full_name}.",
+                link=f"/admissions/applicant/{applicant.pk}/", actor=None,
+            )
+            if fo.email:
+                from core.email_templates import send_dynamic_email
+                e18_context = {
+                    "child_name": applicant.child_full_name,
+                    "grade": applicant.grade_applying_for,
+                    "parent_name": applicant.parent_full_name,
+                    "invoice_number": inv_no,
+                    "amount_due": f"{admission_fee:,.0f}",
+                    "currency": "TZS",
+                    "reference_number": applicant.reference_number,
+                    "application_link": f"/admissions/applicant/{applicant.pk}/",
+                    "school_name": settings.school_name or "Hodari Christian School",
+                }
+                db_sent = send_dynamic_email(
+                    template_type="invoice_generated",
+                    to_email=fo.email,
+                    context=e18_context,
+                )
+                if not db_sent:
+                    send_email_safe(
+                        to_email=fo.email,
+                        subject=f"Invoice raised: {applicant.child_full_name} — {applicant.reference_number}",
+                        body=(
+                            f"An admission invoice has been generated and payment is expected.\n\n"
+                            f"Learner: {applicant.child_full_name}\n"
+                            f"Grade: {applicant.grade_applying_for}\n"
+                            f"Parent: {applicant.parent_full_name}\n"
+                            f"Invoice number: {inv_no}\n"
+                            f"Amount: TZS {admission_fee:,.0f}\n"
+                            f"Reference: {applicant.reference_number}\n\n"
+                            f"Enrolment cannot proceed until this invoice is settled in full.\n\n"
+                            f"View the application: /admissions/applicant/{applicant.pk}/"
+                        ),
+                    )
+
+        django_messages.success(
+            request,
+            f"Invoice {inv_no} generated. Amount: TZS {admission_fee:,.0f}. "
+            f"Due by {invoice.due_date.strftime('%d %B %Y')}. "
+            f"Please pay to confirm enrolment."
+        )
+        return redirect("parent_portal:dashboard")

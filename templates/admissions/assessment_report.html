@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}Assessment Report — {{ applicant.child_full_name }}{% endblock %}
+{% block content %}
+<div style="max-width:800px;margin:0 auto;padding:24px 16px">
+  <!-- Header -->
+  <div style="text-align:center;margin-bottom:24px;padding-bottom:20px;border-bottom:2px solid var(--hodari-blue)">
+    <h1 style="font-size:22px;font-weight:800;color:var(--hodari-blue);margin:0">{{ school_name }}</h1>
+    <div style="font-size:13px;color:var(--text-muted);margin-top:4px">Admission Assessment Report</div>
+  </div>
+
+  <!-- Student Info Card -->
+  <div style="background:var(--bg-metric);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <div class="hf-label">Child's Full Name</div>
+        <div style="font-size:15px;font-weight:700;color:var(--text-primary);margin-top:4px">{{ applicant.child_full_name }}</div>
+      </div>
+      <div>
+        <div class="hf-label">Grade Applying For</div>
+        <div style="font-size:15px;font-weight:700;color:var(--text-primary);margin-top:4px">{{ applicant.grade_applying_for }}</div>
+      </div>
+      <div>
+        <div class="hf-label">Date of Birth</div>
+        <div style="font-size:14px;font-weight:600;color:var(--text-primary);margin-top:4px">{{ applicant.child_dob|date:"d M Y" }}</div>
+      </div>
+      <div>
+        <div class="hf-label">Gender</div>
+        <div style="font-size:14px;font-weight:600;color:var(--text-primary);margin-top:4px">{{ applicant.child_gender|default:"—" }}</div>
+      </div>
+      <div>
+        <div class="hf-label">Parent / Guardian</div>
+        <div style="font-size:14px;font-weight:600;color:var(--text-primary);margin-top:4px">{{ applicant.parent_full_name }}</div>
+      </div>
+      <div>
+        <div class="hf-label">Reference No.</div>
+        <div style="font-size:14px;font-weight:600;color:var(--text-primary);margin-top:4px">{{ applicant.reference_number }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Assessment Details -->
+  <div style="background:var(--bg-metric);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+    <h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 12px 0">Assessment Details</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+      <div>
+        <div class="hf-label">Date</div>
+        <div style="font-size:14px;font-weight:600;color:var(--text-primary);margin-top:4px">{{ assessment.scheduled_date|date:"d M Y" }}</div>
+      </div>
+      <div>
+        <div class="hf-label">Time</div>
+        <div style="font-size:14px;font-weight:600;color:var(--text-primary);margin-top:4px">{{ assessment.scheduled_time|time:"H:i" }}</div>
+      </div>
+      <div>
+        <div class="hf-label">Location</div>
+        <div style="font-size:14px;font-weight:600;color:var(--text-primary);margin-top:4px">{{ assessment.location }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Assessment Form -->
+  <form method="post" action="{% url 'admissions:assessment_report' applicant.pk %}">
+    {% csrf_token %}
+
+    <!-- Subject Assessment Table -->
+    <div style="background:var(--bg-metric);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+      <h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 16px 0">Subject Assessment</h3>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="background:var(--hodari-blue);color:#fff">
+              <th style="padding:10px 12px;text-align:left;border-radius:8px 0 0 0;font-weight:600">Subject</th>
+              <th style="padding:10px 12px;text-align:center;width:100px;font-weight:600">Marks (0-100)</th>
+              <th style="padding:10px 12px;text-align:center;width:100px;font-weight:600">Grade</th>
+              <th style="padding:10px 12px;text-align:left;border-radius:0 8px 0 0;font-weight:600">Remarks</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for subject in subjects %}
+            <tr style="border-bottom:1px solid var(--border);{% cycle 'background:var(--bg-metric)' 'background:var(--bg-card)' %}">
+              <td style="padding:10px 12px;font-weight:600;color:var(--text-primary)">{{ subject.name }}</td>
+              <td style="padding:10px 12px;text-align:center">
+                <input type="number" name="mark_{{ subject.key }}" min="0" max="100"
+                  style="width:80px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;text-align:center;font-size:13px"
+                  placeholder="0-100">
+              </td>
+              <td style="padding:10px 12px;text-align:center">
+                <select name="grade_{{ subject.key }}"
+                  style="width:80px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+                  <option value="">—</option>
+                  <option value="A">A</option>
+                  <option value="B">B</option>
+                  <option value="C">C</option>
+                  <option value="D">D</option>
+                  <option value="E">E</option>
+                  <option value="F">F</option>
+                </select>
+              </td>
+              <td style="padding:10px 12px">
+                <input type="text" name="remark_{{ subject.key }}"
+                  style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px"
+                  placeholder="Brief comment on performance">
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Teacher Comments -->
+    <div style="background:var(--bg-metric);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+      <h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 12px 0">Teacher Comments</h3>
+      <textarea name="teacher_comments" rows="4"
+        style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;resize:vertical"
+        placeholder="Overall assessment of the child's academic readiness, behavior, and potential..."></textarea>
+    </div>
+
+    <!-- Overall Remark -->
+    <div style="background:var(--bg-metric);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+      <h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 12px 0">Overall Recommendation</h3>
+      <textarea name="overall_remark" rows="3"
+        style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;resize:vertical"
+        placeholder="Final recommendation regarding the child's admission..."></textarea>
+    </div>
+
+    <!-- Signature Section -->
+    <div style="background:var(--bg-metric);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+      <h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 16px 0">Assessment Sign-off</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+        <div>
+          <div class="hf-label">Teacher's Name</div>
+          <div style="font-size:14px;font-weight:600;color:var(--text-primary);margin-top:6px;padding-bottom:8px;border-bottom:1px dashed var(--border)">
+            {{ assessment.facilitating_teacher_name }}
+          </div>
+        </div>
+        <div>
+          <div class="hf-label">Signature</div>
+          <div style="height:40px;border-bottom:1px dashed var(--border);margin-top:6px"></div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Sign above the line</div>
+        </div>
+      </div>
+      <div style="margin-top:16px">
+        <div class="hf-label">Date</div>
+        <div style="font-size:14px;font-weight:600;color:var(--text-primary);margin-top:6px">
+          {{ assessment.scheduled_date|date:"d M Y" }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <div style="display:flex;gap:12px;justify-content:flex-end">
+      <a href="{% url 'admissions:detail' applicant.pk %}"
+        style="padding:10px 20px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text-secondary);text-decoration:none">
+        Cancel
+      </a>
+      <button type="submit" class="btn-primary" style="padding:10px 24px;font-size:13px">
+        Save Assessment Report
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+{% block title %}Financial Reports &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Financial Reports{% endblock %}
+{% block topbar_date %}{{ selected_term.name|default:"Custom" }} &middot; {{ date_from }} to {{ date_to }}{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+
+
+<!-- Term / Date Selector -->
+<form method="get" class="hf2-toolbar" style="padding:16px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;margin-bottom:20px">
+  <span class="hf2-toolbar-label">Term</span>
+  <select name="term" class="hf2-select" style="min-width:200px">
+    <option value="">Custom range</option>
+    {% for term in terms %}
+    <option value="{{ term.pk }}" {% if selected_term.pk == term.pk %}selected{% endif %}>{{ term.name }} ({{ term.academic_year.name }})</option>
+    {% endfor %}
+  </select>
+  <span class="hf2-toolbar-label">From</span>
+  <input type="date" name="from" value="{{ date_from }}" class="hf2-input hf2-date" style="width:148px">
+  <span class="hf2-toolbar-label">To</span>
+  <input type="date" name="to" value="{{ date_to }}" class="hf2-input hf2-date" style="width:148px">
+  <button type="submit" class="btn btn-primary btn-sm">Update</button>
+  <a href="{% url 'finance:financial_reports' %}?type={{ report_type }}" class="btn btn-secondary btn-sm">Reset</a>
+</form>
+
+<!-- Report Navigation -->
+<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
+  <a href="?type=income_statement{% if selected_term.pk %}&term={{ selected_term.pk }}{% endif %}{% if date_from %}&from={{ date_from }}&to={{ date_to }}{% endif %}"
+     class="btn btn-sm {% if report_type == 'income_statement' %}btn-primary{% else %}btn-secondary{% endif %}">Income Statement</a>
+  <a href="?type=collection_report{% if selected_term.pk %}&term={{ selected_term.pk }}{% endif %}{% if date_from %}&from={{ date_from }}&to={{ date_to }}{% endif %}"
+     class="btn btn-sm {% if report_type == 'collection_report' %}btn-primary{% else %}btn-secondary{% endif %}">Collection Report</a>
+  <a href="?type=expense_report{% if selected_term.pk %}&term={{ selected_term.pk }}{% endif %}{% if date_from %}&from={{ date_from }}&to={{ date_to }}{% endif %}"
+     class="btn btn-sm {% if report_type == 'expense_report' %}btn-primary{% else %}btn-secondary{% endif %}">Expense Report</a>
+  <a href="?type=aging{% if selected_term.pk %}&term={{ selected_term.pk }}{% endif %}{% if date_from %}&from={{ date_from }}&to={{ date_to }}{% endif %}"
+     class="btn btn-sm {% if report_type == 'aging' %}btn-primary{% else %}btn-secondary{% endif %}">Aging Analysis</a>
+  <a href="{% url 'finance:budget_vs_actual' %}{% if selected_term.pk %}?term={{ selected_term.pk }}{% endif %}"
+     class="btn btn-sm btn-outline" style="margin-left:auto">Budget vs Actual &rarr;</a>
+</div>
+
+<!-- ===== INCOME STATEMENT ===== -->
+{% if report_type == 'income_statement' %}
+<div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:20px;flex-wrap:wrap">
+  <a href="{% url 'finance:report_csv_export' %}?type=income_statement{% if selected_term.pk %}&term={{ selected_term.pk }}{% endif %}{% if date_from %}&from={{ date_from }}{% endif %}{% if date_to %}&to={{ date_to }}{% endif %}"
+     class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center;gap:4px;flex-shrink:0" download>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Download CSV
+  </a>
+</div>
+<div class="metrics" style="grid-template-columns:repeat(3,1fr);gap:14px">
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Total Revenue</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#023AA5">{{ total_revenue|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#5A697D">{{ revenue_count }} payment{{ revenue_count|pluralize }}</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FFF0F0,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Total Expenses</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#DC2626">{{ total_expenses|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#DC2626">{{ expense_count }} expense{{ expense_count|pluralize }}</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,{% if net_income >= 0 %}#EEF9F0{% else %}#FFF0F0{% endif %},#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Net Income</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:{% if net_income >= 0 %}#059669{% else %}#DC2626{% endif %}">{{ net_income|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:{% if net_income >= 0 %}#059669{% else %}#DC2626{% endif %}">
+      {% if net_income >= 0 %}Surplus{% else %}Deficit{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-title-row"><span class="card-title" style="margin-bottom:0">Revenue by method</span></div>
+    {% for code, item in revenue_by_method.items %}
+    <div class="trow">
+      <div class="trow-name">{{ item.label }}</div>
+      <span class="trow-right" style="font-weight:600;font-family:var(--font-mono)">TZS {{ item.amount|floatformat:0 }}</span>
+    </div>
+    {% empty %}
+    <div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">No revenue in this period.</div>
+    {% endfor %}
+  </div>
+  <div class="card">
+    <div class="card-title-row"><span class="card-title" style="margin-bottom:0">Expenses by category</span></div>
+    {% for cat in expenses_by_category %}
+    <div class="trow">
+      <div>
+        <div class="trow-name">{{ cat.label }}</div>
+        <div class="trow-sub">{{ cat.pct }}% of total</div>
+      </div>
+      <span class="trow-right" style="font-weight:600;font-family:var(--font-mono)">TZS {{ cat.amount|floatformat:0 }}</span>
+    </div>
+    {% empty %}
+    <div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">No expenses in this period.</div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ===== COLLECTION REPORT ===== -->
+{% elif report_type == 'collection_report' %}
+<div class="metrics" style="grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:12px">
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Total Billed</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#023AA5">{{ total_billed|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#5A697D">{{ invoice_count }} invoice{{ invoice_count|pluralize }}</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF9F0,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Total Collected</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#059669">{{ total_received|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#059669">{{ collection_rate }}% rate</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FFF0F0,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Outstanding</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#DC2626">{{ total_outstanding|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#DC2626">Needs follow-up</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,{% if collection_rate >= 80 %}#EEF9F0{% elif collection_rate >= 50 %}#FFF8ED{% else %}#FFF0F0{% endif %},#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Collection Rate</span>
+      <span class="mc-currency">%</span>
+    </div>
+    <div class="mc-val" style="color:{% if collection_rate >= 80 %}#059669{% elif collection_rate >= 50 %}#B45309{% else %}#DC2626{% endif %}">{{ collection_rate }}</div>
+    <div class="mc-sub" style="color:#5A697D">Overall</div>
+  </div>
+</div>
+
+{% if collection_by_class %}
+<div class="card" style="padding:0;overflow:hidden">
+  <div style="padding:14px 16px 0;display:flex;align-items:center;justify-content:space-between">
+    <div class="card-title" style="margin-bottom:12px">Collection by class</div>
+    <a href="{% url 'finance:report_csv_export' %}?type=collection_report{% if selected_term.pk %}&term={{ selected_term.pk }}{% endif %}{% if date_from %}&from={{ date_from }}{% endif %}{% if date_to %}&to={{ date_to }}{% endif %}"
+       class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:12px" download>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      CSV
+    </a>
+  </div>
+  <table style="width:100%;border-collapse:collapse">
+    <thead>
+      <tr style="text-align:left;background:var(--bg-metric);border-bottom:1px solid var(--border)">
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Class</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Billed</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Collected</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Outstanding</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Rate</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Students</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in collection_by_class %}
+      <tr style="border-bottom:1px solid var(--border);font-size:13px;transition:background .1s;cursor:pointer" onclick="window.location='{% url 'finance:class_collection_detail' class_name=item.class_name %}{% if selected_term.pk %}?term={{ selected_term.pk }}{% endif %}'" onmouseover="this.style.background='var(--bg-metric)'" onmouseout="this.style.background=''">
+        <td style="padding:10px 14px;font-weight:600;color:var(--hodari-blue)">
+          {{ item.class_name }}
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-left:3px"><polyline points="9 18 15 12 9 6"/></svg>
+        </td>
+        <td style="padding:10px 14px;font-family:var(--font-mono)">TZS {{ item.billed|floatformat:0 }}</td>
+        <td style="padding:10px 14px;font-family:var(--font-mono)">TZS {{ item.received|floatformat:0 }}</td>
+        <td style="padding:10px 14px;font-family:var(--font-mono)">TZS {{ item.outstanding|floatformat:0 }}</td>
+        <td style="padding:10px 14px">
+          <span class="chip {% if item.rate >= 80 %}chip-green{% elif item.rate >= 50 %}chip-amber{% else %}chip-red{% endif %}">{{ item.rate }}%</span>
+        </td>
+        <td style="padding:10px 14px;color:var(--text-muted);font-size:12px">{{ item.student_count|default:"N/A" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- ===== EXPENSE REPORT ===== -->
+{% elif report_type == 'expense_report' %}
+<div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:20px;flex-wrap:wrap">
+  <div style="max-width:360px;flex:1">
+    <div class="metric-compact" style="background:linear-gradient(135deg,#FFF0F0,#fff)">
+      <div class="mc-lbl-row">
+        <span class="mc-lbl">Total Expenses</span>
+        <span class="mc-currency">TZS</span>
+      </div>
+      <div class="mc-val" style="color:#DC2626">{{ total_expenses|floatformat:0 }}</div>
+      <div class="mc-sub" style="color:#DC2626">{{ expense_count }} expense{{ expense_count|pluralize }}</div>
+    </div>
+  </div>
+  <a href="{% url 'finance:report_csv_export' %}?type=expense_report{% if selected_term.pk %}&term={{ selected_term.pk }}{% endif %}{% if date_from %}&from={{ date_from }}{% endif %}{% if date_to %}&to={{ date_to }}{% endif %}"
+     class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center;gap:4px;flex-shrink:0" download>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Download CSV
+  </a>
+</div>
+
+<div class="card" style="margin-bottom:16px">
+  <div class="card-title">Expenses by category</div>
+  {% for cat in expenses_by_category %}
+  <div class="bar-row">
+    <div class="bar-lbl">{{ cat.label }}</div>
+    <div class="bar-track">
+      <div class="bar-fill" style="width:{{ cat.pct }}%;background:var(--hodari-blue)"></div>
+    </div>
+    <div class="bar-pct" style="min-width:200px;text-align:right;font-size:12px;font-family:var(--font-mono)">
+      TZS {{ cat.amount|floatformat:0 }} ({{ cat.pct }}%)
+    </div>
+  </div>
+  {% empty %}
+  <div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">No expenses in this period.</div>
+  {% endfor %}
+</div>
+
+{% if recent_expenses %}
+<div class="card" style="padding:0;overflow:hidden">
+  <div style="padding:14px 16px 0">
+    <div class="card-title" style="margin-bottom:12px">Recent expenses</div>
+  </div>
+  <table style="width:100%;border-collapse:collapse">
+    <thead>
+      <tr style="text-align:left;background:var(--bg-metric);border-bottom:1px solid var(--border)">
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Date</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Category</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Description</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Vendor</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for exp in recent_expenses %}
+      <tr style="border-bottom:1px solid var(--border);font-size:13px;transition:background .1s" onmouseover="this.style.background='var(--bg-metric)'" onmouseout="this.style.background=''">
+        <td style="padding:10px 14px;color:var(--text-muted);font-size:12px">{{ exp.expense_date|date:"d M Y" }}</td>
+        <td style="padding:10px 14px"><span class="chip chip-grey">{{ exp.get_category_display }}</span></td>
+        <td style="padding:10px 14px;font-weight:500">{{ exp.description|truncatechars:40 }}</td>
+        <td style="padding:10px 14px;color:var(--text-secondary)">{{ exp.vendor|default:"N/A" }}</td>
+        <td style="padding:10px 14px;font-weight:700;font-family:var(--font-mono)">TZS {{ exp.amount|floatformat:0 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- ===== AGING ANALYSIS ===== -->
+{% elif report_type == 'aging' %}
+<div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:20px;flex-wrap:wrap">
+  <div style="max-width:360px;flex:1">
+    <div class="metric-compact" style="background:linear-gradient(135deg,#FFF0F0,#fff)">
+      <div class="mc-lbl-row">
+        <span class="mc-lbl">Total Overdue</span>
+        <span class="mc-currency">TZS</span>
+      </div>
+      <div class="mc-val" style="color:#DC2626">{{ total_overdue|floatformat:0 }}</div>
+      <div class="mc-sub" style="color:#DC2626">{{ total_overdue_count }} overdue invoice{{ total_overdue_count|pluralize }}</div>
+    </div>
+  </div>
+  <a href="{% url 'finance:report_csv_export' %}?type=aging{% if selected_term.pk %}&term={{ selected_term.pk }}{% endif %}{% if date_from %}&from={{ date_from }}{% endif %}{% if date_to %}&to={{ date_to }}{% endif %}"
+     class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center;gap:4px;flex-shrink:0" download>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Download CSV
+  </a>
+</div>
+
+{% for key, bucket in aging_buckets.items %}
+<div class="card" style="margin-bottom:12px">
+  <div class="card-title-row">
+    <span class="card-title" style="margin-bottom:0;display:flex;align-items:center;gap:8px">
+      {{ bucket.label }}
+      <span class="chip {% if key == '60_plus' %}chip-red{% elif key == '31_60_days' %}chip-red{% else %}chip-amber{% endif %}">
+        TZS {{ bucket.total|floatformat:0 }}
+      </span>
+    </span>
+    <span style="font-size:12px;color:var(--text-muted)">{{ bucket.invoices|length }} invoice{{ bucket.invoices|length|pluralize }}</span>
+  </div>
+  {% for entry in bucket.invoices %}
+  <div class="trow">
+    <div>
+      <div class="trow-name">{{ entry.student_name }} &middot; {{ entry.class_name }}</div>
+      <div class="trow-sub">{{ entry.days }} day{{ entry.days|pluralize }} overdue</div>
+    </div>
+    <span class="trow-right">
+      <span class="chip chip-red" style="font-family:var(--font-mono)">TZS {{ entry.balance|floatformat:0 }}</span>
+    </span>
+  </div>
+  {% empty %}
+  <div style="padding:12px;text-align:center;color:var(--text-muted);font-size:13px">No invoices in this bucket.</div>
+  {% endfor %}
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

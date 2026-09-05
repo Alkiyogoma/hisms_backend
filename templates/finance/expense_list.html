@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Expenses &mdash; Finance &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Expenses{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+<div class="section-hdr">
+  <span class="section-title">All expenses</span>
+  <div style="display:flex;align-items:center;gap:8px">
+    <a href="{% url 'finance:dashboard' %}" class="btn btn-secondary btn-sm">&larr; Dashboard</a>
+    <a href="{% url 'finance:budget_list' %}" class="btn btn-secondary btn-sm">Budgets</a>
+    <a href="{% url 'finance:recurring_list' %}" class="btn btn-secondary btn-sm">Recurring</a>
+    {% has_perm user "finance.add_expense" as can_add_expense %}
+    {% if can_add_expense %}
+    <a href="{% url 'finance:expense_create' %}" class="btn btn-primary btn-sm">+ Record expense</a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Metric cards -->
+<div class="metrics" style="grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px">
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Total spent</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#023AA5">{{ total_expenses|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#5A697D">{{ total_count }} transactions</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FFF8ED,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Pending approval</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#B45309">{{ pending_total|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#B45309">{{ pending_count }} expense(s) awaiting review</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF9F0,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Approved</span>
+    </div>
+    <div class="mc-val" style="color:#059669">{{ approved_count }}</div>
+    <div class="mc-sub" style="color:#059669">Expenses approved</div>
+  </div>
+</div>
+
+<!-- Filters -->
+<form method="get" class="hf2-toolbar">
+  <input type="text" name="q" class="hf2-input" placeholder="Search description, vendor, reference..." value="{{ q }}" style="width:200px">
+  <span class="hf2-toolbar-label">Status</span>
+  <select name="status" class="hf2-select">
+    <option value="">All statuses</option>
+    {% for code, label in expense_statuses %}
+    <option value="{{ code }}" {% if selected_status == code %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <span class="hf2-toolbar-label">Category</span>
+  <select name="category" class="hf2-select">
+    <option value="">All categories</option>
+    {% for code, label in categories %}<option value="{{ code }}" {% if selected_category == code %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  <span class="hf2-toolbar-label">From</span>
+  <input type="date" name="from" value="{{ date_from }}" class="hf2-input hf2-date" style="width:148px">
+  <span class="hf2-toolbar-label">To</span>
+  <input type="date" name="to" value="{{ date_to }}" class="hf2-input hf2-date" style="width:148px">
+  <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+  <a href="{% url 'finance:expense_list' %}" class="btn btn-secondary btn-sm">Clear</a>
+</form>
+
+{% if expenses %}
+<div class="card" style="padding:0;overflow:hidden">
+  <table style="width:100%;border-collapse:collapse">
+    <thead>
+      <tr style="text-align:left;background:var(--bg-metric);border-bottom:1px solid var(--border)">
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Date</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Category</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Description</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Vendor</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Amount</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Status</th>
+        <th style="padding:10px 14px"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for expense in expenses %}
+      <tr style="border-bottom:1px solid var(--border);font-size:13px;transition:background .1s" onmouseover="this.style.background='var(--bg-metric)'" onmouseout="this.style.background=''">
+        <td style="padding:10px 14px;color:var(--text-muted);font-size:12px">{{ expense.expense_date|date:"d M Y" }}</td>
+        <td style="padding:10px 14px"><span class="chip chip-grey">{{ expense.get_category_display }}</span></td>
+        <td style="padding:10px 14px;font-weight:500">{{ expense.description|truncatechars:45 }}</td>
+        <td style="padding:10px 14px;color:var(--text-secondary)">{{ expense.vendor|default:"N/A" }}</td>
+        <td style="padding:10px 14px;font-weight:700;font-family:var(--font-mono)">TZS {{ expense.amount|floatformat:0 }}</td>
+        <td style="padding:10px 14px">
+          {% if expense.status == "approved" %}
+          <span class="chip chip-green">Approved</span>
+          {% elif expense.status == "rejected" %}
+          <span class="chip chip-red">Rejected</span>
+          {% else %}
+          <span class="chip chip-amber">Pending</span>
+          {% endif %}
+        </td>
+        <td style="padding:10px 14px;text-align:right">
+          <a href="{% url 'finance:expense_detail' expense.pk %}" class="section-link" style="font-size:12px">View &rarr;</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div style="text-align:center;padding:48px 24px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px">
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" style="margin-bottom:12px"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+  <div style="font-size:16px;font-weight:600;color:var(--text-primary)">No expenses recorded</div>
+  <div style="font-size:13px;color:var(--text-muted);margin-top:4px;max-width:360px;margin-left:auto;margin-right:auto">
+    Record your first outgoing payment to start tracking school expenditure.
+  </div>
+  {% has_perm user "finance.add_expense" as can_add_expense %}
+    {% if can_add_expense %}
+  <a href="{% url 'finance:expense_create' %}" class="btn btn-primary" style="margin-top:16px">Record expense</a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

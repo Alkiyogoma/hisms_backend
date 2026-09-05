@@ -1,0 +1,154 @@
+{% load role_tags %}
+{% has_perm user "admissions.transition_applicant_status" as can_decide %}
+
+{% if can_decide %}
+<input type="hidden" id="decision-csrf-token" value="{{ csrf_token }}">
+<div style="display:flex;flex-direction:column;gap:12px">
+  <div style="display:flex;flex-wrap:wrap;gap:10px">
+    <button type="button" onclick="confirmDecision('admitted')"
+      style="flex:1;min-width:120px;padding:12px 16px;font-size:13px;font-weight:700;color:#fff;background:#16A34A;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background 0.2s"
+      onmouseover="this.style.background='#15803D'" onmouseout="this.style.background='#16A34A'">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      Admit
+    </button>
+    <button type="button" onclick="confirmDecision('conditional')"
+      style="flex:1;min-width:120px;padding:12px 16px;font-size:13px;font-weight:700;color:#fff;background:#D97706;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background 0.2s"
+      onmouseover="this.style.background='#B45309'" onmouseout="this.style.background='#D97706'">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Conditional
+    </button>
+    <button type="button" onclick="confirmDecision('waitlisted')"
+      style="flex:1;min-width:120px;padding:12px 16px;font-size:13px;font-weight:700;color:#fff;background:#2563EB;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background 0.2s"
+      onmouseover="this.style.background='#1D4ED8'" onmouseout="this.style.background='#2563EB'">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Waitlist
+    </button>
+    <button type="button" onclick="confirmDecision('denied')"
+      style="flex:1;min-width:120px;padding:12px 16px;font-size:13px;font-weight:700;color:#fff;background:#DC2626;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background 0.2s"
+      onmouseover="this.style.background='#B91C1C'" onmouseout="this.style.background='#DC2626'">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      Deny
+    </button>
+  </div>
+</div>
+
+<div id="decisionModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);backdrop-filter:blur(2px);align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.2);max-width:480px;width:92%;overflow:hidden;animation:modalSlideIn 0.25s cubic-bezier(0.16,1,0.3,1)">
+    <div style="padding:24px 24px 16px;text-align:center">
+      <div id="decisionModalIcon" style="width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px"></div>
+      <h3 id="decisionModalTitle" style="font-size:18px;font-weight:700;color:#1E293B;margin:0 0 8px"></h3>
+      <p id="decisionModalDesc" style="font-size:13px;color:#64748B;margin:0;line-height:1.5"></p>
+    </div>
+    <div id="decisionError" style="display:none;margin:0 24px;padding:10px 14px;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;font-size:12px;color:#991B1B"></div>
+    <div id="decisionConditionsWrap" style="display:none;padding:0 24px 16px">
+      <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:6px">Conditions for Admission</label>
+      <textarea id="decisionConditions" rows="3" placeholder="Specify the conditions for conditional admission..." style="width:100%;padding:10px 12px;font-size:13px;border:1px solid #E2E8F0;border-radius:8px;resize:vertical;box-sizing:border-box"></textarea>
+    </div>
+    <div style="padding:0 24px 16px">
+      <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:6px">Reason (optional)</label>
+      <textarea id="decisionReason" rows="2" placeholder="Optional note for this decision..." style="width:100%;padding:10px 12px;font-size:13px;border:1px solid #E2E8F0;border-radius:8px;resize:vertical;box-sizing:border-box"></textarea>
+    </div>
+    <div style="display:flex;border-top:1px solid #E5E7EB">
+      <button type="button" onclick="closeDecisionModal()" style="flex:1;padding:14px;font-size:14px;font-weight:600;color:#475569;background:none;border:none;border-right:1px solid #E2E8F0;cursor:pointer">Cancel</button>
+      <button type="button" id="decisionModalSubmit" onclick="submitDecision()" style="flex:1;padding:14px;font-size:14px;font-weight:700;color:#fff;border:none;cursor:pointer">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var _currentDecision = '';
+var _decisionLabels = {admitted:'Admit',conditional:'Conditional Admission',waitlisted:'Waitlist',denied:'Deny'};
+var _decisionColors = {admitted:'#16A34A',conditional:'#D97706',waitlisted:'#2563EB',denied:'#DC2626'};
+var _decisionIcons = {
+  admitted:'<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>',
+  conditional:'<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+  waitlisted:'<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+  denied:'<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
+};
+var _decisionDescs = {
+  admitted:'This will move the applicant to Admitted status and unlock the Enrolment section.',
+  conditional:'This will admit the applicant with conditions. You must specify the conditions below.',
+  waitlisted:'This will place the applicant on the waitlist. They will be notified when a spot opens.',
+  denied:'This will deny the application. This action cannot be undone.'
+};
+
+function confirmDecision(status) {
+  _currentDecision = status;
+  var modal = document.getElementById('decisionModal');
+  document.getElementById('decisionModalIcon').innerHTML = _decisionIcons[status];
+  document.getElementById('decisionModalIcon').style.background = status === 'denied' ? '#FEE2E2' : status === 'conditional' ? '#FEF3C7' : status === 'waitlisted' ? '#EFF6FF' : '#E8F5EC';
+  document.getElementById('decisionModalTitle').textContent = _decisionLabels[status] + '?';
+  document.getElementById('decisionModalDesc').textContent = _decisionDescs[status];
+  document.getElementById('decisionConditionsWrap').style.display = status === 'conditional' ? 'block' : 'none';
+  document.getElementById('decisionConditions').value = '';
+  document.getElementById('decisionReason').value = '';
+  hideDecisionError();
+  var btn = document.getElementById('decisionModalSubmit');
+  btn.disabled = false;
+  btn.style.background = _decisionColors[status];
+  btn.textContent = 'Confirm ' + _decisionLabels[status];
+  modal.style.display = 'flex';
+}
+function closeDecisionModal() {
+  document.getElementById('decisionModal').style.display = 'none';
+}
+function getCsrfToken() {
+  var el = document.getElementById('decision-csrf-token');
+  if (el) return el.value;
+  var match = document.cookie.match(/csrftoken=([^;]+)/);
+  return match ? match[1] : '';
+}
+function showDecisionError(msg) {
+  var el = document.getElementById('decisionError');
+  if (el) { el.textContent = msg; el.style.display = 'block'; }
+}
+function hideDecisionError() {
+  var el = document.getElementById('decisionError');
+  if (el) el.style.display = 'none';
+}
+function submitDecision() {
+  var btn = document.getElementById('decisionModalSubmit');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = 'Processing...';
+  hideDecisionError();
+  var fd = new FormData();
+  fd.append('to_status', _currentDecision);
+  fd.append('reason', document.getElementById('decisionReason').value);
+  if (_currentDecision === 'conditional') {
+    fd.append('conditions', document.getElementById('decisionConditions').value);
+  }
+  var csrf = getCsrfToken();
+  if (csrf) fd.append('csrfmiddlewaretoken', csrf);
+  fetch('{% url "admissions:decision" applicant.id %}', {
+    method: 'POST',
+    body: fd,
+    headers: {'HX-Request': 'true', 'X-CSRFToken': csrf}
+  })
+  .then(function(resp) {
+    if (resp.status === 403) throw new Error('Permission denied. You may not have access to make this decision.');
+    if (!resp.ok) throw new Error('Server error (' + resp.status + '). Please try again.');
+    return resp.text();
+  })
+  .then(function(html) {
+    closeDecisionModal();
+    location.reload();
+  })
+  .catch(function(err) {
+    btn.disabled = false;
+    btn.textContent = 'Confirm ' + _decisionLabels[_currentDecision];
+    showDecisionError(err.message || 'Failed to submit decision. Please try again.');
+  });
+}
+document.getElementById('decisionModal').addEventListener('click', function(e) { if (e.target === this) closeDecisionModal(); });
+</script>
+
+{% else %}
+<div style="padding:12px;background:var(--bg-metric);border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text-muted)">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+    <span style="font-weight:600;color:var(--text-secondary)">Decision unavailable</span>
+  </div>
+  <span>You do not have permission to make admission decisions. Contact the Head of School.</span>
+</div>
+{% endif %}

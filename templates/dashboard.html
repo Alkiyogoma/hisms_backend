@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}Dashboard &mdash; {{ brand.school_name }}{% endblock %}
+
+{% block topbar_greeting %}Good {% if hour < 12 %}morning{% elif hour < 17 %}afternoon{% else %}evening{% endif %}, {{ user.get_full_name|default:user.username }}{% endblock %}
+{% block topbar_date %}{{ today_display }} &middot; {{ term_label }}{% endblock %}
+
+{% block topbar_badges %}
+  {% if alert_count > 0 %}
+    <div class="topbar-badge badge-red"><span class="badge-dot"></span>{{ alert_count }} alert{{ alert_count|pluralize }}</div>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="section-hdr">
+  <span class="section-title">School overview &middot; today</span>
+  <a href="/admissions/" class="section-link">View full report &rarr;</a>
+</div>
+
+<!-- KPI Metrics -->
+<div class="metrics">
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF9F0,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Attendance today</span></div>
+    <div class="mc-val" style="color:#059669">{{ stats.attendance_pct }}<span class="mc-currency" style="margin-left:4px;vertical-align:middle">%</span></div>
+    <div class="mc-sub" style="color:#059669">{{ stats.students_present }} of {{ stats.students_active }} students present</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FFF8ED,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Students enrolled</span></div>
+    <div class="mc-val" style="color:#B45309">{{ stats.students }}</div>
+    <div class="mc-sub" style="color:#B45309">{{ stats.students_active }} active</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FFF0F0,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Actions needed</span></div>
+    <div class="mc-val" style="color:#DC2626">{{ stats.action_count }}</div>
+    <div class="mc-sub" style="color:#DC2626">
+      {% if stats.action_count > 0 %}
+        <a href="{% url 'admissions:actions_needed' %}" style="color:inherit;text-decoration:none">Critical blockers &rarr;</a>
+      {% else %}
+        Pipeline clear
+      {% endif %}
+    </div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FFFBEB,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Open invoices</span></div>
+    <div class="mc-val" style="color:#B45309">{{ stats.invoices_open }}</div>
+    <div class="mc-sub" style="color:#B45309">Payments received: TZS {{ stats.payments_total|floatformat:0 }}</div>
+  </div>
+</div>
+
+<!-- Upcoming Events -->
+<div class="ev-widget">
+  <div class="ev-title">Upcoming events
+    <a href="{% url 'events:list' %}" class="ev-link">View calendar &rarr;</a>
+  </div>
+  <div class="ev-item">
+    <div class="ev-date"><div class="ev-day">16</div><div class="ev-mon">Apr</div></div>
+    <div class="ev-body">
+      <div class="ev-name">HOD Lesson Plan Review Deadline</div>
+      <div class="ev-meta">Academic deadline</div>
+      <div class="ev-badge ev-soon">Tomorrow</div>
+    </div>
+  </div>
+  <div class="ev-item">
+    <div class="ev-date"><div class="ev-day">18</div><div class="ev-mon">Apr</div></div>
+    <div class="ev-body">
+      <div class="ev-name">Term 2 Report Grades Due</div>
+      <div class="ev-meta">Academic deadline</div>
+      <div class="ev-badge ev-soon">3 days</div>
+    </div>
+  </div>
+  <div class="ev-item">
+    <div class="ev-date"><div class="ev-day">25</div><div class="ev-mon">Apr</div></div>
+    <div class="ev-body">
+      <div class="ev-name">Parent-Teacher Meeting Day</div>
+      <div class="ev-meta">School event</div>
+    </div>
+  </div>
+  <div class="ev-item">
+    <div class="ev-date"><div class="ev-day">30</div><div class="ev-mon">Apr</div></div>
+    <div class="ev-body">
+      <div class="ev-name">Term 2 Fee Deadline</div>
+      <div class="ev-meta">Finance</div>
+    </div>
+  </div>
+</div>
+
+<!-- Admissions Pipeline + Recent Audit -->
+<div class="grid-6-4">
+  <div class="card">
+    <div class="card-title">Admissions pipeline</div>
+    <div class="pipeline">
+      {% for stage in pipeline_stages %}
+        <div class="pipe-col">
+          <div class="pipe-count">{{ stage.count }}</div>
+          <div class="pipe-bar-wrap">
+            <div class="pipe-bar" style="height:{{ stage.bar_height }}px;background:{{ stage.color }}"></div>
+          </div>
+          <div class="pipe-lbl">{{ stage.label }}</div>
+        </div>
+      {% empty %}
+        <div style="grid-column:1/-1;padding:24px;text-align:center">{% include '_partials/empty_state.html' with title='No data' desc='No pipeline data available.' icon='inbox' icon_color='grey' %}</div>
+      {% endfor %}
+    </div>
+    <div style="margin-top:12px">
+      <a href="/admissions/" class="section-link" style="font-size:12px">View all applicants &rarr;</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title-row">
+      <div class="card-title" style="margin:0">Recent audit activity</div>
+      <a href="{% url 'audit:logs' %}" class="section-link" style="font-size:12px">View all &rarr;</a>
+    </div>
+    {% for entry in recent_audit %}
+      <div class="audit-row">
+        <div class="audit-icon {% if entry.severity == 'warn' %}ai-amber{% elif entry.severity == 'info' %}ai-blue{% else %}ai-green{% endif %}">
+          {% if entry.severity == 'warn' %}
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="#92550A" stroke-width="1.5"/><path d="M7 4v3.5M7 9v.5" stroke="#92550A" stroke-width="1.5" stroke-linecap="round"/></svg>
+          {% else %}
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="#023AA5" stroke-width="1.5"/><path d="M7 5.5V10M7 4v.5" stroke="#023AA5" stroke-width="1.5" stroke-linecap="round"/></svg>
+          {% endif %}
+        </div>
+        <div>
+          <div class="audit-text">{{ entry.label }}</div>
+          <div class="audit-meta">{{ entry.actor }} &middot; {{ entry.when }}</div>
+        </div>
+      </div>
+    {% empty %}
+      <div style="padding:24px;text-align:center">{% include '_partials/empty_state.html' with title='No audit entries yet' desc='System activity will be logged here.' icon='doc' icon_color='grey' %}</div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Attendance by class + Recent Students -->
+<div class="grid-2">
+  <div class="card">
+    <div class="card-title">Class distribution (active students)</div>
+    {% for row in class_breakdown %}
+      <div class="trow">
+        <div><div class="trow-name">{{ row.class_name }}</div></div>
+        <span class="trow-right">
+          <span class="status-dot {% if row.c >= 30 %}dot-green{% elif row.c >= 20 %}dot-amber{% else %}dot-red{% endif %}"></span>
+          <span class="trow-val">{{ row.c }}</span>
+        </span>
+      </div>
+    {% empty %}
+      <div style="padding:24px;text-align:center">{% include '_partials/empty_state.html' with title='No class data' desc='Add students in Admin to see class distribution.' icon='inbox' icon_color='grey' %}</div>
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    <div class="card-title-row">
+      <span class="card-title" style="margin-bottom:0">Recent students</span>
+      <span class="chip chip-blue">Latest registrations</span>
+    </div>
+    {% for s in recent_students %}
+      <div class="trow">
+        <div>
+          <div class="trow-name">{{ s.first_name }} {{ s.last_name }}</div>
+          <div class="trow-sub">{{ s.admission_no }} &middot; {{ s.class_name }}{% if s.stream_name %} &middot; {{ s.stream_name }}{% endif %}</div>
+        </div>
+        <span class="trow-right">
+          <span class="chip {% if s.status == 'active' %}chip-green{% elif s.status == 'inactive' %}chip-grey{% else %}chip-amber{% endif %}">{{ s.get_status_display }}</span>
+        </span>
+      </div>
+    {% empty %}
+      <div style="padding:24px;text-align:center">{% include '_partials/empty_state.html' with title='No students yet' desc='Students will appear here once enrolled.' icon='users' icon_color='blue' %}</div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Recent Discipline Incidents -->
+{% if recent_incidents %}
+<div class="card" style="margin-top:0">
+  <div class="card-title-row">
+    <span class="card-title" style="margin-bottom:0">Recent discipline incidents</span>
+    <span class="chip chip-amber">{{ stats.incidents_open }} open</span>
+  </div>
+  {% for i in recent_incidents %}
+    <div class="trow" style="flex-direction:column;align-items:flex-start;gap:6px">
+      <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
+        <div class="trow-name">{{ i.student.first_name }} {{ i.student.last_name }} &middot; {{ i.student.admission_no }}</div>
+        <span class="trow-right">
+          <span class="chip {% if i.severity == 'high' %}chip-red{% elif i.severity == 'medium' %}chip-amber{% else %}chip-blue{% endif %}">{{ i.get_severity_display }}</span>
+          {% if i.escalated %}<span class="chip chip-grey">Escalated</span>{% endif %}
+        </span>
+      </div>
+      <div class="trow-sub">{{ i.summary|truncatechars:120 }} &middot; Reported by {{ i.reported_by.get_username }}</div>
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

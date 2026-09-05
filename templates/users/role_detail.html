@@ -1,0 +1,494 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}{{ role_config.label }} &mdash; Role Management{% endblock %}
+{% block topbar_greeting %}User Management{% endblock %}
+
+{% block extra_head %}
+<style>
+  .perm-category {
+    background: #fff;
+    border: 1.5px solid #E8EDF5;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    transition: box-shadow 0.2s;
+  }
+  .perm-category:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
+  .perm-category-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+  }
+  .perm-category-header:hover { background: #F8FAFC; }
+  .perm-category-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary, #1E293B);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .perm-category-title .model-badge {
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    background: #F1F5F9;
+    color: #64748B;
+  }
+  .perm-category-count {
+    font-size: 11px;
+    color: #94A3B8;
+    font-weight: 600;
+  }
+  .perm-list {
+    padding: 0 20px 16px;
+    display: none;
+  }
+  .perm-list.expanded { display: block; }
+  .perm-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    transition: background 0.15s;
+  }
+  .perm-item:hover { background: #F8FAFC; }
+  .perm-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    accent-color: var(--hodari-blue, #2563EB);
+    cursor: pointer;
+  }
+  .perm-category-count {
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+  .perm-count-all { color: #047857; }
+  .perm-count-some { color: #92400E; }
+  .perm-count-none { color: #B91C1C; }
+  .perm-item label {
+    font-size: 13px;
+    color: #334155;
+    cursor: pointer;
+    font-weight: 500;
+    flex: 1;
+  }
+  .user-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    border-bottom: 1px solid #F1F5F9;
+    transition: background 0.15s;
+  }
+  .user-row:last-child { border-bottom: none; }
+  .user-row:hover { background: #F8FAFC; }
+  .user-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .user-view-as-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid #E2E8F0;
+    background: #EEF4FF;
+    color: var(--hodari-blue, #2563EB);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .user-view-as-btn:hover { background: #DBEAFE; }
+  .save-indicator {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #FEF3C7;
+    color: #92400E;
+  }
+  .save-indicator.visible { display: flex; }
+  .select-all-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    margin-bottom: 4px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "users/_top_tabs.html" %}
+
+<div style="max-width:1000px; margin:0 auto; padding:0 0 40px 0">
+  <!-- Role Header Card -->
+  <div style="background:linear-gradient(135deg, {{ role_config.icon_color }} 0%, {{ role_config.icon_color }}CC 100%); border-radius:16px; padding:28px 32px; color:#fff; margin-bottom:24px; box-shadow:0 8px 24px rgba(0,0,0,0.1)">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:20px">
+      <div style="display:flex; align-items:center; gap:20px">
+        <div style="width:56px; height:56px; border-radius:14px; background:rgba(255,255,255,0.15); border:2px solid rgba(255,255,255,0.2); display:flex; align-items:center; justify-content:center">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            {% if role_value == 'super_admin' %}
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            {% elif role_value == 'head_of_school' %}
+              <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+            {% elif role_value == 'teacher' %}
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            {% elif role_value == 'parent' %}
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            {% else %}
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+            {% endif %}
+          </svg>
+        </div>
+        <div>
+          <h1 style="font-size:22px; font-weight:800; margin:0; letter-spacing:-0.02em">{{ role_config.label }}</h1>
+          <p style="font-size:13px; color:rgba(255,255,255,0.7); margin:4px 0 0 0; font-weight:500">
+            {{ role_config.description }}
+          </p>
+        </div>
+      </div>
+      <div style="text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:10px">
+        <div>
+          <div style="font-size:28px; font-weight:800">{{ user_count }}</div>
+          <div style="font-size:11px; color:rgba(255,255,255,0.6); font-weight:600; text-transform:uppercase; letter-spacing:0.04em">
+            Active User{{ user_count|pluralize }}
+          </div>
+        </div>
+        {% if role_config_obj and not role_config_obj.is_system %}
+        <div style="display:flex; gap:8px">
+          <a href="{% url 'users:role_edit' role_pk=role_config_obj.pk %}" style="display:inline-flex; align-items:center; gap:5px; padding:6px 14px; border-radius:8px; font-size:12px; font-weight:600; background:rgba(255,255,255,0.15); color:#fff; text-decoration:none; border:1px solid rgba(255,255,255,0.2); transition:all 0.15s">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Edit
+          </a>
+          <a href="{% url 'users:role_delete' role_pk=role_config_obj.pk %}" style="display:inline-flex; align-items:center; gap:5px; padding:6px 14px; border-radius:8px; font-size:12px; font-weight:600; background:rgba(220,38,38,0.3); color:#fff; text-decoration:none; border:1px solid rgba(220,38,38,0.4); transition:all 0.15s">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Delete
+          </a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Department Tags -->
+    {% if role_config.departments %}
+    <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:16px">
+      {% for dept in role_config.departments %}
+      <span style="padding:4px 12px; border-radius:99px; font-size:11px; font-weight:700; background:rgba(255,255,255,0.15); color:#fff; border:1px solid rgba(255,255,255,0.2)">
+        {{ dept }}
+      </span>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="margin-top:12px; font-size:12px; color:rgba(255,255,255,0.5); font-style:italic">
+      No department restriction — can access all departments
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Two Column Layout -->
+  <div style="display:grid; grid-template-columns:1fr 340px; gap:24px; align-items:start">
+    <!-- Left: Permissions -->
+    <div>
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px">
+        <h2 style="font-size:16px; font-weight:700; color:var(--text-primary, #1E293B); margin:0; display:flex; align-items:center; gap:8px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--hodari-blue, #2563EB)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Permissions
+        </h2>
+        <div class="save-indicator" id="saveIndicator">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Unsaved changes
+        </div>
+      </div>
+
+      <!-- Select All Bar -->
+      <div class="select-all-bar">
+        <label style="font-size:12px; color:#64748B; font-weight:600; display:flex; align-items:center; gap:8px; cursor:pointer">
+          <input type="checkbox" id="selectAllPerms" style="width:18px; height:18px; accent-color:var(--hodari-blue, #2563EB)">
+          Select All Permissions
+        </label>
+        <span id="permCount" style="font-size:13px; color:#475569; font-weight:700"></span>
+      </div>
+
+      <!-- Permission Categories -->
+      <div id="permCategories">
+        {% for key, category in all_categories.items %}
+        <div class="perm-category" data-category="{{ key }}">
+          <div class="perm-category-header" onclick="toggleCategory(this)">
+            <div class="perm-category-title">
+              <span class="model-badge">{{ category.app_label }}</span>
+              {{ category.model }}
+            </div>
+            <div style="display:flex; align-items:center; gap:12px">
+              {% with total=category.permissions|length %}
+              {% with checked=category.checked_count %}
+              <span class="perm-category-count {% if checked == total %}perm-count-all{% elif checked == 0 %}perm-count-none{% else %}perm-count-some{% endif %}">{{ checked }}/{{ total }} permissions</span>
+              {% endwith %}
+              {% endwith %}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+          </div>
+          <div class="perm-list">
+            {% for perm in category.permissions %}
+            <div class="perm-item">
+              <input type="checkbox"
+                     class="perm-checkbox"
+                     data-codename="{{ perm.codename }}"
+                     {% if perm.codename in role_permissions %}checked{% endif %}
+                     onchange="onPermChange()">
+              <label for="perm_{{ perm.codename }}">{{ perm.name }}</label>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Save Button -->
+      <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:12px">
+        <button type="button" class="hf-btn hf-btn-secondary" onclick="resetPermissions()" style="padding:10px 24px; height:42px">
+          Reset
+        </button>
+        <button type="button" class="hf-btn hf-btn-primary" onclick="savePermissions()" id="saveBtn" style="padding:10px 32px; height:42px; display:flex; align-items:center; gap:8px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          Save Permissions
+        </button>
+      </div>
+    </div>
+
+    <!-- Right: Users with this role -->
+    <div>
+      <h2 style="font-size:16px; font-weight:700; color:var(--text-primary, #1E293B); margin:0 0 16px 0; display:flex; align-items:center; gap:8px">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--hodari-blue, #2563EB)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Users ({{ user_count }})
+      </h2>
+
+      <div style="background:#fff; border:1.5px solid #E8EDF5; border-radius:12px; overflow:hidden; max-height:500px; overflow-y:auto">
+        {% if users_with_role %}
+          {% for user in users_with_role %}
+          <div class="user-row">
+            <div class="user-avatar" style="background:{{ role_config.icon_color }}15; color:{{ role_config.icon_color }}">
+              {% if user.profile_picture %}
+                <img src="{{ user.profile_picture.url }}" style="width:100%; height:100%; object-fit:cover; border-radius:50%">
+              {% else %}
+                {{ user.first_name|first|default:"" }}{{ user.last_name|first|default:user.username|first }}
+              {% endif %}
+            </div>
+            <div style="flex:1; min-width:0">
+              <div style="font-size:13px; font-weight:600; color:var(--text-primary, #1E293B); white-space:nowrap; overflow:hidden; text-overflow:ellipsis">
+                {{ user.get_full_name|default:user.username }}
+              </div>
+              <div style="font-size:11px; color:#94A3B8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">
+                {{ user.email|default:"No email" }}
+              </div>
+            </div>
+            <span class="status-badge {% if user.is_active %}active{% else %}inactive{% endif %}" style="font-size:10px; padding:2px 8px">
+              {{ user.is_active|yesno:"Active,Inactive" }}
+            </span>
+            <button type="button" class="user-view-as-btn" title="Manage Extra Roles" aria-label="Manage Extra Roles for {{ user.get_full_name|default:user.username }}" onclick="openRolesPanel({{ user.pk }})">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </button>
+            <form method="post" action="{% url 'users:impersonate_start' user.pk %}" style="margin:0" title="View As {{ user.get_full_name|default:user.username }}">
+              {% csrf_token %}
+              <button type="submit" class="user-view-as-btn" title="View As" aria-label="View As {{ user.get_full_name|default:user.username }}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </form>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div style="padding:32px; text-align:center">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="11" x2="23" y2="11"/></svg>
+            <div style="font-size:13px; color:#94A3B8; font-weight:500">No users with this role</div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+    var ROLE = '{{ role_value }}';
+    var CSRF_TOKEN = '{{ csrf_token }}';
+    var ORIGINAL_PERMS = {{ role_permissions_json|safe }};
+    var hasChanges = false;
+
+    // Toggle category expansion
+    window.toggleCategory = function(header) {
+        var list = header.nextElementSibling;
+        var arrow = header.querySelector('svg');
+        if (list.classList.contains('expanded')) {
+            list.classList.remove('expanded');
+            if (arrow) arrow.style.transform = 'rotate(0deg)';
+        } else {
+            list.classList.add('expanded');
+            if (arrow) arrow.style.transform = 'rotate(180deg)';
+        }
+    };
+
+    // Expand first category by default
+    var firstHeader = document.querySelector('.perm-category-header');
+    if (firstHeader) toggleCategory(firstHeader);
+
+    // Select All checkbox
+    document.getElementById('selectAllPerms').addEventListener('change', function() {
+        var checked = this.checked;
+        document.querySelectorAll('.perm-checkbox').forEach(function(cb) {
+            cb.checked = checked;
+        });
+        onPermChange();
+    });
+
+    // Permission change handler
+    window.onPermChange = function() {
+        var currentPerms = getCurrentPerms();
+        hasChanges = JSON.stringify(currentPerms.sort()) !== JSON.stringify(ORIGINAL_PERMS.sort());
+        document.getElementById('saveIndicator').classList.toggle('visible', hasChanges);
+        document.getElementById('saveBtn').style.opacity = hasChanges ? '1' : '0.6';
+        updatePermCount();
+    };
+
+    function getCurrentPerms() {
+        var perms = [];
+        document.querySelectorAll('.perm-checkbox:checked').forEach(function(cb) {
+            perms.push(cb.getAttribute('data-codename'));
+        });
+        return perms;
+    }
+
+    function updatePermCount() {
+        var total = document.querySelectorAll('.perm-checkbox').length;
+        var selected = document.querySelectorAll('.perm-checkbox:checked').length;
+        document.getElementById('permCount').textContent = selected + ' / ' + total + ' selected';
+
+        // Update per-category counts
+        document.querySelectorAll('.perm-category').forEach(function(cat) {
+            var catTotal = cat.querySelectorAll('.perm-checkbox').length;
+            var catChecked = cat.querySelectorAll('.perm-checkbox:checked').length;
+            var countEl = cat.querySelector('.perm-category-count');
+            if (countEl) {
+                countEl.textContent = catChecked + '/' + catTotal + ' permissions';
+                countEl.className = 'perm-category-count ' + (
+                    catChecked === catTotal ? 'perm-count-all' :
+                    catChecked === 0 ? 'perm-count-none' : 'perm-count-some'
+                );
+            }
+        });
+    }
+
+    updatePermCount();
+
+    // Save permissions
+    window.savePermissions = function() {
+        if (!hasChanges) return;
+
+        var btn = document.getElementById('saveBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/></svg> Saving...';
+
+        var perms = getCurrentPerms();
+
+        fetch('{% url "users:role_permission_update" role=role_value %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CSRF_TOKEN,
+            },
+            body: JSON.stringify({ permissions: perms }),
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.success) {
+                ORIGINAL_PERMS = perms.slice();
+                hasChanges = false;
+                document.getElementById('saveIndicator').classList.remove('visible');
+                btn.disabled = false;
+                btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save Permissions';
+                showToast('Permissions updated successfully', 'success');
+            } else {
+                btn.disabled = false;
+                btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save Permissions';
+                showToast(data.error || 'Failed to save permissions', 'error');
+            }
+        })
+        .catch(function(err) {
+            btn.disabled = false;
+            btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save Permissions';
+            showToast('Network error. Please try again.', 'error');
+        });
+    };
+
+    // Reset permissions
+    window.resetPermissions = function() {
+        document.querySelectorAll('.perm-checkbox').forEach(function(cb) {
+            cb.checked = ORIGINAL_PERMS.indexOf(cb.getAttribute('data-codename')) !== -1;
+        });
+        hasChanges = false;
+        document.getElementById('saveIndicator').classList.remove('visible');
+        document.getElementById('selectAllPerms').checked = false;
+        updatePermCount();
+    };
+
+    // Toast notification
+    function showToast(message, type) {
+        var existing = document.querySelector('.toast-notification');
+        if (existing) existing.remove();
+
+        var toast = document.createElement('div');
+        toast.className = 'toast-notification';
+        toast.style.cssText = 'position:fixed; top:20px; right:20px; z-index:9999; padding:14px 20px; border-radius:12px; font-size:13px; font-weight:600; box-shadow:0 8px 24px rgba(0,0,0,0.12); animation:slideIn 0.3s ease; display:flex; align-items:center; gap:8px; max-width:400px';
+
+        if (type === 'success') {
+            toast.style.background = '#DCFCE7';
+            toast.style.color = '#166534';
+            toast.style.border = '1px solid #BBF7D0';
+        } else {
+            toast.style.background = '#FEE2E2';
+            toast.style.color = '#991B1B';
+            toast.style.border = '1px solid #FECACA';
+        }
+
+        toast.textContent = message;
+        document.body.appendChild(toast);
+
+        setTimeout(function() {
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity 0.3s';
+            setTimeout(function() { toast.remove(); }, 300);
+        }, 3000);
+    }
+
+    // Warn before leaving with unsaved changes
+    window.addEventListener('beforeunload', function(e) {
+        if (hasChanges) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+})();
+</script>
+{% include "users/_user_roles_panel.html" %}
+{% endblock %}

@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Expense detail &mdash; Finance &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Expense detail{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+<div class="section-hdr">
+  <span class="section-title">{{ expense.get_category_display }} &middot; TZS {{ expense.amount|floatformat:0 }}</span>
+  <a href="{% url 'finance:expense_list' %}" class="section-link">&larr; All expenses</a>
+</div>
+
+<div class="card" style="max-width:600px">
+  <div class="card-title-row">
+    <span class="card-title" style="margin-bottom:0">{{ expense.description|truncatechars:60 }}</span>
+    <span>
+      {% if expense.status == "approved" %}
+      <span class="chip chip-green">Approved</span>
+      {% elif expense.status == "rejected" %}
+      <span class="chip chip-red">Rejected</span>
+      {% else %}
+      <span class="chip chip-amber">Pending approval</span>
+      {% endif %}
+    </span>
+  </div>
+
+  <div class="trow">
+    <div><span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Category</span></div>
+    <span class="trow-right"><span class="chip chip-grey">{{ expense.get_category_display }}</span></span>
+  </div>
+  <div class="trow">
+    <div><span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Amount</span></div>
+    <span class="trow-right"><span style="font-size:18px;font-weight:700;font-family:var(--font-mono)">TZS {{ expense.amount|floatformat:0 }}</span></span>
+  </div>
+  <div class="trow" style="align-items:flex-start">
+    <div><span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Description</span></div>
+    <span class="trow-right" style="max-width:380px;text-align:right;font-size:13px;white-space:pre-wrap;color:var(--text-secondary)">{{ expense.description }}</span>
+  </div>
+  <div class="trow">
+    <div><span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Date</span></div>
+    <span class="trow-right" style="font-size:13px">{{ expense.expense_date|date:"l, d F Y" }}</span>
+  </div>
+  <div class="trow">
+    <div><span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Payment method</span></div>
+    <span class="trow-right" style="font-size:13px">{{ expense.get_payment_method_display }}</span>
+  </div>
+  <div class="trow">
+    <div><span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Reference</span></div>
+    <span class="trow-right" style="font-size:13px;font-family:var(--font-mono)">{{ expense.reference|default:"N/A" }}</span>
+  </div>
+  <div class="trow">
+    <div><span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Vendor / Payee</span></div>
+    <span class="trow-right" style="font-size:13px">{{ expense.vendor|default:"N/A" }}</span>
+  </div>
+  {% if expense.notes %}
+  <div class="trow" style="align-items:flex-start">
+    <div><span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Notes</span></div>
+    <span class="trow-right" style="max-width:380px;text-align:right;font-size:13px;white-space:pre-wrap;color:var(--text-secondary)">{{ expense.notes }}</span>
+  </div>
+  {% endif %}
+  <div class="trow">
+    <div><span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Recorded by</span></div>
+    <span class="trow-right" style="font-size:13px">{{ expense.created_by.get_full_name|default:expense.created_by.username }}</span>
+  </div>
+  <div class="trow">
+    <div><span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Reimbursement</span></div>
+    <span class="trow-right">{% if expense.is_reimbursement %}<span class="chip chip-amber">Staff reimbursement</span>{% else %}<span class="chip chip-grey">No</span>{% endif %}</span>
+  </div>
+
+  <!-- Approval info -->
+  <!-- Related Budget info -->
+  {% if related_budget %}
+  <div class="trow" style="border-top:1px solid var(--border);padding-top:8px;margin-top:8px">
+    <div><span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Related Budget</span></div>
+    <span class="trow-right" style="font-size:13px">
+      <a href="{% url 'finance:budget_detail' related_budget.pk %}" class="section-link">
+        {{ related_budget.get_category_display }}
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-left:2px"><polyline points="9 18 15 12 9 6"/></svg>
+      </a>
+    </span>
+  </div>
+  <div class="trow">
+    <div><span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Budget remaining</span></div>
+    <span class="trow-right" style="font-size:13px;font-family:var(--font-mono);font-weight:700">
+      <span style="color:{% if budget_remaining < 0 %}#DC2626{% elif budget_remaining < budget_allocated|divisibleby:4 %}#E0A800{% else %}#16A34A{% endif %}">
+        TZS {{ budget_remaining|floatformat:0 }}
+      </span>
+      <span style="font-size:11px;color:var(--text-muted);font-weight:400">
+        of TZS {{ budget_allocated|floatformat:0 }}
+      </span>
+    </span>
+  </div>
+  <div class="trow">
+    <div><span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Utilization</span></div>
+    <span class="trow-right" style="font-size:13px">
+      <div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
+        <div style="width:100px;height:6px;background:#EDF1F7;border-radius:99px;overflow:hidden">
+          <div style="height:100%;border-radius:99px;width:{{ budget_utilization }}%;background:{% if budget_utilization >= 90 %}#DC2626{% elif budget_utilization >= 75 %}#E0A800{% else %}var(--green){% endif %}"></div>
+        </div>
+        <span style="font-weight:600;font-family:var(--font-mono);font-size:12px">{{ budget_utilization }}%</span>
+      </div>
+    </span>
+  </div>
+  {% endif %}
+
+  <!-- Approval info -->
+  {% if expense.approved_by %}
+  <div class="trow">
+    <div><span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Reviewed by</span></div>
+    <span class="trow-right" style="font-size:13px">
+      {{ expense.approved_by.get_full_name|default:expense.approved_by.username }}
+      {% if expense.approved_at %}&middot; {{ expense.approved_at|date:"d M Y H:i" }}{% endif %}
+    </span>
+  </div>
+  {% endif %}
+  {% if expense.rejection_reason %}
+  <div class="trow" style="align-items:flex-start">
+    <div><span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Rejection reason</span></div>
+    <span class="trow-right" style="max-width:380px;text-align:right;font-size:13px;white-space:pre-wrap;color:var(--red)">{{ expense.rejection_reason }}</span>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Action buttons -->
+<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+  <a href="{% url 'finance:expense_list' %}" class="btn btn-secondary">&larr; Back to expenses</a>
+  {% has_perm user "finance.change_expense" as can_change_expense %}
+  {% if expense.status == "pending" and can_change_expense %}
+  <a href="{% url 'finance:expense_edit' expense.pk %}" class="btn btn-secondary">Edit</a>
+  {% endif %}
+</div>
+
+<!-- Approve/Reject — only for HOS or Super Admin viewing a pending expense -->
+{% if expense.status == "pending" and perms.finance.change_expense %}
+<div class="card" style="margin-top:14px;max-width:600px;border-left:3px solid var(--amber)">
+  <div class="card-title">Review this expense</div>
+  <form method="post" action="{% url 'finance:expense_approve' expense.pk %}" style="display:flex;flex-direction:column;gap:10px">
+    {% csrf_token %}
+    <div>
+      <button type="submit" name="action" value="approve" class="btn btn-primary" onclick="return confirm('Approve this expense of TZS {{ expense.amount|floatformat:0 }}?')">Approve expense</button>
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:10px">
+      <textarea name="rejection_reason" rows="2" class="hf2-textarea" placeholder="Reason for rejection (required to reject)" style="margin-bottom:8px"></textarea>
+      <button type="submit" name="action" value="reject" class="btn btn-danger" onclick="return confirm('Reject this expense? A reason must be provided.')">Reject expense</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

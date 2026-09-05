@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaving Certificate</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #f8fafc;
+            margin: 0;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #0f172a;
+        }
+        .certificate {
+            background: #fff;
+            width: 800px;
+            padding: 56px 64px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px -10px rgba(30, 58, 138, 0.15);
+            border: 1px solid #f1f5f9;
+            position: relative;
+        }
+        .certificate::before {
+            content: '';
+            position: absolute;
+            inset: 14px;
+            border: 2px solid #023AA5;
+            border-radius: 8px;
+            pointer-events: none;
+        }
+        .header { text-align: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 32px; }
+        .school-name { font-size: 26px; font-weight: 800; color: #023AA5; margin: 0; letter-spacing: 0.02em; }
+        .school-tagline { font-size: 12px; color: #64748b; margin-top: 4px; }
+        .cert-title {
+            text-align: center;
+            font-size: 22px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: #0f172a;
+            margin: 8px 0 28px;
+        }
+        .body-text { font-size: 14px; line-height: 1.9; color: #334155; }
+        .name-highlight { font-weight: 800; font-size: 15px; color: #023AA5; }
+        .detail-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px 32px;
+            margin: 28px 0;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 20px 24px;
+        }
+        .detail-item { display: flex; justify-content: space-between; font-size: 13px; border-bottom: 1px dotted #e2e8f0; padding-bottom: 6px; }
+        .detail-item .k { color: #94a3b8; }
+        .detail-item .v { font-weight: 700; }
+        .signatures {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 48px;
+            margin-top: 64px;
+        }
+        .signature { font-size: 12.5px; color: #64748b; }
+        .signature .line { border-top: 1px solid #cbd5e1; margin-top: 44px; padding-top: 8px; text-align: center; }
+        .print-controls { position: fixed; top: 24px; right: 24px; z-index: 100; }
+        .btn-print {
+            background: #023AA5; color: #fff; border: none; padding: 14px 28px;
+            border-radius: 16px; font-weight: 700; font-family: 'Segoe UI', system-ui, sans-serif;
+            font-size: 14px; cursor: pointer; box-shadow: 0 10px 20px rgba(30, 58, 138, 0.2);
+        }
+        @media print {
+            body { background: #fff; padding: 0; }
+            .print-controls { display: none; }
+            .certificate { box-shadow: none; width: 100%; padding: 40px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="print-controls">
+        <button class="btn-print" onclick="window.print()">Print Certificate</button>
+    </div>
+
+    <div class="certificate">
+        <div class="header">
+            <p class="school-name">{{ brand.school_name }}</p>
+            <div class="school-tagline">{{ brand.tagline|default:"Excellence in Education" }}</div>
+        </div>
+
+        <div class="cert-title">Leaving Certificate</div>
+
+        <p class="body-text">
+            This is to certify that <span class="name-highlight">{{ student.first_name }} {{ student.last_name }}</span>
+            was a registered student of {{ brand.school_name }}.
+        </p>
+
+        <div class="detail-grid">
+            <div class="detail-item"><span class="k">Admission No.</span><span class="v">{{ student.admission_no }}</span></div>
+            <div class="detail-item"><span class="k">Date of Birth</span><span class="v">{{ student.date_of_birth|date:"j F Y"|default:"&mdash;" }}</span></div>
+            <div class="detail-item"><span class="k">Gender</span><span class="v">{{ student.get_gender_display|default:"&mdash;" }}</span></div>
+            <div class="detail-item"><span class="k">Class</span><span class="v">{{ student.class_name }}{% if student.stream_name %} {{ student.stream_name }}{% endif %}</span></div>
+            <div class="detail-item"><span class="k">Enrolment Date</span><span class="v">{{ student.enrolment_date|date:"j F Y"|default:"&mdash;" }}</span></div>
+            <div class="detail-item"><span class="k">Status</span><span class="v">{{ student.get_status_display }}</span></div>
+        </div>
+
+        {% if reason %}
+        <p class="body-text">
+            <strong>Reason for leaving:</strong> {{ reason }}
+        </p>
+        {% endif %}
+
+        <p class="body-text">
+            This certificate is issued at the request of the parent/guardian and may be used for
+            transfer to another school, or any other lawful purpose.
+        </p>
+
+        <div class="signatures">
+            <div class="signature">
+                <div class="line">School Seal</div>
+            </div>
+            <div class="signature">
+                <div class="line">Head of School</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

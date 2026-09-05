@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+{% load static hodari_forms %}
+{% block title %}Welfare Observation #{{ obs.id }} — {{ brand.school_name }}{% endblock %}
+
+{% block extra_head %}
+{% include "includes/hodari_print_styles.html" %}
+<style>
+  .print-only { display: none; }
+  @media print {
+    .sidebar, .topbar, .hf2-actions, .btn-primary, .status-btn-group, form, .nav-tabs, .welfare-tabs, .sub-nav,
+    .hide-on-print, .locked-banner { display: none !important; }
+    .print-only { display: block !important; }
+    .main { margin-left: 0 !important; }
+    .content { padding: 0 !important; }
+    .card { border: none !important; box-shadow: none !important; padding: 0 !important; }
+    body { background: white !important; }
+  }
+  .form-header { border-bottom: 2px solid var(--hodari-blue); padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-start; }
+  .form-title { font-family: var(--font-display); font-size: 24px; color: var(--hodari-blue); font-weight: 800; margin: 0; }
+  .form-subtitle { color: var(--text-muted); font-size: 13px; margin-top: 4px; font-weight: 600; }
+  
+  .data-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-bottom: 30px; }
+  .data-item { display: flex; flex-direction: column; gap: 4px; }
+  .data-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .data-value { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+
+  .form-section { margin-bottom: 32px; }
+  .form-section-title { font-size: 14px; font-weight: 800; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+  .form-section-title::before { content: ''; width: 4px; height: 18px; background: var(--hodari-blue); border-radius: 2px; }
+
+  .incident-box { background: #F8FAFC; border: 1px solid var(--border); border-radius: 12px; padding: 24px; font-size: 15px; line-height: 1.6; color: var(--text-primary); white-space: pre-wrap; margin-bottom: 20px; }
+  
+  .tag-cloud { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  .tag { background: white; border: 1px solid var(--border); padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+  .tag-blue { background: #E0F2FE; color: #0369A1; border-color: #BAE6FD; }
+
+  .confirmation-card { border: 2px dashed var(--border); border-radius: 12px; padding: 24px; background: #FAFBFC; }
+  .signature-line { border-bottom: 1px solid #000; height: 40px; width: 250px; margin-bottom: 10px; }
+
+  .status-btn-group { display: flex; gap: 12px; margin-top: 8px; }
+  .status-btn { 
+    flex: 1; text-align: center; padding: 12px 10px; border-radius: 10px; 
+    border: 1px solid var(--border); background: #fff; cursor: pointer; 
+    font-size: 13px; font-weight: 700; color: var(--text-secondary);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .status-btn:hover { background: #F8FAFC; border-color: #CBD5E1; color: var(--text-primary); }
+  
+  .status-radio:checked + .btn-pending { background: #64748B; color: #fff; border-color: #64748B; box-shadow: 0 4px 12px rgba(100, 116, 139, 0.2); }
+  .status-radio:checked + .btn-progress { background: var(--hodari-blue); color: #fff; border-color: var(--hodari-blue); box-shadow: 0 4px 12px rgba(2, 58, 165, 0.25); }
+  .status-radio:checked + .btn-resolved { background: #10B981; color: #fff; border-color: #10B981; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25); }
+  .status-btn-group.locked .status-btn { pointer-events: none; opacity: 0.55; cursor: not-allowed; }
+  .locked-banner { background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; color: #166534; font-size: 13px; font-weight: 600; }
+  .field-locked { opacity: 0.6; pointer-events: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "welfare/_top_tabs.html" %}
+<!-- Print-only branded header -->
+<div class="print-only doc-container" style="max-width:800px;margin:0 auto 20px;background:#fff;padding:24px 28px;border:1px solid #DDE3EE;border-radius:12px">
+  {% include "includes/hodari_print_header.html" %}
+  <div style="height:1px;background:var(--border);margin:16px 0"></div>
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <div style="font-family:var(--font-display);font-size:18pt;font-weight:bold;color:var(--hodari-blue);text-transform:uppercase">Welfare Observation</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Ref: #{{ obs.id }}</div>
+    </div>
+  </div>
+</div>
+<div style="max-width: 800px; margin: 0 auto;">
+  <div class="card" style="padding: 40px; margin-bottom: 24px;">
+    <!-- Form Header -->
+    <div class="form-header">
+      <div>
+        <h1 class="form-title">{% if is_ecd_welfare %}ECD{% else %}Primary{% endif %} Welfare Observation</h1>
+        <div class="form-subtitle">Student Welfare Record &middot; Ref: #{{ obs.id }}</div>
+      </div>
+      <div style="text-align: right">
+        <img src="{% static 'branding/hodari-logo.png' %}" style="height: 48px; margin-bottom: 8px;" alt="{{ brand.school_name }} Logo">
+        <div class="hf2-actions" style="margin-bottom: 12px;">
+          <button onclick="window.print()" class="btn-secondary" style="padding: 6px 12px; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; background: #fff; cursor: pointer;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+            Print Form
+          </button>
+        </div>
+        <div class="chip hide-on-print {% if obs.severity == 'critical' %}chip-red{% elif obs.severity == 'high' %}chip-amber{% else %}chip-blue{% endif %}" style="font-size: 12px; padding: 4px 14px;">
+          {{ obs.get_severity_display|upper }} SEVERITY
+        </div>
+      </div>
+    </div>
+
+    <!-- Student & Record Metadata -->
+    <div class="data-grid">
+      <div class="data-item"><span class="data-label">Learner's Name</span><a href="{% url 'students:detail' obs.student.pk %}" class="data-value" style="text-decoration:none;color:var(--hodari-blue)">{{ obs.student.first_name }} {{ obs.student.last_name }}</a></div>
+      <div class="data-item"><span class="data-label">Class/Grade</span><span class="data-value">{{ obs.student.class_name }}</span></div>
+      <div class="data-item"><span class="data-label">Date of Observation</span><span class="data-value">{{ obs.observation_date|date:"F d, Y" }}</span></div>
+      
+      <div class="data-item"><span class="data-label">Concern Type</span><span class="data-value">{{ obs.get_concern_type_display }}</span></div>
+      <div class="data-item"><span class="data-label">Reporting Teacher</span><span class="data-value">{% if obs.submitted_by.staff_profile %}{{ obs.submitted_by.staff_profile.full_name }}{% else %}{{ obs.submitted_by.get_full_name|default:obs.submitted_by.username }}{% endif %}</span></div>
+      <div class="data-item"><span class="data-label">Submitted</span><span class="data-value">{{ obs.created_at|date:"d M Y, H:i" }}</span></div>
+    </div>
+
+    <!-- Acknowledgment Section (ECD only — removed from Primary per FRD) -->
+    {% if needs_acknowledgment and is_ecd_welfare %}
+    <div class="form-section">
+      <div class="form-section-title">Required Acknowledgments</div>
+      <div class="incident-box">
+        <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 200px;">
+            <div style="font-size:11px; font-weight:700; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">{% if is_ecd_welfare %}ECD{% else %}Primary{% endif %} HOD</div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              {% if obs.is_hod_acknowledged %}
+              <span style="display:inline-flex;align-items:center;gap:6px;background:#DCFCE7;color:#166534;padding:6px 14px;border-radius:6px;font-weight:700;font-size:12px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+                Acknowledged
+              </span>
+              {% else %}
+              <span style="display:inline-flex;align-items:center;gap:6px;background:#F1F5F9;color:#64748B;padding:6px 14px;border-radius:6px;font-weight:700;font-size:12px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+                Awaiting Acknowledgment
+              </span>
+              {% endif %}
+            </div>
+          </div>
+          {% if obs.severity == 'critical' %}
+          <div style="flex:1; min-width:200px;">
+            <div style="font-size:11px; font-weight:700; color: var(--text-muted); margin-bottom:6px; text-transform: uppercase; letter-spacing: 0.05em;">Head of School</div>
+            <div style="display: flex; align-items: center; gap:8px;">
+              {% if obs.is_hos_acknowledged %}
+              <span style="display:inline-flex;align-items:center;gap:6px;background:#DCFCE7;color:#166534;padding:6px 14px;border-radius:6px;font-weight:700;font-size:12px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+                Acknowledged
+              </span>
+              {% else %}
+              <span style="display:inline-flex;align-items:center;gap:6px;background:#F1F5F9;color:#64748B;padding:6px 14px;border-radius:6px;font-weight:700;font-size:12px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+                Awaiting Acknowledgment
+              </span>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+
+        {% if can_review and not user_acknowledged %}
+        <form method="post" action="{% url 'welfare:acknowledge' obs.pk %}" style="margin-top: 20px;">
+          {% csrf_token %}
+          <button type="submit" class="btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;"><path d="M9 12l2 2 4-4"></path><rect x="3" y="8" width="18" height="12" rx="2"></rect></svg>
+            Acknowledge This Observation
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Observation Description -->
+    <div class="form-section">
+      <div class="form-section-title">What was observed</div>
+      <div class="incident-box">{{ obs.observation_text }}</div>
+    </div>
+
+    <!-- Action Taken -->
+    {% if obs.action_taken %}
+    <div class="form-section">
+      <div class="form-section-title">Action taken</div>
+      <div class="incident-box" style="background:#F0F9F4;border:1px solid #B7DFBF;">{{ obs.action_taken }}</div>
+    </div>
+    {% endif %}
+
+    <!-- Parent Contact -->
+    <div class="form-section">
+      <div class="form-section-title">Parent Contact</div>
+      <div style="display:flex;gap:40px;flex-wrap:wrap">
+        <div class="data-item">
+          <span class="data-label">Parent Contacted</span>
+          <span class="data-value">{{ obs.parent_contacted|yesno:"Yes,No" }}</span>
+        </div>
+        {% if obs.parent_contact_datetime %}
+          <div class="data-item">
+            <span class="data-label">Contact Date & Time</span>
+            <span class="data-value">{{ obs.parent_contact_datetime|date:"F d, Y @ H:i" }}</span>
+          </div>
+        {% endif %}
+        {% if obs.parent_confirmed %}
+          <div class="data-item">
+            <span class="data-label">Parent Confirmed</span>
+            <span class="data-value">{{ obs.parent_confirmation_date|date:"F d, Y @ H:i" }}</span>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Follow-up -->
+    {% if obs.follow_up_required %}
+    <div class="form-section">
+      <div class="form-section-title">Follow-up</div>
+      <div class="data-item">
+        <span class="data-label">Follow-up Date</span>
+        <span class="data-value">{{ obs.follow_up_date|date:"F d, Y"|default:"Not set" }}</span>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Administrative Review — FR-WEL-004: visible only to HOD/HOS/SA, not teachers -->
+    {% if can_review %}
+    {% if obs.hod_notes or obs.hod_status == 'resolved' %}
+    <div class="form-section">
+      <div class="form-section-title">Administrative Resolution</div>
+      <div style="background: #F0FDF4; border: 1px solid #BBF7D0; padding: 20px; border-radius: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <span style="font-size: 12px; font-weight: 700; color: #166534; text-transform: uppercase;">Status: {{ obs.get_hod_status_display }}</span>
+          <span style="font-size: 11px; color: #166534;">Reviewed by: {{ obs.reviewed_by.get_full_name|default:"HOD" }}</span>
+        </div>
+        {% if obs.hod_notes %}
+          <div style="font-size: 14px; line-height: 1.6; color: #166534;">{{ obs.hod_notes }}</div>
+        {% endif %}
+        {% if obs.follow_up_date %}
+          <div style="margin-top: 12px; font-weight: 700; font-size: 12px; color: #166534;">Follow-up: {{ obs.follow_up_date|date:"F d, Y" }}</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <!-- Parent Confirmation removed per FRD -->
+  </div>
+
+  <!-- Actions -->
+  <div class="hf2-actions" style="display: flex; justify-content: space-between; align-items: center;">
+    <a href="{% url 'welfare:list' %}" class="btn-secondary">&larr; Back to Case List</a>
+    <div style="display: flex; gap: 10px;">
+      {% if user == obs.submitted_by and not obs.is_locked and obs.severity != 'critical' and obs.hod_status == 'pending' %}
+      <a href="{% url 'welfare:edit' obs.pk %}" class="btn-secondary" style="border-color:#F59E0B;color:#92400E">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Edit Observation
+      </a>
+      {% endif %}
+      <button onclick="window.print()" class="btn-secondary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+        Print / Save as PDF
+      </button>
+      
+      {% if can_review %}
+        <a href="#review-form" class="btn-primary" style="text-decoration:none">
+          {% if is_incident_locked %}Add Comment{% else %}Administrative Review &rarr;{% endif %}
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if can_review %}
+  <div id="review-form" class="card" style="margin-top: 24px; padding: 32px; border-top: 4px solid var(--hodari-blue);">
+    {% if is_incident_locked %}
+    <div class="locked-banner">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      This incident is resolved. Status and follow-up settings are locked. You may add comments only.
+    </div>
+    <div class="form-section-title">Add Comment</div>
+    {% if obs.hod_notes %}
+    <div style="margin-bottom:16px;">
+      <label class="hf2-label">Review History</label>
+      <div class="incident-box" style="background:#fff;font-size:13px;">{{ obs.hod_notes }}</div>
+    </div>
+    {% endif %}
+    <form method="post" action="{% url 'welfare:hod_review' obs.pk %}">
+      {% csrf_token %}
+      <div>
+        <label class="hf2-label">New Comment</label>
+        <textarea name="comment" class="hf2-textarea" rows="3" style="width: 100%; padding: 12px; border-radius: 8px; border: 1.5px solid var(--border);" placeholder="Add a follow-up note or comment..." required></textarea>
+      </div>
+      <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
+        <button type="submit" class="btn-primary" style="padding: 12px 32px;">Add Comment</button>
+      </div>
+    </form>
+    {% else %}
+    <div class="form-section-title">Administrative Review Panel</div>
+    <form method="post" action="{% url 'welfare:hod_review' obs.pk %}">
+      {% csrf_token %}
+      <div style="display: grid; gap: 20px;">
+        <div>
+          <label class="hf2-label">Resolution Status</label>
+          <div class="status-btn-group">
+            <input type="radio" name="hod_status" value="pending" id="status_pending" class="status-radio" {% if obs.hod_status == 'pending' %}checked{% endif %} style="display:none">
+            <label for="status_pending" class="status-btn btn-pending">Pending</label>
+
+            <input type="radio" name="hod_status" value="in_progress" id="status_progress" class="status-radio" {% if obs.hod_status == 'in_progress' or not obs.hod_status %}checked{% endif %} style="display:none">
+            <label for="status_progress" class="status-btn btn-progress">In Progress</label>
+
+            <input type="radio" name="hod_status" value="resolved" id="status_resolved" class="status-radio" {% if obs.hod_status == 'resolved' %}checked{% endif %} style="display:none">
+            <label for="status_resolved" class="status-btn btn-resolved">Resolved</label>
+          </div>
+        </div>
+        
+        <div>
+          <label class="hf2-label">Reviewer Findings & Resolution Details</label>
+          <textarea name="hod_notes" class="hf2-textarea" rows="4" style="width: 100%; padding: 12px; border-radius: 8px; border: 1.5px solid var(--border);" placeholder="Document findings, parental meetings, or follow-up actions...">{{ obs.hod_notes }}</textarea>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: end;">
+           <div class="hf2-check-group">
+             <label class="hf2-check-label" style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+               <input type="checkbox" name="follow_up_required" {% if obs.follow_up_required %}checked{% endif %} style="width: 20px; height: 20px;">
+               <span style="font-weight: 600;">Follow-up required?</span>
+             </label>
+           </div>
+           <div>
+             <label class="hf2-label">Follow-up Date</label>
+             <input type="date" name="follow_up_date" class="hf2-input" value="{{ obs.follow_up_date|date:'Y-m-d' }}">
+           </div>
+        </div>
+        
+        <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
+          <button type="submit" class="btn-primary" style="padding: 12px 32px;">Submit Review</button>
+        </div>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

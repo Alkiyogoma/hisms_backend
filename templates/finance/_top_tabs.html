@@ -1,0 +1,47 @@
+<div class="sub-nav">
+  {% if perms.finance.view_invoice or perms.finance.view_payment or perms.finance.view_budget or perms.finance.view_expense or perms.finance.view_feestructure or perms.finance.view_financeperiod %}
+  <a href="{% url 'finance:dashboard' %}" class="sub-tab {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">Dashboard</a>
+  {% endif %}
+  {% if perms.finance.view_invoice %}
+  <a href="{% url 'finance:invoice_list' %}" class="sub-tab {% if request.resolver_match.url_name == 'invoice_list' or request.resolver_match.url_name == 'invoice_detail' or request.resolver_match.url_name == 'invoice_form' %}active{% endif %}">Invoices</a>
+  {% endif %}
+  {% if perms.finance.change_feestructure %}
+  <a href="{% url 'finance:fee_structure_setup' %}" class="sub-tab {% if request.resolver_match.url_name == 'fee_structure_setup' or request.resolver_match.url_name == 'fee_structure_create' or request.resolver_match.url_name == 'fee_structure_copy' %}active{% endif %}">Fee Structures</a>
+  {% endif %}
+  {% if perms.finance.view_expense %}
+  <a href="{% url 'finance:expense_list' %}" class="sub-tab {% if request.resolver_match.url_name == 'expense_list' or request.resolver_match.url_name == 'expense_detail' or request.resolver_match.url_name == 'expense_create' or request.resolver_match.url_name == 'expense_edit' or request.resolver_match.url_name == 'expense_approve' or request.resolver_match.url_name == 'expense_batch_approval' %}active{% endif %}">Expenses</a>
+  {% endif %}
+  {% if perms.finance.view_budget %}
+  <a href="{% url 'finance:budget_list' %}" class="sub-tab {% if request.resolver_match.url_name == 'budget_list' or request.resolver_match.url_name == 'budget_detail' or request.resolver_match.url_name == 'budget_create' or request.resolver_match.url_name == 'budget_edit' or request.resolver_match.url_name == 'budget_vs_actual' %}active{% endif %}">Budgets</a>
+  {% endif %}
+  {% if perms.finance.view_payment %}
+  <a href="{% url 'finance:payment_list' %}" class="sub-tab {% if request.resolver_match.url_name == 'payment_list' or request.resolver_match.url_name == 'payment_receipt_print' %}active{% endif %}">Receipts</a>
+  {% endif %}
+  {% if perms.finance.view_invoice %}
+  <a href="{% url 'finance:financial_reports' %}" class="sub-tab {% if request.resolver_match.url_name == 'financial_reports' or request.resolver_match.url_name == 'class_collection_detail' or request.resolver_match.url_name == 'student_statement' %}active{% endif %}">Reports</a>
+  {% endif %}
+  {% if perms.finance.add_payment %}
+  <a href="{% url 'finance:batch_payment' %}" class="sub-tab {% if request.resolver_match.url_name == 'batch_payment' %}active{% endif %}">Batch Payment</a>
+  {% endif %}
+  {% if perms.finance.change_payment %}
+  <a href="{% url 'finance:bank_statement_upload' %}" class="sub-tab {% if request.resolver_match.url_name == 'bank_statement_upload' %}active{% endif %}">Bank Reconciliation</a>
+  {% endif %}
+  {% if perms.finance.view_invoice %}
+  <a href="{% url 'finance:overdue_accounts' %}" class="sub-tab {% if request.resolver_match.url_name == 'overdue_accounts' %}active{% endif %}">
+    Overdue
+    {% if overdue_count > 0 %}<span class="sub-tab-count amber">{{ overdue_count }}</span>{% endif %}
+  </a>
+  {% endif %}
+  {% if perms.finance.change_payment %}
+  <a href="{% url 'finance:payment_correction' %}" class="sub-tab {% if request.resolver_match.url_name == 'payment_correction' or request.resolver_match.url_name == 'invoice_correction' %}active{% endif %}">Corrections</a>
+  {% endif %}
+  {% if perms.finance.view_financeperiod %}
+  <a href="{% url 'finance:period_list' %}" class="sub-tab {% if request.resolver_match.url_name == 'period_list' or request.resolver_match.url_name == 'period_detail' or request.resolver_match.url_name == 'period_create' or request.resolver_match.url_name == 'period_edit' or request.resolver_match.url_name == 'opening_balance' %}active{% endif %}">Periods</a>
+  {% endif %}
+  {% if perms.finance.view_expense %}
+  <a href="{% url 'finance:recurring_list' %}" class="sub-tab {% if request.resolver_match.url_name == 'recurring_list' or request.resolver_match.url_name == 'recurring_create' or request.resolver_match.url_name == 'recurring_edit' %}active{% endif %}">Recurring</a>
+  {% endif %}
+  {% if perms.finance.change_feestructure %}
+  <a href="{% url 'finance:reminder_configuration' %}" class="sub-tab {% if request.resolver_match.url_name == 'reminder_configuration' %}active{% endif %}">Auto Reminders</a>
+  {% endif %}
+</div>

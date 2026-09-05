@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Academic Years - {{ brand.school_name }}{% endblock %}
+
+{% block content %}
+<div class="section-hdr">
+    <div style="display:flex;align-items:center;gap:12px">
+        <span class="section-title">Academic Year Configuration</span>
+        <span class="chip chip-blue">Academic Years</span>
+    </div>
+    <a href="{% url 'academics:academic_year_create' %}" class="hf-btn hf-btn-primary">+ Create New Academic Year</a>
+</div>
+
+<div class="card">
+    <div class="card-title">Manage Academic Years</div>
+    <div class="trow" style="background:var(--bg-page);border-radius:8px;margin-bottom:12px;font-weight:700;color:var(--text-secondary);font-size:11px;text-transform:uppercase;letter-spacing:0.05em">
+        <div style="flex:3">Year Name</div>
+        <div style="flex:1;text-align:center">Status</div>
+        <div style="flex:1;text-align:center">Actions</div>
+    </div>
+    {% for year in academic_years %}
+    <div class="trow">
+        <div style="flex:3">
+            <div class="trow-name">{{ year.name }}</div>
+            <div class="trow-sub">{% if year.is_current %}Currently active academic year{% else %}Archived academic year{% endif %}</div>
+        </div>
+        <div style="flex:1;display:flex;justify-content:center">
+            {% if year.is_current %}
+                <span class="chip chip-green">Current</span>
+            {% else %}
+                <span class="chip chip-grey">Inactive</span>
+            {% endif %}
+        </div>
+        <div style="flex:1;display:flex;justify-content:center">
+            <a href="{% url 'academics:term_create' %}" style="padding:4px 12px;border-radius:6px;font-size:12px;font-weight:500;color:#023AA5;background:#ebf4ff;border:1px solid #bee3f8;text-decoration:none">Add Term</a>
+        </div>
+    </div>
+    {% empty %}
+    <div style="padding:40px;text-align:center;color:var(--text-muted)">
+        <p>No academic years have been configured yet.</p>
+        <a href="{% url 'academics:academic_year_create' %}" style="display:inline-block;margin-top:12px;padding:8px 20px;border-radius:8px;font-size:13px;font-weight:600;color:#fff;background:#023AA5;text-decoration:none">Create First Academic Year</a>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

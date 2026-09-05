@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+{% block title %}Link Guardian — {{ student.first_name }}{% endblock %}
+
+{% block topbar_greeting %}Add Guardian{% endblock %}
+
+{% block content %}
+{% include "students/_top_tabs.html" %}
+<div class="page-hdr">
+  <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px">
+    <div style="width:40px; height:40px; border-radius:50%; background:#023AA5; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700">
+      {{ student.first_name|slice:":1" }}
+    </div>
+    <div>
+      <h1 style="font-family:Merriweather,serif; font-size:24px; color:#1A1A2E">{{ student.first_name }} {{ student.last_name }}</h1>
+      <div style="font-size:12px; color:#8492A6">Admission No: {{ student.admission_no }} &middot; {{ student.class_name }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="max-width:800px; margin:24px auto">
+  <div class="tabs-nav" style="margin-bottom:20px">
+    <div class="tab-item active" id="tabExisting" onclick="switchMode('existing')">Link Existing Guardian</div>
+    <div class="tab-item" id="tabNew" onclick="switchMode('new')">Create New Guardian</div>
+  </div>
+
+  <form method="post" id="guardianForm">
+    {% csrf_token %}
+    <input type="hidden" name="guardian_id" id="guardianId">
+
+    {# Scenario 1: Existing Guardian Search #}
+    <div id="sectionExisting">
+      <div class="form-group">
+        <label class="form-label">Search for Guardian (Name or Phone)</label>
+        <div style="position:relative">
+          <input type="text" class="form-input" id="guardianSearch" placeholder="Type name or phone number..." autocomplete="off">
+          <div id="searchResults" style="position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid #DDE3EE; border-radius:8px; box-shadow:0 10px 20px rgba(0,0,0,0.1); display:none; z-index:100; margin-top:4px; max-height:300px; overflow-y:auto">
+          </div>
+        </div>
+        <p class="form-help">Tip: The system will automatically detect siblings if the guardian is already linked to other students.</p>
+      </div>
+
+      <div id="selectedGuardian" style="display:none; margin-top:16px; padding:16px; background:#F0F4FB; border:1px solid #023AA5; border-radius:8px">
+        <div style="display:flex; justify-content:space-between; align-items:center">
+          <div>
+            <div style="font-weight:700; color:#1A1A2E" id="selName"></div>
+            <div style="font-size:13px; color:#474747" id="selContact"></div>
+          </div>
+          <button type="button" class="btn-secondary btn-sm" onclick="clearSelection()">Change</button>
+        </div>
+        {# Sibling match alert banner — shown when siblings detected #}
+        <div id="siblingAlertLink" style="display:none; margin-top:12px; padding:12px; background:#FEF3C7; border:1px solid #FCD34D; border-radius:8px; font-size:12px">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <p style="font-weight:600; color:#92550A; margin:0">Possible sibling match found</p>
+            <button type="button" onclick="dismissSiblingLinkAlert()" style="background:none;border:none;color:#8492A6;cursor:pointer;font-size:12px;padding:2px 6px;border-radius:4px;transition:all 0.15s" onmouseover="this.style.background='rgba(0,0,0,0.05)';this.style.color='#1A1A2E'" onmouseout="this.style.background='none';this.style.color='#8492A6'" title="Dismiss this match">
+              Dismiss
+            </button>
+          </div>
+          <p style="color:#6B5800; margin:6px 0 8px" id="selSibsText"></p>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" name="confirm_sibling" value="1" id="confirmSibling" style="accent-color:var(--green);width:16px;height:16px">
+            <span style="font-size:12px;font-weight:500;color:#92550A">Confirm sibling relationship and enable sibling discount</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    {# Scenario 2: New Guardian Info #}
+    <div id="sectionNew" style="display:none">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Full Name*</label>
+          <input type="text" name="full_name" class="form-input" placeholder="e.g. John Doe">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Primary Phone*</label>
+          <input type="text" name="phone" class="form-input" placeholder="e.g. +255 767 000 000">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Secondary Phone</label>
+          <input type="text" name="secondary_phone" class="form-input" placeholder="e.g. +255 743 000 000">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input type="email" name="email" class="form-input" placeholder="e.g. parent@example.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Preferred Invoice Name</label>
+          <input type="text" name="preferred_invoice_name" class="form-input" placeholder="e.g. Mr. & Mrs. Doe">
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:16px">
+        <label class="form-label">Physical Address</label>
+        <textarea name="address" class="form-input" rows="2" placeholder="Street, Area, City..."></textarea>
+      </div>
+
+      {# FR-PDPA-002: PDPA consent required for new guardians #}
+      <div style="margin-top:16px; padding:14px; background:#FEF3C7; border:1px solid #FCD34D; border-radius:8px">
+        <div style="font-size:13px; font-weight:600; color:#92550A; margin-bottom:10px">PDPA Consent <span style="color:#991C1C; font-weight:400">(required)</span></div>
+        <label style="display:flex; align-items:flex-start; gap:8px; font-size:13px; cursor:pointer; margin-bottom:10px">
+          <input type="checkbox" name="pdpa_consent_given" value="on" style="width:18px; height:18px; accent-color:var(--green); margin-top:1px">
+          <span>Parent has acknowledged and signed the PDPA Consent Form*</span>
+        </label>
+        <div style="display:flex; gap:16px; margin-top:6px">
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer">
+            <input type="radio" name="pdpa_consent_method" value="in_person" style="accent-color:var(--green)">
+            In-person
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer">
+            <input type="radio" name="pdpa_consent_method" value="digital" style="accent-color:var(--green)">
+            Digital
+          </label>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:13px; margin-top:10px">
+          <span>Consent statement version*</span>
+          <input type="text" name="pdpa_consent_version" id="pdpa_version_link" placeholder="e.g. v1.0" style="flex:1; padding:6px 8px; border:1px solid var(--border); border-radius:6px">
+        </div>
+      </div>
+
+      {# Portal access: create a linked User account for parent login #}
+      <div style="margin-top:16px; padding:14px; background:#EEF4FF; border:1px solid #B6C9F5; border-radius:8px">
+        <label style="display:flex; align-items:flex-start; gap:8px; font-size:13px; cursor:pointer">
+          <input type="checkbox" name="portal_access" value="on" style="width:18px; height:18px; accent-color:var(--green); margin-top:1px">
+          <span><strong>Portal Access</strong> — create a login account so this guardian can view attendance, report cards, invoices, and school communications online.</span>
+        </label>
+      </div>
+    </div>
+
+    {# Shared Relationship Info #}
+    <div style="margin-top:24px; padding-top:24px; border-top:1px solid #DDE3EE">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Relationship to Student</label>
+          <select name="relationship" class="form-select">
+            {% for code, label in relationships %}
+            <option value="{{ code }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group" style="display:flex; align-items:center; gap:8px; height:100%; padding-top:24px">
+          <input type="checkbox" name="is_primary" id="is_primary" style="width:18px; height:18px">
+          <label for="is_primary" class="form-label" style="margin:0">Set as Primary Contact</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions" style="margin-top:32px">
+      <a href="{% url 'students:detail' student.pk %}" class="btn-secondary">Cancel</a>
+      <button type="submit" class="btn-primary" style="padding:10px 24px">Link Guardian to Profile</button>
+    </div>
+  </form>
+</div>
+
+<script>
+  let currentMode = 'existing';
+  const searchInput = document.getElementById('guardianSearch');
+  const resultsDiv = document.getElementById('searchResults');
+  const selectedDiv = document.getElementById('selectedGuardian');
+  const guardianIdInput = document.getElementById('guardianId');
+
+  function switchMode(mode) {
+    currentMode = mode;
+    document.getElementById('tabExisting').classList.toggle('active', mode === 'existing');
+    document.getElementById('tabNew').classList.toggle('active', mode === 'new');
+    document.getElementById('sectionExisting').style.display = mode === 'existing' ? 'block' : 'none';
+    document.getElementById('sectionNew').style.display = mode === 'new' ? 'block' : 'none';
+    
+    if (mode === 'new') {
+        clearSelection();
+        document.getElementById('pdpa_version_link').setAttribute('required', 'required');
+    } else {
+        document.getElementById('pdpa_version_link').removeAttribute('required');
+    }
+  }
+
+  // Live Search logic
+  let debounceTimer;
+  searchInput.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      const q = searchInput.value.trim();
+      if (q.length < 2) {
+        resultsDiv.style.display = 'none';
+        return;
+      }
+      
+      fetch(`{% url 'students:api_guardian_search' %}?q=${encodeURIComponent(q)}`)
+        .then(res => res.json())
+        .then(data => {
+          resultsDiv.innerHTML = '';
+          if (data.results.length === 0) {
+            resultsDiv.innerHTML = '<div style="padding:12px; color:#8492A6; font-size:13px">No guardians found. Try creating a new one.</div>';
+          } else {
+            data.results.forEach(g => {
+              const item = document.createElement('div');
+              item.style.padding = '12px';
+              item.style.cursor = 'pointer';
+              item.style.borderBottom = '1px solid #F3F4F6';
+              item.innerHTML = `
+                <div style="font-weight:600; font-size:14px; color:#1A1A2E">${g.full_name}</div>
+                <div style="font-size:12px; color:#474747">${g.phone} ${g.email ? '&middot; ' + g.email : ''}</div>
+                ${g.siblings ? '<div style="font-size:11px; color:#023AA5; margin-top:4px">Sibling(s): ' + g.siblings + '</div>' : ''}
+              `;
+              item.onclick = () => selectGuardian(g);
+              item.onmouseover = () => item.style.background = '#F7F9FC';
+              item.onmouseout = () => item.style.background = '#fff';
+              resultsDiv.appendChild(item);
+            });
+          }
+          resultsDiv.style.display = 'block';
+        });
+    }, 300);
+  });
+
+  function selectGuardian(g) {
+    guardianIdInput.value = g.id;
+    document.getElementById('selName').innerText = g.full_name;
+    document.getElementById('selContact').innerText = `${g.phone} ${g.email ? ' · ' + g.email : ''}`;
+    
+    var sibAlert = document.getElementById('siblingAlertLink');
+    var sibText = document.getElementById('selSibsText');
+    if (g.siblings && g.siblings.length > 0) {
+      sibText.innerHTML = 'The following student(s) are already linked to this guardian: ' + g.siblings + '.';
+      sibAlert.style.display = 'block';
+      sibAlert.style.opacity = '1';
+      sibAlert.style.transform = 'none';
+      document.getElementById('confirmSibling').checked = false;
+    } else {
+      sibAlert.style.display = 'none';
+    }
+    
+    selectedDiv.style.display = 'block';
+    resultsDiv.style.display = 'none';
+    searchInput.parentElement.style.display = 'none';
+  }
+
+  function dismissSiblingLinkAlert() {
+    var alert = document.getElementById('siblingAlertLink');
+    if (alert) {
+      alert.style.transition = 'opacity 0.2s, transform 0.2s';
+      alert.style.opacity = '0';
+      alert.style.transform = 'translateY(-8px)';
+      setTimeout(function() { alert.style.display = 'none'; }, 200);
+    }
+    var cb = document.getElementById('confirmSibling');
+    if (cb) cb.checked = false;
+  }
+
+  function clearSelection() {
+    guardianIdInput.value = '';
+    selectedDiv.style.display = 'none';
+    searchInput.parentElement.style.display = 'block';
+    searchInput.value = '';
+  }
+
+  // Close search results on click outside
+  document.addEventListener('click', (e) => {
+    if (!resultsDiv.contains(e.target) && e.target !== searchInput) {
+      resultsDiv.style.display = 'none';
+    }
+  });
+
+  // Show toast for URL error params — wait for showToast to be defined
+  function _checkUrlParams() {
+    if (typeof showToast !== 'function') { setTimeout(_checkUrlParams, 100); return; }
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('error') === 'pdpa_consent') {
+      showToast('PDPA consent must be recorded before linking this guardian. Please update the guardian\'s profile first.', 'error');
+      params.delete('error');
+      const newUrl = params.toString() ? window.location.pathname + '?' + params.toString() : window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+    if (params.get('success') === '1') {
+      showToast('Guardian linked successfully!', 'success');
+      params.delete('success');
+      const newUrl = params.toString() ? window.location.pathname + '?' + params.toString() : window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }
+  _checkUrlParams();
+</script>
+{% endblock %}

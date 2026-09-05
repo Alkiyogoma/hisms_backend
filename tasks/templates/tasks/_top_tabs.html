@@ -1,0 +1,3 @@
+<div class="sub-nav">
+  <a href="{% url 'tasks:dashboard' %}" class="sub-tab {% if request.resolver_match.url_name == 'dashboard' or request.resolver_match.url_name == 'detail' %}active{% endif %}">Dashboard</a>
+</div>

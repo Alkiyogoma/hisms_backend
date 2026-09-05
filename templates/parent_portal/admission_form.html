@@ -1,0 +1,981 @@
+{% load role_tags %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hodari Christian School — Enrolment</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#17337A; --navy-700:#1B3A8F; --navy-100:#E7ECF7;
+  --gold:#F2B21C; --gold-100:#FDF3DC;
+  --ink:#171A21; --muted:#5C6575; --line:#DCE1EB; --line-soft:#EDF0F5;
+  --paper:#F2F4F8; --white:#fff; --red:#B3261E;
+  --r:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper); color:var(--ink);
+  font-family:'Archivo',system-ui,sans-serif; font-size:15px; line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,.serif{font-family:'Newsreader',Georgia,serif; font-weight:500; letter-spacing:-.01em}
+.tag{font-family:'Newsreader',Georgia,serif; font-style:italic; color:var(--muted)}
+button{font-family:inherit;font-size:inherit}
+:focus-visible{outline:2px solid var(--navy-700); outline-offset:2px}
+
+/* ---------- letterhead ---------- */
+.head{background:var(--white); border-bottom:1px solid var(--line)}
+.head-in{max-width:1160px;margin:0 auto;padding:16px 20px 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.mark{width:38px;height:38px;flex:0 0 auto}
+.wordmark{font-family:'Newsreader',Georgia,serif;font-size:15px;line-height:1.05;color:#58595B;letter-spacing:.04em;text-transform:uppercase}
+.wordmark b{display:block;font-weight:400}
+.head-spacer{flex:1}
+.rule{max-width:1160px;margin:14px auto 0;padding:0 20px}
+.rule i{display:block;height:3px;background:var(--navy);border-radius:2px}
+
+/* ---------- progress rail ---------- */
+.rail{max-width:1160px;margin:0 auto;padding:14px 20px 0;display:flex;gap:3px}
+.rail span{flex:1;height:4px;background:var(--line);border-radius:2px;transition:background .3s}
+.rail span.done{background:var(--navy)}
+.rail span.now{background:var(--gold)}
+.railtxt{max-width:1160px;margin:0 auto;padding:8px 20px 16px;display:flex;justify-content:space-between;font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+
+/* ---------- layout ---------- */
+.app{max-width:1160px;margin:0 auto;padding:24px 20px 140px;display:grid;grid-template-columns:1fr 336px;gap:28px;align-items:start}
+.panel{background:var(--white);border:1px solid var(--line);border-radius:var(--r);padding:30px 32px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--navy);font-weight:700;margin:0 0 8px}
+h1.step-t{font-size:29px;margin:0 0 8px}
+.lede{color:var(--muted);margin:0 0 26px;max-width:56ch}
+
+/* ---------- form ---------- */
+fieldset{border:0;margin:0 0 26px;padding:0}
+legend{font-family:'Newsreader',serif;font-size:19px;padding:0 0 12px;width:100%;border-bottom:1px solid var(--line-soft);margin-bottom:16px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px}
+.f{display:flex;flex-direction:column;gap:5px}
+.f.wide{grid-column:1/-1}
+label{font-size:12.5px;font-weight:600;color:#3B4453;letter-spacing:.01em}
+label .opt{font-weight:400;color:#98A0AE}
+input[type=text],input[type=email],input[type=tel],input[type=date],select,textarea{
+  font-family:inherit;font-size:14.5px;color:var(--ink);background:var(--white);
+  border:1px solid var(--line);border-radius:7px;padding:9px 11px;width:100%;
+}
+textarea{resize:vertical;min-height:74px}
+input:focus,select:focus,textarea:focus{border-color:var(--navy-700);outline:2px solid var(--navy-100);outline-offset:0}
+input.bad,select.bad,textarea.bad{border-color:var(--red);background:#FDF6F6}
+.hint{font-size:12px;color:var(--muted)}
+.err{font-size:12px;color:var(--red);font-weight:600}
+
+.check{display:flex;gap:11px;align-items:flex-start;padding:13px 14px;border:1px solid var(--line);border-radius:8px;cursor:pointer;background:var(--white)}
+.check:hover{border-color:#B9C3D6}
+.check input{margin:2px 0 0;width:17px;height:17px;flex:0 0 auto;accent-color:var(--navy)}
+.check.on{border-color:var(--navy);background:#F6F8FD}
+.check .t{font-weight:600;font-size:14px}
+.check .d{font-size:12.5px;color:var(--muted);margin-top:2px}
+.stack{display:flex;flex-direction:column;gap:10px}
+
+/* ---------- child card ---------- */
+.child{border:1px solid var(--line);border-radius:var(--r);padding:20px 22px;margin-bottom:16px;background:#FCFDFF}
+.child-h{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.pip{width:26px;height:26px;border-radius:6px;background:var(--navy);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700;flex:0 0 auto}
+.child-h h3{margin:0;font-size:18px;flex:1}
+.linkbtn{background:none;border:0;color:var(--navy);font-size:12.5px;font-weight:600;cursor:pointer;text-decoration:underline;padding:4px}
+.linkbtn.danger{color:var(--red)}
+.addbtn{width:100%;border:1.5px dashed #BCC6D8;background:var(--white);color:var(--navy);padding:13px;border-radius:9px;font-weight:600;cursor:pointer;font-size:14px}
+.addbtn:hover{background:#F6F8FD;border-color:var(--navy)}
+
+/* segmented */
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--white)}
+.seg button{border:0;background:none;padding:8px 15px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer}
+.seg button.on{background:var(--navy);color:#fff}
+
+/* menu table */
+.menu{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px}
+.menu th{background:var(--navy);color:#fff;text-align:left;padding:7px 10px;font-size:11.5px;letter-spacing:.07em;text-transform:uppercase}
+.menu td{padding:7px 10px;border-bottom:1px solid var(--line-soft)}
+.menu td:first-child{font-weight:600;width:112px;color:var(--navy)}
+details.menu-d{margin-top:12px;border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:var(--white)}
+details.menu-d summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--navy)}
+
+/* uploads */
+.up{display:flex;flex-wrap:wrap;align-items:center;gap:12px;border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:var(--white)}
+.up .n{flex:1}
+.up .n b{display:block;font-size:14px}
+.up .n span{font-size:12.5px;color:var(--muted)}
+.up input[type=file]{display:none}
+.up .pick{border:1px solid var(--navy);color:var(--navy);background:#fff;padding:7px 13px;border-radius:7px;font-weight:600;font-size:13px;cursor:pointer}
+.up.ok{border-color:var(--navy);background:#F6F8FD}
+.up .got{font-size:12.5px;color:var(--navy);font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.up .err{width:100%;margin-top:-4px}
+
+/* policy */
+.pol{border:1px solid var(--line);border-radius:9px;background:var(--white);margin-bottom:12px}
+.pol-h{padding:14px 16px;display:flex;gap:11px;align-items:flex-start;cursor:pointer}
+.pol-h input{margin:2px 0 0;width:17px;height:17px;accent-color:var(--navy);flex:0 0 auto}
+.pol-h .t{font-weight:600;font-size:14px}
+.pol-h .d{font-size:12.5px;color:var(--muted);margin-top:2px}
+.pol-body{border-top:1px solid var(--line-soft);padding:14px 16px;font-size:13px;color:#404856;max-height:190px;overflow-y:auto}
+.pol-body ul{margin:0;padding-left:18px}
+.pol-body li{margin-bottom:5px}
+.pol-toggle{background:none;border:0;color:var(--navy);font-size:12.5px;font-weight:600;cursor:pointer;padding:0 16px 13px;text-decoration:underline}
+
+/* review */
+.rev{border:1px solid var(--line);border-radius:9px;margin-bottom:14px;background:var(--white);overflow:hidden}
+.rev-h{display:flex;align-items:center;gap:10px;padding:12px 16px;background:#F8FAFD;border-bottom:1px solid var(--line-soft)}
+.rev-h h3{margin:0;font-size:16px;flex:1}
+.rev dl{margin:0;padding:14px 16px;display:grid;grid-template-columns:auto 1fr;gap:7px 18px;font-size:13.5px}
+.rev dt{color:var(--muted)}
+.rev dd{margin:0;font-weight:500;text-align:right}
+
+/* ---------- summary aside (the ledger) ---------- */
+.aside{position:sticky;top:20px}
+.ledger{background:var(--white);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.ledger-h{background:var(--navy);color:#fff;padding:14px 18px}
+.ledger-h .k{font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.7;font-weight:700}
+.ledger-h .v{font-family:'Newsreader',serif;font-size:27px;margin-top:1px;font-variant-numeric:tabular-nums}
+.ledger-b{padding:14px 18px}
+.lgroup{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--navy);font-weight:700;margin:12px 0 7px;padding-bottom:5px;border-bottom:1px solid var(--line-soft)}
+.lgroup:first-child{margin-top:0}
+.li{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:3.5px 0;animation:fade .35s ease}
+.li span:last-child{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.li.dim{color:#9AA3B2}
+.li.dim span:last-child{font-weight:500}
+@keyframes fade{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.li{animation:none}}
+.ltotal{display:flex;justify-content:space-between;padding:12px 18px;border-top:2px solid var(--navy);font-weight:700;font-size:15px;font-variant-numeric:tabular-nums}
+.lnote{padding:0 18px 16px;font-size:11.5px;color:var(--muted);line-height:1.45}
+
+/* ---------- footer nav ---------- */
+.nav{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.97);border-top:1px solid var(--line);backdrop-filter:blur(6px);z-index:40}
+.nav-in{max-width:1160px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:12px}
+.nav .tag{flex:1;font-size:13px}
+.btn{border:0;border-radius:8px;padding:11px 22px;font-weight:600;cursor:pointer;font-size:14.5px}
+.btn.p{background:var(--navy);color:#fff}
+.btn.p:hover{background:var(--navy-700)}
+.btn.s{background:#fff;color:var(--navy);border:1px solid var(--line)}
+.btn.s:hover{border-color:var(--navy)}
+.btn.g{background:var(--gold);color:#3D2E00}
+.btn.g:hover{background:#E5A70F}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.mtotal{display:none}
+
+/* ---------- invoice ---------- */
+.sheet{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:38px 40px}
+.sheet-head{display:flex;align-items:flex-start;gap:14px;padding-bottom:16px;border-bottom:3px solid var(--navy)}
+.sheet-head .meta{margin-left:auto;text-align:right;font-size:12.5px;color:var(--muted);line-height:1.7}
+.sheet-head .meta b{color:var(--ink);font-variant-numeric:tabular-nums}
+.sheet h2{font-size:23px;margin:22px 0 3px}
+.itable{width:100%;border-collapse:collapse;margin-top:14px;font-size:13.5px}
+.itable th{text-align:left;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);padding:0 0 7px}
+.itable th:last-child,.itable td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.itable td{padding:7px 0;border-bottom:1px solid var(--line-soft)}
+.itable tr.sub td{font-weight:700;border-bottom:2px solid var(--line)}
+.itable tr.head td{padding-top:16px;font-family:'Newsreader',serif;font-size:16px;font-weight:600;color:var(--navy);border-bottom:1px solid var(--line)}
+.grand{display:flex;justify-content:space-between;align-items:baseline;margin-top:20px;padding:16px 20px;background:var(--navy);color:#fff;border-radius:8px}
+.grand .l{font-size:12px;letter-spacing:.1em;text-transform:uppercase;opacity:.75;font-weight:700}
+.grand .v{font-family:'Newsreader',serif;font-size:29px;font-weight:700;font-variant-numeric:tabular-nums}
+.banks{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px}
+.bank{border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+.bank .b{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--navy);font-weight:700}
+.bank .a{font-family:'Newsreader',serif;font-size:19px;margin-top:5px;font-variant-numeric:tabular-nums}
+.bank .c{font-size:12.5px;color:var(--muted)}
+.notes{margin-top:22px;padding-top:16px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted);line-height:1.6}
+.notes b{color:var(--ink)}
+.sheet-foot{margin-top:26px;padding-top:14px;border-top:3px solid var(--navy);text-align:center}
+
+.done-mark{display:flex;align-items:center;gap:12px;background:var(--gold-100);border:1px solid #EBD79B;border-radius:9px;padding:15px 18px;margin-bottom:24px}
+.done-mark .ic{width:30px;height:30px;border-radius:50%;background:var(--gold);display:grid;place-items:center;flex:0 0 auto;font-weight:700;color:#3D2E00}
+.done-mark div b{display:block;font-size:14.5px}
+.done-mark div span{font-size:13px;color:#6B5104}
+
+/* form title band */
+.titleband{max-width:1160px;margin:0 auto;padding:14px 20px 0;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.titleband h2{margin:0;font-size:22px;letter-spacing:-.015em}
+.titleband .yr{font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--gold);background:#3A2E05;padding:3px 9px;border-radius:4px}
+.titleband .yr.navy{color:#fff;background:var(--navy)}
+
+/* uniform visual */
+.uniblock{border:1px solid var(--navy);border-radius:var(--r);overflow:hidden;margin-bottom:16px;background:#fff}
+.uniblock-h{background:var(--navy);color:#fff;padding:14px 18px;display:flex;gap:11px;align-items:flex-start}
+.uniblock-h .t{font-family:'Newsreader',serif;font-size:19px;flex:1}
+.uniblock-h .d{font-size:12.5px;opacity:.8;margin-top:2px}
+.uniblock-b{padding:18px}
+.uniweek{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.uday{border:1px solid var(--line);border-radius:9px;padding:12px 8px;text-align:center;background:#FCFDFF}
+.uday.fri{border-color:var(--gold);background:var(--gold-100)}
+.uday .d{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;font-weight:700;color:var(--navy);margin-bottom:9px}
+.uday.fri .d{color:#6B5104}
+.shirts{display:flex;justify-content:center;gap:3px;margin-bottom:9px;min-height:40px;align-items:flex-end}
+.shirts svg{width:32px;height:36px}
+.uday .b{font-size:11.5px;color:var(--muted);line-height:1.4}
+.uday .b b{color:var(--ink);font-weight:600;display:block}
+.ubuy{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
+.ubox{border:1px solid var(--line);border-radius:9px;padding:14px 16px}
+.ubox h4{margin:0 0 3px;font-family:'Newsreader',serif;font-size:16px;font-weight:600}
+.ubox .who{font-size:12px;color:var(--muted);margin-bottom:10px}
+.ubox ul{margin:0;padding:0;list-style:none;font-size:13px}
+.ubox li{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--line-soft)}
+.ubox li:last-child{border:0}
+.ubox li span:last-child{font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap}
+.unote{margin-top:14px;padding:11px 14px;background:#F6F8FD;border-radius:8px;font-size:12.5px;color:#3B4453;line-height:1.5}
+
+.doclink{display:inline-block;margin-top:9px;color:var(--navy);font-weight:600;font-size:12.5px;text-decoration:underline;cursor:pointer;background:none;border:0;padding:0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:86px;background:var(--ink);color:#fff;padding:11px 17px;border-radius:8px;font-size:13px;z-index:60;opacity:0;transition:opacity .25s;pointer-events:none;max-width:88vw;text-align:center}
+.toast.on{opacity:1}
+
+/* no-applicant alert */
+.no-app-alert{background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;padding:20px 24px;margin:40px auto;max-width:600px;text-align:center}
+.no-app-alert p:first-child{font-size:16px;font-weight:600;color:#92400E;margin:0 0 6px}
+.no-app-alert p:last-child{font-size:13px;color:#92400E;margin:0}
+
+/* success panel */
+.success-panel{background:#F0FDF4;border:1px solid #86EFAC;border-radius:9px;padding:24px;text-align:center;margin-bottom:24px}
+.success-panel .ic{width:48px;height:48px;border-radius:50%;background:#22C55E;color:#fff;display:inline-grid;place-items:center;font-size:24px;font-weight:700;margin-bottom:12px}
+.success-panel h2{margin:0 0 6px;font-size:20px}
+.success-panel p{margin:0 0 4px;font-size:13.5px;color:var(--muted)}
+.success-panel .ref{font-size:18px;font-weight:700;color:var(--navy);margin:10px 0 16px}
+.success-panel a{display:inline-block;padding:10px 22px;background:var(--navy);color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px}
+
+#print-root{display:none !important}
+@media print{
+  body{background:#fff}
+  .head,.rail,.railtxt,.rule,.nav,.app{display:none !important}
+  #print-root{display:block !important}
+  .sheet{border:0;padding:0}
+  .banks{grid-template-columns:1fr 1fr !important}
+  @page{margin:14mm}
+}
+
+@media (max-width:940px){
+  .app{grid-template-columns:1fr;padding-bottom:104px}
+  .aside{display:none}
+  .aside.open{display:block;position:fixed;inset:auto 0 62px;z-index:45;padding:0 14px;max-height:64vh;overflow:auto}
+  .grid{grid-template-columns:1fr}
+  .panel,.sheet{padding:22px 18px}
+  .railtxt span.of{display:none}
+  .banks{grid-template-columns:1fr}
+  .uniweek{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:130px;overflow-x:auto;padding-bottom:6px}
+  .ubuy{grid-template-columns:1fr}
+  .titleband h2{font-size:19px}
+  .mtotal{display:flex;flex-direction:column;line-height:1.15;cursor:pointer;background:none;border:0;text-align:left;padding:0}
+  .mtotal small{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:700}
+  .mtotal b{font-family:'Newsreader',serif;font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}
+  .nav .tag{display:none}
+  .btn{padding:11px 16px;font-size:14px}
+}
+</style>
+</head>
+<body>
+
+<div class="head">
+  <div class="head-in">
+    <svg class="mark" viewBox="0 0 48 48" aria-hidden="true">
+      <path d="M4 12a8 8 0 0 1 8-8h9v17H4z" fill="#1B3A8F"/>
+      <circle cx="35.5" cy="12.5" r="8.5" fill="#F2B21C"/>
+      <path d="M21 27v17h-9a8 8 0 0 1-8-8V27z" fill="#1B3A8F"/>
+      <path d="M27 27h17v9a8 8 0 0 1-8 8h-9z" fill="#1B3A8F"/>
+    </svg>
+    <div class="wordmark"><b>Hodari</b><b>Christian</b><b>School</b></div>
+    <div class="head-spacer"></div>
+  </div>
+  <div class="rule"><i></i></div>
+  <div class="titleband"><h2>Admission Form</h2><span class="yr navy">Academic year 2026–2027</span></div>
+  <div class="rail" id="rail"></div>
+  <div class="railtxt"><span id="stepname"></span><span class="of" id="stepof"></span></div>
+</div>
+
+{% if no_applicant %}
+<div style="max-width:1160px;margin:0 auto;padding:40px 20px">
+  <div class="no-app-alert">
+    <p>No Active Admission Application</p>
+    <p>We could not find an admission application linked to your account that is ready for form submission.</p>
+  </div>
+</div>
+{% else %}
+
+<div class="app">
+  <main class="panel" id="panel" tabindex="-1"></main>
+  <aside class="aside" id="aside"></aside>
+</div>
+
+<div class="nav"><div class="nav-in">
+  <button class="btn s" id="back">Back</button>
+  <button class="mtotal" id="mtotal"></button>
+  <div class="tag">"The courage to stand out"</div>
+  <button class="btn p" id="next">Continue</button>
+</div></div>
+
+<div id="print-root"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+var CSRF = '{{ csrf_token }}';
+var SUBMIT_URL = '{% url "parent_portal:admission_form" %}';
+
+/* ============ fee book ============ */
+var ECD = ['Pre-KG','Kindergarten','Preschool','ABC'];
+var GRADES = ECD.concat(Array.from({length:9},function(_,i){return 'Grade '+(i+1)}));
+var FEE = {
+  tuition: function(g){ return ECD.indexOf(g)!==-1 ? 3200000 : (['Grade 7','Grade 8','Grade 9'].indexOf(g)!==-1 ? 3800000 : 3500000); },
+  development: 700000, admission: 700000, checkpoint: 300000,
+  stem: 180000, breakfast: 300000,
+  uniform: { polo:{label:'Polo T-shirt (white / blue / yellow)', price:20000},
+             sweater:{label:'Hodari sweater', price:25000},
+             tee:{label:'Sports team T-shirt (red / blue / green)', price:15000} }
+};
+var money = function(n){ return 'TSh ' + n.toLocaleString('en-US'); };
+
+function childLines(c){
+  var L = [];
+  L.push({l:'Tuition — Term 1', a:FEE.tuition(c.grade)});
+  L.push({l:'Development fee (annual)', a:FEE.development});
+  if(c.isNew) L.push({l:'Admission fee (one-time)', a:FEE.admission});
+  if(c.grade==='Grade 6') L.push({l:'Cambridge Checkpoint', a:FEE.checkpoint});
+  if(c.stem) L.push({l:'STEM — Term 1', a:FEE.stem});
+  if(c.breakfast) L.push({l:'Breakfast — Term 1', a:FEE.breakfast});
+  for(var k in FEE.uniform){
+    var q = c.uniform[k]||0;
+    if(q) L.push({l: FEE.uniform[k].label + ' × ' + q, a:FEE.uniform[k].price*q});
+  }
+  return L;
+}
+var childTotal = function(c){ return childLines(c).reduce(function(s,x){return s+x.a;},0); };
+var grandTotal = function(){ return S.children.reduce(function(s,c){return s+childTotal(c);},0); };
+
+/* ============ state ============ */
+function blankChild(n){
+  n = n || 1;
+  return {
+    id:'c'+Math.random().toString(36).slice(2,7),
+    name:'', dob:'', gender:'', nationality:'Tanzanian', religion:'', grade:'Grade '+n,
+    prevSchool:'', languages:'', disabilities:'', allergies:'', isNew:true,
+    health:'', meds:'', sen:'', physician:'', physicianPhone:'', hospital:'', hospitalPhone:'', insurance:'',
+    breakfast:false, stem:false, uniform:{polo:0,sweater:0,tee:0}
+  };
+}
+function blankGuardian(){ return {name:'',rel:'',phone:'',email:'',pobox:'',nid:'',address:'',marital:'',occupation:'',workplace:'',religion:'',denomination:'',church:''}; }
+
+var S = {
+  step:0,
+  children:[blankChild(6)],
+  guardians:[blankGuardian()],
+  secondGuardian:false,
+  emergency:[{name:'',rel:'',phone:''},{name:'',rel:'',phone:''}],
+  siblings:'', heardFrom:'',
+  pledge:'', expelled:'', why:'', summary:'',
+  files:{}, ack:{}, consent:{}, signature:'', signDate:'',
+  ref:'HCS-2627-' + String(Math.floor(Math.random()*9000)+1000),
+  submitted:false
+};
+
+/* Django pre-population */
+S.children[0].name = '{{ applicant.child_full_name|escapejs|default:"" }}';
+S.children[0].grade = '{{ applicant.grade_applying_for|default:"Grade 6" }}';
+S.children[0].dob = '{{ applicant.child_date_of_birth|date:"Y-m-d"|default:"" }}';
+S.guardians[0].name = '{{ applicant.parent_full_name|escapejs|default:"" }}';
+S.guardians[0].phone = '{{ applicant.parent_phone|default:"" }}';
+S.guardians[0].email = '{{ applicant.parent_email|default:"" }}';
+
+/* Hydrate from saved form data if available */
+{% if saved_form_data %}
+try {
+  var _d = {{ saved_form_data|safe }};
+  if(_d.children && _d.children.length) S.children = _d.children;
+  if(_d.guardians && _d.guardians.length) S.guardians = _d.guardians;
+  if(_d.emergency && _d.emergency.length) S.emergency = _d.emergency;
+  if(_d.siblings !== undefined) S.siblings = _d.siblings;
+  if(_d.heardFrom !== undefined) S.heardFrom = _d.heardFrom;
+  if(_d.pledge !== undefined) S.pledge = _d.pledge;
+  if(_d.expelled !== undefined) S.expelled = _d.expelled;
+  if(_d.why !== undefined) S.why = _d.why;
+  if(_d.summary !== undefined) S.summary = _d.summary;
+  if(_d.ack) S.ack = _d.ack;
+  if(_d.consent) S.consent = _d.consent;
+  if(_d.signature !== undefined) S.signature = _d.signature;
+  if(_d.signDate !== undefined) S.signDate = _d.signDate;
+} catch(e) {}
+{% endif %}
+
+var FORM_SUBMITTED = {% if form_submitted %}true{% else %}false{% endif %};
+if(FORM_SUBMITTED){ S.submitted = true; S.step = 10; }
+
+var STEPS = ['Students','Parents','Health','Contacts','Faith','Options','Documents','Policies','Consent','Review','Invoice'];
+
+/* ============ helpers ============ */
+var $ = function(s){ return document.querySelector(s); };
+var esc = function(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]}); };
+var field = function(label,path,opts){
+  opts = opts || {};
+  var v = get(path);
+  var id = 'f_'+path.replace(/[^\w]/g,'_');
+  var ctl;
+  if(opts.options) ctl = '<select id="'+id+'" data-path="'+path+'"><option value=""'+(!v?' selected':'')+'>Select\u2026</option>'+opts.options.map(function(o){return '<option'+(o===v?' selected':'')+'>'+esc(o)+'</option>'}).join('')+'</select>';
+  else if(opts.area) ctl = '<textarea id="'+id+'" data-path="'+path+'" placeholder="'+esc(opts.ph||'')+'">'+esc(v)+'</textarea>';
+  else ctl = '<input id="'+id+'" type="'+(opts.type||'text')+'" data-path="'+path+'" value="'+esc(v)+'" placeholder="'+esc(opts.ph||'')+'">';
+  return '<div class="f'+(opts.span?' wide':'')+'"><label for="'+id+'">'+esc(label)+(opts.opt?' <span class="opt">optional</span>':'')+'</label>'+ctl+'<div class="err" data-err="'+path+'" hidden></div></div>';
+};
+var toastT;
+function toast(msg){
+  var el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('on');
+  clearTimeout(toastT); toastT = setTimeout(function(){el.classList.remove('on')}, 3800);
+}
+function get(path){ return path.split('.').reduce(function(o,k){ return o && o[k]; }, S) || ''; }
+function set(path,val){
+  var ks = path.split('.'); var last = ks.pop();
+  ks.reduce(function(o,k){return o[k];},S)[last] = val;
+}
+
+/* ============ steps ============ */
+function stepStudents(){
+  return '<p class="eyebrow">Admission form · Section 1 of 9</p><h1 class="step-t">Student information</h1>'+
+  '<p class="lede">This is Hodari\'s admission form, completed online. It takes about fifteen minutes, and at the end you\'ll receive an invoice for Term 1 that you can download and pay. Your child\'s name and grade came from the offer letter — check them, and add any brothers or sisters joining at the same time.</p>'+
+  S.children.map(function(c,i){
+  return '<div class="child">'+
+    '<div class="child-h"><div class="pip">'+(i+1)+'</div><h3>'+(c.name?esc(c.name):'Student '+(i+1))+'</h3>'+
+    (S.children.length>1?'<button class="linkbtn danger" data-act="delchild" data-i="'+i+'">Remove</button>':'')+'</div>'+
+    '<div class="grid">'+
+      field('Full name','children.'+i+'.name',{ph:'As it appears on the birth certificate',span:true})+
+      field('Grade admitted to','children.'+i+'.grade',{options:GRADES})+
+      '<div class="f"><label>Status at Hodari</label>'+
+        '<div class="seg" data-seg="children.'+i+'.isNew">'+
+          '<button type="button" data-val="true" class="'+(c.isNew?'on':'')+'">New student</button>'+
+          '<button type="button" data-val="false" class="'+(!c.isNew?'on':'')+'">Returning</button>'+
+        '</div>'+
+        '<div class="hint">Returning students don\'t pay the admission fee.</div>'+
+      '</div>'+
+      field('Date of birth','children.'+i+'.dob',{type:'date'})+
+      field('Gender','children.'+i+'.gender',{options:['Female','Male']})+
+      field('Nationality','children.'+i+'.nationality')+
+      field('Religion','children.'+i+'.religion')+
+      field('Previous school(s) attended','children.'+i+'.prevSchool',{span:true,ph:'Write "None" if this is the child\u2019s first school'})+
+      field('Languages the child uses','children.'+i+'.languages',{ph:'e.g. English, Kiswahili',span:true})+
+    '</div>'+
+  '</div>';
+  }).join('')+
+  '<button class="addbtn" data-act="addchild">+ Add another child</button>';
+}
+
+function stepParents(){
+  function g(i,title){
+    return '<div class="child">'+
+    '<div class="child-h"><div class="pip">'+(i+1)+'</div><h3>'+title+'</h3>'+
+    (i===1?'<button class="linkbtn danger" data-act="delguardian">Remove</button>':'')+'</div>'+
+    '<div class="grid">'+
+      field('Full name','guardians.'+i+'.name',{span:true})+
+      field('Relationship to student','guardians.'+i+'.rel',{options:['Mother','Father','Legal guardian','Other']})+
+      field('Phone number','guardians.'+i+'.phone',{type:'tel',ph:'+255 7XX XXX XXX'})+
+      field('Email address','guardians.'+i+'.email',{type:'email'})+
+      field('National ID number','guardians.'+i+'.nid')+
+      field('P.O. Box','guardians.'+i+'.pobox',{opt:true})+
+      field('Marital status','guardians.'+i+'.marital',{options:['Married','Single','Widowed','Separated','Divorced']})+
+      field('Home address','guardians.'+i+'.address',{span:true})+
+      field('Occupation','guardians.'+i+'.occupation')+
+      field('Place of work','guardians.'+i+'.workplace')+
+      field('Religion','guardians.'+i+'.religion',{opt:true})+
+      field('Denomination','guardians.'+i+'.denomination',{opt:true})+
+      field('Current church','guardians.'+i+'.church',{opt:true,span:true})+
+    '</div></div>';
+  }
+  return '<p class="eyebrow">Admission form · Section 2 of 9</p><h1 class="step-t">Parent and guardian details</h1>'+
+  '<p class="lede">The first contact listed receives all invoices, reports and school notices. Add a second parent or guardian if there is one.</p>'+
+  g(0,'Primary parent or guardian')+
+  (S.secondGuardian ? g(1,'Second parent or guardian') : '<button class="addbtn" data-act="addguardian">+ Add a second parent or guardian</button>');
+}
+
+function stepHealth(){
+  return '<p class="eyebrow">Admission form · Section 3 of 9</p><h1 class="step-t">Health and special needs</h1>'+
+  '<p class="lede">Only the class teacher, the school nurse and the office see this. Under the Personal Data Protection Act it is held as sensitive data and kept encrypted.</p>'+
+  S.children.map(function(c,i){
+  return '<div class="child">'+
+    '<div class="child-h"><div class="pip">'+(i+1)+'</div><h3>'+esc(c.name||'Student '+(i+1))+'</h3></div>'+
+    '<div class="grid">'+
+      field('Overall state of health','children.'+i+'.health',{options:['Excellent','Good','Fair','Ongoing concerns']})+
+      '<div class="f"></div>'+
+      field('Allergies','children.'+i+'.allergies',{opt:true,ph:'Food, medication, insect — and what we should do',span:true,area:true})+
+      field('Long-term medication','children.'+i+'.meds',{opt:true,ph:'Name, dose, when it is taken',span:true,area:true})+
+      field('Disabilities or special needs','children.'+i+'.sen',{opt:true,ph:'Educational, emotional, social or physical',span:true,area:true})+
+    '</div>'+
+    '<fieldset style="margin:20px 0 0"><legend>In a medical emergency</legend>'+
+      '<p class="hint" style="margin:-6px 0 14px">Tell us where you want your child taken and who you want called, so we act on your wishes rather than the nearest option.</p>'+
+      '<div class="grid">'+
+        field('Preferred hospital or clinic','children.'+i+'.hospital',{ph:'e.g. Regency Medical Centre, Alykhan Road'})+
+        field('Hospital phone number','children.'+i+'.hospitalPhone',{type:'tel',opt:true})+
+        field('Preferred doctor\u2019s name','children.'+i+'.physician',{opt:true,ph:'If your child sees a particular doctor'})+
+        field('Doctor\u2019s phone number','children.'+i+'.physicianPhone',{type:'tel',opt:true})+
+        field('Medical insurance or scheme','children.'+i+'.insurance',{opt:true,ph:'Provider and membership number',span:true})+
+      '</div>'+
+    '</fieldset></div>';
+  }).join('');
+}
+
+function stepContacts(){
+  return '<p class="eyebrow">Admission form · Section 4 of 9</p><h1 class="step-t">Emergency contacts</h1>'+
+  '<p class="lede">Two people we can call if neither parent can be reached. Please make sure they know they\'ve been listed.</p>'+
+  S.emergency.map(function(e,i){
+  return '<fieldset><legend>Contact '+(i+1)+'</legend><div class="grid">'+
+    field('Full name','emergency.'+i+'.name')+
+    field('Relationship to the student','emergency.'+i+'.rel')+
+    field('Phone number','emergency.'+i+'.phone',{type:'tel'})+
+  '</div></fieldset>';
+  }).join('')+
+  '<fieldset><legend>Family</legend><div class="grid">'+
+    field('Other children and the schools they attend','siblings',{opt:true,span:true,area:true,ph:'Name, school, grade'})+
+    field('How did you hear about Hodari?','heardFrom',{options:['Another parent','Church','Social media','Website','Passing by','Staff member','Other']})+
+  '</div></fieldset>';
+}
+
+function stepFaith(){
+  return '<p class="eyebrow">Admission form · Section 5 of 9</p><h1 class="step-t">Faith and background</h1>'+
+  '<p class="lede">Hodari is a Christian school and these answers help the pastoral team know your family. Please answer in your own words.</p>'+
+  '<fieldset><div class="grid">'+
+    field('Do you pledge to adhere to the biblical doctrines of the School and maintain an atmosphere that honours God at home?','pledge',{options:['Yes','No','I would like to discuss this with the school'],span:true})+
+    field('Has your child ever been expelled from a school?','expelled',{options:['No','Yes'],span:true})+
+    field('Why do you want your child to join Hodari Christian School?','why',{span:true,area:true,ph:'A few sentences is plenty'})+
+    field('How would you summarise your child\u2019s experience with the School so far?','summary',{opt:true,span:true,area:true})+
+  '</div></fieldset>';
+}
+
+function stepOptions(){
+  var menu = [['Monday','Bread with margarine, boiled eggs, milk & black tea'],['Tuesday','Sweet potatoes / potato wedges, eggs & rosella juice'],['Wednesday','Maandazi, sausage and milk / black tea'],['Thursday','Chapati, sausage and milk / black tea'],['Friday','Vitumbua & tea / yoghurt & fruits']];
+  return '<p class="eyebrow">Admission form · Section 8 of 9</p><h1 class="step-t">Choose your extras</h1>'+
+  '<p class="lede">Tuition already covers lunch, books and stationery, events and school trips within the timetable. These three are the only choices you need to make — and breakfast and STEM can be changed each term.</p>'+
+  S.children.map(function(c,i){
+  return '<div class="child">'+
+    '<div class="child-h"><div class="pip">'+(i+1)+'</div><h3>'+esc(c.name||'Student '+(i+1))+' · '+esc(c.grade)+'</h3></div>'+
+    '<div class="stack">'+
+      '<label class="check '+(c.breakfast?'on':'')+'"><input type="checkbox" data-path="children.'+i+'.breakfast" '+(c.breakfast?'checked':'')+'>'+
+        '<div><div class="t">Breakfast — '+money(FEE.breakfast)+' per term</div>'+
+        '<div class="d">Served from 7:15am, Monday to Friday. You can start or stop this at the beginning of any term.</div></div></label>'+
+      '<details class="menu-d"><summary>See this term\'s breakfast menu</summary>'+
+        '<table class="menu"><tr><th>Day</th><th>Served</th></tr>'+
+        menu.map(function(r){return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td></tr>'}).join('')+'</table></details>'+
+      '<label class="check '+(c.stem?'on':'')+'"><input type="checkbox" data-path="children.'+i+'.stem" '+(c.stem?'checked':'')+'>'+
+        '<div><div class="t">STEM programme — '+money(FEE.stem)+' per term</div>'+
+        '<div class="d">Weekly hands-on science, coding and robotics beyond the Cambridge curriculum.</div></div></label>'+
+    '</div>'+
+    '<fieldset style="margin-top:20px"><legend>Uniform from the school office</legend>'+
+      '<div class="grid">'+
+      Object.entries(FEE.uniform).map(function(entry){
+        var k = entry[0], u = entry[1];
+        return '<div class="f">'+
+        '<label>'+u.label+' — '+money(u.price)+'</label>'+
+        '<select data-path="children.'+i+'.uniform.'+k+'">'+[0,1,2,3,4,5].map(function(n){
+          return '<option value="'+n+'"'+((c.uniform[k]||0)===n?' selected':'')+'>'+(n===0?'None':n)+'</option>';
+        }).join('')+'</select></div>';
+      }).join('')+
+      '</div>'+
+      '<p class="hint" style="margin-top:10px">Trousers, dresses and sports shorts are bought from <b>Rockdove Kids Empire</b>, Mikocheni (next to East Africa Primary School), 0717 419 498 — they are not billed by the school.</p>'+
+    '</fieldset>'+
+  '</div>';
+  }).join('')+
+  '<div class="check" style="cursor:default;border-color:var(--navy);background:#F6F8FD">'+
+    '<div><div class="t">School transport is arranged directly with the bus operator</div>'+
+    '<div class="d">Routes cost between '+money(400000)+' and '+money(600000)+' a term. Call Upanga Transport Company on 0711 729 572 — the school does not invoice for it.</div></div></div>';
+}
+
+function stepDocs(){
+  var docs = [['birth','Child\u2019s birth certificate','A clear photo of the original is fine'],
+    ['clearance','Clearance form from previous school','Ask the previous school\u2019s office to issue this'],
+    ['photo','Passport photo of the student','We print the ID cards here — one photo is enough'],
+    ['nid','Parent National ID','Front side, for the parent signing this form']];
+  return '<p class="eyebrow">Admission form · Section 6 of 9</p><h1 class="step-t">Upload documents</h1>'+
+  '<p class="lede">All four documents are required to complete the enrolment. You can take a photo of each document with your phone.</p>'+
+  '<div class="stack">'+docs.map(function(d){
+    var f = S.files[d[0]];
+    var fname = f ? f.name : '';
+    return '<div class="up '+(fname?'ok':'')+'"><div class="n"><b>'+d[1]+'</b><span>'+d[2]+'</span></div>'+
+    (fname?'<div class="got">'+esc(fname)+'</div>':'')+
+    '<label class="pick">'+(fname?'Replace':'Choose file')+'<input type="file" data-file="'+d[0]+'" accept="image/*,.pdf"></label>'+
+    '<div class="err" data-err="files.'+d[0]+'" hidden></div></div>';
+  }).join('')+'</div>';
+}
+
+var shirt = function(fill,stroke){ return '<svg viewBox="0 0 40 44" aria-hidden="true"><path d="M14 4 L7 7 L3 12.5 L7.5 16.5 L10 14 L10 40 L30 40 L30 14 L32.5 16.5 L37 12.5 L33 7 L26 4 L23 8.5 L17 8.5 Z" fill="'+fill+'" stroke="'+(stroke||'#C3CBD9')+'" stroke-width="1.2" stroke-linejoin="round"/></svg>'; };
+
+function uniformBlock(){
+  var W='#FFFFFF', B='#1B3A8F', R='#C0392B', G='#1E8449';
+  var days = [
+    ['Monday', [ [W] ], 'White polo', 'with blue shorts or dress', false],
+    ['Tuesday', [[W],[B]], 'White or blue polo', 'with blue shorts or dress', false],
+    ['Wednesday', [[W],[B]], 'White or blue polo', 'with blue shorts or dress', false],
+    ['Thursday', [[W],[B]], 'White or blue polo', 'with blue shorts or dress', false],
+    ['Friday', [[R],[B],[G]], 'Sports team T-shirt', 'with blue sports shorts', true]
+  ];
+  return '<div class="uniblock">'+
+    '<div class="uniblock-h">'+
+      '<label style="display:contents"><input type="checkbox" data-ack="uniform" '+(S.ack.uniform?'checked':'')+' style="width:17px;height:17px;margin-top:5px;accent-color:#F2B21C;flex:0 0 auto;cursor:pointer"></label>'+
+      '<div><div class="t">Uniform requirements</div>'+
+      '<div class="d">What your child wears on each day, and where each item is bought. Tick to confirm you have read it.</div></div>'+
+    '</div>'+
+    '<div class="uniblock-b">'+
+      '<div class="uniweek">'+days.map(function(d){
+        return '<div class="uday'+(d[4]?' fri':'')+'">'+
+        '<div class="d">'+d[0]+'</div>'+
+        '<div class="shirts">'+d[1].map(function(c){return shirt(c[0])}).join('')+'</div>'+
+        '<div class="b"><b>'+d[2]+'</b>'+d[3]+'</div>'+
+      '</div>';
+      }).join('')+'</div>'+
+      '<div class="unote"><b>Shoes and socks:</b> plain black closed shoes with white socks Monday to Thursday. Sneakers with coloured or white socks on Friday. If black shoes are lost or being repaired, send a note with your child.<br><br>'+
+      '<b>Hair, nails and jewellery:</b> hair short and neat for boys, neatly braided or tied back for girls, and no dyed hair. Nails short with no polish. No jewellery beyond a plain watch, or one stud per ear for girls.</div>'+
+      '<div class="ubuy">'+
+        '<div class="ubox"><h4>Buy at the school office</h4><div class="who">Pay for these on your invoice — choose sizes at the next step</div>'+
+          '<ul><li><span>Polo T-shirt · white, blue or yellow</span><span>20,000</span></li>'+
+          '<li><span>Hodari sweater</span><span>25,000</span></li>'+
+          '<li><span>Sports team T-shirt · red, blue or green</span><span>15,000</span></li></ul></div>'+
+        '<div class="ubox"><h4>Buy at Rockdove Kids Empire</h4><div class="who">Mikocheni, next to East Africa Primary School · 0717 419 498</div>'+
+          '<ul><li><span>Blue Hodari trousers</span><span>25,000</span></li>'+
+          '<li><span>Blue dress (girls)</span><span>25,000</span></li>'+
+          '<li><span>Blue shorts (boys)</span><span>20,000</span></li>'+
+          '<li><span>Blue sports shorts</span><span>20,000</span></li></ul></div>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+
+function stepPolicies(){
+  var pols = [
+    ['conduct','Code of Conduct for Students','Twenty school rules, the dress code and the disciplinary steps',
+      ['School starts at 8:00am; students are to be dropped off by 7:55am.',
+       'Correct uniform for the day is worn at all times; hair and nails kept neat, no nail polish.',
+       'No jewellery beyond a plain watch, or one stud per ear for girls.',
+       'Black shoes Monday to Thursday, sports shoes on Friday.',
+       'Mobile phones, tablets and other devices may not be brought to school without the head teacher\u2019s permission.',
+       'Bullying, fighting, intimidation and abusive language are not tolerated.',
+       'All school activities are compulsory; absence needs a written note, and a doctor\u2019s note on test days.',
+       'Serious offences may lead to suspension or expulsion after a reprimand and warning.']],
+    ['swim','Swimming and Sports Guidelines 2026–2027','What your child brings for PE and swimming lessons',
+      ['Sneakers for PE — football cleats are not allowed except during a match.',
+       'Friday sports kit: navy blue shorts, a Hodari sports T-shirt, socks and sneakers.',
+       'Swimming: goggles, a fitting towel and slippers, sandals or crocs.',
+       'Floaters are required for ECD, and for lower primary if your child is still a beginner.',
+       'Costumes must be full-body or one-piece with legs; two-piece and brief-style costumes are not permitted.']]
+  ];
+  return '<p class="eyebrow">Admission form · Section 7 of 9</p><h1 class="step-t">School policies</h1>'+
+  '<p class="lede">Read each one and tick to confirm. We record which version you agreed to and when, so you can always ask the office for a copy.</p>'+
+  uniformBlock()+
+  pols.map(function(p){
+  return '<div class="pol">'+
+    '<label class="pol-h"><input type="checkbox" data-ack="'+p[0]+'" '+(S.ack[p[0]]?'checked':'')+'>>'+
+      '<div><div class="t">'+p[1]+'</div><div class="d">'+p[2]+'</div></div></label>'+
+    (S.ack['_c'+p[0]]?'':'<div class="pol-body"><ul>'+p[3].map(function(x){return '<li>'+x+'</li>'}).join('')+'</ul>'+
+      '<button class="doclink" data-doc="'+p[1]+'">Read the full document</button></div>')+
+    '<button class="pol-toggle" data-open="'+p[0]+'">'+(S.ack['_c'+p[0]]?'Show the key points':'Hide the key points')+'</button>'+
+  '</div>';
+  }).join('');
+}
+
+function stepConsent(){
+  var cats = [
+    ['id','Student identification','Name, date of birth, gender, nationality and photograph — for registration, school ID and Ministry reporting.'],
+    ['academic','Academic and school records','Placement, grades, assessments and reports — to track progress and produce report cards.'],
+    ['contact','Parent contact details','For school communication, emergencies, billing and record-keeping.'],
+    ['financial','Financial information','Invoices, payment records and receipts — for billing and audit.'],
+    ['health','Health and medical data','Conditions, allergies, medication and emergency instructions — to keep your child safe.'],
+    ['faith','Religious affiliation','To run chapel programmes and provide pastoral care in keeping with the school\u2019s Christian ethos.'],
+    ['sen','Special needs and learning assessments','To provide academic support and coordinate with specialists.'],
+    ['counsel','Counselling records','Held in strict confidence, used solely for your child\u2019s wellbeing.']
+  ];
+  return '<p class="eyebrow">Admission form · Section 9 of 9</p><h1 class="step-t">Data consent</h1>'+
+  '<p class="lede">Under the Personal Data Protection Act, 2022, Hodari is a registered Data Controller and needs your written consent before holding your family\'s information. What follows is a summary of the full form — please read the whole document before you sign. You can withdraw consent at any time by writing to <b>dpo@hodari.ac.tz</b>.</p>'+
+  '<div class="unote" style="margin-bottom:22px"><b>Parental Data Consent Form (Act No. 11 of 2022)</b><br>'+
+    'The complete form sets out data sharing and disclosure, security and retention, and your rights as a data subject under Part VI of the Act.'+
+    '<br><button class="doclink" data-doc="Parental Data Consent Form 2026–2027">Read the full consent form</button></div>'+
+  '<fieldset><legend>What the school holds and why</legend>'+
+    '<div class="stack">'+cats.map(function(c){return '<div class="check" style="cursor:default"><div><div class="t">'+c[1]+'</div><div class="d">'+c[2]+'</div></div></div>'}).join('')+'</div>'+
+    '<label class="check '+(S.consent.core?'on':'')+'" style="margin-top:14px"><input type="checkbox" data-consent="core" '+(S.consent.core?'checked':'')+'>>'+
+      '<div><div class="t">I consent to the school holding and processing the data above</div>'+
+      '<div class="d">This is required to enrol. Data stays in Tanzania and is never sold or shared for marketing.</div></div></label>'+
+  '</fieldset>'+
+  '<fieldset><legend>Photographs and video — your choice</legend>'+
+    '<p class="hint" style="margin:-6px 0 12px">Both answers are entirely up to you. Saying no to either changes nothing about your child\u2019s place, and you can change your mind at any time by writing to the Data Protection Officer.</p>'+
+    '<div class="stack">'+
+      '<label class="check '+(S.consent.media?'on':'')+'"><input type="checkbox" data-consent="media" '+(S.consent.media?'checked':'')+'>>'+
+        '<div><div class="t">You may use photographs and video of my child</div>'+
+        '<div class="d">Taken at school events, in classrooms and during activities — for newsletters, notice boards, the school website, social media and promotional materials.</div></div></label>'+
+      '<label class="check '+(S.consent.mediaParent?'on':'')+'"><input type="checkbox" data-consent="mediaParent" '+(S.consent.mediaParent?'checked':'')+'>>'+
+        '<div><div class="t">You may use photographs and video of me</div>'+
+        '<div class="d">Taken where parents appear — sports days, chapel, prize-giving, parent meetings and open days — used in the same places.</div></div></label>'+
+    '</div>'+
+  '</fieldset>'+
+  '<fieldset><legend>Signature</legend><div class="grid">'+
+    field('Type your full name to sign','signature',{ph:'As written above'})+
+    field('Date','signDate',{type:'date'})+
+    '<p class="hint wide" style="grid-column:1/-1">By typing your name you declare that you are the parent or legal guardian of the children listed, and that the information you have given is true and current.</p>'+
+  '</div></fieldset>';
+}
+
+function stepReview(){
+  var g = S.guardians[0];
+  var _editBtn = FORM_SUBMITTED ? '' : '<button class="linkbtn" data-goto="1">Edit</button>';
+  return '<p class="eyebrow">Admission form · Review</p><h1 class="step-t">Check everything over</h1>'+
+  '<p class="lede">'+(FORM_SUBMITTED ? 'This form has been submitted. Contact the school office to make changes.' : 'Nothing is submitted until you press Generate invoice. Use Edit to go back to any section.')+'</p>'+
+  '<div class="rev"><div class="rev-h"><h3>Parent or guardian</h3>'+((!FORM_SUBMITTED)?'<button class="linkbtn" data-goto="1">Edit</button>':'')+'</div>'+
+    '<dl><dt>Name</dt><dd>'+(esc(g.name)||'—')+'</dd><dt>Phone</dt><dd>'+(esc(g.phone)||'—')+'</dd>'+
+    '<dt>Email</dt><dd>'+(esc(g.email)||'—')+'</dd><dt>Address</dt><dd>'+(esc(g.address)||'—')+'</dd>'+
+    (S.secondGuardian?'<dt>Second guardian</dt><dd>'+(esc(S.guardians[1].name)||'—')+'</dd>':'')+'</dl></div>'+
+  S.children.map(function(c,i){
+  return '<div class="rev"><div class="rev-h"><div class="pip">'+(i+1)+'</div><h3>'+esc(c.name||'Student '+(i+1))+'</h3>'+((!FORM_SUBMITTED)?'<button class="linkbtn" data-goto="0">Edit</button>':'')+'</div>'+
+    '<dl><dt>Grade</dt><dd>'+esc(c.grade)+'</dd><dt>Status</dt><dd>'+(c.isNew?'New student':'Returning')+'</dd>'+
+    '<dt>Breakfast</dt><dd>'+(c.breakfast?'Yes':'No')+'</dd><dt>STEM</dt><dd>'+(c.stem?'Yes':'No')+'</dd>'+
+    '<dt>Allergies</dt><dd>'+(esc(c.allergies)||'None given')+'</dd>'+
+    '<dt>Term 1 total</dt><dd>'+money(childTotal(c))+'</dd></dl></div>';
+  }).join('')+
+  '<div class="rev"><div class="rev-h"><h3>Emergency contacts</h3>'+((!FORM_SUBMITTED)?'<button class="linkbtn" data-goto="3">Edit</button>':'')+'</div>'+
+    '<dl>'+S.emergency.map(function(e){return '<dt>'+(esc(e.name)||'—')+'</dt><dd>'+(esc(e.rel)||'—')+(' · ')+(esc(e.phone)||'—')+'</dd>'}).join('')+'</dl></div>'+
+  '<div class="rev"><div class="rev-h"><h3>Consent</h3>'+((!FORM_SUBMITTED)?'<button class="linkbtn" data-goto="8">Edit</button>':'')+'</div>'+
+    '<dl><dt>Data processing</dt><dd>'+(S.consent.core?'Agreed':'Not agreed')+'</dd>'+
+    '<dt>Photographs of my child</dt><dd>'+(S.consent.media?'Agreed':'Declined')+'</dd>'+
+    '<dt>Photographs of me</dt><dd>'+(S.consent.mediaParent?'Agreed':'Declined')+'</dd>'+
+    '<dt>Signed by</dt><dd>'+(esc(S.signature)||'—')+'</dd></dl></div>';
+}
+
+function invoiceHTML(){
+  var g = S.guardians[0];
+  var d = new Date();
+  var due = new Date(d.getTime()+14*864e5);
+  var fmt = function(x){ return x.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); };
+  return '<div class="sheet">'+
+  '<div class="sheet-head">'+
+    '<svg class="mark" viewBox="0 0 48 48" style="width:44px;height:44px"><path d="M4 12a8 8 0 0 1 8-8h9v17H4z" fill="#1B3A8F"/><circle cx="35.5" cy="12.5" r="8.5" fill="#F2B21C"/><path d="M21 27v17h-9a8 8 0 0 1-8-8V27z" fill="#1B3A8F"/><path d="M27 27h17v9a8 8 0 0 1-8 8h-9z" fill="#1B3A8F"/></svg>'+
+    '<div class="wordmark"><b>Hodari</b><b>Christian</b><b>School</b></div>'+
+    '<div class="meta">House No. 14, Nova Rd, Kawe Beach, Dar es Salaam<br>+255 767 016 940 · hello@hodari.ac.tz</div>'+
+  '</div>'+
+  '<h2>Enrolment invoice</h2>'+
+  '<table class="itable" style="margin-top:16px"><tr>'+
+    '<td style="border:0;padding-top:6px"><span style="color:var(--muted);font-size:12px">Billed to</span><br><b>'+(esc(g.name)||'—')+'</b><br>'+(esc(g.address)||'')+'<br>'+(esc(g.phone)||'')+'</td>'+
+    '<td style="border:0;padding-top:6px;text-align:right;font-size:13px">'+
+      '<span style="color:var(--muted);font-size:12px">Reference</span><br><b style="font-size:15px">'+S.ref+'</b><br>'+
+      'Issued '+fmt(d)+' · Due '+fmt(due)+'<br>Academic year 2026–2027 · Term 1</td>'+
+  '</tr></table>'+
+  '<table class="itable">'+
+    '<tr><th>Item</th><th>Amount</th></tr>'+
+    S.children.map(function(c){return ''+
+      '<tr class="head"><td>'+esc(c.name||'Student')+' — '+esc(c.grade)+'</td><td></td></tr>'+
+      childLines(c).map(function(l){return '<tr><td>'+esc(l.l)+'</td><td>'+money(l.a)+'</td></tr>'}).join('')+
+      '<tr class="sub"><td>Subtotal</td><td>'+money(childTotal(c))+'</td></tr>';
+    }).join('')+
+  '</table>'+
+  '<div class="grand"><div class="l">Total due — Term 1</div><div class="v">'+money(grandTotal())+'</div></div>'+
+  '<div class="banks">'+
+    '<div class="bank"><div class="b">Diamond Trust Bank · Mbezi Chini</div><div class="a">0225556001</div><div class="c">Hodari Trust</div></div>'+
+    '<div class="bank"><div class="b">CRDB Bank · Mikocheni</div><div class="a">0150829302900</div><div class="c">Hodari Trust</div></div>'+
+  '</div>'+
+  '<div class="notes">'+
+    '<b>Quote '+S.ref+' as the payment reference</b> so we can match your transfer to your children straight away.<br><br>'+
+    'The 300,000 assessment fee is already paid and is not charged again. Tuition covers lunch, books, stationery and school events. Breakfast and STEM are charged per term and continue automatically until you tell us otherwise. School trips are billed separately when they come up. <b>School transport is paid directly to Upanga Transport Company on 0711 729 572</b>, and trousers, dresses and sports shorts are bought from Rockdove Kids Empire on 0717 419 498. Fees paid are not refundable.'+
+  '</div>'+
+  '<div class="sheet-foot"><span class="tag">"The courage to stand out"</span></div>'+
+'</div>';
+}
+
+function stepInvoice(){
+  return '<div class="success-panel">'+
+    '<div class="ic">✓</div>'+
+    '<h2>Enrolment submitted</h2>'+
+    '<p>A copy has been sent to <b>'+esc(S.guardians[0].email||'your email')+'</b> and the school office.</p>'+
+    '<p>Reference number:</p>'+
+    '<div class="ref">'+S.ref+'</div>'+
+  '</div>'+
+  invoiceHTML();
+}
+
+var RENDER = [stepStudents,stepParents,stepHealth,stepContacts,stepFaith,stepOptions,stepDocs,stepPolicies,stepConsent,stepReview,stepInvoice];
+
+/* ============ ledger ============ */
+function renderAside(){
+  var started = S.step>0 || S.children.some(function(c){return c.name});
+  var body = '';
+  S.children.forEach(function(c,i){
+    body += '<div class="lgroup">'+esc(c.name||'Student '+(i+1))+' · '+esc(c.grade)+'</div>';
+    childLines(c).forEach(function(l){ body += '<div class="li"><span>'+esc(l.l)+'</span><span>'+money(l.a).replace('TSh ','')+'</span></div>'; });
+  });
+  body += '<div class="li dim" style="margin-top:10px"><span>Assessment fee</span><span>already paid</span></div>'+
+           '<div class="li dim"><span>Transport</span><span>paid to vendor</span></div>';
+  var fileLabels = {birth:'Birth certificate',clearance:'Clearance form',photo:'Passport photo',nid:'Parent NID'};
+  var fileCount = Object.keys(S.files).filter(function(k){return S.files[k]}).length;
+  if(fileCount > 0){
+    body += '<div class="lgroup" style="margin-top:14px">Documents uploaded</div>';
+    Object.keys(fileLabels).forEach(function(k){
+      if(S.files[k]) body += '<div class="li"><span>'+fileLabels[k]+'</span><span style="color:#22C55E">✓</span></div>';
+    });
+  } else if(S.step >= 6){
+    body += '<div class="lgroup" style="margin-top:14px">Documents</div>'+
+      '<div class="li dim"><span>4 files required</span><span>none yet</span></div>';
+  }
+  $('#aside').innerHTML = '<div class="ledger">'+
+    '<div class="ledger-h"><div class="k">Total due at enrolment</div><div class="v">'+money(grandTotal())+'</div></div>'+
+    '<div class="ledger-b">'+body+'</div>'+
+    '<div class="ltotal"><span>Term 1 total</span><span>'+money(grandTotal())+'</span></div>'+
+    '<div class="lnote">Term 1 only. Terms 2 and 3 are billed later and will be lower — the admission, development and Checkpoint fees don\'t repeat.</div>'+
+  '</div>';
+  $('#mtotal').innerHTML = '<small>Total due</small><b>'+money(grandTotal())+'</b>';
+}
+
+/* ============ validation ============ */
+var REQ = {
+  0: function(){ return S.children.flatMap(function(c,i){return [['children.'+i+'.name','Enter the student\u2019s full name'],['children.'+i+'.dob','Enter the date of birth'],['children.'+i+'.gender','Select a gender'],['children.'+i+'.religion','Enter the child\u2019s religion'],['children.'+i+'.prevSchool','Enter the previous school, or write "None"']]}); },
+  1: function(){
+    var r = [['guardians.0.name','Enter the parent or guardian\u2019s name'],['guardians.0.phone','Enter a phone number we can reach you on'],['guardians.0.email','Enter an email address'],['guardians.0.address','Enter a home address'],['guardians.0.rel','Select a relationship'],['guardians.0.workplace','Enter a place of work']];
+    if(S.secondGuardian) r.push(['guardians.1.name','Enter this guardian\u2019s name or remove them'],['guardians.1.workplace','Enter a place of work']);
+    return r;
+  },
+  2: function(){ return S.children.flatMap(function(c,i){return [['children.'+i+'.health','Select a general state of health'],['children.'+i+'.hospital','Name the hospital or clinic you want us to use']]}); },
+  3: function(){ return [['emergency.0.name','Enter a first emergency contact'],['emergency.0.phone','Enter their phone number'],['emergency.1.name','Enter a second emergency contact'],['emergency.1.phone','Enter their phone number']]; },
+  4: function(){ return [['pledge','Please answer this question'],['expelled','Please answer this question'],['why','Tell us briefly why you chose Hodari']]; },
+  8: function(){ return [['signature','Type your full name to sign'],['signDate','Enter today\u2019s date']]; }
+};
+
+function validate(){
+  document.querySelectorAll('[data-err]').forEach(function(e){e.hidden=true;e.textContent=''});
+  document.querySelectorAll('.bad').forEach(function(e){e.classList.remove('bad')});
+  var first = null;
+  var rules = REQ[S.step] ? REQ[S.step]() : [];
+  rules.forEach(function(rule){
+    var path = rule[0], msg = rule[1];
+    if(!String(get(path)).trim()){
+      var box = document.querySelector('[data-err="'+path+'"]');
+      var inp = document.querySelector('[data-path="'+path+'"]');
+      if(box){box.hidden=false;box.textContent=msg}
+      if(inp){inp.classList.add('bad'); if(!first) first=inp}
+    }
+  });
+  if(S.step===6){
+    var missing = [['birth','Child\'s birth certificate'],['clearance','Clearance form'],['photo','Passport photo'],['nid','Parent National ID']].filter(function(d){return !S.files[d[0]]});
+    if(missing.length){
+      missing.forEach(function(d){
+        var box = document.querySelector('[data-err="files.'+d[0]+'"]');
+        if(box){box.hidden=false;box.textContent='Please upload the '+d[1]}
+      });
+      toast('Please upload all required documents: ' + missing.map(function(d){return d[1]}).join(', ') + '.');
+      return false;
+    }
+  }
+  if(S.step===7){
+    var missing = ['uniform','conduct','swim'].filter(function(k){return !S.ack[k]});
+    if(missing.length){ toast('Please tick all three policies — uniform, code of conduct and swimming — to confirm you have read them.'); return false; }
+  }
+  if(S.step===8 && !S.consent.core){
+    toast('The school cannot enrol your child without consent to hold their data. If you have concerns, contact dpo@hodari.ac.tz.'); return false;
+  }
+  if(first){ first.focus(); first.scrollIntoView({block:'center',behavior:'smooth'}); return false; }
+  return true;
+}
+
+/* ============ render ============ */
+function render(){
+  $('#panel').innerHTML = RENDER[S.step]();
+  $('#rail').innerHTML = STEPS.map(function(_,i){return '<span class="'+(i<S.step?'done':i===S.step?'now':'')+'"></span>'}).join('');
+  $('#stepname').textContent = STEPS[S.step];
+  $('#stepof').textContent = 'Step '+(S.step+1)+' of '+STEPS.length;
+  $('#back').style.visibility = S.step===0 ? 'hidden':'visible';
+  var last = S.step===STEPS.length-1;
+  $('#next').textContent = last ? 'Download invoice' : (S.step===9 ? 'Generate invoice' : 'Continue');
+  $('#next').className = last ? 'btn g' : 'btn p';
+  $('#aside').classList.remove('open');
+  renderAside();
+  if(last){ $('#print-root').innerHTML = invoiceHTML(); }
+  window.scrollTo({top:0,behavior:'smooth'});
+  $('#panel').focus({preventScroll:true});
+  if(FORM_SUBMITTED){
+    $('#panel').querySelectorAll('input,textarea,select').forEach(function(el){el.disabled=true;el.readOnly=true;});
+    $('#back').style.display='none';
+    if(!last){ $('#next').style.display='none'; }
+    var banner=document.createElement('div');
+    banner.style.cssText='padding:14px 18px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;margin-bottom:16px;font-size:13px;color:#16A34A;font-weight:600;display:flex;align-items:center;gap:8px';
+    banner.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Enrolment submitted — form is read-only. Contact the school office to make changes.';
+    $('#panel').prepend(banner);
+  }
+}
+
+/* ============ events ============ */
+document.addEventListener('input', function(e){
+  var t = e.target;
+  if(t.dataset.path){
+    var v = t.value;
+    if(t.type==='checkbox') v = t.checked;
+    if(t.dataset.path.indexOf('.uniform.')!==-1) v = parseInt(t.value,10)||0;
+    set(t.dataset.path, v);
+    t.classList.remove('bad');
+    var err = document.querySelector('[data-err="'+t.dataset.path+'"]'); if(err) err.hidden=true;
+    renderAside();
+  }
+});
+document.addEventListener('change', function(e){
+  var t = e.target;
+  if(t.dataset.path && (t.type==='checkbox'||t.tagName==='SELECT')){
+    var v = t.type==='checkbox' ? t.checked : t.value;
+    if(t.dataset.path.indexOf('.uniform.')!==-1) v = parseInt(t.value,10)||0;
+    set(t.dataset.path, v);
+    if(t.type==='checkbox') { var cb = t.closest('.check'); if(cb) cb.classList.toggle('on', t.checked); }
+    renderAside();
+  }
+  if(t.dataset.ack) S.ack[t.dataset.ack] = t.checked;
+  if(t.dataset.consent){ S.consent[t.dataset.consent] = t.checked; var ch = t.closest('.check'); if(ch) ch.classList.toggle('on',t.checked); }
+  if(t.dataset.file){ S.files[t.dataset.file] = t.files[0] || null; render(); }
+});
+document.addEventListener('click', function(e){
+  var b = e.target.closest('button'); if(!b) return;
+  var a = b.dataset;
+  if(a.act==='addchild'){ S.children.push(blankChild(1)); render(); }
+  if(a.act==='delchild'){ S.children.splice(+a.i,1); render(); }
+  if(a.act==='addguardian'){ S.secondGuardian=true; S.guardians[1]=blankGuardian(); render(); }
+  if(a.act==='delguardian'){ S.secondGuardian=false; S.guardians.length=1; render(); }
+  if(a.val!==undefined && b.parentElement.dataset.seg){ set(b.parentElement.dataset.seg, a.val==='true'); render(); }
+  if(a.open!==undefined){ S.ack['_c'+a.open] = !S.ack['_c'+a.open]; render(); }
+  if(a.doc!==undefined){ toast('In the live form this opens \u201c'+a.doc+'\u201d as a PDF.'); }
+  if(a.goto!==undefined){ if(!FORM_SUBMITTED){ S.step = +a.goto; render(); } }
+});
+$('#next').onclick = function(){
+  if(S.step===STEPS.length-1){ window.print(); return; }
+  if(!validate()) return;
+
+  if(S.step === 9){
+    $('#next').disabled = true;
+    $('#next').textContent = 'Submitting\u2026';
+    var fd = new FormData();
+    fd.append('action', 'submit_admission');
+    var payload = JSON.parse(JSON.stringify(S));
+    payload.files = {};
+    Object.keys(S.files).forEach(function(k){ payload.files[k] = S.files[k] ? S.files[k].name : ''; });
+    fd.append('data', JSON.stringify(payload));
+    Object.keys(S.files).forEach(function(k){
+      if(S.files[k]) fd.append('file_' + k, S.files[k]);
+    });
+    fetch(SUBMIT_URL, {
+      method: 'POST',
+      headers: {'X-CSRFToken': CSRF},
+      body: fd
+    }).then(function(r){ return r.json(); }).then(function(d){
+      $('#next').disabled = false;
+      if(d.ok){
+        S.submitted = true;
+        S.ref = d.ref || S.ref;
+        S.step++;
+        render();
+      } else {
+        $('#next').textContent = 'Generate invoice';
+        toast(d.error || 'Something went wrong. Please try again.');
+      }
+    }).catch(function(){
+      $('#next').disabled = false;
+      $('#next').textContent = 'Generate invoice';
+      toast('Network error. Please check your connection and try again.');
+    });
+    return;
+  }
+
+  S.step++; render();
+};
+$('#back').onclick = function(){ if(S.step>0){ S.step--; render(); } };
+$('#mtotal').onclick = function(){ $('#aside').classList.toggle('open'); };
+
+render();
+</script>
+{% endif %}
+</body>
+</html>

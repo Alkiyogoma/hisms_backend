@@ -1,0 +1,35 @@
+{% if is_ecd_welfare %}
+<div class="sub-nav">
+  {% if perms.welfare.view_welfareobservation %}
+  <a href="{% url 'welfare:student_incidents_ecd' %}" class="sub-tab {% if welfare_tab == 'student_incidents' %}active{% endif %}">Student Incidents</a>
+  {% endif %}
+  {% if perms.welfare.view_welfareobservation %}
+  <a href="{% url 'welfare:list_ecd' %}" class="sub-tab {% if welfare_tab == 'list' %}active{% endif %}">Observations</a>
+  {% endif %}
+  {% if perms.welfare.add_welfareobservation %}
+  <a href="{% url 'welfare:submit_ecd' %}" class="sub-tab {% if welfare_tab == 'submit' %}active{% endif %}">New Observation</a>
+  {% endif %}
+  {% if can_see_hod_dashboard %}
+  {% if perms.welfare.view_welfareobservation %}
+  <a href="{% url 'welfare:hod_dashboard_ecd' %}" class="sub-tab {% if welfare_tab == 'hod_dashboard' %}active{% endif %}">HOD Dashboard</a>
+  {% endif %}
+  {% endif %}
+</div>
+{% else %}
+<div class="sub-nav">
+  {% if perms.welfare.view_welfareobservation %}
+  <a href="{% url 'welfare:student_incidents_primary' %}" class="sub-tab {% if welfare_tab == 'student_incidents' %}active{% endif %}">Student Incidents</a>
+  {% endif %}
+  {% if perms.welfare.view_welfareobservation %}
+  <a href="{% url 'welfare:list_primary' %}" class="sub-tab {% if welfare_tab == 'list' %}active{% endif %}">Observations</a>
+  {% endif %}
+  {% if perms.welfare.add_welfareobservation %}
+  <a href="{% url 'welfare:submit_primary' %}" class="sub-tab {% if welfare_tab == 'submit' %}active{% endif %}">New Observation</a>
+  {% endif %}
+  {% if can_see_hod_dashboard %}
+  {% if perms.welfare.view_welfareobservation %}
+  <a href="{% url 'welfare:hod_dashboard_primary' %}" class="sub-tab {% if welfare_tab == 'hod_dashboard' %}active{% endif %}">HOD Dashboard</a>
+  {% endif %}
+  {% endif %}
+</div>
+{% endif %}

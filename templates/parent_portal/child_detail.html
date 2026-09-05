@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% block title %}{{ student.get_full_name }} — Overview{% endblock %}
+
+{% block extra_head %}
+<style>
+  .ov-header { display:flex; flex-direction:column; }
+  .ov-avatar-box { display:flex; align-items:center; justify-content:flex-start; padding:16px; background:linear-gradient(135deg,#023AA5 0%,#1A56C4 100%); }
+  .ov-info-box { flex:1; padding:16px; display:flex; flex-direction:column; justify-content:center; }
+  .ov-score-box { flex-direction:row; gap:12px; padding:0 16px 12px; }
+  .ov-grid { display:grid; grid-template-columns:1fr; gap:16px; align-items:start; }
+  .ov-stats { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:16px; text-align:center; }
+  .ov-trend { display:flex; align-items:flex-end; gap:6px; height:100px; margin-bottom:16px; overflow-x:auto; min-height:100px; }
+  .ov-trend > div { min-width:40px; }
+  .ov-actions { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
+
+  @media(min-width: 541px) {
+    .ov-header { flex-direction:row; align-items:stretch; }
+    .ov-avatar-box { min-width:160px; padding:28px 32px; justify-content:center; }
+    .ov-info-box { padding:24px 28px; }
+    .ov-score-box { flex-direction:column; align-items:center; justify-content:center; padding:24px 28px; }
+    .ov-grid { grid-template-columns:1fr 340px; gap:24px; }
+    .ov-stats { grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:20px; }
+    .ov-trend { height:120px; margin-bottom:24px; }
+    .ov-trend > div { min-width:48px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% if error %}
+<div class="card" style="padding:48px;text-align:center">
+  <p style="color:var(--text-muted);font-size:14px;margin:0">{{ error }}</p>
+  <a href="{% url 'parent_portal:children_list' %}" class="hf-btn hf-btn-primary" style="margin-top:16px">Back to My Children</a>
+</div>
+{% else %}
+
+<!-- Breadcrumb -->
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted);margin-bottom:20px;flex-wrap:wrap">
+  <a href="{% url 'parent_portal:children_list' %}" style="color:var(--hodari-blue);text-decoration:none">My Children</a>
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg>
+  <span style="color:var(--text-primary);font-weight:600">{{ student.get_full_name }}</span>
+</div>
+
+<!-- Student Header -->
+<div class="card" style="padding:0;overflow:hidden;margin-bottom:24px">
+  <div class="ov-header">
+    <div class="ov-avatar-box">
+      <div style="width:100px;height:100px;border-radius:50%;background:rgba(255,255,255,0.15);color:#fff;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:700;border:3px solid rgba(255,255,255,0.3)">
+        {% if student.photo %}
+          <img src="{{ student.photo.url }}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">
+        {% else %}
+          {{ student.first_name.0 }}{{ student.last_name.0 }}
+        {% endif %}
+      </div>
+    </div>
+    <div class="ov-info-box">
+      <h1 style="margin:0;font-size:22px;font-weight:800;color:#1E293B">{{ student.get_full_name }}</h1>
+      <div style="font-size:14px;color:#64748B;margin-top:4px">{{ student.class_name|default:"No class" }}{% if student.admission_no %} · ADM: {{ student.admission_no }}{% endif %}</div>
+      <div class="ov-actions">
+        <a href="{% url 'parent_portal:child_detail' student.id %}" class="hf-btn hf-btn-primary" style="font-size:12px;padding:6px 14px">Full Profile</a>
+        <a href="{% url 'parent_portal:attendance' %}?student={{ student.id }}" class="hf-btn hf-btn-secondary" style="font-size:12px;padding:6px 14px">Attendance</a>
+        <a href="{% url 'parent_portal:grades' %}?student={{ student.id }}" class="hf-btn hf-btn-secondary" style="font-size:12px;padding:6px 14px">Grades</a>
+        <a href="{% url 'parent_portal:guardian_list' student.id %}" class="hf-btn hf-btn-secondary" style="font-size:12px;padding:6px 14px">Guardians</a>
+      </div>
+    </div>
+    <div class="ov-score-box">
+      <div style="font-size:32px;font-weight:800;color:{% if overall_average >= 80 %}#16A34A{% elif overall_average >= 50 %}#CA8A04{% else %}#DC2626{% endif %}">{% if overall_average > 0 %}{{ overall_average }}%{% else %}N/A{% endif %}</div>
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:600">Overall</div>
+    </div>
+  </div>
+</div>
+
+<!-- Child Selector -->
+{% if children|length > 1 %}
+<div class="sub-nav" style="margin-bottom:20px">
+  {% for child in children %}
+  <a href="{% url 'parent_portal:child_overview' child.id %}" class="sub-tab {% if student.id == child.id %}active{% endif %}">{{ child.get_full_name }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="ov-grid">
+
+  <!-- Left Column -->
+  <div style="display:flex;flex-direction:column;gap:24px">
+
+    <!-- Attendance -->
+    <div class="card" style="padding:24px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+        <h2 style="margin:0;font-size:16px;font-weight:700">Attendance (Last 6 Months)</h2>
+        <a href="{% url 'parent_portal:attendance' %}?student={{ student.id }}" style="font-size:12px;color:var(--hodari-blue);text-decoration:none">Full Calendar →</a>
+      </div>
+
+      {% if att_stats.total %}
+      <div class="ov-stats">
+        <div>
+          <div style="font-size:20px;font-weight:700;color:#16A34A">{{ att_stats.present }}</div>
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600">Present</div>
+        </div>
+        <div>
+          <div style="font-size:20px;font-weight:700;color:#DC2626">{{ att_stats.absent }}</div>
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600">Absent</div>
+        </div>
+        <div>
+          <div style="font-size:20px;font-weight:700;color:#CA8A04">{{ att_stats.late }}</div>
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600">Late</div>
+        </div>
+        <div>
+          <div style="font-size:20px;font-weight:700;color:#2563EB">{{ att_stats.excused }}</div>
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600">Excused</div>
+        </div>
+        <div>
+          <div style="font-size:20px;font-weight:700;color:{% if att_stats.rate >= 90 %}#16A34A{% elif att_stats.rate >= 75 %}#CA8A04{% else %}#DC2626{% endif %}">{{ att_stats.rate }}%</div>
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600">Rate</div>
+        </div>
+      </div>
+
+      <h3 style="font-size:13px;font-weight:600;color:var(--text-muted);margin:0 0 12px">Monthly Trend</h3>
+      <div class="ov-trend">
+        {% for m in monthly_attendance %}
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:48px">
+          <span style="font-size:10px;font-weight:600;color:{% if m.rate >= 90 %}#16A34A{% elif m.rate >= 75 %}#CA8A04{% else %}#DC2626{% endif %}">{{ m.rate }}%</span>
+          <div style="width:100%;border-radius:4px 4px 0 0;background:{% if m.rate >= 90 %}#4ADE80{% elif m.rate >= 75 %}#FACC15{% else %}#F87171{% endif %};min-height:4px;height:{{ m.rate }}%"></div>
+          <span style="font-size:10px;color:var(--text-muted)">{{ m.month }}</span>
+        </div>
+        {% endfor %}
+      </div>
+
+      <h3 style="font-size:13px;font-weight:600;color:var(--text-muted);margin:0 0 8px">Recent Attendance</h3>
+      <div style="overflow-x:auto">
+        <table class="h-table" style="min-width:300px">
+          <thead><tr><th>Date</th><th>Status</th><th style="text-align:right">Time</th></tr></thead>
+          <tbody>
+            {% for entry in attendance_entries %}
+            <tr>
+              <td>{{ entry.date|date:"D, d M Y" }}</td>
+              <td>
+                {% with s=entry.status|lower %}
+                {% if "present" in s %}<span style="color:#16A34A;font-weight:600">Present</span>
+                {% elif "late" in s %}<span style="color:#CA8A04;font-weight:600">Late</span>
+                {% elif "absent" in s %}<span style="color:#DC2626;font-weight:600">Absent</span>
+                {% else %}<span>{{ entry.status }}</span>{% endif %}
+                {% endwith %}
+              </td>
+              <td style="text-align:right;color:var(--text-muted);font-size:12px">{% if entry.check_in_time %}{{ entry.check_in_time|time:"H:i" }}{% endif %}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" style="text-align:center;padding:24px">{% include '_partials/empty_state.html' with title='No attendance records in the last 6 months' desc='Attendance will appear here once recorded.' icon='calendar' icon_color='grey' %}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p style="margin:0">{% include '_partials/empty_state.html' with title='No attendance records in the last 6 months' desc='Attendance will appear here once recorded.' icon='calendar' icon_color='grey' %}</p>
+      {% endif %}
+    </div>
+
+    <!-- Exam Scores -->
+    {% if grouped_scores %}
+    <div class="card" style="padding:24px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+        <h2 style="margin:0;font-size:16px;font-weight:700">Exam Scores{% if active_term %} ({{ active_term.name }}){% endif %}</h2>
+        <a href="{% url 'parent_portal:grades' %}?student={{ student.id }}" style="font-size:12px;color:var(--hodari-blue);text-decoration:none">All Grades →</a>
+      </div>
+      {% for subj, data in grouped_scores.items %}
+      <div style="padding:12px 0;{% if not forloop.last %}border-bottom:1px solid var(--border){% endif %}">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span style="font-weight:600;font-size:14px">{{ subj }}</span>
+          <span style="font-weight:700;font-size:14px;color:{% if data.average >= 80 %}#16A34A{% elif data.average >= 50 %}#CA8A04{% else %}#DC2626{% endif %}">{{ data.average }}%</span>
+        </div>
+        <div style="height:6px;background:#E2E8F0;border-radius:99px;overflow:hidden;margin-bottom:8px">
+          <div style="height:100%;width:{{ data.average }}%;background:{% if data.average >= 80 %}#16A34A{% elif data.average >= 50 %}#CA8A04{% else %}#DC2626{% endif %};border-radius:99px"></div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          {% for score in data.scores %}
+          <span style="padding:2px 8px;border-radius:4px;font-size:11px;background:#F8FAFC;color:var(--text-secondary)">{{ score.exam_type.name|default:"Exam" }}: {{ score.score }}{% if score.max_score %}/{{ score.max_score }}{% endif %}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Report Cards -->
+    {% if report_cards %}
+    <div class="card" style="padding:24px">
+      <h2 style="margin:0 0 16px;font-size:16px;font-weight:700">Report Cards</h2>
+      {% for rc in report_cards %}
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#F8FAFC;border:1px solid var(--border);border-radius:8px;flex-wrap:wrap;gap:8px;{% if not forloop.last %}margin-bottom:8px{% endif %}">
+        <div>
+          <div style="font-weight:600;font-size:14px">{{ rc.term.name }}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+            {% if rc.signed_off_by %}Signed by {{ rc.signed_off_by.get_full_name }}{% endif %}
+          </div>
+        </div>
+        <span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#DCFCE7;color:#166534">Published</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- Right Column -->
+  <div style="display:flex;flex-direction:column;gap:24px">
+
+    <!-- Enrichment Grades -->
+    {% if enrichment_grades %}
+    <div class="card" style="padding:24px">
+      <h2 style="margin:0 0 16px;font-size:16px;font-weight:700">Enrichment</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        {% for grade in enrichment_grades %}
+        <div style="padding:12px;background:#F8FAFC;border-radius:8px;text-align:center">
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">{{ grade.enrichment_subject.name }}</div>
+          <div style="font-size:20px;font-weight:700;color:{% if grade.letter_grade == 'A*' or grade.letter_grade == 'A' %}#16A34A{% elif grade.letter_grade == 'B' or grade.letter_grade == 'C' %}#CA8A04{% else %}#DC2626{% endif %}">{{ grade.letter_grade }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Teacher Comments -->
+    {% if teacher_comments %}
+    <div class="card" style="padding:24px">
+      <h2 style="margin:0 0 16px;font-size:16px;font-weight:700">Teacher Comments</h2>
+      {% for comment in teacher_comments %}
+      <div style="padding:12px;background:#F8FAFC;border-radius:8px;{% if not forloop.last %}margin-bottom:8px{% endif %}">
+        <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:#EFF6FF;color:#1E40AF;margin-bottom:6px">{{ comment.subject_name }}</span>
+        <p style="font-size:13px;color:var(--text-secondary);margin:0;line-height:1.5">{{ comment.comment_text }}</p>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Learner Attributes -->
+    {% if learner_attributes %}
+    <div class="card" style="padding:24px">
+      <h2 style="margin:0 0 16px;font-size:16px;font-weight:700">Learner Attributes</h2>
+      {% for attr in learner_attributes %}
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#F8FAFC;border-radius:8px;{% if not forloop.last %}margin-bottom:6px{% endif %}">
+        <span style="font-size:13px;color:var(--text-secondary)">Attribute #{{ attr.attribute_number }}</span>
+        <span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;background:{% if attr.rating == 'E' %}#DCFCE7;color:#166534{% elif attr.rating == 'G' %}#DBEAFE;color:#1E40AF{% elif attr.rating == 'S' %}#FEF9C3;color:#854D0E{% else %}#FEE2E2;color:#991B1B{% endif %}">{{ attr.rating }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </div>
+
+</div>
+{% endif %}
+{% endblock %}

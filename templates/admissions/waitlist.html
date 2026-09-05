@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Waitlist &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Admissions{% endblock %}
+{% block topbar_date %}{{ today_display }}{% endblock %}
+{% block topbar_badges %}
+  <a href="{% url 'admissions:actions_needed' %}" class="topbar-badge badge-red" style="background:#FEF2F2;color:#9B1C1C;border-color:#FECACA;text-decoration:none;cursor:pointer">
+    <span class="badge-dot"></span>{{ critical_action_count }} actions needed
+  </a>
+{% endblock %}
+{% block content %}
+  {% include "admissions/_top_tabs.html" %}
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">Waitlisted applicants</div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;margin-top:-6px">Applicants waiting for available space.</div>
+    {% if grade_waitlist_counts %}
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+      {% for g in grade_waitlist_counts %}
+        <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;background:#F3F4F6;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--text-secondary)">
+          {{ g.grade }}
+          <span style="display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;border-radius:50%;background:#023AA5;color:#fff;font-size:11px;font-weight:700">{{ g.count }}</span>
+        </span>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <div style="border-top:1px solid var(--border)">
+      {% for applicant in items %}
+        <div class="trow">
+          <div style="flex:1">
+            <div class="trow-name">{{ applicant.child_full_name }}</div>
+            <div class="trow-sub">{{ applicant.grade_applying_for }} &middot; {{ applicant.parent_full_name }} &middot; {{ applicant.parent_phone }}</div>
+          </div>
+          <div class="trow-right">
+            <a href="{% url 'admissions:detail' applicant.id %}" style="padding:5px 12px;background:#F3F4F6;border-radius:6px;font-size:11.5px;font-weight:600;color:var(--text-secondary);text-decoration:none;transition:background 0.1s">Open</a>
+          </div>
+        </div>
+      {% empty %}
+        {% include '_partials/empty_state.html' with title='No applicants on the waitlist' desc='All applicants have been processed.' icon='check' icon_color='green' %}
+      {% endfor %}
+    </div>
+  </div>
+{% endblock %}

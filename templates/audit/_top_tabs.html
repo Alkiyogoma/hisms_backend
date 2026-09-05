@@ -1,0 +1,12 @@
+{% load role_tags %}
+<div class="sub-nav">
+  {% if perms.audit.view_auditlog %}
+  <a href="{% url 'audit:logs' %}" class="sub-tab {% if audit_tab == 'logs' %}active{% endif %}">Audit Logs</a>
+  {% endif %}
+  {% if perms.audit.view_dsarrequest %}
+  <a href="{% url 'audit:dsar_export' %}" class="sub-tab {% if audit_tab == 'dsar' %}active{% endif %}">DSAR Export</a>
+  {% endif %}
+  {% if perms.audit.view_auditlog %}
+  <a href="{% url 'audit:csp_reports' %}" class="sub-tab {% if audit_tab == 'csp' %}active{% endif %}">CSP Reports</a>
+  {% endif %}
+</div>

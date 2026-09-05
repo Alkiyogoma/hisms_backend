@@ -1,0 +1,482 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}PTC - {{ student.get_full_name }}{% endblock %}
+
+{% block extra_head %}
+{% include "includes/hodari_print_styles.html" %}
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 18mm 15mm 20mm 15mm;
+  }
+  @media print {
+    .no-print { display: none !important; }
+    .sidebar, .topbar { display: none !important; }
+    .main { margin: 0 !important; padding: 0 !important; }
+    .ptc-container { box-shadow: none; border-radius: 0; max-width: 100%; border: none; margin: 0; padding: 0; }
+    body { background: #fff; padding: 0; font-size: 11pt; line-height: 1.4; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    table { page-break-inside: avoid; }
+    tr { page-break-inside: avoid; }
+    h3 { page-break-after: avoid; margin-top: 16px !important; }
+    .signatures { page-break-inside: avoid; }
+    .doc-footer { page-break-inside: avoid; }
+    .grade-pill, .attr-pill { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+  .ptc-container { max-width: 900px; margin: 0 auto; }
+  .grade-pill { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 12px; font-weight: 700; min-width: 32px; text-align: center; }
+  .gp-a { background: #E8F5EC; color: #1B7B34; }
+  .gp-b { background: #E8EEF9; color: var(--hodari-blue); }
+  .gp-c { background: #FEF3C7; color: #92550A; }
+  .gp-d { background: #FEF2F2; color: #9B1C1C; }
+  .gp-e { background: #FEF2F2; color: #9B1C1C; }
+  .gp-blank { background: #F7F9FC; color: var(--text-muted); font-style: italic; }
+  .attr-pill { display: inline-block; width: 28px; height: 28px; border-radius: 50%; text-align: center; line-height: 28px; font-size: 11px; font-weight: 700; }
+  .attr-E { background: #E8F5EC; color: #1B7B34; }
+  .attr-G { background: #E8EEF9; color: var(--hodari-blue); }
+  .attr-S { background: #FEF3C7; color: #92550A; }
+  .attr-N { background: #FEF2F2; color: #9B1C1C; }
+  .learner-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .learner-grid-label { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); }
+  .learner-grid-value { font-size: 16px; font-weight: 700; margin-top: 2px; }
+  .learner-grid-sig { border-bottom: 1.5px solid var(--hodari-charcoal); height: 30px; margin-top: 6px; }
+</style>
+{% endblock %}
+
+{% block topbar_greeting %}
+<h1 class="topbar-title">Learner Progress Report</h1>
+{% endblock %}
+
+{% block content %}
+<div class="ptc-container" style="max-width:900px;margin:0 auto">
+
+  <!-- No-print toolbar -->
+  <div class="no-print" style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:14px">
+    <button onclick="window.print()" class="btn btn-primary" style="padding:8px 16px;border-radius:7px;font-size:13px;font-weight:600;background:var(--hodari-blue);color:#fff;border:none;cursor:pointer">Print / Save PDF</button>
+    <a href="{% url 'ptc:student_picker' %}" style="padding:8px 16px;border-radius:7px;font-size:13px;font-weight:600;background:#fff;color:var(--hodari-blue);border:1.5px solid var(--hodari-blue);text-decoration:none">Back</a>
+  </div>
+
+  <!-- 1. Header — Learner Information -->
+  <div style="background:#fff;border:1px solid var(--border);border-radius:12px 12px 0 0;padding:24px 28px">
+    {% include "includes/hodari_print_header.html" %}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
+      <div style="font-weight:700;font-size:14px;color:var(--hodari-blue)">{% if academic_year %}Academic Year: {{ academic_year.name }}{% endif %}</div>
+      <div style="text-align:right;font-size:12px;color:var(--text-muted)">{% if ptc_window %}PTC Date: {{ ptc_window.ptc_date }}{% endif %}</div>
+    </div>
+    <div class="learner-grid">
+      <div>
+        <div class="learner-grid-label">Learner Name</div>
+        <div class="learner-grid-value">{{ student.get_full_name }}</div>
+      </div>
+      <div>
+        <div class="learner-grid-label">Grade</div>
+        <div class="learner-grid-value">{{ student.class_name }}</div>
+      </div>
+      <div>
+        <div class="learner-grid-label">Class Teacher</div>
+        <div class="learner-grid-value">{% if class_teacher %}{{ class_teacher.get_full_name }}{% else %}N/A{% endif %}</div>
+      </div>
+      <div>
+        <div class="learner-grid-label">Signature</div>
+        <div class="learner-grid-sig"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Grading Key Banner -->
+  <div style="background:#F7F9FC;border-bottom:1px solid var(--border);padding:10px 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <span style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase">Academic Performance Key:</span>
+    <span class="grade-pill gp-a" style="font-size:10px">A* Outstanding (90-100)</span>
+    <span class="grade-pill gp-a" style="font-size:10px">A High (80-89)</span>
+    <span class="grade-pill gp-b" style="font-size:10px">B Good (70-79)</span>
+    <span class="grade-pill gp-c" style="font-size:10px">C Aspiring (60-69)</span>
+    <span class="grade-pill gp-d" style="font-size:10px">D Basic (50-59)</span>
+    <span class="grade-pill gp-e" style="font-size:10px">E Needs Improvement (49-0)</span>
+    <span style="margin-left:12px;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase">Attributes:</span>
+    <span class="attr-pill attr-E">E</span>
+    <span class="attr-pill attr-G">G</span>
+    <span class="attr-pill attr-S">S</span>
+    <span class="attr-pill attr-N">N</span>
+  </div>
+
+  <div style="background:#fff;border:1px solid var(--border);border-top:none;border-radius:0 0 12px 12px;padding:24px">
+
+    <!-- 2. Academic Performance Grid -->
+    <h3 style="font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:14px;border-bottom:2px solid var(--border);padding-bottom:6px">Academic Performance</h3>
+
+    {% if terms_data %}
+    <div style="overflow-x:auto;margin-bottom:20px">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border)">
+            <th style="padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Subject</th>
+            {% for td in terms_data %}
+            <th colspan="4" style="padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;color:var(--hodari-blue);border-left:2px solid var(--border)">{{ td.term_label }}</th>
+            {% endfor %}
+          </tr>
+          <tr style="border-bottom:1px solid var(--border)">
+            <th></th>
+            {% for td in terms_data %}
+            <th style="padding:4px 6px;text-align:center;font-size:10px;color:var(--text-muted)">Quiz ({% firstof exam_weights.quiz "20" %}%)</th>
+            <th style="padding:4px 6px;text-align:center;font-size:10px;color:var(--text-muted)">Mid Term ({% firstof exam_weights.mid_term "30" %}%)</th>
+            <th style="padding:4px 6px;text-align:center;font-size:10px;color:var(--text-muted)">End Term ({% firstof exam_weights.end_of_term "50" %}%)</th>
+            <th style="padding:4px 6px;text-align:center;font-size:10px;color:var(--text-muted);border-left:2px solid var(--border)">Total Average</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for subj in subjects %}
+          <tr style="border-bottom:1px solid #F0F4FB">
+            <td style="padding:8px 10px;font-weight:600">{{ subj }}</td>
+            {% for td in terms_data %}
+            {% for sname, sdata in td.subjects.items %}
+            {% if sname == subj %}
+            <td style="padding:8px 6px;text-align:center">{% if sdata.quiz is not None %}{{ sdata.quiz }}{% else %}<span style="color:var(--text-muted);font-style:italic">N/A</span>{% endif %}</td>
+            <td style="padding:8px 6px;text-align:center">{% if sdata.mid_term is not None %}{{ sdata.mid_term }}{% else %}<span style="color:var(--text-muted);font-style:italic">N/A</span>{% endif %}</td>
+            <td style="padding:8px 6px;text-align:center">{% if sdata.end_term is not None %}{{ sdata.end_term }}{% else %}<span style="color:var(--text-muted);font-style:italic">N/A</span>{% endif %}</td>
+            <td style="padding:8px 6px;text-align:center;border-left:2px solid var(--border);font-weight:700">{% if sdata.weighted_avg is not None %}{{ sdata.weighted_avg }}%{% else %}<span style="color:var(--text-muted);font-style:italic">N/A</span>{% endif %}</td>
+            {% endif %}
+            {% endfor %}
+            {% endfor %}
+          </tr>
+          {% endfor %}
+
+          <!-- Average Percentage row -->
+          <tr style="border-top:2px solid var(--border);background:#F7F9FC">
+            <td style="padding:8px 10px;font-weight:700;font-size:11px;text-transform:uppercase;color:var(--text-secondary)">Overall Average</td>
+            {% for td in terms_data %}
+            <td colspan="3"></td>
+            <td style="padding:8px 6px;text-align:center;border-left:2px solid var(--border);font-weight:700;font-size:14px;color:var(--hodari-blue)">
+              {% if td.overall_average is not None %}{{ td.overall_average }}%{% else %}N/A{% endif %}
+            </td>
+            {% endfor %}
+          </tr>
+
+          <!-- Meets Academic Expectations row -->
+          <tr style="background:#F7F9FC">
+            <td style="padding:8px 10px;font-weight:700;font-size:11px;text-transform:uppercase;color:var(--text-secondary)">Meets Academic Expectations?<br><span style="font-size:9px;font-weight:400;text-transform:none;font-style:italic">(Average mark above 50%)</span></td>
+            {% for td in terms_data %}
+            <td colspan="3"></td>
+            <td style="padding:8px 6px;text-align:center;border-left:2px solid var(--border)">
+              {% if td.meets_expectations == "Yes" %}
+              <span style="display:inline-block;padding:2px 10px;border-radius:99px;font-size:11px;font-weight:700;background:#E8F5EC;color:#1B7B34">Yes</span>
+              {% elif td.meets_expectations == "No" %}
+              <span style="display:inline-block;padding:2px 10px;border-radius:99px;font-size:11px;font-weight:700;background:#FEF2F2;color:#9B1C1C">No</span>
+              {% else %}
+              <span style="color:var(--text-muted);font-style:italic">N/A</span>
+              {% endif %}
+            </td>
+            {% endfor %}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    {% include '_partials/empty_state.html' with icon='doc' icon_color='grey' title='No academic data available yet' desc='Academic records will appear here once published.' %}
+    {% endif %}
+
+    <!-- 3. Overall Progress Trend -->
+    <h3 style="font-size:15px;font-weight:700;color:var(--text-primary);margin:20px 0 14px;border-bottom:2px solid var(--border);padding-bottom:6px">Overall Progress Trend</h3>
+    <div style="background:#F7F9FC;border-radius:10px;padding:14px 20px;display:flex;align-items:center;gap:16px">
+      <div>
+        <span style="font-size:12px;color:var(--text-muted)">Current Average: </span>
+        <strong style="font-size:16px;color:var(--hodari-blue)">{% if latest_overall_average %}{{ latest_overall_average }}%{% else %}N/A{% endif %}</strong>
+      </div>
+      <div style="width:1px;height:30px;background:var(--border)"></div>
+      <div>
+        <span style="font-size:12px;color:var(--text-muted)">Trend: </span>
+        <strong style="font-size:14px;
+          {% if progress_trend.trend == 'Improving' %}color:#1B7B34
+          {% elif progress_trend.trend == 'Needs Attention' %}color:#9B1C1C
+          {% elif progress_trend.trend == 'Stable' %}color:var(--hodari-blue)
+          {% else %}color:var(--text-muted){% endif %}">
+          {{ progress_trend.trend }}
+        </strong>
+      </div>
+      {% if progress_trend.previous_average is not None %}
+      <div style="width:1px;height:30px;background:var(--border)"></div>
+      <div>
+        <span style="font-size:12px;color:var(--text-muted)">Previous: </span>
+        <strong style="font-size:14px">{{ progress_trend.previous_average }}%</strong>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Progress Trend Override (FR-PTC-029) — placed adjacent to trend section -->
+    {% if can_edit_attributes %}
+    <div class="no-print" style="margin-top:10px;padding:10px 16px;background:#F7F9FC;border-radius:8px;border:1px solid var(--border)">
+      <form method="post" action="{% url 'ptc:ptc_screen' student_pk=student.pk %}" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        {% csrf_token %}
+        <label style="font-size:11px;font-weight:600;color:var(--text-secondary)">Override Trend:</label>
+        <select name="progress_trend_override" style="padding:4px 8px;border-radius:6px;border:1px solid var(--border);font-size:12px">
+          <option value="" disabled selected>{% if progress_trend.is_overridden %}{{ progress_trend.trend }}{% else %}Auto: {{ progress_trend.auto_trend }}{% endif %}</option>
+          <option value="improving">Improving</option>
+          <option value="stable">Stable</option>
+          <option value="needs_attention">Needs Attention</option>
+        </select>
+        <button type="submit" style="padding:4px 12px;border-radius:6px;border:1.5px solid var(--hodari-blue);background:var(--hodari-blue);color:#fff;font-size:11px;font-weight:600;cursor:pointer">Save Override</button>
+        {% if progress_trend.is_overridden %}
+        <span style="font-size:10px;color:var(--hodari-gold);font-weight:600">Overridden</span>
+        {% endif %}
+      </form>
+    </div>
+    {% endif %}
+
+    <!-- 4. Subject Teacher Comments -->
+    <h3 style="font-size:15px;font-weight:700;color:var(--text-primary);margin:24px 0 14px;border-bottom:2px solid var(--border);padding-bottom:6px">Subject Teacher Comments</h3>
+    {% for subj in core_subjects %}
+    <div style="margin-bottom:12px;padding:12px 16px;background:#F7F9FC;border-left:4px solid var(--hodari-gold);border-radius:0 8px 8px 0">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--hodari-blue);margin-bottom:4px">{{ subj }}</div>
+      {% for cname, comment in ptc_comments.items %}
+        {% if cname == subj %}
+          {% if comment.comment_text %}
+          <div style="font-size:13px;color:var(--text-secondary)">{{ comment.comment_text }}</div>
+          {% else %}
+          <div style="height:16px">&nbsp;</div>
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% endfor %}
+
+    <!-- 5. Enrichment Grades -->
+    {% if enrichment_subjects %}
+    <h3 style="font-size:15px;font-weight:700;color:var(--text-primary);margin:24px 0 14px;border-bottom:2px solid var(--border);padding-bottom:6px">Extra-Curricular &amp; Enrichment</h3>
+    <div style="overflow-x:auto;margin-bottom:20px">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border)">
+            <th style="padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Subject</th>
+            {% for term in enrichment_terms %}
+            <th style="padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;color:var(--hodari-blue)">{{ term.name }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for es in enrichment_subjects %}
+          <tr style="border-bottom:1px solid #F0F4FB">
+            <td style="padding:8px 10px;font-weight:600">{{ es.name }}</td>
+            {% for term in enrichment_terms %}
+            <td style="padding:8px 10px;text-align:center">
+              {% for gname, grade_dict in enrichment_grades.items %}
+                {% if gname == es.name %}
+                  {% for tname, grade_obj in grade_dict.items %}
+                    {% if tname == term.name %}
+                      {% if grade_obj %}
+                        <span class="grade-pill {% if grade_obj.letter_grade == 'A*' or grade_obj.letter_grade == 'A' %}gp-a{% elif grade_obj.letter_grade == 'B' %}gp-b{% elif grade_obj.letter_grade == 'C' %}gp-c{% else %}gp-d{% endif %}">{{ grade_obj.letter_grade }}</span>
+                      {% else %}
+              <span style="color:var(--text-muted);font-style:italic">N/A</span>
+                      {% endif %}
+                    {% endif %}
+                  {% endfor %}
+                {% endif %}
+              {% endfor %}
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    <!-- 6. Learner Attributes -->
+    <h3 style="font-size:15px;font-weight:700;color:var(--text-primary);margin:24px 0 14px;border-bottom:2px solid var(--border);padding-bottom:6px">Learner Attributes</h3>
+
+    <!-- FR-PTC-036: Term comparison toggle -->
+    {% if prev_ptc_window %}
+    <div class="no-print" style="margin-bottom:12px;display:flex;align-items:center;gap:8px">
+      <span style="font-size:11px;color:var(--text-muted);font-weight:600">Compare:</span>
+      <button id="attrToggleCurrent" onclick="showAttrTab('current')" style="padding:4px 12px;border-radius:6px;font-size:11px;font-weight:600;border:1.5px solid var(--hodari-blue);background:var(--hodari-blue);color:#fff;cursor:pointer">Current Window</button>
+      <button id="attrTogglePrev" onclick="showAttrTab('prev')" style="padding:4px 12px;border-radius:6px;font-size:11px;font-weight:600;border:1.5px solid var(--border);background:#fff;color:var(--text-muted);cursor:pointer">Previous Window</button>
+      <button id="attrToggleSideBySide" onclick="showAttrTab('side')" style="padding:4px 12px;border-radius:6px;font-size:11px;font-weight:600;border:1.5px solid var(--border);background:#fff;color:var(--text-muted);cursor:pointer">Side by Side</button>
+    </div>
+    {% endif %}
+
+    <div id="attrTabCurrent">
+    <div style="overflow-x:auto;margin-bottom:20px">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border)">
+            <th style="padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Attribute</th>
+            <th style="padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;color:var(--hodari-blue);min-width:60px">{% if prev_ptc_window %}Current{% else %}Rating{% endif %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for num, label in learner_attributes %}
+          <tr style="border-bottom:1px solid #F0F4FB">
+            <td style="padding:8px 10px">{{ num }}. {{ label }}</td>
+            <td style="padding:8px 10px;text-align:center">
+              {% for anum, aval in current_attribute_ratings.items %}
+                {% if anum == num %}
+                  {% if aval %}
+                  <span class="attr-pill attr-{{ aval }}">{{ aval }}</span>
+                  {% else %}
+                  <span style="color:var(--text-muted);font-style:italic">N/A</span>
+                  {% endif %}
+                {% endif %}
+              {% endfor %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    </div>
+
+    {% if prev_ptc_window %}
+    <div id="attrTabPrev" style="display:none">
+    <div style="overflow-x:auto;margin-bottom:20px">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border)">
+            <th style="padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Attribute</th>
+            <th style="padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;color:var(--hodari-blue);min-width:60px">Previous ({{ prev_ptc_window.get_term_slot_display }})</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for num, label in learner_attributes %}
+          <tr style="border-bottom:1px solid #F0F4FB">
+            <td style="padding:8px 10px">{{ num }}. {{ label }}</td>
+            <td style="padding:8px 10px;text-align:center">
+              {% for anum, aval in prev_attribute_ratings.items %}
+                {% if anum == num %}
+                  {% if aval %}
+                  <span class="attr-pill attr-{{ aval }}">{{ aval }}</span>
+                  {% else %}
+                  <span style="color:var(--text-muted);font-style:italic">N/A</span>
+                  {% endif %}
+                {% endif %}
+              {% endfor %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    </div>
+
+    <div id="attrTabSide" style="display:none">
+    <div style="overflow-x:auto;margin-bottom:20px">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border)">
+            <th style="padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Attribute</th>
+            <th style="padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;color:var(--hodari-blue);min-width:60px">{{ ptc_window.get_term_slot_display }}</th>
+            <th style="padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;color:var(--text-muted);min-width:60px;border-left:2px solid var(--border)">{{ prev_ptc_window.get_term_slot_display }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for num, label in learner_attributes %}
+          <tr style="border-bottom:1px solid #F0F4FB">
+            <td style="padding:8px 10px">{{ num }}. {{ label }}</td>
+            <td style="padding:8px 10px;text-align:center">
+              {% for anum, aval in current_attribute_ratings.items %}
+                {% if anum == num %}
+                  {% if aval %}
+                  <span class="attr-pill attr-{{ aval }}">{{ aval }}</span>
+                  {% else %}
+                  <span style="color:var(--text-muted);font-style:italic">N/A</span>
+                  {% endif %}
+                {% endif %}
+              {% endfor %}
+            </td>
+            <td style="padding:8px 10px;text-align:center;border-left:2px solid var(--border)">
+              {% for anum, aval in prev_attribute_ratings.items %}
+                {% if anum == num %}
+                  {% if aval %}
+                  <span class="attr-pill attr-{{ aval }}">{{ aval }}</span>
+                  {% else %}
+                  <span style="color:var(--text-muted);font-style:italic">N/A</span>
+                  {% endif %}
+                {% endif %}
+              {% endfor %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    </div>
+    {% endif %}
+
+    <!-- 7. Attendance (OI-PTC-01, feature-flagged) -->
+    {% if show_attendance and attendance_summary %}
+    <h3 style="font-size:15px;font-weight:700;color:var(--text-primary);margin:24px 0 14px;border-bottom:2px solid var(--border);padding-bottom:6px">Attendance</h3>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+      <div style="background:#E8F5EC;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:24px;font-weight:700;color:#1B7B34">{{ attendance_summary.present }}</div>
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#1B7B34">Days Present</div>
+      </div>
+      <div style="background:#FEF2F2;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:24px;font-weight:700;color:#9B1C1C">{{ attendance_summary.absent }}</div>
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#9B1C1C">Days Absent</div>
+      </div>
+      <div style="background:#FEF3C7;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:24px;font-weight:700;color:#92550A">{{ attendance_summary.late }}</div>
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#92550A">Days Late</div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Parent Signature & Meeting Date (OI-PTC-02) -->
+    <div class="signatures" style="margin-top:28px;display:grid;grid-template-columns:1fr 1fr;gap:24px">
+      <div>
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);font-weight:600;margin-bottom:4px">Parent / Guardian Signature</div>
+        <div style="border-bottom:1px solid var(--border);height:24px"></div>
+      </div>
+      <div>
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);font-weight:600;margin-bottom:4px">Date of Meeting</div>
+        <div style="border-bottom:1px solid var(--border);height:24px"></div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="margin-top:30px;padding-top:14px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted);display:flex;justify-content:space-between">
+      <div>&copy; {% now "Y" %} {{ brand.school_name }} &bull; Learner Progress Report - Internal Use Only</div>
+      <div>Generated: {% now "d F Y H:i" %}</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+  /* FR-PTC-036: Attribute comparison tab toggle */
+  var btnCurrent = document.getElementById('attrToggleCurrent');
+  var btnPrev = document.getElementById('attrTogglePrev');
+  var btnSide = document.getElementById('attrToggleSideBySide');
+  if (!btnCurrent) return;
+
+  var panels = {
+    current: document.getElementById('attrTabCurrent'),
+    prev: document.getElementById('attrTabPrev'),
+    side: document.getElementById('attrTabSide'),
+  };
+
+  function setActive(btn) {
+    [btnCurrent, btnPrev, btnSide].forEach(function(b) {
+      b.style.background = '#fff';
+      b.style.color = 'var(--text-muted)';
+      b.style.borderColor = 'var(--border)';
+    });
+    btn.style.background = 'var(--hodari-blue)';
+    btn.style.color = '#fff';
+    btn.style.borderColor = 'var(--hodari-blue)';
+  }
+
+  window.showAttrTab = function(tab) {
+    Object.keys(panels).forEach(function(k) {
+      if (panels[k]) panels[k].style.display = 'none';
+    });
+    if (panels[tab]) panels[tab].style.display = '';
+    if (tab === 'current') setActive(btnCurrent);
+    else if (tab === 'prev') setActive(btnPrev);
+    else if (tab === 'side') setActive(btnSide);
+  };
+
+  /* Default: show current */
+  setActive(btnCurrent);
+})();
+</script>
+{% endblock %}

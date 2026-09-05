@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}{% if is_edit %}Edit{% else %}New{% endif %} budget &mdash; Finance &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}{% if is_edit %}Edit budget{% else %}New budget{% endif %}{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+<div class="section-hdr">
+  <span class="section-title">{% if is_edit %}Edit{% else %}Create{% endif %} budget allocation</span>
+  <a href="{% url 'finance:budget_list' %}" class="section-link">&larr; All budgets</a>
+</div>
+
+{% has_perm user "finance.add_budget" as can_create %}
+{% has_perm user "finance.change_budget" as can_edit %}
+{% if is_edit and can_edit or not is_edit and can_create %}
+<form method="post" style="max-width:560px">
+  {% csrf_token %}
+
+  <div class="card">
+    <div class="card-title">Budget details</div>
+
+    <div class="hf2-group">
+      <label class="hf2-label">Term <span class="hf2-req">*</span></label>
+      <select name="term" required class="hf2-select">
+        <option value="">Select term</option>
+        {% for term in terms %}
+        <option value="{{ term.pk }}"
+          {% if is_edit and budget.term_id == term.pk %}selected
+          {% elif not is_edit and selected_term_id|stringformat:"s" == term.pk|stringformat:"s" %}selected
+          {% endif %}>
+          {{ term.name }} &middot; {{ term.academic_year.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="hf2-group">
+      <label class="hf2-label">Category <span class="hf2-req">*</span></label>
+      <select name="category" required class="hf2-select">
+        <option value="">Select category</option>
+        {% for code, label in categories %}
+        <option value="{{ code }}" {% if is_edit and budget.category == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="hf2-group">
+      <label class="hf2-label">Allocated amount (TZS) <span class="hf2-req">*</span></label>
+      <input type="number" name="allocated_amount" step="0.01" min="0" required class="hf2-input"
+        value="{% if is_edit %}{{ budget.allocated_amount|floatformat:2 }}{% endif %}"
+        placeholder="e.g. 5000000">
+    </div>
+
+    <div class="hf2-group">
+      <label class="hf2-label">Notes</label>
+      <textarea name="notes" rows="3" class="hf2-textarea" placeholder="Optional notes about this budget">{% if is_edit %}{{ budget.notes }}{% endif %}</textarea>
+    </div>
+
+    <div class="hf2-group hf2-check-group">
+      <label class="hf2-check-label" for="id_is_frozen">
+        <input type="checkbox" name="is_frozen" id="id_is_frozen" class="hf2-checkbox"
+          {% if is_edit and budget.is_frozen %}checked{% endif %}>
+        Freeze: prevent further edits once approved
+      </label>
+    </div>
+
+    <div class="hf2-actions">
+      <button type="submit" class="btn btn-primary">{% if is_edit %}Update{% else %}Create{% endif %} budget</button>
+      <a href="{% url 'finance:budget_list' %}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

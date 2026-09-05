@@ -1,0 +1,23 @@
+{% load role_tags %}
+{% is_hod_like user as user_is_hod %}
+{% is_hos_signoff user as can_hos_signoff %}
+<div class="sub-nav">
+  {% if perms.academics.view_reportcard %}
+  <a href="{% url 'academics:report_card_list' %}" class="sub-tab {% if academics_tab == 'reports' %}active{% endif %}">Reports</a>
+  {% endif %}
+  {% if perms.academics.change_reportcard %}
+  <a href="{% url 'academics:primary_comments_entry' %}" class="sub-tab {% if academics_tab == 'comments' %}active{% endif %}">Comments</a>
+  {% endif %}
+  {% if user_is_hod %}
+  <a href="{% url 'academics:report_review_queue' %}" class="sub-tab {% if academics_tab == 'review_queue' %}active{% endif %}">Review Queue</a>
+  {% endif %}
+  {% if can_hos_signoff %}
+  <a href="{% url 'academics:hos_signoff_list' %}" class="sub-tab {% if academics_tab == 'hos_signoff' %}active{% endif %}">HOS Sign-Off</a>
+  {% endif %}
+  {% if can_hos_signoff %}
+  <a href="{% url 'academics:analytics' %}" class="sub-tab {% if academics_tab == 'analytics' %}active{% endif %}">Analytics</a>
+  {% endif %}
+  {% if user_is_hod %}
+  <a href="{% url 'academics:at_risk_list' %}" class="sub-tab {% if academics_tab == 'at_risk' %}active{% endif %}">At Risk</a>
+  {% endif %}
+</div>

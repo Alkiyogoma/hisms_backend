@@ -1,0 +1,311 @@
+<div id="timetable-content">
+{% load role_tags %}
+<!-- Week Navigation -->
+<div class="week-nav">
+  <a href="?view={{ view_type }}&class_name={{ class_filter }}&teacher_id={{ teacher_filter }}&q={{ q }}&week={{ week_offset|add:'-1' }}"
+     class="week-nav-btn" title="Previous week"
+     hx-get="?view={{ view_type }}&class_name={{ class_filter }}&teacher_id={{ teacher_filter }}&q={{ q }}&week={{ week_offset|add:'-1' }}"
+     hx-target="#timetable-content" hx-swap="outerHTML" hx-push-url="true">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+  </a>
+  <div class="week-label">{{ target_monday|date:"j M" }} – {{ target_sunday|date:"j M, Y" }}</div>
+  <a href="?view={{ view_type }}&class_name={{ class_filter }}&teacher_id={{ teacher_filter }}&q={{ q }}&week={{ week_offset|add:'1' }}"
+     class="week-nav-btn" title="Next week"
+     hx-get="?view={{ view_type }}&class_name={{ class_filter }}&teacher_id={{ teacher_filter }}&q={{ q }}&week={{ week_offset|add:'1' }}"
+     hx-target="#timetable-content" hx-swap="outerHTML" hx-push-url="true">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+  </a>
+  {% if week_offset != 0 %}
+  <a href="?view={{ view_type }}&class_name={{ class_filter }}&teacher_id={{ teacher_filter }}&q={{ q }}&week=0"
+     class="week-nav-btn" title="This week" style="width:auto;padding:0 10px;font-size:11px;font-weight:600;color:var(--hodari-blue)"
+     hx-get="?view={{ view_type }}&class_name={{ class_filter }}&teacher_id={{ teacher_filter }}&q={{ q }}&week=0"
+     hx-target="#timetable-content" hx-swap="outerHTML" hx-push-url="true">Today</a>
+  {% endif %}
+</div>
+
+{% if view_type == 'grid' %}
+  <div class="tt-container">
+    <div class="tt-grid">
+      <div class="tt-head">Time</div>
+      <div class="tt-head">Monday</div>
+      <div class="tt-head">Tuesday</div>
+      <div class="tt-head">Wednesday</div>
+      <div class="tt-head">Thursday</div>
+      <div class="tt-head">Friday</div>
+
+      {% for time_key, day_map in grid_data.items %}
+        <div class="tt-time-col">
+          <span style="color:#0f172a; font-size:12px; letter-spacing:-0.02em">{{ time_key|slice:":5" }}</span>
+          <span style="opacity:0.3; margin:2px 0; font-size:8px">&bull;</span>
+          <span style="opacity:0.6">{{ time_key|slice:"8:" }}</span>
+        </div>
+        {% for day_code, day_slots in day_map.items %}
+          <div class="tt-cell">
+            {% for s in day_slots %}
+              <div class="tt-slot" style="--subject-color: {{ s.subject.color|default:'#023AA5' }}; position:relative">
+                {% if can_edit %}
+                <label class="slot-select" style="position:absolute; top:4px; right:4px; z-index:2; cursor:pointer; opacity:0.6; transition:opacity 0.15s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'">
+                  <input type="checkbox" name="slot_ids" value="{{ s.pk }}" onchange="updateBulkBar()" style="width:14px; height:14px; accent-color:var(--hodari-blue); cursor:pointer">
+                </label>
+                {% endif %}
+                <div class="tt-slot-subj">
+                  <span class="tt-slot-code">{% if s.subject and s.subject.code %}{{ s.subject.code }}{% else %}{{ s.subject_name }}{% endif %}</span>
+                  <span class="tt-slot-teacher">
+                    {% if s.lp_status == 'approved' %}<span class="lp-badge lp-green" title="Lesson plan approved"></span>
+                    {% elif s.lp_status == 'submitted' %}<span class="lp-badge lp-blue" title="Lesson plan submitted"></span>
+                    {% elif s.lp_status == 'draft' %}<span class="lp-badge lp-grey" title="Lesson plan draft"></span>
+                    {% elif s.lp_status == 'missing' %}<span class="lp-badge lp-red" title="Lesson plan missing"></span>
+                    {% elif s.lp_status == 'revision_requested' %}<span class="lp-badge lp-yellow" title="Revision requested"></span>
+                    {% elif s.lp_status == 'rejected' %}<span class="lp-badge lp-red" title="Lesson plan rejected"></span>
+                    {% elif s.teacher %}<span class="lp-badge lp-grey" title="No lesson plan"></span>
+                    {% endif %}
+                    {% if s.teacher %}{{ s.teacher.get_full_name }}{% else %}N/A{% endif %}
+                  </span>
+                </div>
+                <div class="tt-slot-meta">{{ s.class_name }}</div>
+                {% has_role user "teacher" as is_teacher %}
+                {% if can_create_lp and s.teacher %}
+                  {% if s.lp_status is None %}
+                    {% if not is_teacher or s.teacher.pk == user.pk %}
+                    <div style="margin-top:4px">
+                      <a href="{% url 'academics:quick_lesson_plan' %}?slot_id={{ s.pk }}&week={{ week_offset }}"
+                         title="Create lesson plan for {{ s.class_name }} — {{ s.subject_name }}"
+                         style="font-size:11px; font-weight:600; color:#fff; text-decoration:none; padding:2px 10px; border-radius:5px; background:#023AA5; border:1px solid rgba(2,58,165,0.3); transition:all 0.15s; display:inline-flex; align-items:center; gap:4px"
+                         hx-get="{% url 'academics:quick_lesson_plan' %}?slot_id={{ s.pk }}&week={{ week_offset }}"
+                         hx-target="body" hx-swap="beforeend"
+                         onmouseover="this.style.background='#012A80'"
+                         onmouseout="this.style.background='#023AA5'">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        Plan
+                      </a>
+                    </div>
+                    {% endif %}
+                  {% elif s.lp_status == 'draft' or s.lp_status == 'revision_requested' %}
+                    {% if not is_teacher or s.teacher.pk == user.pk %}
+                    <div style="margin-top:4px">
+                      <a href="{% url 'academics:edit_lesson_plan_modal' s.lp_pk %}"
+                         title="{% if s.lp_status == 'revision_requested' %}Edit plan{% else %}Edit draft{% endif %}"
+                         style="font-size:11px; font-weight:600; color:#fff; text-decoration:none; padding:2px 10px; border-radius:5px; background:{% if s.lp_status == 'revision_requested' %}#F59E0B{% else %}#F59E0B{% endif %}; transition:all 0.15s; display:inline-flex; align-items:center; gap:4px"
+                         hx-get="{% url 'academics:edit_lesson_plan_modal' s.lp_pk %}"
+                         hx-target="body" hx-swap="beforeend"
+                         onmouseover="this.style.background='#D97706'"
+                         onmouseout="this.style.background='#F59E0B'">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        {% if s.lp_status == 'revision_requested' %}Revise{% else %}Draft{% endif %}
+                      </a>
+                    </div>
+                    {% endif %}
+                  {% elif s.lp_status == 'submitted' %}
+                    {% if not is_teacher or s.teacher.pk == user.pk %}
+                    <div style="margin-top:4px">
+                      <a href="{% url 'academics:withdraw_lesson_plan_modal' s.lp_pk %}"
+                         title="Withdraw submission"
+                         style="font-size:11px; font-weight:600; color:#fff; text-decoration:none; padding:2px 10px; border-radius:5px; background:#DC2626; border:none; transition:all 0.15s; display:inline-flex; align-items:center; gap:4px"
+                         hx-get="{% url 'academics:withdraw_lesson_plan_modal' s.lp_pk %}"
+                         hx-target="body" hx-swap="beforeend"
+                         onmouseover="this.style.background='#B91C1C'"
+                         onmouseout="this.style.background='#DC2626'">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+                        Withdraw
+                      </a>
+                    </div>
+                    {% endif %}
+                  {% elif s.lp_status == 'approved' %}
+                    <div style="margin-top:4px">
+                      <span style="font-size:11px; font-weight:600; color:#16A34A; padding:2px 10px; border-radius:5px; background:#DCFCE7; display:inline-flex; align-items:center; gap:4px">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                        Approved
+                      </span>
+                    </div>
+                  {% elif s.lp_status == 'rejected' %}
+                    {% if not is_teacher or s.teacher.pk == user.pk %}
+                    <div style="margin-top:4px">
+                      <a href="{% url 'academics:edit_lesson_plan_modal' s.lp_pk %}"
+                         title="Re-edit rejected plan"
+                         style="font-size:11px; font-weight:600; color:#fff; text-decoration:none; padding:2px 10px; border-radius:5px; background:#DC2626; transition:all 0.15s; display:inline-flex; align-items:center; gap:4px"
+                         hx-get="{% url 'academics:edit_lesson_plan_modal' s.lp_pk %}"
+                         hx-target="body" hx-swap="beforeend"
+                         onmouseover="this.style.background='#B91C1C'"
+                         onmouseout="this.style.background='#DC2626'">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        Re-edit
+                      </a>
+                    </div>
+                    {% endif %}
+                  {% endif %}
+                {% endif %}
+                {% if can_edit %}
+                <div style="margin-top:4px; display:flex; gap:6px">
+                  <a href="{% url 'timetable:slot_edit' pk=s.pk %}" title="Edit slot" style="font-size:11px; font-weight:600; color:var(--hodari-blue); text-decoration:none; padding:2px 10px; border-radius:5px; background:rgba(255,255,255,0.85); border:1px solid rgba(2,58,165,0.15); transition:all 0.15s" onmouseover="this.style.background='var(--hodari-blue)'; this.style.color='#fff'" onmouseout="this.style.background='rgba(255,255,255,0.85)'; this.style.color='var(--hodari-blue)'">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle; margin-right:3px"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    Edit
+                  </a>
+                  <button type="button" title="Delete slot" onclick="confirmDeleteModal({title:'Delete Slot?',body:'Delete the <strong>{{ s.subject_name }}</strong> slot for <strong>{{ s.class_name }}</strong> taught by <strong>{{ s.teacher.get_full_name|escapejs }}</strong>?',detail:'This timetable slot will be permanently removed.',confirmText:'Delete Slot',url:'{% url 'timetable:slot_delete' pk=s.pk %}'})" style="font-size:11px; font-weight:600; color:#9B1C1C; background:rgba(254,242,242,0.85); border:1px solid rgba(254,202,202,0.5); padding:2px 10px; border-radius:5px; cursor:pointer; transition:all 0.15s" onmouseover="this.style.background='#9B1C1C'; this.style.color='#fff'" onmouseout="this.style.background='rgba(254,242,242,0.85)'; this.style.color='#9B1C1C'">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle; margin-right:2px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    Delete
+                  </button>
+                </div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% endfor %}
+      {% empty %}
+        <div style="padding:60px; text-align:center; grid-column: 1 / span 6; background:#fff">
+          {% include '_partials/empty_state.html' with title='No timetable entries found' desc='No timetable entries match your current filters.' icon='calendar' icon_color='grey' %}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{% else %}
+  <!-- List View -->
+  <div class="card" style="padding:0; overflow:hidden">
+    <table class="h-table">
+      <thead>
+        <tr>
+          {% if can_edit %}<th style="width:40px"><input type="checkbox" id="selectAllList" onchange="toggleSelectAll(this)" style="width:14px; height:14px; accent-color:var(--hodari-blue); cursor:pointer"></th>{% endif %}
+          <th>Time</th>
+          <th>Class</th>
+          <th>Subject</th>
+          <th>Teacher</th>
+          <th>Lesson Plan</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for slot in slots %}
+          <tr>
+            {% if can_edit %}<td><input type="checkbox" name="slot_ids" value="{{ slot.pk }}" onchange="updateBulkBar()" style="width:14px; height:14px; accent-color:var(--hodari-blue); cursor:pointer"></td>{% endif %}
+            <td style="font-family:var(--font-mono); font-weight:600; white-space:nowrap">{{ slot.start_time|time:"H:i" }} &ndash; {{ slot.end_time|time:"H:i" }}</td>
+            <td>
+              <div style="font-weight:600; color:var(--hodari-blue)">{{ slot.class_name }}</div>
+            </td>
+            <td style="font-weight:500">
+              {% if slot.subject and slot.subject.color %}
+                <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:{{ slot.subject.color }}; margin-right:6px"></span>
+              {% endif %}
+              {% if slot.subject and slot.subject.code %}<strong>{{ slot.subject.code }}</strong> &ndash; {% endif %}{{ slot.subject_name }}
+            </td>
+            <td>{{ slot.teacher.get_full_name }}</td>
+            <td>
+              {% has_role user "teacher" as is_teacher %}
+              {% if can_create_lp and slot.teacher %}
+                {% if slot.lp_status is None %}
+                  {% if not is_teacher or slot.teacher.pk == user.pk %}
+                  <a href="{% url 'academics:quick_lesson_plan' %}?slot_id={{ slot.pk }}&week={{ week_offset }}"
+                     style="font-size:11px; font-weight:600; color:#fff; text-decoration:none; padding:3px 12px; border-radius:5px; background:#023AA5; transition:all 0.15s; display:inline-flex; align-items:center; gap:4px"
+                     hx-get="{% url 'academics:quick_lesson_plan' %}?slot_id={{ slot.pk }}&week={{ week_offset }}"
+                     hx-target="body" hx-swap="beforeend"
+                     onmouseover="this.style.background='#012A80'" onmouseout="this.style.background='#023AA5'">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Plan
+                  </a>
+                  {% endif %}
+                {% elif slot.lp_status == 'draft' or slot.lp_status == 'revision_requested' %}
+                  {% if not is_teacher or slot.teacher.pk == user.pk %}
+                  <a href="{% url 'academics:edit_lesson_plan_modal' slot.lp_pk %}"
+                     style="font-size:11px; font-weight:600; color:#fff; text-decoration:none; padding:3px 12px; border-radius:5px; background:#F59E0B; transition:all 0.15s; display:inline-flex; align-items:center; gap:4px"
+                     hx-get="{% url 'academics:edit_lesson_plan_modal' slot.lp_pk %}"
+                     hx-target="body" hx-swap="beforeend"
+                     onmouseover="this.style.background='#D97706'" onmouseout="this.style.background='#F59E0B'">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    {% if slot.lp_status == 'revision_requested' %}Revise{% else %}Draft{% endif %}
+                  </a>
+                  {% endif %}
+                {% elif slot.lp_status == 'submitted' %}
+                  {% if not is_teacher or slot.teacher.pk == user.pk %}
+                  <a href="{% url 'academics:withdraw_lesson_plan_modal' slot.lp_pk %}"
+                     style="font-size:11px; font-weight:600; color:#fff; text-decoration:none; padding:3px 12px; border-radius:5px; background:#DC2626; transition:all 0.15s; display:inline-flex; align-items:center; gap:4px"
+                     hx-get="{% url 'academics:withdraw_lesson_plan_modal' slot.lp_pk %}"
+                     hx-target="body" hx-swap="beforeend"
+                     onmouseover="this.style.background='#B91C1C'" onmouseout="this.style.background='#DC2626'">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+                    Withdraw
+                  </a>
+                  {% endif %}
+                {% elif slot.lp_status == 'approved' %}
+                  <span style="font-size:11px; font-weight:600; color:#16A34A; padding:3px 12px; border-radius:5px; background:#DCFCE7; display:inline-flex; align-items:center; gap:4px">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    Approved
+                  </span>
+                {% elif slot.lp_status == 'rejected' %}
+                  {% if not is_teacher or slot.teacher.pk == user.pk %}
+                  <a href="{% url 'academics:edit_lesson_plan_modal' slot.lp_pk %}"
+                     style="font-size:11px; font-weight:600; color:#fff; text-decoration:none; padding:3px 12px; border-radius:5px; background:#DC2626; transition:all 0.15s; display:inline-flex; align-items:center; gap:4px"
+                     hx-get="{% url 'academics:edit_lesson_plan_modal' slot.lp_pk %}"
+                     hx-target="body" hx-swap="beforeend"
+                     onmouseover="this.style.background='#B91C1C'" onmouseout="this.style.background='#DC2626'">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    Re-edit
+                  </a>
+                  {% endif %}
+                {% endif %}
+              {% endif %}
+              {% if can_edit %}
+                <div style="margin-top:4px; display:flex; gap:6px">
+                  <a href="{% url 'timetable:slot_edit' pk=slot.pk %}" style="font-size:11px; font-weight:600; color:var(--hodari-blue); text-decoration:none; padding:2px 10px; border-radius:5px; background:#F0F4FF; border:1px solid rgba(2,58,165,0.15); transition:all 0.15s" onmouseover="this.style.background='var(--hodari-blue)'; this.style.color='#fff'" onmouseout="this.style.background='#F0F4FF'; this.style.color='var(--hodari-blue)'">
+                    Edit
+                  </a>
+                  <button type="button" onclick="confirmDeleteModal({title:'Delete Slot?',body:'Delete the <strong>{{ slot.subject_name }}</strong> slot for <strong>{{ slot.class_name }}</strong> taught by <strong>{{ slot.teacher.get_full_name|escapejs }}</strong>?',detail:'This timetable slot will be permanently removed.',confirmText:'Delete Slot',url:'{% url 'timetable:slot_delete' pk=slot.pk %}'})" style="font-size:11px; font-weight:600; color:#9B1C1C; background:#FEF2F2; border:1px solid #FECACA; padding:2px 10px; border-radius:5px; cursor:pointer; transition:all 0.15s" onmouseover="this.style.background='#9B1C1C'; this.style.color='#fff'" onmouseout="this.style.background='#FEF2F2'; this.style.color='#9B1C1C'">Delete</button>
+                </div>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="6" style="text-align:center; padding:40px">{% include '_partials/empty_state.html' with title='No entries for this day' desc='No timetable entries match your filters.' icon='calendar' icon_color='grey' %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+</div>
+
+<script>
+// ── Bulk select & delete (uses global confirmDeleteModal from base.html) ──
+function updateBulkBar() {
+  var checked = document.querySelectorAll('input[name="slot_ids"]:checked');
+  var bar = document.getElementById('bulkDeleteBar');
+  var count = document.getElementById('bulkCount');
+  if (!bar) return;
+  if (checked.length > 0) {
+    bar.style.display = 'flex';
+    count.textContent = checked.length + ' slot' + (checked.length !== 1 ? 's' : '') + ' selected';
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+function toggleSelectAll(master) {
+  var checkboxes = document.querySelectorAll('input[name="slot_ids"]');
+  checkboxes.forEach(function(cb) { cb.checked = master.checked; });
+  updateBulkBar();
+}
+
+function openBulkDeleteModal() {
+  var checked = document.querySelectorAll('input[name="slot_ids"]:checked');
+  if (checked.length === 0) return;
+  var count = checked.length;
+  confirmDeleteModal({
+    title: 'Delete ' + count + ' Slot' + (count !== 1 ? 's' : '') + '?',
+    body: 'You are about to delete <strong>' + count + ' timetable slot' + (count !== 1 ? 's' : '') + '</strong> across the timetable.',
+    detail: 'This action cannot be undone.',
+    confirmText: 'Delete ' + count + ' Slot' + (count !== 1 ? 's' : ''),
+    type: 'danger',
+    url: '{% url "timetable:bulk_delete" %}',
+    extraData: Array.from(checked).map(function(cb) { return { name: 'slot_ids', value: cb.value }; })
+  });
+}
+
+// Global confirmDeleteAction (from base.html) handles extraData natively.
+</script>
+
+<!-- Bulk Delete Floating Bar -->
+{% if can_edit %}
+<div id="bulkDeleteBar" style="display:none; position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:9998; background:#1E293B; color:#fff; padding:12px 24px; border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,0.25); align-items:center; gap:16px; font-size:13px; font-weight:600">
+  <span id="bulkCount">0 slots selected</span>
+  <button onclick="openBulkDeleteModal()" style="background:#DC2626; color:#fff; border:none; padding:8px 20px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; transition:background 0.15s" onmouseover="this.style.background='#B91C1C'" onmouseout="this.style.background='#DC2626'">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle; margin-right:4px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+    Delete Selected
+  </button>
+  <button onclick="document.querySelectorAll('input[name=slot_ids]').forEach(function(c){c.checked=false}); updateBulkBar();" style="background:none; color:#94A3B8; border:1px solid #475569; padding:8px 16px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.15s" onmouseover="this.style.color='#fff'; this.style.borderColor='#64748B'" onmouseout="this.style.color='#94A3B8'; this.style.borderColor='#475569'">Clear Selection</button>
+</div>
+{% endif %}

@@ -1,0 +1,343 @@
+{% extends "base.html" %}
+{% load hodari_forms %}
+{% block title %}{{ dept_label }} Welfare Dashboard &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}{{ dept_label }} Welfare Dashboard{% endblock %}
+
+{% block content %}
+{% include "welfare/_top_tabs.html" %}
+
+{# ── KPI CARDS ───────────────────────────────────────────────────── #}
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px">
+  {% include '_partials/stat_card.html' with label='Welfare Observations' value=welfare_total sub='Total recorded' variant='blue' %}
+  {% include '_partials/stat_card.html' with label='Open Concerns' value=welfare_open sub=welfare_critical|add:' high / critical' variant='red' %}
+  {% include '_partials/stat_card.html' with label='Discipline Incidents' value=discipline_total sub=discipline_this_month|add:' this month' variant='red' %}
+  {% include '_partials/stat_card.html' with label='Pending Review' value=discipline_pending sub='Discipline items' variant='amber' %}
+  {% include '_partials/stat_card.html' with label='Attendance Today' value=att_today_pct unit='%' sub=att_today_present|add:'/'|add:att_today_total|add:' present' variant='green' %}
+  {% include '_partials/stat_card.html' with label='Weekly Attendance' value=att_week_pct unit='%' sub='7-day average' variant='green' %}
+</div>
+
+{# ── HOS ECD CLASS AGGREGATE (FR-WEL-008) ───────────────────────── #}
+{% if is_hos_view and ecd_class_grid %}
+<div class="card" style="margin:0 0 24px">
+  <div class="card-title">ECD Welfare by Class</div>
+  <div style="overflow-x:auto;margin-top:16px">
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="border-bottom:2px solid var(--border)">
+          <th style="text-align:left;padding:10px 12px;font-weight:600;color:var(--text-muted)">Class</th>
+          <th style="text-align:center;padding:10px 12px;font-weight:600;color:var(--text-muted)">Total</th>
+          <th style="text-align:center;padding:10px 12px;font-weight:600;color:var(--text-muted)">Open</th>
+          <th style="text-align:center;padding:10px 12px;font-weight:600;color:var(--text-muted)">Uncontacted</th>
+          <th style="text-align:center;padding:10px 12px;font-weight:600;color:#dc2626">Critical</th>
+          <th style="text-align:center;padding:10px 12px;font-weight:600;color:#f59e0b">High</th>
+          <th style="text-align:center;padding:10px 12px;font-weight:600;color:#3b82f6">Medium</th>
+          <th style="text-align:center;padding:10px 12px;font-weight:600;color:#6b7280">Low</th>
+          <th style="text-align:center;padding:10px 12px;font-weight:600;color:var(--text-muted)">Behavioral</th>
+          <th style="text-align:center;padding:10px 12px;font-weight:600;color:var(--text-muted)">Health</th>
+          <th style="text-align:center;padding:10px 12px;font-weight:600;color:var(--text-muted)">Attendance</th>
+          <th style="text-align:center;padding:10px 12px;font-weight:600;color:var(--text-muted)">Academic</th>
+          <th style="text-align:center;padding:10px 12px;font-weight:600;color:var(--text-muted)">Home</th>
+          <th style="text-align:center;padding:10px 12px;font-weight:600;color:var(--text-muted)">Other</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in ecd_class_grid %}
+        <tr style="border-bottom:1px solid #f3f4f6">
+          <td style="padding:10px 12px;font-weight:600;color:#1E293B">{{ row.class_name }}</td>
+          <td style="padding:10px 12px;text-align:center;font-weight:700">{{ row.total }}</td>
+          <td style="padding:10px 12px;text-align:center">{% if row.open > 0 %}<span style="font-weight:700;color:#dc2626">{{ row.open }}</span>{% else %}<span style="color:#16a34a">0</span>{% endif %}</td>
+          <td style="padding:10px 12px;text-align:center">{% if row.uncontacted > 0 %}<span style="font-weight:700;color:#dc2626">{{ row.uncontacted }}</span>{% else %}<span style="color:#16a34a">0</span>{% endif %}</td>
+          <td style="padding:10px 12px;text-align:center">{{ row.severity.critical|default:"0" }}</td>
+          <td style="padding:10px 12px;text-align:center">{{ row.severity.high|default:"0" }}</td>
+          <td style="padding:10px 12px;text-align:center">{{ row.severity.medium|default:"0" }}</td>
+          <td style="padding:10px 12px;text-align:center">{{ row.severity.low|default:"0" }}</td>
+          <td style="padding:10px 12px;text-align:center">{{ row.concern.behavioral|default:"0" }}</td>
+          <td style="padding:10px 12px;text-align:center">{{ row.concern.health|default:"0" }}</td>
+          <td style="padding:10px 12px;text-align:center">{{ row.concern.attendance|default:"0" }}</td>
+          <td style="padding:10px 12px;text-align:center">{{ row.concern.academic|default:"0" }}</td>
+          <td style="padding:10px 12px;text-align:center">{{ row.concern.home_situation|default:"0" }}</td>
+          <td style="padding:10px 12px;text-align:center">{{ row.concern.other|default:"0" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{# ── ALERTS ROW ───────────────────────────────────────────────────── #}
+{% if uncontacted_critical %}
+<div class="card" style="margin:0 0 24px;border:1px solid #dc2626;background:#fef2f2">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+    <div style="width:10px;height:10px;background:#dc2626;border-radius:50%;flex-shrink:0"></div>
+    <div style="font-weight:600;color:#dc2626">Parent Contact Overdue</div>
+    <div style="font-size:13px;color:#991b1b;margin-left:auto">{{ uncontacted_critical|length }} case{{ uncontacted_critical|length|pluralize }} requiring attention</div>
+  </div>
+  {% for obs in uncontacted_critical|slice:":4" %}
+  <div style="background:white;padding:12px 16px;border-radius:8px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <a href="{% url 'students:detail' obs.student.pk %}" style="font-weight:600;color:var(--hodari-blue);text-decoration:none">{{ obs.student }}</a>
+      <span style="font-size:12px;color:var(--text-muted);margin-left:8px">{{ obs.student.class_name }}</span>
+      <span class="chip {% if obs.severity == 'critical' %}chip-red{% else %}chip-amber{% endif %}" style="margin-left:8px">{{ obs.get_severity_display }}</span>
+    </div>
+    <a href="{% url 'welfare:detail' obs.pk %}" class="btn-primary btn-sm">Contact Parent</a>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── CHARTS ROW ───────────────────────────────────────────────────── #}
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:24px;margin-bottom:24px">
+  {# Monthly Trend Chart #}
+  <div class="card" style="margin:0">
+    <div class="card-title">Monthly Trend (All Modules)</div>
+    <div style="height:280px;margin-top:16px">
+      <canvas id="trendChart"></canvas>
+    </div>
+  </div>
+
+  {# Attendance Today Breakdown #}
+  <div class="card" style="margin:0">
+    <div class="card-title">Attendance Today</div>
+    <div style="height:280px;margin-top:16px">
+      <canvas id="attendanceChart"></canvas>
+    </div>
+  </div>
+</div>
+
+{# ── SECONDARY CHARTS ROW ─────────────────────────────────────────── #}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px">
+  {# Welfare Severity Distribution #}
+  <div class="card" style="margin:0">
+    <div class="card-title">Welfare Severity (This Week)</div>
+    <div style="margin-top:16px">
+      {% for sev, count in severity_counts.items %}
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f3f4f6">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:10px;height:10px;border-radius:50%;background:{% if sev == 'critical' %}#dc2626{% elif sev == 'high' %}#f59e0b{% elif sev == 'medium' %}#3b82f6{% else %}#6b7280{% endif %}"></div>
+          <span style="font-size:13px">{{ sev|title }}</span>
+        </div>
+        <span style="font-weight:600">{{ count }}</span>
+      </div>
+      {% empty %}
+      {% include '_partials/empty_state.html' with icon='doc' icon_color='grey' title='No welfare entries this week' desc='Entries will appear here once recorded.' %}
+      {% endfor %}
+    </div>
+  </div>
+
+  {# Discipline Severity Distribution #}
+  <div class="card" style="margin:0">
+    <div class="card-title">Discipline Severity (This Month)</div>
+    <div style="margin-top:16px">
+      {% for sev, count in discipline_severity_counts.items %}
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f3f4f6">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:10px;height:10px;border-radius:50%;background:{% if sev == 'critical' %}#dc2626{% elif sev == 'high' %}#f59e0b{% elif sev == 'medium' %}#3b82f6{% else %}#6b7280{% endif %}"></div>
+          <span style="font-size:13px">{{ sev|title }}</span>
+        </div>
+        <span style="font-weight:600">{{ count }}</span>
+      </div>
+      {% empty %}
+      {% include '_partials/empty_state.html' with icon='check' icon_color='green' title='No discipline incidents this month' desc='All clear for now.' %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{# ── TABLES ROW ───────────────────────────────────────────────────── #}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px">
+  {# Open Welfare Entries #}
+  <div class="card" style="margin:0" id="open-welfare">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div class="card-title" style="margin:0">Open Welfare Entries</div>
+      <span class="chip chip-amber" style="font-size:11px">{{ open_entries|length }} pending</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border)">
+            <th style="text-align:left;padding:10px 12px;font-weight:600;color:var(--text-muted)">Student</th>
+            <th style="text-align:left;padding:10px 12px;font-weight:600;color:var(--text-muted)">Class</th>
+            <th style="text-align:left;padding:10px 12px;font-weight:600;color:var(--text-muted)">Severity</th>
+            <th style="text-align:left;padding:10px 12px;font-weight:600;color:var(--text-muted)">Concern</th>
+            <th style="text-align:left;padding:10px 12px;font-weight:600;color:var(--text-muted)">Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for obs in open_entries %}
+          <tr style="border-bottom:1px solid #f3f4f6">
+            <td style="padding:10px 12px">
+              <a href="{% url 'students:detail' obs.student.pk %}" style="color:var(--hodari-blue);text-decoration:none;font-weight:500">{{ obs.student }}</a>
+            </td>
+            <td style="padding:10px 12px;color:var(--text-muted)">{{ obs.student.class_name }}</td>
+            <td style="padding:10px 12px">
+              <span class="chip {% if obs.severity == 'critical' %}chip-red{% elif obs.severity == 'high' %}chip-amber{% elif obs.severity == 'medium' %}chip-blue{% else %}chip-grey{% endif %}">{{ obs.get_severity_display }}</span>
+            </td>
+            <td style="padding:10px 12px">{{ obs.get_concern_type_display }}</td>
+            <td style="padding:10px 12px;color:var(--text-muted)">{{ obs.observation_date|date:"d M" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" style="padding:24px;text-align:center;color:var(--text-muted)">No open welfare entries</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {# Recent Discipline Incidents #}
+  <div class="card" style="margin:0">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div class="card-title" style="margin:0">Recent Discipline Incidents</div>
+      <a href="{% url 'discipline:list' %}" style="font-size:12px;color:var(--hodari-blue);text-decoration:none">View All</a>
+    </div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border)">
+            <th style="text-align:left;padding:10px 12px;font-weight:600;color:var(--text-muted)">Student</th>
+            <th style="text-align:left;padding:10px 12px;font-weight:600;color:var(--text-muted)">Severity</th>
+            <th style="text-align:left;padding:10px 12px;font-weight:600;color:var(--text-muted)">Status</th>
+            <th style="text-align:left;padding:10px 12px;font-weight:600;color:var(--text-muted)">Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for inc in recent_discipline %}
+          <tr style="border-bottom:1px solid #f3f4f6">
+            <td style="padding:10px 12px;font-weight:500"><a href="{% url 'students:detail' inc.student.pk %}" style="color:var(--hodari-blue);text-decoration:none">{{ inc.student }}</a></td>
+            <td style="padding:10px 12px">
+              <span class="chip {% if inc.severity == 'critical' %}chip-red{% elif inc.severity == 'high' %}chip-amber{% elif inc.severity == 'medium' %}chip-blue{% else %}chip-grey{% endif %}">{{ inc.get_severity_display }}</span>
+            </td>
+            <td style="padding:10px 12px">
+              <span class="chip {% if inc.status == 'pending_review' %}chip-amber{% elif inc.status == 'resolved' %}chip-green{% elif inc.status == 'dismissed' %}chip-grey{% else %}chip-blue{% endif %}">{{ inc.get_status_display }}</span>
+            </td>
+            <td style="padding:10px 12px;color:var(--text-muted)">{{ inc.incident_date|date:"d M" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" style="padding:24px;text-align:center;color:var(--text-muted)">No discipline incidents recorded</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{# ── BOTTOM ROW: Chronic Absentees + Resolved + Children with Concerns ── #}
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-bottom:24px">
+  {# Chronic Absentees #}
+  <div class="card" style="margin:0">
+    <div class="card-title">Chronic Absentees (3+ days/month)</div>
+    <div style="margin-top:12px">
+      {% for entry in chronic_absentees %}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f3f4f6">
+        <div>
+          <a href="{% url 'students:detail' entry.student.pk %}" style="font-weight:500;font-size:13px;color:var(--hodari-blue);text-decoration:none">{{ entry.student.first_name }} {{ entry.student.last_name }}</a>
+          <div style="font-size:11px;color:var(--text-muted)">{{ entry.student.class_name }}</div>
+        </div>
+        <span class="chip chip-red" style="font-size:11px">{{ entry.absence_count }} days</span>
+      </div>
+      {% empty %}
+      {% include '_partials/empty_state.html' with icon='check' icon_color='green' title='No chronic absentees this month' desc='Attendance is looking good.' %}
+      {% endfor %}
+    </div>
+  </div>
+
+  {# Children with Open Concerns #}
+  <div class="card" style="margin:0">
+    <div class="card-title">Children with Open Concerns</div>
+    <div style="margin-top:12px">
+      {% for item in children_with_open|slice:":8" %}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f3f4f6">
+        <div>
+          <a href="{% url 'students:detail' item.student.pk %}" style="font-weight:500;font-size:13px;color:var(--hodari-blue);text-decoration:none">{{ item.student }}</a>
+          <div style="font-size:11px;color:var(--text-muted)">{{ item.student.class_name }} &middot; {{ item.latest_obs.get_concern_type_display }}</div>
+        </div>
+        <span class="chip {% if item.latest_obs.severity == 'critical' %}chip-red{% elif item.latest_obs.severity == 'high' %}chip-amber{% else %}chip-blue{% endif %}">{{ item.latest_obs.get_severity_display }}</span>
+      </div>
+      {% empty %}
+      {% include '_partials/empty_state.html' with icon='check' icon_color='green' title='No children with open concerns' desc='All welfare concerns have been resolved.' %}
+      {% endfor %}
+    </div>
+  </div>
+
+  {# Recently Resolved #}
+  <div class="card" style="margin:0">
+    <div class="card-title">Recently Resolved</div>
+    <div style="margin-top:12px">
+      {% for obs in resolved_entries|slice:":8" %}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f3f4f6">
+        <div>
+          <a href="{% url 'students:detail' obs.student.pk %}" style="font-weight:500;font-size:13px;color:var(--hodari-blue);text-decoration:none">{{ obs.student }}</a>
+          <div style="font-size:11px;color:var(--text-muted)">{{ obs.get_concern_type_display }} &middot; {{ obs.reviewed_at|date:"d M" }}</div>
+        </div>
+        <span class="chip chip-green" style="font-size:10px">Resolved</span>
+      </div>
+      {% empty %}
+      {% include '_partials/empty_state.html' with icon='doc' icon_color='grey' title='No resolved entries yet' desc='Resolved welfare entries will appear here.' %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{# ── CHART.JS ─────────────────────────────────────────────────────── #}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const trendData = {{ monthly_trend_json|safe }};
+
+  // ── Monthly Trend (Stacked Bar) ──
+  new Chart(document.getElementById('trendChart'), {
+    type: 'bar',
+    data: {
+      labels: trendData.map(d => d.month),
+      datasets: [
+        {
+          label: 'Welfare',
+          data: trendData.map(d => d.welfare),
+          backgroundColor: '#3b82f6',
+          borderRadius: 4,
+        },
+        {
+          label: 'Discipline',
+          data: trendData.map(d => d.discipline),
+          backgroundColor: '#a855f7',
+          borderRadius: 4,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, font: { size: 12 } } }
+      },
+      scales: {
+        x: { stacked: true, grid: { display: false } },
+        y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } }
+      }
+    }
+  });
+
+  // ── Attendance Doughnut ──
+  new Chart(document.getElementById('attendanceChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Present', 'Absent', 'Late', 'Excused'],
+      datasets: [{
+        data: [{{ att_today_present }}, {{ att_today_absent }}, {{ att_today_late }}, {{ att_today_excused }}],
+        backgroundColor: ['#22c55e', '#ef4444', '#f59e0b', '#6b7280'],
+        borderWidth: 0,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '65%',
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 12 } } }
+      }
+    }
+  });
+});
+</script>
+{% endblock %}

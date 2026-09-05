@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block title %}PTC - Select Student{% endblock %}
+
+{% block extra_head %}
+<style>
+  .ptc-tab { padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1.5px solid var(--border); background: #fff; color: var(--text-secondary); transition: all .15s; white-space: nowrap; user-select: none; }
+  .ptc-tab:hover { background: var(--hodari-blue-pale, #E8EEF9); border-color: var(--hodari-blue); color: var(--hodari-blue); }
+  .ptc-tab.active { background: var(--hodari-blue); color: #fff; border-color: var(--hodari-blue); }
+  .ptc-tab .tab-count { display: inline-block; background: rgba(255,255,255,.25); padding: 1px 7px; border-radius: 99px; font-size: 11px; margin-left: 4px; }
+  .ptc-tab.active .tab-count { background: rgba(255,255,255,.3); }
+  .ptc-tab:not(.active) .tab-count { background: var(--hodari-blue-pale, #E8EEF9); color: var(--hodari-blue); }
+  .tab-complete-badge { display: inline-block; background: #1B7B34; color: #fff; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 99px; margin-left: 4px; line-height: 1.3; }
+  .student-done-badge { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #E8F5EC; color: #1B7B34; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .student-pending-badge { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #FEF3C7; color: #92550A; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ptc-tabs-wrap { position: relative; margin-bottom: 18px; }
+  .ptc-tabs-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; }
+  .ptc-tabs-scroll::-webkit-scrollbar { display: none; }
+  .ptc-tabs-fade { position: absolute; top: 0; bottom: 0; width: 36px; pointer-events: none; z-index: 2; opacity: 0; transition: opacity .2s; }
+  .ptc-tabs-fade.left { left: 0; background: linear-gradient(to right, #fff 0%, transparent 100%); }
+  .ptc-tabs-fade.right { right: 0; background: linear-gradient(to left, #fff 0%, transparent 100%); }
+  .ptc-tabs-fade.show { opacity: 1; }
+  .class-section { display: none; }
+  .class-section.visible { display: block; }
+  .student-link { display: flex; align-items: center; padding: 10px 20px; text-decoration: none; color: inherit; border-bottom: 1px solid #F0F4FB; transition: background .15s; }
+  .student-link:hover { background: #F7F9FC; }
+  .search-input { width: 100%; padding: 10px 14px 10px 38px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; background: #fff; transition: border-color .15s; }
+  .search-input:focus { outline: none; border-color: var(--hodari-blue); box-shadow: 0 0 0 3px rgba(26,86,196,.1); }
+</style>
+{% endblock %}
+
+{% block topbar_greeting %}
+<h1 class="topbar-title">Learner Progress Report</h1>
+{% endblock %}
+
+{% block content %}
+{% include "ptc/_top_tabs.html" %}
+<div style="max-width:960px;margin:0 auto;padding:0 16px">
+
+  <!-- Header -->
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px">
+    <div>
+      <h2 style="font-size:20px;font-weight:700;color:var(--text-primary);margin:0">Select Student for PTC</h2>
+      <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 0">
+        {% if active_academic_year %}Academic Year: {{ active_academic_year.name }}{% endif %}
+        {% if ptc_window %} - PTC Date: {{ ptc_window.ptc_date }} ({{ ptc_window.get_term_slot_display }}){% endif %}
+      </p>
+    </div>
+    {% if is_admin_view %}
+    <a href="{% url 'ptc:calendar_config' %}" title="PTC Calendar Settings" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:var(--text-secondary);text-decoration:none;font-size:12px;font-weight:600;transition:all .15s;flex-shrink:0">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      PTC Settings
+    </a>
+    {% endif %}
+  </div>
+
+  {% if not ptc_window %}
+  <div style="padding:16px 20px;margin-bottom:16px">
+    {% include '_partials/empty_state.html' with icon='alert' icon_color='amber' title='No PTC window configured' desc='Please ask the Admin Officer to set up PTC dates.' %}
+  </div>
+  {% endif %}
+
+  {% if classes %}
+  <!-- Search bar -->
+  <div style="position:relative;margin-bottom:16px">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none">
+      <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+    </svg>
+    <input type="text" id="studentSearch" class="search-input" placeholder="Search by name or admission number..." oninput="filterStudents()">
+  </div>
+
+  <!-- Completion summary -->
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding:10px 16px;background:var(--hodari-blue-pale,#E8EEF9);border-radius:8px;font-size:13px">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--hodari-blue)" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+    <strong style="color:var(--hodari-blue)">{{ total_complete }} / {{ total_students }}</strong>
+    <span style="color:var(--text-secondary)">students with complete PTC data</span>
+    {% if total_students > 0 %}
+    <div style="flex:1;max-width:200px;height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-left:8px">
+      <div style="height:100%;width:{% widthratio total_complete total_students 100 %}%;background:var(--hodari-blue);border-radius:3px;transition:width .3s"></div>
+    </div>
+    <span style="font-size:12px;font-weight:700;color:var(--hodari-blue)">{% widthratio total_complete total_students 100 %}%</span>
+    {% endif %}
+  </div>
+
+  <!-- Class Tabs -->
+  <div class="ptc-tabs-wrap">
+    <div class="ptc-tabs-fade left" id="tabsFadeLeft"></div>
+    <div class="ptc-tabs-fade right" id="tabsFadeRight"></div>
+    <div class="ptc-tabs-scroll" id="tabsScroll" style="display:flex;gap:8px;flex-wrap:nowrap;padding-bottom:4px">
+    <div class="ptc-tab active" data-class="__all__" onclick="switchTab(this)">
+      All Classes <span class="tab-count">{{ total_students }}</span>
+    </div>
+    {% for tab in class_tabs %}
+    <div class="ptc-tab" data-class="{{ tab.name }}" onclick="switchTab(this)" style="position:relative">
+      {{ tab.name }} <span class="tab-count">{{ tab.count }}</span>
+      {% if tab.complete > 0 %}<span class="tab-complete-badge">{{ tab.complete }}</span>{% endif %}
+    </div>
+    {% endfor %}
+    </div>
+  </div>
+
+  <!-- Class Sections -->
+  {% for class_name, students_list in classes.items %}
+  <div class="class-section visible" data-class="{{ class_name }}" id="section-{{ class_name|cut:' ' }}">
+    <div style="background:#fff;border:1px solid var(--border);border-radius:12px;margin-bottom:16px;overflow:hidden">
+      <div style="padding:12px 20px;background:var(--hodari-blue);color:#fff;font-size:14px;font-weight:700;display:flex;justify-content:space-between;align-items:center">
+        <span>{{ class_name }}</span>
+        <span class="section-count" style="font-size:12px;opacity:.8">{{ students_list|length }} student{{ students_list|length|pluralize }}</span>
+      </div>
+      <div style="padding:8px 0" id="students-{{ class_name|cut:' ' }}">
+        {% for student in students_list %}
+        <a href="{% url 'ptc:ptc_screen' student_pk=student.id %}"
+           class="student-link"
+           data-name="{{ student.get_full_name|lower }}"
+           data-admission="{{ student.admission_no|lower }}">
+          <div style="width:36px;height:36px;border-radius:50%;background:var(--hodari-blue-pale,#E8EEF9);color:var(--hodari-blue);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">
+            {{ student.first_name|slice:":1" }}{{ student.last_name|slice:":1" }}
+          </div>
+          <div style="margin-left:12px;flex:1">
+            <div style="font-size:14px;font-weight:600;color:var(--text-primary)">{{ student.get_full_name }}</div>
+            <div style="font-size:11px;color:var(--text-muted)">Admission: {{ student.admission_no }}</div>
+          </div>
+          {% if student.ptc_complete %}<span class="student-done-badge" title="PTC complete">OK</span>
+          {% else %}<span class="student-pending-badge" title="PTC incomplete">!</span>
+          {% endif %}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" style="margin-left:6px"><path d="M9 18l6-6-6-6"/></svg>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+  {% else %}
+  <div style="padding:20px">
+    {% include '_partials/empty_state.html' with icon='users' icon_color='grey' title='No eligible students found' desc='Only students in Grades 1-9 (non-ECD) are eligible for PTC.' %}
+  </div>
+  {% endif %}
+
+  <!-- No results message (hidden by default, shown by JS) -->
+  <div id="noResults" style="display:none;padding:20px">
+    {% include '_partials/empty_state.html' with icon='search' icon_color='grey' title='No students match your search' desc='Try adjusting your search criteria.' %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let activeTab = '__all__';
+
+function switchTab(tabEl) {
+  // Deactivate all tabs
+  document.querySelectorAll('.ptc-tab').forEach(t => t.classList.remove('active'));
+  tabEl.classList.add('active');
+  activeTab = tabEl.getAttribute('data-class');
+
+  // Show/hide sections
+  document.querySelectorAll('.class-section').forEach(sec => {
+    if (activeTab === '__all__' || sec.getAttribute('data-class') === activeTab) {
+      sec.classList.add('visible');
+    } else {
+      sec.classList.remove('visible');
+    }
+  });
+
+  filterStudents();
+}
+
+function updateTabFades() {
+  const el = document.getElementById('tabsScroll');
+  if (!el) return;
+  const left = document.getElementById('tabsFadeLeft');
+  const right = document.getElementById('tabsFadeRight');
+  if (left) left.classList.toggle('show', el.scrollLeft > 4);
+  if (right) right.classList.toggle('show', el.scrollLeft < el.scrollWidth - el.clientWidth - 4);
+}
+
+function filterStudents() {
+  const query = document.getElementById('studentSearch').value.toLowerCase().trim();
+  let anyVisible = false;
+
+  document.querySelectorAll('.class-section.visible').forEach(sec => {
+    const className = sec.getAttribute('data-class');
+    const container = document.getElementById('students-' + className.replace(/\s/g, ''));
+    if (!container) return;
+
+    const links = container.querySelectorAll('.student-link');
+    let sectionVisible = 0;
+
+    links.forEach(link => {
+      const name = link.getAttribute('data-name') || '';
+      const admission = link.getAttribute('data-admission') || '';
+      if (!query || name.includes(query) || admission.includes(query)) {
+        link.style.display = '';
+        sectionVisible++;
+        anyVisible = true;
+      } else {
+        link.style.display = 'none';
+      }
+    });
+
+    // Update student count in section header
+    const countEl = sec.querySelector('.section-count');
+    if (countEl) {
+      countEl.textContent = sectionVisible + ' student' + (sectionVisible !== 1 ? 's' : '');
+    }
+
+    // Hide entire section if no students match (only in search mode)
+    if (query && sectionVisible === 0) {
+      sec.style.display = 'none';
+    } else {
+      sec.style.display = '';
+    }
+  });
+
+  document.getElementById('noResults').style.display = anyVisible || !query ? 'none' : 'block';
+}
+
+// Initialise fade indicators on scroll
+const tabsEl = document.getElementById('tabsScroll');
+if (tabsEl) {
+  tabsEl.addEventListener('scroll', updateTabFades, { passive: true });
+  // Run once on load (next frame to ensure layout is calculated)
+  requestAnimationFrame(updateTabFades);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Setup System Data &mdash; {{ brand.school_name }}{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 40px auto; text-align: center;">
+    <div class="card" style="padding: 40px;">
+        <svg style="width: 64px; height: 64px; margin: 0 auto 20px; color: var(--hodari-blue)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+        </svg>
+        
+        <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 16px; color: var(--text-primary);">System Initialization Required</h2>
+        
+        <p style="color: var(--text-muted); font-size: 15px; margin-bottom: 24px; line-height: 1.6;">
+            Your database is currently empty. To use the dropdowns for classes, evaluations, and attendance, you need to populate the initial 2026 academic data (classes, students, terms, etc.).
+        </p>
+
+        <form method="POST" action="{% url 'core:seed_db' %}" onsubmit="document.getElementById('seed-btn').disabled=true; document.getElementById('seed-btn').innerHTML='Initializing Database... Please wait...';">
+            {% csrf_token %}
+            <button type="submit" id="seed-btn" class="hf-btn hf-btn-primary" style="font-size: 16px; padding: 12px 32px; height: auto; width: 100%;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+                Populate 2026 Academic Data
+            </button>
+        </form>
+        
+        <p style="margin-top: 16px; font-size: 12px; color: var(--text-muted);">
+            This will safely create academic terms, grade classes, students, staff, and configurations required for the dashboards to function.
+        </p>
+    </div>
+</div>
+{% endblock %}

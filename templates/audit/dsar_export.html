@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+{% block title %}DSAR Export — Data Subject Access Request{% endblock %}
+
+{% block topbar_greeting %}Data Privacy — DSAR Export{% endblock %}
+{% block topbar_date %}{{ today_display }}{% endblock %}
+
+{% block content %}
+{% include "audit/_top_tabs.html" %}
+<div style="max-width:900px; margin:0 auto; padding:24px 16px;">
+
+  {# ── Header ──────────────────────────────────────────────────────────── #}
+  <div style="margin-bottom:24px;">
+    <h1 style="font-family:Merriweather,serif; font-size:22px; color:#1A1A2E; margin-bottom:4px;">
+      DSAR Export
+    </h1>
+    <p style="font-size:13px; color:#8492A6; margin:0;">
+      Search for a student or guardian to produce a complete personal data export. Only Super Admins may use this tool.
+    </p>
+  </div>
+
+  {# ── Search Type Toggle ──────────────────────────────────────────────── #}
+  <div style="display:flex; gap:8px; margin-bottom:16px;">
+    <button type="button" id="btnStudent" class="dsar-tab active" onclick="switchSearchType('student')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; vertical-align:text-bottom;">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+      Student
+    </button>
+    <button type="button" id="btnGuardian" class="dsar-tab" onclick="switchSearchType('guardian')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; vertical-align:text-bottom;">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+      Guardian / Parent
+    </button>
+  </div>
+
+  {# ── Search Card ─────────────────────────────────────────────────────── #}
+  <div class="card" style="margin-bottom:24px;">
+    <div style="position:relative;">
+      <label class="form-label" style="font-size:13px; font-weight:600; margin-bottom:8px;">
+        Search by name, admission number, phone, or email
+      </label>
+      <input
+        type="text"
+        id="dsarSearchInput"
+        class="form-input"
+        placeholder="Type to search…"
+        autocomplete="off"
+        style="font-size:14px; padding:12px 16px;"
+      >
+      <div id="dsarSearchResults"
+           style="position:absolute; top:100%; left:0; right:0; background:#fff;
+                  border:1px solid #DDE3EE; border-radius:8px;
+                  box-shadow:0 10px 30px rgba(0,0,0,0.12); display:none;
+                  z-index:100; margin-top:4px; max-height:360px; overflow-y:auto;">
+      </div>
+    </div>
+  </div>
+
+  {# ── Selected individual & Export button ──────────────────────────────── #}
+  <div id="selectedCard" style="display:none; margin-bottom:24px;">
+    <div class="card" style="border-left:4px solid #023AA5; padding:20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#8492A6; font-weight:600; margin-bottom:4px;" id="selectedTypeLabel">Student</div>
+          <div style="font-size:18px; font-weight:700; color:#1A1A2E; margin-bottom:4px;" id="selectedName"></div>
+          <div style="font-size:13px; color:#474747;" id="selectedDetail"></div>
+        </div>
+        <button type="button" class="btn-secondary btn-sm" onclick="clearSelection()">Change</button>
+      </div>
+
+      <div style="margin-top:16px; padding-top:16px; border-top:1px solid #E5E7EB;">
+        <div style="font-size:12px; font-weight:600; color:#474747; margin-bottom:8px;">Export Format</div>
+        <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+          <button type="button" class="dsar-fmt active" data-fmt="json" onclick="switchFormat('json')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; vertical-align:text-bottom;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            JSON
+          </button>
+          <button type="button" class="dsar-fmt" data-fmt="csv" onclick="switchFormat('csv')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; vertical-align:text-bottom;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+            CSV
+          </button>
+          <button type="button" class="dsar-fmt" data-fmt="xlsx" onclick="switchFormat('xlsx')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; vertical-align:text-bottom;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+            Excel (XLSX)
+          </button>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <button type="button" id="exportBtn" class="btn-primary" onclick="triggerExport()" style="display:flex; align-items:center; gap:8px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            <span id="exportBtnLabel">Download DSAR Export (JSON)</span>
+          </button>
+          <span id="exportStatus" style="font-size:12px; color:#8492A6;"></span>
+        </div>
+        <p style="font-size:11px; color:#8492A6; margin-top:8px;">
+          This export contains all personal data held in the system for this individual, including identity, medical, financial, academic, attendance, and audit trail records.
+          <strong>JSON</strong> is best for programmatic use. <strong>CSV</strong> opens in any spreadsheet. <strong>Excel</strong> includes formatting, auto-filters, and frozen headers.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  {# ── Info card ───────────────────────────────────────────────────────── #}
+  <div class="card" style="background:#F0F4FB; border:1px solid #BFDBFE; padding:16px;">
+    <div style="display:flex; align-items:flex-start; gap:10px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#023AA5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; margin-top:1px;">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="16" x2="12" y2="12"/>
+        <line x1="12" y1="8" x2="12.01" y2="8"/>
+      </svg>
+      <div>
+        <div style="font-size:13px; font-weight:600; color:#023AA5; margin-bottom:4px;">Compliance</div>
+        <p style="font-size:12px; color:#474747; margin:0;">
+          This tool produces a complete Data Subject Access Request (DSAR) export within the required 30-minute window.
+          The export includes identity, medical, guardian, sibling, attendance, financial, academic, discipline, welfare, admissions, notification, and audit trail records.
+          All exports are logged in the audit trail.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .dsar-tab {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 18px;
+    border: 1.5px solid #D1D9E8;
+    border-radius: 99px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #474747;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+  }
+  .dsar-tab:hover {
+    border-color: #023AA5;
+    color: #023AA5;
+    background: #F0F4FB;
+  }
+  .dsar-tab.active {
+    background: #023AA5;
+    color: #fff;
+    border-color: #023AA5;
+    box-shadow: 0 4px 12px rgba(2,58,165,0.2);
+  }
+  .dsar-fmt {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 14px;
+    border: 1.5px solid #D1D9E8;
+    border-radius: 6px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: #474747;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .dsar-fmt:hover {
+    border-color: #023AA5;
+    color: #023AA5;
+    background: #F0F4FB;
+  }
+  .dsar-fmt.active {
+    background: #023AA5;
+    color: #fff;
+    border-color: #023AA5;
+  }
+</style>
+
+<script>
+  let searchType = 'student';
+  let selectedId = null;
+  let debounceTimer = null;
+  let exportFormat = 'json';
+
+  const formatLabels = {
+    json: 'Download DSAR Export (JSON)',
+    csv: 'Download DSAR Export (CSV)',
+    xlsx: 'Download DSAR Export (Excel)'
+  };
+
+  function switchFormat(fmt) {
+    exportFormat = fmt;
+    document.querySelectorAll('.dsar-fmt').forEach(function(btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-fmt') === fmt);
+    });
+    document.getElementById('exportBtnLabel').textContent = formatLabels[fmt] || formatLabels.json;
+  }
+
+  function switchSearchType(type) {
+    searchType = type;
+    document.getElementById('btnStudent').classList.toggle('active', type === 'student');
+    document.getElementById('btnGuardian').classList.toggle('active', type === 'guardian');
+    clearSelection();
+    document.getElementById('dsarSearchInput').value = '';
+    document.getElementById('dsarSearchResults').style.display = 'none';
+  }
+
+  function clearSelection() {
+    selectedId = null;
+    document.getElementById('selectedCard').style.display = 'none';
+    document.getElementById('dsarSearchInput').value = '';
+  }
+
+  document.getElementById('dsarSearchInput').addEventListener('input', function() {
+    clearTimeout(debounceTimer);
+    var q = this.value.trim();
+    if (q.length < 2) {
+      document.getElementById('dsarSearchResults').style.display = 'none';
+      return;
+    }
+    debounceTimer = setTimeout(function() {
+      fetch(`/audit/export/?action=search&type=${searchType}&q=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(data => {
+          var div = document.getElementById('dsarSearchResults');
+          div.innerHTML = '';
+          if (!data.results || data.results.length === 0) {
+            div.innerHTML = '<div style="padding:14px; color:#8492A6; font-size:13px;">No results found.</div>';
+          } else {
+            data.results.forEach(function(item) {
+              var el = document.createElement('div');
+              el.style.padding = '12px 16px';
+              el.style.cursor = 'pointer';
+              el.style.borderBottom = '1px solid #F3F4F6';
+              el.style.transition = 'background 0.12s';
+              el.innerHTML = `
+                <div style="font-weight:600; font-size:14px; color:#1A1A2E;">${item.label}</div>
+                <div style="font-size:12px; color:#8492A6; margin-top:2px;">${item.detail}</div>
+              `;
+              el.onmouseover = function() { el.style.background = '#F7F9FC'; };
+              el.onmouseout = function() { el.style.background = '#fff'; };
+              el.onclick = function() { selectItem(item); };
+              div.appendChild(el);
+            });
+          }
+          div.style.display = 'block';
+        });
+    }, 300);
+  });
+
+  function selectItem(item) {
+    selectedId = item.id;
+    document.getElementById('selectedTypeLabel').textContent = item.type === 'guardian' ? 'Guardian / Parent' : 'Student';
+    document.getElementById('selectedName').textContent = item.label;
+    document.getElementById('selectedDetail').textContent = item.detail;
+    document.getElementById('selectedCard').style.display = 'block';
+    document.getElementById('dsarSearchResults').style.display = 'none';
+    document.getElementById('dsarSearchInput').value = item.label;
+    document.getElementById('exportStatus').textContent = '';
+  }
+
+  function triggerExport() {
+    if (!selectedId) return;
+    var btn = document.getElementById('exportBtn');
+    var status = document.getElementById('exportStatus');
+    btn.disabled = true;
+    btn.style.opacity = '0.6';
+    status.textContent = 'Generating export…';
+
+    var url = `/audit/export/?action=export&type=${searchType}&id=${selectedId}&format=${exportFormat}`;
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = '';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    setTimeout(function() {
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      status.textContent = 'Export downloaded. Check your downloads folder.';
+    }, 2000);
+  }
+
+  // Close dropdown on outside click
+  document.addEventListener('click', function(e) {
+    var results = document.getElementById('dsarSearchResults');
+    var input = document.getElementById('dsarSearchInput');
+    if (!results.contains(e.target) && e.target !== input) {
+      results.style.display = 'none';
+    }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}{{ period.name }} &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}{{ period.name }}{% endblock %}
+{% block topbar_date %}{% now "d F Y" %}{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+<style>
+  .period-status { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:99px; font-size:11px; font-weight:600 }
+  .period-open { background:var(--green-bg, #E8F5E9); color:var(--green, #2E7D32) }
+  .period-reconciled { background:var(--bg-metric, #F5F5F5); color:var(--text-muted, #6B7280) }
+</style>
+
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:13px">
+  <a href="{% url 'finance:dashboard' %}" style="color:var(--hodari-blue);text-decoration:none;font-weight:500">Dashboard</a>
+  <span style="color:var(--text-muted)">&rarr;</span>
+  <a href="{% url 'finance:period_list' %}" style="color:var(--hodari-blue);text-decoration:none;font-weight:500">Periods</a>
+  <span style="color:var(--text-muted)">&rarr;</span>
+  <span style="color:var(--text-secondary);font-weight:500">{{ period.name }}</span>
+</div>
+
+<!-- Header -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+  <div style="display:flex;align-items:center;gap:10px">
+    <h1 style="font-family:var(--font-display);font-size:20px;font-weight:700;color:var(--text-primary);margin:0">{{ period.name }}</h1>
+    {% if period.is_reconciled %}
+    <span class="period-status period-reconciled"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> Reconciled</span>
+    {% else %}
+    <span class="period-status period-open"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg> Open</span>
+    {% endif %}
+  </div>
+  <div style="display:flex;gap:8px">
+    {% has_perm user "finance.change_financeperiod" as can_finance %}
+    {% if can_finance and not period.is_reconciled %}
+    <a href="{% url 'finance:period_edit' pk=period.pk %}" class="btn btn-secondary btn-sm">Edit</a>
+    <a href="{% url 'finance:opening_balance' pk=period.pk %}" class="btn btn-secondary btn-sm">Opening Balances</a>
+    <button type="button" class="btn btn-primary btn-sm" style="background:#DC2626;border-color:#DC2626"
+      onclick="confirmDeleteModal({title:'Reconcile Period?',body:'Are you sure you want to reconcile this period?',detail:'This will lock all invoices and payments.',confirmText:'Reconcile',url:'{% url 'finance:period_reconcile' pk=period.pk %}',type:'warning'})">
+      Reconcile Period
+    </button>
+    {% elif can_finance and period.is_reconciled %}
+    <span class="chip chip-grey" style="font-size:11px">Read-only &middot; reconciled at {{ period.reconciled_at|date:"d M Y H:i" }}</span>
+    {% endif %}
+  </div>
+</div>
+
+{% if period.notes %}
+<div style="padding:8px 14px;background:var(--bg-metric);border-radius:6px;font-size:12px;color:var(--text-secondary);margin-bottom:16px">
+  {{ period.notes }}
+</div>
+{% endif %}
+
+<!-- Period info -->
+<div style="display:flex;gap:16px;margin-bottom:16px;font-size:12px;color:var(--text-muted);flex-wrap:wrap">
+  <span><strong>Start:</strong> {{ period.start_date|date:"d M Y"|default:"N/A" }}</span>
+  <span><strong>End:</strong> {{ period.end_date|date:"d M Y"|default:"N/A" }}</span>
+  <span><strong>Invoices:</strong> {{ invoice_count }}</span>
+  {% if period.reconciled_by %}
+  <span><strong>Reconciled by:</strong> {{ period.reconciled_by.get_full_name|default:period.reconciled_by.username }}</span>
+  {% endif %}
+</div>
+
+<!-- Financial Summary Metrics -->
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px">
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Total Invoiced</span><span class="mc-currency">TZS</span></div>
+    <div class="mc-val">{{ total_invoiced|floatformat:0 }}</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#ECFDF5,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Total Collected</span><span class="mc-currency">TZS</span></div>
+    <div class="mc-val" style="color:#059669">{{ total_collected|floatformat:0 }}</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FEF2F2,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Outstanding</span><span class="mc-currency">TZS</span></div>
+    <div class="mc-val" style="color:#DC2626">{{ outstanding|floatformat:0 }}</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FFF8ED,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Net Position</span><span class="mc-currency">TZS</span></div>
+    <div class="mc-val" style="{% if net_position >= 0 %}color:#059669{% else %}color:#DC2626{% endif %}">{{ net_position|floatformat:0 }}</div>
+  </div>
+</div>
+
+<div class="grid-2" style="margin-bottom:20px">
+  <div class="card">
+    <div class="card-title-row">
+      <span class="card-title" style="margin-bottom:0">Opening Balances</span>
+      <a href="{% url 'finance:opening_balance' pk=period.pk %}" class="section-link" style="font-size:12px;color:var(--hodari-blue);text-decoration:none;font-weight:500">
+        {% if can_finance %}Manage &rarr;{% endif %}
+      </a>
+    </div>
+    {% if opening_balances %}
+    <div class="trow">
+      <div><div class="trow-name">Total Debit</div></div>
+      <span class="trow-right" style="font-weight:600;font-family:var(--font-mono);color:var(--green)">
+        TZS {{ opening_total|floatformat:0 }}
+      </span>
+    </div>
+    <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
+      {{ opening_balances|length }} entry{{ opening_balances|length|pluralize }}
+    </div>
+    {% else %}
+    <div style="padding:12px 0;text-align:center;font-size:12px;color:var(--text-muted)">
+      No opening balances set for this period.
+    </div>
+    {% endif %}
+  </div>
+  <div class="card">
+    <div class="card-title-row">
+      <span class="card-title" style="margin-bottom:0">Period Summary</span>
+    </div>
+    <div class="trow">
+      <div><div class="trow-name">Total Expenses</div></div>
+      <span class="trow-right" style="font-weight:600;font-family:var(--font-mono)">TZS {{ total_expenses|floatformat:0 }}</span>
+    </div>
+    <div class="trow">
+      <div><div class="trow-name">Opening Balances</div></div>
+      <span class="trow-right" style="font-weight:600;font-family:var(--font-mono);color:var(--green)">TZS {{ opening_total|floatformat:0 }}</span>
+    </div>
+    <div class="trow" style="border-top:1px solid var(--border);margin-top:4px;padding-top:8px">
+      <div><div class="trow-name" style="font-weight:700">Net Position</div></div>
+      <span class="trow-right" style="font-weight:700;font-family:var(--font-mono);{% if net_position >= 0 %}color:var(--green){% else %}color:#DC2626{% endif %}">
+        TZS {{ net_position|floatformat:0 }}
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- Back link -->
+<div style="margin-top:16px">
+  <a href="{% url 'finance:period_list' %}" class="btn btn-secondary btn-sm">&larr; All Periods</a>
+</div>
+{% endblock %}

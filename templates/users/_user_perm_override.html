@@ -1,0 +1,273 @@
+{# _user_perm_override.html — Slide-out panel for per-user permission overrides #}
+{# Included in role_detail.html when a user row is clicked #}
+
+<div id="userOverridePanel" style="display:none; position:fixed; top:0; right:0; width:560px; height:100vh; background:#fff; box-shadow:-8px 0 30px rgba(0,0,0,0.12); z-index:1000; overflow-y:auto; transition:transform 0.3s ease">
+  <!-- Header -->
+  <div style="position:sticky; top:0; background:#fff; z-index:1; padding:20px 24px; border-bottom:1px solid #E8EDF5">
+    <div style="display:flex; align-items:center; justify-content:space-between">
+      <div style="display:flex; align-items:center; gap:12px">
+        <button onclick="closeOverridePanel()" style="background:none; border:none; cursor:pointer; padding:4px; color:#64748B">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <div>
+          <div style="font-size:16px; font-weight:700; color:#1E293B" id="overrideUserName">—</div>
+          <div style="font-size:12px; color:#64748B" id="overrideUserRole">—</div>
+        </div>
+      </div>
+      <div style="display:flex; gap:8px">
+        <span id="overrideInheritedBadge" style="padding:3px 10px; border-radius:6px; font-size:11px; font-weight:600; background:#F0F4FB; color:#2563EB"></span>
+        <span id="overrideCustomBadge" style="padding:3px 10px; border-radius:6px; font-size:11px; font-weight:600; background:#FEF3C7; color:#92400E"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Extra Roles Section -->
+  <div style="padding:20px 24px; border-bottom:1px solid #E8EDF5">
+    <div style="font-size:13px; font-weight:700; color:#1E293B; margin-bottom:12px; display:flex; align-items:center; gap:6px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Additional Roles
+    </div>
+    <p style="font-size:11px; color:#94A3B8; margin:0 0 12px 0">Assign extra roles to grant additional permissions beyond the primary role.</p>
+    <div id="extraRolesList" style="display:flex; flex-wrap:wrap; gap:6px">
+      {# Populated by JS #}
+    </div>
+  </div>
+
+  <!-- Permission Overrides Section -->
+  <div style="padding:20px 24px">
+    <div style="font-size:13px; font-weight:700; color:#1E293B; margin-bottom:4px; display:flex; align-items:center; gap:6px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Permission Overrides
+    </div>
+    <p style="font-size:11px; color:#94A3B8; margin:0 0 6px 0">Add individual permissions beyond what the role grants. Already-inherited permissions are shown as read-only.</p>
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
+      <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer; color:#64748B">
+        <input type="checkbox" id="overrideSelectAll" onchange="toggleOverrideSelectAll()" style="width:14px; height:14px; accent-color:#2563EB">
+        Select All Overrides
+      </label>
+      <span id="overrideCount" style="font-size:11px; color:#94A3B8; font-weight:600">0 overrides</span>
+    </div>
+    <div id="overridePermList" style="max-height:400px; overflow-y:auto; border:1px solid #E8EDF5; border-radius:10px; padding:8px">
+      {# Populated by JS — grouped permission categories #}
+    </div>
+  </div>
+
+  <!-- Save Button -->
+  <div style="position:sticky; bottom:0; background:#fff; padding:16px 24px; border-top:1px solid #E8EDF5; display:flex; justify-content:flex-end; gap:8px">
+    <button onclick="closeOverridePanel()" style="padding:8px 16px; border-radius:8px; font-size:12px; font-weight:600; background:#F1F5F9; color:#475569; border:none; cursor:pointer">Cancel</button>
+    <button onclick="saveUserOverrides()" id="saveOverridesBtn" style="padding:8px 20px; border-radius:8px; font-size:12px; font-weight:700; background:#2563EB; color:#fff; border:none; cursor:pointer; transition:all 0.15s">
+      Save Overrides
+    </button>
+  </div>
+</div>
+
+{# Backdrop #}
+<div id="overrideBackdrop" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.3); z-index:999" onclick="closeOverridePanel()"></div>
+
+<script>
+let _overrideUserId = null;
+let _overrideInherited = new Set();
+let _overrideCurrent = new Set();
+
+function openOverridePanel(userId) {
+  _overrideUserId = userId;
+  document.getElementById('userOverridePanel').style.display = 'block';
+  document.getElementById('overrideBackdrop').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+
+  fetch(`/accounts/users/${userId}/permissions/`)
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('overrideUserName').textContent = data.username;
+      document.getElementById('overrideUserRole').textContent = 'Primary: ' + data.role.replace(/_/g, ' ');
+
+      _overrideInherited = new Set(data.inherited_perms);
+      _overrideCurrent = new Set(data.direct_perms);
+
+      const pureCount = data.pure_overrides.length;
+      document.getElementById('overrideInheritedBadge').textContent = `${_overrideInherited.size} inherited`;
+      document.getElementById('overrideCustomBadge').textContent = `${pureCount} custom overrides`;
+
+      // Render extra roles
+      renderExtraRoles(data.extra_roles, data.all_custom_roles);
+
+      // Render permissions
+      renderOverridePerms(data.inherited_perms, data.direct_perms);
+    });
+}
+
+function closeOverridePanel() {
+  document.getElementById('userOverridePanel').style.display = 'none';
+  document.getElementById('overrideBackdrop').style.display = 'none';
+  document.body.style.overflow = '';
+  _overrideUserId = null;
+}
+
+function renderExtraRoles(currentExtraRoles, allCustomRoles) {
+  const container = document.getElementById('extraRolesList');
+  const currentIds = new Set(currentExtraRoles.map(r => r.id));
+
+  let html = '';
+  allCustomRoles.forEach(role => {
+    const checked = currentIds.has(role.id) ? 'checked' : '';
+    const borderColor = currentIds.has(role.id) ? role.color : '#E8EDF5';
+    html += `
+      <label style="display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius:8px; border:1.5px solid ${borderColor}; font-size:12px; font-weight:600; cursor:pointer; transition:all 0.15s; background:${currentIds.has(role.id) ? role.color + '10' : '#fff'}">
+        <input type="checkbox" class="extra-role-cb" value="${role.id}" ${checked} onchange="this.parentElement.style.borderColor=this.checked?'${role.color}':'#E8EDF5'; this.parentElement.style.background=this.checked?'${role.color}10':'#fff'" style="width:14px; height:14px; accent-color:${role.color}">
+        <span style="width:8px; height:8px; border-radius:50%; background:${role.color}; flex-shrink:0"></span>
+        ${role.label}
+      </label>
+    `;
+  });
+  container.innerHTML = html || '<span style="font-size:12px; color:#94A3B8">No custom roles available</span>';
+}
+
+function renderOverridePerms(inheritedPerms, directPerms) {
+  const container = document.getElementById('overridePermList');
+  const inheritedSet = new Set(inheritedPerms);
+  const directSet = new Set(directPerms);
+
+  // Group permissions by app.label
+  const grouped = {};
+  const allPerms = [...new Set([...inheritedPerms, ...directPerms])].sort();
+
+  // We need all permissions to show checkboxes — fetch from the role's permission list
+  // Use the existing permission categories from the page
+  const permCategories = window._permCategories || [];
+
+  if (permCategories.length === 0) {
+    // Fallback: just show direct perms
+    let html = '';
+    directPerms.forEach(p => {
+      html += `<div style="padding:6px 12px; font-size:12px; color:#334155; display:flex; align-items:center; gap:8px">
+        <input type="checkbox" class="override-perm-cb" value="${p}" checked style="width:14px; height:14px; accent-color:#2563EB">
+        <span>${p}</span>
+        <span style="margin-left:auto; font-size:10px; color:#2563EB; font-weight:600">override</span>
+      </div>`;
+    });
+    container.innerHTML = html || '<div style="padding:16px; text-align:center; color:#94A3B8; font-size:12px">No permissions to override</div>';
+    return;
+  }
+
+  let html = '';
+  permCategories.forEach(cat => {
+    let catHtml = '';
+    let catChecked = 0;
+    let catTotal = 0;
+
+    cat.perms.forEach(p => {
+      catTotal++;
+      const isInherited = inheritedSet.has(p.codename);
+      const isDirect = directSet.has(p.codename);
+
+      if (isDirect) catChecked++;
+
+      const badge = isInherited
+        ? '<span style="font-size:9px; color:#2563EB; font-weight:600; background:#EFF6FF; padding:1px 6px; border-radius:4px; margin-left:auto">inherited</span>'
+        : '';
+
+      catHtml += `
+        <div style="padding:5px 12px; font-size:12px; color:${isInherited ? '#94A3B8' : '#334155'}; display:flex; align-items:center; gap:8px; ${isInherited ? 'opacity:0.7' : ''}">
+          <input type="checkbox" class="override-perm-cb" value="${p.codename}"
+            ${isDirect ? 'checked' : ''}
+            ${isInherited && !isDirect ? 'disabled' : ''}
+            onchange="updateOverrideCount()"
+            style="width:14px; height:14px; accent-color:#2563EB; ${isInherited && !isDirect ? 'opacity:0.5' : ''}">
+          <span style="flex:1">${p.label || p.codename}</span>
+          <span style="font-size:10px; color:#94A3B8; font-family:monospace">${p.codename}</span>
+          ${badge}
+        </div>`;
+    });
+
+    if (catHtml) {
+      html += `
+        <div style="margin-bottom:8px">
+          <div style="padding:6px 12px; font-size:11px; font-weight:700; color:#64748B; background:#F8FAFC; border-radius:6px; display:flex; align-items:center; justify-content:space-between; cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+            <span>${cat.app_label}</span>
+            <span style="font-size:10px; color:#94A3B8">${catChecked}/${catTotal}</span>
+          </div>
+          <div class="cat-perms">${catHtml}</div>
+        </div>`;
+    }
+  });
+
+  container.innerHTML = html || '<div style="padding:16px; text-align:center; color:#94A3B8; font-size:12px">No permissions available</div>';
+  updateOverrideCount();
+}
+
+function updateOverrideCount() {
+  const checked = document.querySelectorAll('.override-perm-cb:checked').length;
+  document.getElementById('overrideCount').textContent = `${checked} overrides`;
+  document.getElementById('overrideSelectAll').checked =
+    checked === document.querySelectorAll('.override-perm-cb').length;
+}
+
+function toggleOverrideSelectAll() {
+  const selectAll = document.getElementById('overrideSelectAll').checked;
+  document.querySelectorAll('.override-perm-cb:not(:disabled)').forEach(cb => {
+    cb.checked = selectAll;
+  });
+  updateOverrideCount();
+}
+
+function saveUserOverrides() {
+  if (!_overrideUserId) return;
+
+  const btn = document.getElementById('saveOverridesBtn');
+  btn.textContent = 'Saving...';
+  btn.disabled = true;
+
+  // 1. Save extra roles
+  const extraRoleIds = [];
+  document.querySelectorAll('.extra-role-cb:checked').forEach(cb => {
+    extraRoleIds.push(parseInt(cb.value));
+  });
+
+  fetch(`/accounts/users/${_overrideUserId}/extra-roles/`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
+    body: JSON.stringify({role_ids: extraRoleIds})
+  }).then(r => r.json()).then(() => {
+    // 2. Save permission overrides
+    const perms = [];
+    document.querySelectorAll('.override-perm-cb:checked').forEach(cb => {
+      perms.push(cb.value);
+    });
+
+    return fetch(`/accounts/users/${_overrideUserId}/permissions/`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
+      body: JSON.stringify({permissions: perms})
+    });
+  }).then(r => r.json()).then(data => {
+    btn.textContent = 'Saved!';
+    btn.style.background = '#059669';
+    setTimeout(() => {
+      closeOverridePanel();
+      btn.textContent = 'Save Overrides';
+      btn.style.background = '#2563EB';
+      btn.disabled = false;
+      // Reload page to reflect changes
+      window.location.reload();
+    }, 800);
+  }).catch(err => {
+    btn.textContent = 'Error — try again';
+    btn.style.background = '#DC2626';
+    setTimeout(() => {
+      btn.textContent = 'Save Overrides';
+      btn.style.background = '#2563EB';
+      btn.disabled = false;
+    }, 2000);
+  });
+}
+
+function getCSRFToken() {
+  const name = 'csrftoken';
+  const cookies = document.cookie.split(';');
+  for (let c of cookies) {
+    c = c.trim();
+    if (c.startsWith(name + '=')) return c.substring(name.length + 1);
+  }
+  return '';
+}
+</script>

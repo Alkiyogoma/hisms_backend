@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Report Sign-Off &mdash; {{ brand.school_name }}{% endblock %}
+
+{% block topbar_greeting %}Report Card Sign-Off{% endblock %}
+{% block topbar_date %}{{ current_term.academic_year.name }} - {{ current_term.name }}{% endblock %}
+
+{% block content %}
+{% include "academics/_top_tabs_reports.html" %}
+
+{% if signoff_blocked %}
+<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:14px 20px;margin:16px 0;display:flex;align-items:center;gap:12px">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+    <div>
+        <div style="font-size:13px;font-weight:700;color:#991B1B">Sign-off blocked</div>
+        <div style="font-size:12px;color:#DC2626;margin-top:2px">{{ signoff_block_reason }}. Reports cannot be published until this date is reached.</div>
+    </div>
+</div>
+{% endif %}
+<div class="section-hdr">
+  <span class="section-title">Pending Reports &middot; {{ current_term.name }}</span>
+  <div style="display:flex; gap:10px">
+    <a href="{% url 'academics:analytics' %}" class="hf-btn hf-btn-secondary" style="font-size:12px; padding:6px 12px">Academic Analytics</a>
+    <span class="chip chip-blue">HOS Action Required</span>
+  </div>
+</div>
+
+<div class="card" style="padding:0; overflow:hidden; border-top: 3px solid var(--hodari-blue);">
+  <table class="h-table">
+    <thead>
+      <tr style="background: #F8FAFC">
+        <th style="padding-left:24px">Class Type / Grade</th>
+        <th style="text-align:center">Students</th>
+        <th style="text-align:center">Published</th>
+        <th style="text-align:center">Pending Sign-off</th>
+        <th style="text-align:center">Blocked (Incomplete)</th>
+        <th style="text-align:right; padding-right:24px">Management Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for stats in class_stats %}
+        <tr class="hover-row">
+          <td style="padding-left:24px;">
+            <div style="font-weight:700; color:var(--hodari-blue); font-size:14px">{{ stats.class_name }}</div>
+            <div style="font-size:11px; color:var(--text-muted)">{{ stats.department|default:"Standard Curriculum" }}</div>
+          </td>
+          <td style="text-align:center; font-weight:500">{{ stats.total }}</td>
+          <td style="text-align:center">
+            {% if stats.published > 0 %}
+                <span class="chip chip-green" style="font-weight:700">{{ stats.published }}</span>
+            {% else %}
+                <span class="t-muted">0</span>
+            {% endif %}
+          </td>
+          <td style="text-align:center">
+            {% if stats.pending > 0 %}
+                <span class="chip chip-amber" style="font-weight:700">{{ stats.pending }}</span>
+            {% else %}
+                <span class="t-muted">0</span>
+            {% endif %}
+          </td>
+          <td style="text-align:center">
+            {% if stats.blocked > 0 %}
+              <div style="display:flex; flex-direction:column; align-items:center">
+                <span class="chip chip-red" style="font-family:var(--font-mono); font-weight:700">{{ stats.blocked }}</span>
+                <span style="font-size:10px; color:var(--red); margin-top:2px">Missing Comments</span>
+              </div>
+            {% else %}
+              <span class="t-green" style="font-size:11px; font-weight:600">Ready</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right; padding-right:24px">
+            <div style="display:flex; justify-content:flex-end; gap:8px">
+                <a href="{% url 'academics:report_card_list' %}?class_name={{ stats.class_name|urlencode }}" class="hf-btn hf-btn-secondary" style="font-size: 11px; padding: 5px 12px;">
+                  Review List
+                </a>
+                {% if perms.academics.change_reportcard %}
+                    {% if stats.pending > 0 and not signoff_blocked %}
+                        <button type="button" class="hf-btn hf-btn-primary" style="font-size: 11px; padding: 5px 12px;" {% if not stats.can_sign_off_all %}disabled title="Cannot bulk sign-off while some reports are blocked."{% endif %}
+                          onclick="confirmDeleteModal({title:'Sign Off All?',body:'Approve all <strong>{{ stats.pending }} pending reports</strong> for <strong>{{ stats.class_name }}</strong>?',detail:'Reports will be moved from Pending to Published and become visible to parents immediately.',confirmText:'Sign Off All',url:'{% url 'academics:signoff_action' %}',type:'info',extraData:[{name:'class_name',value:'{{ stats.class_name }}'},{name:'term_id',value:'{{ current_term.id }}'}]})">
+                          Sign Off All
+                        </button>
+                    {% elif stats.pending > 0 and signoff_blocked %}
+                        <span class="hf-btn hf-btn-primary" style="font-size: 11px; padding: 5px 12px; opacity:0.5; cursor:not-allowed" title="{{ signoff_block_reason }}">
+                          Sign Off All
+                        </span>
+                    {% endif %}
+                {% endif %}
+            </div>
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="6">{% include '_partials/empty_state.html' with title='No report cards pending sign-off' desc='Teachers must submit reports for sign-off once evaluations are complete.' icon='check' icon_color='green' %}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div style="margin-top:24px; background:linear-gradient(135deg, #F0F4FB 0%, #E8EEF9 100%); border-radius:12px; padding:20px; border:1px solid #BFCFE9; display:flex; gap:20px; align-items:center">
+    <div style="width:48px; height:48px; background:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(2,58,165,0.08); flex-shrink:0">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#023AA5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+    </div>
+    <div style="font-size:13.5px; color:#1A1A2E; line-height:1.6">
+        <strong style="color:var(--hodari-blue); font-weight:700">Management Information:</strong> 
+        When you "Sign Off", reports are moved from <span class="t-amber" style="font-weight:700">Pending</span> to <span class="t-green" style="font-weight:700">Published</span>. 
+        Published reports are immediately visible to parents in the Parent Portal. 
+        Reports are <span class="t-red" style="font-weight:700">Blocked</span> if they lack mandatory teacher narratives (min. 50 chars).
+    </div>
+</div>
+
+<style>
+  .hover-row:hover { background: #F8FAFC; }
+</style>
+{% endblock %}

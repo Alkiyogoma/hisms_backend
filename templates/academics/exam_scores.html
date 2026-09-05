@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Exam Scores &mdash; {{ brand.school_name }}{% endblock %}
+{% load hodari_forms %}
+
+{% block content %}
+{% include "academics/_top_tabs.html" %}
+<div class="section-hdr">
+  <span class="section-title">Exam Scores Entry</span>
+  <span class="chip chip-blue">Teacher</span>
+</div>
+
+<div class="card">
+  <form method="GET" action="." class="grid-4" style="align-items:end; gap:12px; margin-bottom:0;">
+    <div>
+      <label class="field-lbl">Term</label>
+      {{ filter_form.term }}
+    </div>
+    <div>
+      <label class="field-lbl">Class</label>
+      {{ filter_form.class_name }}
+    </div>
+    <div>
+      <label class="field-lbl">Subject</label>
+      {{ filter_form.subject_name }}
+    </div>
+    <div>
+      <label class="field-lbl">Exam Type</label>
+      {{ filter_form.exam_type }}
+    </div>
+    <div style="grid-column: span 4; text-align: right; margin-top: 12px;">
+      <button type="submit" class="hf-btn hf-btn-primary">Load Class List</button>
+    </div>
+  </form>
+</div>
+
+{% if filter_form.is_valid %}
+  <div class="card mt-4">
+    <div class="card-title-row">
+      <span class="card-title">Score Entry</span>
+    </div>
+    <div class="trow-sub mb-4">
+      Entering scores for: <strong>{{ filter_form.cleaned_data.class_name }}</strong> &middot; <strong>{{ filter_form.cleaned_data.subject_name }}</strong> &middot; <strong>{{ filter_form.cleaned_data.exam_type }}</strong>
+    </div>
+
+    <form method="POST" action=".">
+      {% csrf_token %}
+      <!-- Hidden fields to maintain state -->
+      <input type="hidden" name="term" value="{{ filter_form.cleaned_data.term.id }}">
+      <input type="hidden" name="class_name" value="{{ filter_form.cleaned_data.class_name }}">
+      <input type="hidden" name="subject_name" value="{{ filter_form.cleaned_data.subject_name }}">
+      <input type="hidden" name="exam_type" value="{{ filter_form.cleaned_data.exam_type }}">
+
+      <table class="w-full text-left" style="border-collapse: collapse; margin-bottom: 24px;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border); font-size: 13px; color: var(--text-muted);">
+            <th class="py-2 px-2">Student ID</th>
+            <th class="py-2 px-2">Name</th>
+            <th class="py-2 px-2" style="width: 150px;">Score (/100)</th>
+            <th class="py-2 px-2">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for student in students %}
+            {% with existing=scores_by_student|get_item:student.id %}
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td class="py-3 px-2 font-mono text-xs">{{ student.admission_no }}</td>
+              <td class="py-3 px-2 text-sm">{{ student.last_name }}, {{ student.first_name }}</td>
+              <td class="py-3 px-2">
+                <input type="number" step="1" min="0" max="{{ exam_max_score|default:100 }}" name="score_{{ student.id }}"
+                       id="score_{{ student.id }}"
+                       class="hf-input score-input"
+                       style="width: 100%; padding: 6px 12px; font-size: 13px; border: 1px solid var(--border);"
+                       value="{{ existing.score|default_if_none:'' }}"
+                       oninput="clearScoreError(this)"
+                       onblur="validateSingleScore(this)"
+                       {% if existing and existing.is_locked %}readonly style="background-color: #f1f5f9; cursor: not-allowed;"{% endif %}>
+                <div class="score-error" id="error_{{ student.id }}"
+                     style="display:none; color:#dc2626; font-size:11px; margin-top:2px;"></div>
+              </td>
+              <td class="py-3 px-2">
+                {% if existing %}
+                  {% if existing.is_locked %}
+                    <span class="chip chip-green">Locked</span>
+                  {% else %}
+                    <span class="chip chip-amber">Saved</span>
+                  {% endif %}
+                {% else %}
+                  <span class="chip chip-grey">Pending</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endwith %}
+          {% empty %}
+            <tr>
+              <td colspan="4">{% include '_partials/empty_state.html' with title='No active students' desc='No students are enrolled in this class.' icon='users' icon_color='grey' %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      {% if students %}
+        <div style="text-align: right; display: flex; gap: 10px; justify-content: flex-end;">
+          {% has_perm user "academics.add_examscore" as can_save %}
+          {% if can_save %}
+          <button type="submit" class="hf-btn hf-btn-primary" name="action" value="save" onclick="this.form.action=''; return validateScores()">
+            Save Scores
+          </button>
+          {% endif %}
+          {% has_perm user "academics.change_examscore" as can_submit %}
+          {% if can_submit %}
+          <button type="submit" class="hf-btn hf-btn-success" name="action" value="submit_for_review"
+                  onclick="return confirm('Submit ALL saved scores for HOD review? Scores will be locked and cannot be edited until returned by HOD.')">
+            Submit for Review
+          </button>
+          {% endif %}
+        </div>
+      {% endif %}
+    </form>
+
+    {{ score_errors|json_script:"score-errors-data" }}
+    {{ submitted_scores|json_script:"submitted-values-data" }}
+    <script>
+    (function() {
+      /* ── Server-side errors and submitted values (JSON from view) ─────── */
+      var serverErrors = JSON.parse(document.getElementById('score-errors-data').textContent);
+      var submittedValues = JSON.parse(document.getElementById('submitted-values-data').textContent);
+      var maxScore = {{ exam_max_score|default:100 }};
+
+      /* Restore submitted values into inputs on re-render after error */
+      for (var sid in submittedValues) {
+        var inp = document.getElementById('score_' + sid);
+        if (inp) inp.value = submittedValues[sid];
+      }
+
+      /* Show server-side errors on load */
+      for (var sid in serverErrors) {
+        var inp = document.getElementById('score_' + sid);
+        var err = document.getElementById('error_' + sid);
+        if (inp && err) {
+          inp.style.borderColor = '#dc2626';
+          inp.style.boxShadow = '0 0 0 1px #dc2626';
+          err.textContent = serverErrors[sid];
+          err.style.display = 'block';
+        }
+      }
+
+      /* Expose clear function for oninput */
+      window.clearScoreError = function(el) {
+        el.style.borderColor = '';
+        el.style.boxShadow = '';
+        var errEl = el.parentElement.querySelector('.score-error');
+        if (errEl) errEl.style.display = 'none';
+      };
+
+      /* Validate a single score field on blur */
+      window.validateSingleScore = function(inp) {
+        if (inp.readOnly) return;
+        var raw = inp.value.trim();
+        var sid = inp.name.replace('score_', '');
+        var errEl = document.getElementById('error_' + sid);
+        /* Clear previous error */
+        inp.style.borderColor = '';
+        inp.style.boxShadow = '';
+        if (errEl) errEl.style.display = 'none';
+        if (raw === '') return;
+        var val = Number(raw);
+        /* Reject decimals */
+        if (raw.indexOf('.') !== -1) {
+          inp.style.borderColor = '#dc2626';
+          inp.style.boxShadow = '0 0 0 1px #dc2626';
+          if (errEl) {
+            errEl.textContent = 'Score must be a whole number (integer) between 0 and {{ exam_max_score|default:100 }}.';
+            errEl.style.display = 'block';
+          }
+          return;
+        }
+        if (isNaN(val) || val < 0 || val > maxScore || !Number.isInteger(val)) {
+          inp.style.borderColor = '#dc2626';
+          inp.style.boxShadow = '0 0 0 1px #dc2626';
+          if (errEl) {
+            errEl.textContent = 'Score must be a whole number (integer) between 0 and {{ exam_max_score|default:100 }}.';
+            errEl.style.display = 'block';
+          }
+        }
+      };
+
+      /* Validate all score inputs on submit */
+      window.validateScores = function() {
+        var valid = true;
+        document.querySelectorAll('.score-input').forEach(function(inp) {
+          if (inp.readOnly) return;
+          var raw = inp.value.trim();
+          if (raw === '') return;
+          var val = Number(raw);
+          var sid = inp.name.replace('score_', '');
+          var errEl = document.getElementById('error_' + sid);
+          /* Reject decimals */
+          if (raw.indexOf('.') !== -1) {
+            inp.style.borderColor = '#dc2626';
+            inp.style.boxShadow = '0 0 0 1px #dc2626';
+            if (errEl) {
+              errEl.textContent = 'Score must be a whole number (integer) between 0 and {{ exam_max_score|default:100 }}.';
+              errEl.style.display = 'block';
+            }
+            valid = false;
+            return;
+          }
+          if (isNaN(val) || val < 0 || val > maxScore || !Number.isInteger(val)) {
+            inp.style.borderColor = '#dc2626';
+            inp.style.boxShadow = '0 0 0 1px #dc2626';
+            if (errEl) {
+              errEl.textContent = 'Score must be a whole number (integer) between 0 and {{ exam_max_score|default:100 }}.';
+              errEl.style.display = 'block';
+            }
+            valid = false;
+          }
+        });
+        return valid;
+      };
+    })();
+    </script>
+  </div>
+{% endif %}
+
+<script>
+(function() {
+  var classSelect = document.querySelector('select[name="class_name"]');
+  var subjectSelect = document.querySelector('select[name="subject_name"]');
+  if (!classSelect || !subjectSelect) return;
+  var originalSubjectOpts = Array.from(subjectSelect.options).map(function(o) {
+    return {value: o.value, text: o.text};
+  });
+
+  classSelect.addEventListener('change', function() {
+    var cls = this.value;
+    if (!cls) {
+      subjectSelect.innerHTML = '';
+      originalSubjectOpts.forEach(function(o) {
+        var el = document.createElement('option');
+        el.value = o.value;
+        el.textContent = o.text;
+        subjectSelect.appendChild(el);
+      });
+      return;
+    }
+    fetch("{% url 'academics:api_subjects_by_class' %}?class_name=" + encodeURIComponent(cls))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var subjects = data.subjects || [];
+        subjectSelect.innerHTML = '';
+        var placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Select Subject';
+        subjectSelect.appendChild(placeholder);
+        originalSubjectOpts.forEach(function(o) {
+          if (o.value && subjects.indexOf(o.value) !== -1) {
+            var el = document.createElement('option');
+            el.value = o.value;
+            el.textContent = o.text;
+            subjectSelect.appendChild(el);
+          }
+        });
+      });
+  });
+})();
+</script>
+
+{% endblock %}

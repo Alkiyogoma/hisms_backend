@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% block title %}{% if object %}Edit Role{% else %}Create Role{% endif %} &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}User Management{% endblock %}
+
+{% block extra_head %}
+<style>
+  .form-card {
+    background: #fff;
+    border: 1.5px solid #E8EDF5;
+    border-radius: 14px;
+    padding: 32px;
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  .form-group {
+    margin-bottom: 20px;
+  }
+  .form-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: #1E293B;
+    margin-bottom: 6px;
+  }
+  .form-hint {
+    font-size: 11px;
+    color: #94A3B8;
+    margin-top: 4px;
+  }
+  .form-input, .form-textarea, .form-select {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1.5px solid #E2E8F0;
+    border-radius: 10px;
+    font-size: 14px;
+    color: #1E293B;
+    background: #fff;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+  }
+  .form-input:focus, .form-textarea:focus, .form-select:focus {
+    outline: none;
+    border-color: #2563EB;
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+  }
+  .form-textarea {
+    min-height: 80px;
+    resize: vertical;
+  }
+  .color-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .color-swatch {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    border: 3px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .color-swatch:hover {
+    transform: scale(1.1);
+  }
+  .color-swatch.selected {
+    border-color: #1E293B;
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px currentColor;
+  }
+  .dept-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .dept-toggle {
+    padding: 8px 16px;
+    border-radius: 99px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border: 1.5px solid #E2E8F0;
+    background: #F8FAFC;
+    color: #64748B;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .dept-toggle.active {
+    background: #2563EB;
+    color: #fff;
+    border-color: #2563EB;
+  }
+  .btn-primary {
+    padding: 12px 28px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    background: #2563EB;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-primary:hover { background: #1D4ED8; }
+  .btn-secondary {
+    padding: 12px 28px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    background: #F1F5F9;
+    color: #475569;
+    border: 1.5px solid #E2E8F0;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+  }
+  .btn-secondary:hover { background: #E2E8F0; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "users/_top_tabs.html" %}
+
+<div style="max-width:800px; margin:0 auto; padding:0 0 40px 0">
+  <div style="margin-bottom:24px">
+    <h1 style="font-size:22px; font-weight:800; color:#1E293B; margin:0; letter-spacing:-0.02em">
+      {% if object %}Edit Role: {{ object.label }}{% else %}Create Custom Role{% endif %}
+    </h1>
+    <p style="font-size:13px; color:#64748B; margin:4px 0 0 0; font-weight:500">
+      {% if object %}Update role settings and department access.{% else %}Define a new role with specific department access.{% endif %}
+    </p>
+  </div>
+
+  <div class="form-card">
+    <form method="post" id="roleForm">
+      {% csrf_token %}
+
+      {% if form.errors %}
+      <div style="padding:12px 16px; background:#FEF2F2; border:1.5px solid #FECACA; border-radius:10px; margin-bottom:20px; font-size:13px; color:#B91C1C">
+        {% for field, errors in form.errors.items %}
+          <div><strong>{{ field|title }}:</strong> {{ errors.0 }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="form-group">
+        <label class="form-label" for="id_label">Role Name</label>
+        <input type="text" name="label" id="id_label" class="form-input"
+               value="{{ form.label.value|default:'' }}" required maxlength="80"
+               placeholder="e.g. Dean of Students">
+        <div class="form-hint">A short, descriptive name for this role.</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="id_description">Description</label>
+        <textarea name="description" id="id_description" class="form-textarea"
+                  placeholder="What does this role do? What access level?">{{ form.description.value|default:'' }}</textarea>
+        <div class="form-hint">Brief description of the role's responsibilities.</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Badge Color</label>
+        <input type="hidden" name="icon_color" id="id_icon_color" value="{{ form.icon_color.value|default:'#6B7280' }}">
+        <div class="color-grid" id="colorGrid">
+          {% for color in color_choices %}
+          <div class="color-swatch {% if form.icon_color.value == color %}selected{% endif %}"
+               style="background:{{ color }}" data-color="{{ color }}" onclick="selectColor(this)"></div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Department Access</label>
+        <div class="dept-toggles" id="deptToggles">
+          {% for dept_value, dept_label in dept_choices %}
+          <div class="dept-toggle {% if dept_value in form.departments.value %}active{% endif %}"
+               data-dept="{{ dept_value }}" onclick="toggleDept(this)">
+            {{ dept_label }}
+          </div>
+          {% endfor %}
+        </div>
+        <div class="form-hint">Which departments can users with this role access?</div>
+        <input type="hidden" name="departments" id="id_departments" value="{{ form.departments.value|default:'[]' }}">
+      </div>
+
+      <div style="display:flex; gap:12px; margin-top:28px">
+        <button type="submit" class="btn-primary">
+          {% if object %}Save Changes{% else %}Create Role{% endif %}
+        </button>
+        <a href="{% url 'users:role_list' %}" class="btn-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function selectColor(el) {
+  document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('id_icon_color').value = el.dataset.color;
+}
+
+function toggleDept(el) {
+  el.classList.toggle('active');
+  updateDepartments();
+}
+
+function updateDepartments() {
+  var depts = [];
+  document.querySelectorAll('.dept-toggle.active').forEach(function(el) {
+    depts.push(el.dataset.dept);
+  });
+  document.getElementById('id_departments').value = JSON.stringify(depts);
+}
+
+// Initialize departments from model value
+(function() {
+  try {
+    var val = document.getElementById('id_departments').value;
+    var depts = JSON.parse(val);
+    if (Array.isArray(depts)) {
+      depts.forEach(function(d) {
+        var el = document.querySelector('.dept-toggle[data-dept="' + d + '"]');
+        if (el) el.classList.add('active');
+      });
+    }
+  } catch(e) {}
+})();
+</script>
+{% endblock %}

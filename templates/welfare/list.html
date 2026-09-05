@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% load hodari_forms role_tags %}
+{% block title %}{{ page_title|default:"Welfare Observations" }} &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}{{ page_title|default:"Student Welfare" }}{% endblock %}
+{% block extra_head %}
+{% include "includes/hodari_print_styles.html" %}
+<style>
+  .print-only { display: none; }
+  @media print {
+    .print-only { display: block !important; }
+    .sidebar, .topbar, header, .hf2-actions, .btn-primary, .btn-secondary,
+    .hf-btn, .hf-btn-primary, .hf-btn-secondary, .hf-btn-danger,
+    form, .filter-bar, .no-print, .no-print-area, .print-hide,
+    .card-title-row { display: none !important; }
+    .main { margin-left: 0 !important; }
+    .content { padding: 0 !important; }
+    .card { border: none !important; box-shadow: none !important; padding: 0 !important; }
+    body { background: #fff !important; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "welfare/_top_tabs.html" %}
+<!-- Print-only branded header -->
+<div class="print-only doc-container" style="max-width:900px;margin:0 auto 20px;background:#fff;padding:24px 28px;border:1px solid #DDE3EE;border-radius:12px">
+  {% include "includes/hodari_print_header.html" %}
+  <div style="height:1px;background:var(--border);margin:16px 0"></div>
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <div style="font-family:var(--font-display);font-size:18pt;font-weight:bold;color:var(--hodari-blue);text-transform:uppercase">Welfare Queue</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Generated {% now "d M Y" %}</div>
+    </div>
+  </div>
+</div>
+<div class="card">
+  <div class="card-title-row">
+    <div class="card-title" style="margin:0">{% if is_ecd_welfare %}ECD{% else %}Primary{% endif %} Welfare Queue</div>
+  </div>
+
+  <!-- Filters -->
+  <form method="get" class="hf2-toolbar" style="margin-bottom:20px;margin-top:20px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span class="hf2-toolbar-label">Severity:</span>
+      <select name="severity" class="hf2-select">
+        <option value="">All severities</option>
+        {% for val, lbl in severity_choices %}
+          <option value="{{ val }}" {% if request.GET.severity == val %}selected{% endif %}>{{ lbl }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn-primary btn-sm">Filter</button>
+    {% if is_ecd_welfare %}
+    <a href="{% url 'welfare:list_ecd' %}" class="btn-secondary btn-sm">Reset</a>
+    {% else %}
+    <a href="{% url 'welfare:list_primary' %}" class="btn-secondary btn-sm">Reset</a>
+    {% endif %}
+  </form>
+
+  <!-- Dashboard Layout -->
+  <div style="display:grid; grid-template-columns: 1fr 340px; gap:24px; margin-top:24px; align-items:start">
+    
+    <!-- Left Section (Active Queue) -->
+    <div class="card" style="margin:0">
+      <div class="card-title">Active Welfare Queue</div>
+      <div style="border-top:1px solid var(--border)">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="text-align:left;border-bottom:2px solid #F3F4F6">
+              <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Date</th>
+              <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Student</th>
+              <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Severity</th>
+              <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Status</th>
+              <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for obs in active_observations %}
+            <tr style="border-bottom:1px solid #F3F4F6;font-size:13px">
+              <td style="padding:12px 8px;color:var(--text-muted)">{{ obs.observation_date|date:"d M" }}</td>
+              <td style="padding:12px 8px">
+                <a href="{% url 'students:detail' obs.student.pk %}" style="font-weight:600;color:var(--hodari-blue);text-decoration:none">{{ obs.student }}</a>
+                <div style="font-size:11px;color:var(--text-muted)">{{ obs.student.class_name }}</div>
+              </td>
+              <td style="padding:12px 8px">
+                <span class="chip {% if obs.severity == 'critical' %}chip-red{% elif obs.severity == 'high' %}chip-amber{% else %}chip-blue{% endif %}">
+                  {{ obs.get_severity_display }}
+                </span>
+              </td>
+              <td style="padding:12px 8px">
+                <span class="chip chip-grey">
+                  {{ obs.get_hod_status_display }}
+                </span>
+              </td>
+              <td style="padding:12px 8px;text-align:right">
+                <a href="{% url 'welfare:detail' obs.pk %}" class="btn-secondary btn-sm">Details</a>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with icon='inbox' title='No observations yet' desc='Submit an observation to get started.' action_url='/welfare/submit/' action_text='+ New Observation' %}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Right Section (Resolved Sidebar) -->
+    <div style="display:flex; flex-direction:column; gap:24px">
+      <div class="card" style="margin:0; padding:0">
+        <div style="padding:16px 20px; border-bottom:1px solid var(--border); background:var(--bg-page); border-radius:12px 12px 0 0">
+          <div style="font-size:14px; font-weight:700">Recently Resolved</div>
+        </div>
+        <div style="padding:10px">
+          {% for obs in resolved_observations %}
+            <div style="padding:12px; border:1px solid #f1f5f9; border-radius:8px; margin-bottom:8px; background:white">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px">
+                <a href="{% url 'students:detail' obs.student.pk %}" style="font-weight:600; font-size:13px;color:var(--hodari-blue);text-decoration:none">{{ obs.student }}</a>
+                <div class="chip chip-green" style="font-size:10px">Resolved</div>
+              </div>
+              <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px">
+                {{ obs.get_concern_type_display }} &middot; {{ obs.observation_date|date:"d M" }}
+              </div>
+              <a href="{% url 'welfare:detail' obs.pk %}" style="font-size:11px; font-weight:600; color:var(--hodari-blue); text-decoration:none">View Details &rarr;</a>
+            </div>
+          {% empty %}
+            {% include '_partials/empty_state.html' with icon='check' icon_color='green' title='No resolved cases found' desc='Resolved cases will appear here.' %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

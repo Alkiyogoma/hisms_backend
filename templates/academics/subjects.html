@@ -1,0 +1,417 @@
+{% extends "base.html" %}
+{% load hodari_forms %}
+{% load static %}
+{% load role_tags %}
+{% block title %}Subjects — {{ brand.school_name }}{% endblock %}
+{% block extra_head %}{{ block.super }}
+{% include "includes/hodari_print_styles.html" %}
+<style>
+  .dept-pill-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; padding: 0; border: none; }
+  .dept-pill-grid .dept-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 16px; border-radius: 99px; font-size: 12px; font-weight: 600; border: 1.5px solid #D1D9E8; background: #fff; color: #64748B; cursor: pointer; transition: all 0.15s; user-select: none; }
+  .dept-pill-grid .dept-pill:hover { border-color: var(--hodari-blue); background: #F0F4FB; }
+  .dept-pill-grid .dept-pill.active { background: var(--hodari-blue); border-color: var(--hodari-blue); color: #fff; }
+  .dept-pill-grid input[type="checkbox"] { display: none; }
+
+  .event-details-modal {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(4px);
+  }
+  .modal-content {
+    background: white;
+    border-radius: 12px;
+    padding: 32px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+    animation: modalSlideIn 0.3s ease;
+  }
+  @keyframes modalSlideIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .modal-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+    color: #1f2937;
+  }
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    color: #6b7280;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+  .close-btn:hover {
+    background: #f3f4f6;
+  }
+
+  .print-only { display: none; }
+  @media print {
+    body { background: #fff !important; padding: 0 !important; }
+    .sidebar, .topbar, header, .hf-btn, .hf-btn-primary, .hf-btn-secondary, .hf-btn-danger,
+    .no-print, .print-hide, .event-details-modal, .dept-pill-grid,
+    .card-title-row, .filter-bar { display: none !important; }
+    .print-only { display: block !important; }
+    .doc-container { box-shadow: none; border-radius: 0; max-width: 100%; margin: 0; }
+    .card { border: none !important; box-shadow: none !important; }
+    table { font-size: 12px !important; }
+    th, td { padding: 8px !important; }
+    th:last-child, td:last-child { display: none !important; }
+    .chip { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+{% endblock %}
+{% block topbar_greeting %}Academic{% endblock %}
+
+{% block content %}
+<div style="display:block">
+
+  {#  Print-only branded header  #}
+  <div class="print-only doc-container" style="max-width:900px;margin:0 auto 20px;background:#fff;padding:24px 28px;border:1px solid #DDE3EE;border-radius:12px">
+    {% include "includes/hodari_print_header.html" %}
+    <div style="height:1px;background:var(--border);margin:16px 0"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-family:var(--font-display);font-size:18pt;font-weight:bold;color:var(--hodari-blue);text-transform:uppercase">Subjects Register</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px">{{ subjects|length }} subject{{ subjects|length|pluralize }} configured</div>
+      </div>
+      <div style="text-align:right;font-size:12px;color:var(--text-muted)">
+        <div style="font-weight:700;color:var(--hodari-blue)">Generated {{ "today"|date:"d M Y" }}</div>
+      </div>
+    </div>
+  </div>
+
+  {#  Subject list  #}
+  <div class="card">
+    <div class="card-title-row">
+      <div class="card-title" style="margin:0">Subjects Management</div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="font-size:12px;color:var(--text-muted)">{{ subjects|length }} subject{{ subjects|length|pluralize }}</span>
+        <a href="{% url 'academics:subjects_per_grade' %}" class="hf-btn hf-btn-secondary hf-btn-sm" style="font-size:11px;padding:6px 14px;text-decoration:none">Subjects per Grade</a>
+        {% if perms.academics.change_ecddomainconfig %}
+        <a href="{% url 'academics:ecd_domain_config' %}" class="hf-btn hf-btn-secondary hf-btn-sm" style="font-size:11px;padding:6px 14px;text-decoration:none">ECD Domains</a>
+        {% endif %}
+        <button onclick="window.print()" class="hf-btn hf-btn-secondary hf-btn-sm print-hide" style="font-size:11px;padding:6px 14px">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:4px"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z"/></svg>
+          Print
+        </button>
+        {% has_any_role user "super_admin,head_of_school,primary_hod,ecd_hod" as can_add_subject %}
+        {% if can_add_subject %}
+        <button type="button" onclick="openSubjectModal()" class="hf-btn hf-btn-primary hf-btn-sm">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add New Subject
+        </button>
+        {% endif %}
+      </div>
+    </div>
+
+    {#  Department filter pills  #}
+    <div style="padding:16px 0 0 20px;display:flex;flex-wrap:wrap;gap:6px">
+      <a href="{% url 'academics:subjects' %}"
+           class="dept-pill {% if not selected_dept %}active{% endif %}"
+           style="padding:4px 14px;border-radius:99px;font-size:11px;font-weight:600;border:1.5px solid #D1D9E8;background:{% if not selected_dept %}var(--hodari-blue){% else %}#fff{% endif %};color:{% if not selected_dept %}#fff{% else %}#64748B{% endif %};text-decoration:none;transition:all 0.2s;cursor:pointer;">All</a>
+      {% for dept_code, dept_label in dept_choices %}
+        {% if dept_code != 'ADMINISTRATION' %}
+        <a href="{% url 'academics:subjects' %}?department={{ dept_code }}"
+           class="dept-pill {% if selected_dept == dept_code %}active{% endif %}"
+           style="padding:4px 14px;border-radius:99px;font-size:11px;font-weight:600;border:1.5px solid #D1D9E8;background:{% if selected_dept == dept_code %}var(--hodari-blue){% else %}#fff{% endif %};color:{% if selected_dept == dept_code %}#fff{% else %}#64748B{% endif %};text-decoration:none;transition:all 0.2s;cursor:pointer;">{{ dept_label }}</a>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    <div style="border-top:1px solid var(--border);margin-top:12px">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="border-bottom:1px solid #F3F4F6">
+            <th style="padding:10px 8px;font-size:11px;color:var(--text-muted);font-weight:600;text-align:left;text-transform:uppercase">Subject</th>
+            <th style="padding:10px 8px;font-size:11px;color:var(--text-muted);font-weight:600;text-align:left;text-transform:uppercase">Code</th>
+            <th style="padding:10px 8px;font-size:11px;color:var(--text-muted);font-weight:600;text-align:center;text-transform:uppercase">Color</th>
+            <th style="padding:10px 8px;font-size:11px;color:var(--text-muted);font-weight:600;text-align:left;text-transform:uppercase">Target Classes</th>
+            <th style="padding:10px 8px;font-size:11px;color:var(--text-muted);font-weight:600;text-align:right;text-transform:uppercase">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for subject in subjects %}
+          <tr style="border-bottom:1px solid #F3F4F6;font-size:13px">
+            <td style="padding:10px 8px;font-weight:600">{{ subject.name }}</td>
+            <td style="padding:10px 8px;color:var(--text-muted)"><code>{{ subject.code|default:"N/A" }}</code></td>
+            <td style="padding:10px 8px;text-align:center">
+              <div style="width:24px;height:24px;border-radius:4px;background-color:{{ subject.color }};margin:0 auto;border:1px solid var(--border)"></div>
+            </td>
+            <td style="padding:10px 8px">
+              <div style="display:flex;flex-wrap:wrap;gap:4px">
+                {% for dept in subject.departments %}
+                  <span class="chip chip-blue" style="font-size:10px">{{ dept|title }}</span>
+                {% endfor %}
+                {% for gc in subject.classes.all %}
+                  <span class="chip chip-grey" style="font-size:10px">{{ gc.name }}</span>
+                {% endfor %}
+              </div>
+            </td>
+            <td style="padding:10px 8px;text-align:right;white-space:nowrap">
+              {% has_any_role user "super_admin,head_of_school,primary_hod,ecd_hod" as can_edit_subject %}
+              {% has_any_role user "super_admin,head_of_school" as can_delete_subject %}
+              {% if can_edit_subject %}<button type="button" class="hf-btn hf-btn-secondary hf-btn-sm" onclick="openSubjectModal({{ subject.pk }})">Edit</button>{% endif %}
+              {% if can_delete_subject %}<button type="button" class="hf-btn hf-btn-danger hf-btn-sm"
+                    onclick="confirmDeleteModal({title:'Delete Subject?',body:'Are you sure you want to delete <strong>{{ subject.name }}</strong>?',detail:'This subject will be permanently removed. This action cannot be undone.',confirmText:'Delete Subject',url:'{% url 'academics:subject_delete' subject.pk %}'})">Delete</button>{% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5">{% include '_partials/empty_state.html' with title='No subjects yet' desc='Add the first subject using the form below.' icon='doc' icon_color='blue' %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  
+  </div>
+
+  {#  Print-only footer  #}
+  <div class="print-only" style="max-width:900px;margin:20px auto 0;padding:12px 28px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted);text-align:center">
+    This is a computer-generated subjects register from {{ brand.school_name|default:"the school" }}.
+  </div>
+
+{#  Subject Modal  #}
+<div class="event-details-modal" id="subject-modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 class="modal-title" id="subject-modal-title">Add New Subject</h3>
+      <button class="close-btn" onclick="closeSubjectModal()" title="Close">&times;</button>
+    </div>
+    <form id="subject-form" method="post" style="display:flex;flex-direction:column;gap:16px">
+      <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+      <div style="display:flex;gap:12px">
+        <div class="hf2-form-group" style="flex:2">
+          <label class="hf2-label">Subject Name</label>
+          <input type="text" name="name" class="hf2-input" required placeholder="e.g. Mathematics">
+        </div>
+        <div class="hf2-form-group" style="flex:1">
+          <label class="hf2-label">Code</label>
+          <input type="text" name="code" class="hf2-input" placeholder="e.g. MATH">
+        </div>
+        <div class="hf2-form-group" style="flex:1">
+          <label class="hf2-label">Color</label>
+          <input type="color" name="color" class="hf2-input" value="#023AA5" style="height:42px;padding:2px">
+        </div>
+      </div>
+      <div class="hf2-form-group">
+        <label class="hf2-label">Departments <span style="color:var(--red);font-weight:600">*</span></label>
+        <div class="dept-pill-grid" id="dept-pill-grid">
+          {% for value, label in dept_choices %}
+          {% if value != 'ADMINISTRATION' %}
+          <label class="dept-pill" data-value="{{ value }}">
+            <input type="checkbox" name="departments" value="{{ value }}">
+            {{ label }}
+          </label>
+          {% endif %}
+          {% endfor %}
+        </div>
+        <div id="subject-dept-error" style="color:#DC2626;font-size:12px;display:none"></div>
+      </div>
+      <div class="hf2-form-group">
+        <label class="hf2-label">Target Classes</label>
+        <div id="class-checkbox-grid" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:12px">
+          {% for gc in all_classes %}
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+            <input type="checkbox" name="classes" value="{{ gc.id }}" data-dept="{{ gc.department }}">
+            {{ gc.name }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+        <input type="checkbox" name="is_active" checked> Active and available for curriculum
+      </label>
+      <div id="subject-form-error" style="color:#DC2626;font-size:13px;display:none"></div>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button type="submit" class="hf-btn hf-btn-primary" id="subject-submit-btn" style="flex:1;justify-content:center">Create Subject</button>
+        <button type="button" onclick="closeSubjectModal()" class="hf-btn hf-btn-secondary">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ class_depts|json_script:"class-depts-data" }}
+<script>
+let classDeptMapping = {};
+try {
+    classDeptMapping = JSON.parse(document.getElementById('class-depts-data').textContent);
+} catch(e) { console.warn('class-depts-data parse error', e); }
+
+const deptGrid = document.getElementById('dept-pill-grid');
+const classGridEl = document.getElementById('class-checkbox-grid');
+
+function getSelectedDepts() {
+    const checked = deptGrid.querySelectorAll('input[type="checkbox"]:checked');
+    return Array.from(checked).map(function(cb) { return cb.value; });
+}
+
+function filterClasses() {
+    const selected = getSelectedDepts();
+    const checkboxes = classGridEl.querySelectorAll('input[type="checkbox"]');
+    checkboxes.forEach(function(cb) {
+        const itemDept = classDeptMapping[cb.value];
+        const label = cb.closest('label');
+        if (!label) return;
+        if (selected.length === 0 || selected.indexOf(itemDept) !== -1) {
+            label.style.display = '';
+            cb.disabled = false;
+        } else {
+            label.style.display = 'none';
+            cb.checked = false;
+            cb.disabled = true;
+        }
+    });
+}
+
+if (deptGrid) {
+    deptGrid.addEventListener('change', function(e) {
+        if (e.target && e.target.type === 'checkbox') {
+            var pill = e.target.closest('.dept-pill');
+            if (pill) pill.classList.toggle('active', e.target.checked);
+            filterClasses();
+        }
+    });
+}
+filterClasses();
+
+function openSubjectModal(pk) {
+    const modal = document.getElementById('subject-modal');
+    const form = document.getElementById('subject-form');
+    const title = document.getElementById('subject-modal-title');
+    const submitBtn = document.getElementById('subject-submit-btn');
+    const errorEl = document.getElementById('subject-form-error');
+    const deptErrorEl = document.getElementById('subject-dept-error');
+
+    errorEl.style.display = 'none';
+    deptErrorEl.style.display = 'none';
+    form.reset();
+    form.querySelectorAll('.dept-pill').forEach(function(p) { p.classList.remove('active'); });
+
+    if (pk) {
+        title.textContent = 'Edit Subject';
+        submitBtn.textContent = 'Save Changes';
+        form.action = '/academics/subjects/' + pk + '/edit/';
+        fetch('/academics/subjects/' + pk + '/edit-json/')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                form.elements['name'].value = data.name || '';
+                form.elements['code'].value = data.code || '';
+                form.elements['color'].value = data.color || '#023AA5';
+                form.elements['is_active'].checked = data.is_active;
+                if (data.departments) {
+                    data.departments.forEach(function(d) {
+                        const cb = form.querySelector('input[name="departments"][value="' + d + '"]');
+                        if (cb) { cb.checked = true; cb.closest('.dept-pill').classList.add('active'); }
+                    });
+                }
+                if (data.classes) {
+                    data.classes.forEach(function(cid) {
+                        const cb = form.querySelector('input[name="classes"][value="' + cid + '"]');
+                        if (cb) cb.checked = true;
+                    });
+                }
+                filterClasses();
+            })
+            .catch(function(err) {
+                errorEl.textContent = 'Failed to load subject data.';
+                errorEl.style.display = 'block';
+                showToast('Failed to load subject data', 'error');
+            });
+    } else {
+        title.textContent = 'Add New Subject';
+        submitBtn.textContent = 'Create Subject';
+        form.action = '/academics/subjects/';
+        filterClasses();
+    }
+
+    modal.style.display = 'flex';
+}
+
+function closeSubjectModal() {
+    document.getElementById('subject-modal').style.display = 'none';
+}
+
+document.getElementById('subject-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeSubjectModal();
+});
+
+document.getElementById('subject-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const form = this;
+    const submitBtn = document.getElementById('subject-submit-btn');
+    const errorEl = document.getElementById('subject-form-error');
+    const deptErrorEl = document.getElementById('subject-dept-error');
+    const deptErrorWrapper = document.getElementById('subject-dept-error').parentElement;
+
+    errorEl.style.display = 'none';
+    deptErrorEl.style.display = 'none';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving...';
+
+    const formData = new FormData(form);
+    fetch(form.action, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: formData
+    })
+    .then(function(r) {
+        if (r.ok) {
+            closeSubjectModal();
+            var isEdit = form.action.indexOf('/edit/') !== -1;
+            showToast(isEdit ? 'Subject updated successfully' : 'Subject created successfully', 'success');
+            setTimeout(function() { window.location.reload(); }, 600);
+        } else {
+            return r.json().then(function(data) {
+                if (data.error) throw new Error(data.error);
+                throw new Error('Failed to save subject. Please check the fields.');
+            }, function() {
+                throw new Error('Server returned an invalid response.');
+            });
+        }
+    })
+    .catch(function(err) {
+        var msg = err.message;
+        if (msg && msg.indexOf('department') !== -1 && deptErrorEl) {
+            deptErrorEl.textContent = msg;
+            deptErrorEl.style.display = 'block';
+        } else {
+            errorEl.textContent = msg;
+            errorEl.style.display = 'block';
+        }
+        showToast(msg, 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = form.action.indexOf('/edit/') !== -1 ? 'Save Changes' : 'Create Subject';
+    });
+});
+</script>
+{% endblock %}

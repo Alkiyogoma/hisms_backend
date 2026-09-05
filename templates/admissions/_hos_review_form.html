@@ -1,0 +1,22 @@
+<form hx-post="{% url 'admissions:hos_review_submit' applicant.id %}"
+      hx-target="#hos-review-section"
+      hx-swap="innerHTML">
+  {% csrf_token %}
+  {% if messages %}
+  {% for msg in messages %}
+  <div style="padding:10px 14px;margin-bottom:12px;border-radius:8px;font-size:12px;font-weight:600;{% if msg.tags == 'success' %}background:#F0FDF4;color:#16A34A;border:1px solid #BBF7D0;{% elif msg.tags == 'error' %}background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;{% else %}background:#EFF6FF;color:#2563EB;border:1px solid #BFDBFE;{% endif %}">{{ msg }}</div>
+  {% endfor %}
+  {% endif %}
+
+  <div style="margin-bottom:14px">
+    <label style="display:block;font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:4px">Comments for Parents</label>
+    <textarea name="parent_facing_comments" rows="3" placeholder="Write feedback to share with the parent..."
+      style="width:100%;padding:10px 12px;font-size:13px;border:1px solid var(--border);border-radius:8px;resize:vertical;font-family:inherit">{{ form.parent_facing_comments.value|default:"" }}</textarea>
+  </div>
+
+  <button type="submit" class="btn-primary" style="width:100%;background:var(--green);border-color:var(--green);padding:12px;font-size:13px;font-weight:700;color:#fff;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px"
+    onmouseover="this.style.background='#15803D'" onmouseout="this.style.background='#16A34A'">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+    Submit Review &amp; Proceed to Decision
+  </button>
+</form>

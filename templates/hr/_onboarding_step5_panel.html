@@ -1,0 +1,126 @@
+<div class="ob-section-label" style="margin-top:0;">Qualifications & Documents</div>
+<p class="ob-panel-hint">Upload certificates and professional documents. Files are saved immediately when you continue.</p>
+
+{% if staff_documents %}
+<ul class="ob-doc-list">
+  {% for doc in staff_documents %}
+  <li>
+    <span class="ob-doc-name">{{ doc.name }}</span>
+    <span class="ob-doc-meta">{{ doc.get_document_type_display }} &middot; {{ doc.created_at|date:"d M Y" }}</span>
+    {% if doc.file %}
+    <a href="{{ doc.file.url }}" target="_blank" rel="noopener" class="ob-doc-link">View</a>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+{% for field_name, doc_type, label in document_upload_fields %}
+<div class="ob-form-group">
+  <label>{{ label }}</label>
+  <input type="file" name="{{ field_name }}" class="ob-input" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx">
+</div>
+{% endfor %}
+
+<div class="ob-form-group">
+  <label>Documents Notes</label>
+  <textarea name="documents_notes" class="ob-input" rows="2" placeholder="List any additional documents submitted..."></textarea>
+</div>
+
+<div class="ob-section-label">Class Assignments</div>
+{% if staff.is_teaching_staff %}
+  {% if current_assignments %}
+  <p class="ob-panel-hint">{{ current_assignments|length }} current assignment{{ current_assignments|length|pluralize }}</p>
+  {% for assignment in current_assignments %}
+  <div class="ob-assign-card">
+    <div class="class-badge">{{ assignment.grade_class.name|truncatechars:8 }}</div>
+    <div class="class-info">
+      <div class="class-name">
+        {{ assignment.grade_class.name }}
+        {% if assignment.is_class_teacher %}
+        <span class="ob-ct-badge">Class Teacher</span>
+        {% endif %}
+      </div>
+      <div class="class-meta">
+        <span>{{ assignment.grade_class.get_department_display }}</span>
+        <span>{{ assignment.term.name }}</span>
+        {% if assignment.subjects_taught %}
+        <span>{{ assignment.subjects_taught|length }} subject{{ assignment.subjects_taught|length|pluralize }}</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <p class="ob-panel-hint" style="text-align:center;padding:16px">{% include '_partials/empty_state.html' with title='No class assignments yet' desc='Select classes and subjects below.' icon='doc' icon_color='grey' %}</p>
+  {% endif %}
+
+  <div class="ob-form-group">
+    <label>Term</label>
+    <select name="assignment_term" class="ob-select">
+      <option value="">Select term...</option>
+      {% for term in terms %}
+      <option value="{{ term.pk }}">{{ term.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="ob-form-row">
+    <div class="ob-form-group">
+      <label>Assigned Classes</label>
+      <div class="ob-check-grid">
+        {% for gc in grade_classes %}
+        <label class="ob-check-item"><input type="checkbox" name="assigned_classes" value="{{ gc.id }}"> {{ gc.name }}</label>
+        {% empty %}
+        <span class="ob-panel-hint" style="display:block;text-align:center;padding:8px">No classes in this department.</span>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="ob-form-group">
+      <label>Subjects Taught</label>
+      <div class="ob-check-grid">
+        {% for subject in subjects %}
+        <label class="ob-check-item"><input type="checkbox" name="subjects_taught" value="{{ subject.name }}"> {{ subject.name }}</label>
+        {% empty %}
+        <span class="ob-panel-hint" style="display:block;text-align:center;padding:8px">No subjects in this department.</span>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="ob-form-group">
+    <label class="ob-check-item" style="display:inline-flex;align-items:center;gap:8px;">
+      <input type="checkbox" name="is_class_teacher" value="1"> Assign as Class Teacher
+    </label>
+  </div>
+{% else %}
+  <p class="ob-panel-hint">Class assignments are not required for non teaching staff.</p>
+{% endif %}
+
+<div class="ob-section-label">System Access</div>
+<div class="ob-access-summary">
+  <div><span class="ob-access-label">Username</span><strong>{{ staff.user.username }}</strong></div>
+  <div><span class="ob-access-label">Email</span><strong>{{ staff.user.email|default:"Not set" }}</strong></div>
+</div>
+<div class="ob-form-row">
+  <div class="ob-form-group">
+    <label>System Role</label>
+    <select name="access_role" class="ob-select">
+      {% for code, label in role_choices %}
+      <option value="{{ code }}" {% if staff.user.role == code %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="ob-form-group">
+    <label>System Access Confirmed</label>
+    <select name="system_account_created" class="ob-select">
+      <option value="yes" {% if staff.user.is_active %}selected{% endif %}>Yes, account is active and accessible</option>
+      <option value="no" {% if not staff.user.is_active %}selected{% endif %}>Not yet, pending</option>
+    </select>
+  </div>
+</div>
+<div class="ob-form-group">
+  <label class="ob-check-item" style="display:inline-flex;align-items:center;gap:8px;">
+    <input type="checkbox" name="access_is_active" value="1" {% if staff.user.is_active %}checked{% endif %}> Account active (can sign in)
+  </label>
+</div>

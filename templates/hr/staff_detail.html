@@ -1,0 +1,574 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% load static %}
+{% block title %}{{ staff.full_name }} — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Staff Profile Management{% endblock %}
+
+{% block extra_head %}
+<style>
+  .profile-header { background: #fff; border-radius: 16px; padding: 32px; border: 1px solid var(--border); margin-bottom: 24px; position: relative; overflow: hidden; }
+  .profile-header::after { content: ''; position: absolute; top: 0; right: 0; width: 300px; height: 100%; background: linear-gradient(225deg, rgba(2,58,165,0.03) 0%, transparent 100%); pointer-events: none; }
+  
+  .avatar-lg { width: 80px; height: 80px; border-radius: 20px; background: var(--hodari-blue); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 700; box-shadow: 0 10px 15px -3px rgba(2,58,165,0.2); }
+  
+  .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px; margin-top: 32px; padding-top: 24px; border-top: 1px solid #F1F5F9; }
+  .info-item .label { font-size: 11px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .info-item .value { font-size: 15px; font-weight: 600; color: #1E293B; }
+
+  /* Attendance Calendar Widget */
+  .att-calendar { background: #fff; border-radius: 16px; border: 1px solid var(--border); padding: 20px; }
+  .att-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 16px; }
+  .att-day { aspect-ratio: 1; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; cursor: default; transition: transform 0.2s; }
+  .att-day:hover { transform: scale(1.1); z-index: 2; }
+  
+  .day-none { background: #F8FAFC; color: #CBD5E1; border: 1px solid #F1F5F9; }
+  .day-green { background: #E8F5EC; color: #1B7B34; border: 1px solid #B7DFBF; }
+  .day-red { background: #FEF2F2; color: #9B1C1C; border: 1px solid #FECACA; }
+  .day-yellow { background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A; }
+  .day-blue { background: #EFF6FF; color: #1E40AF; border: 1px solid #BFDBFE; }
+  .day-dim { opacity: 0.3; }
+
+  .att-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #F1F5F9; }
+  .leg-item { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: #64748B; }
+  .leg-dot { width: 10px; height: 10px; border-radius: 3px; }
+
+  .side-card { background: #fff; border-radius: 16px; border: 1px solid var(--border); padding: 20px; margin-bottom: 20px; }
+  .assignment-row { padding: 12px; border-radius: 12px; background: #F8FAFC; border: 1px solid #F1F5F9; margin-bottom: 10px; transition: all 0.2s; }
+  .assignment-row:hover { border-color: var(--hodari-blue); background: #fff; transform: translateX(4px); }
+  .hf-btn, .hf-btn-primary, .hf-btn-secondary { text-decoration: none !important; }
+  .prev-term { opacity: 0.45; }
+  .prev-term table { opacity: 0.45; }
+  .prev-term:hover { opacity: 0.7; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "hr/_top_tabs.html" %}
+<div style="display:grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;">
+  
+  <!-- Left Side: Main Profile -->
+  <div>
+    <div class="profile-header">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start">
+        <div style="display:flex; gap:24px; align-items:center">
+          <div class="avatar-lg" style="overflow:hidden; padding:0">
+            {% if staff.user.profile_picture %}
+              <img src="{{ staff.user.profile_picture.url }}" alt="{{ staff.full_name }}" style="width:100%; height:100%; object-fit:cover">
+            {% else %}
+              {{ staff.full_name|slice:":1" }}
+            {% endif %}
+          </div>
+          <div>
+            <h1 style="margin:0; font-size:28px; font-weight:800; color:#1E293B">{{ staff.full_name }}</h1>
+            <div style="display:flex; align-items:center; gap:10px; margin-top:4px">
+              <span style="font-size:15px; color:#64748B; font-weight:500">{{ staff.job_title }}</span>
+              <span style="width:4px; height:4px; border-radius:50%; background:#CBD5E1"></span>
+              <span style="font-size:15px; color:#64748B; font-weight:500">{{ staff.get_department_display }}</span>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex; gap:12px">
+          {% if staff.is_active %}
+            <span class="chip chip-green" style="padding:6px 14px; font-size:12px">Active Account</span>
+          {% else %}
+            <span class="chip chip-red" style="padding:6px 14px; font-size:12px">Departed</span>
+          {% endif %}
+          {% has_perm user "hr.change_staffprofile" as can_edit %}
+          {% if can_edit %}
+          <a href="{% url 'users:user_edit' staff.user.pk %}" class="hf-btn hf-btn-secondary" style="padding:8px 16px; font-size:13px">Edit Profile</a>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="label">Employee ID</div>
+          <div class="value">{{ staff.employee_id|default:"NOT SET" }}</div>
+        </div>
+        <div class="info-item">
+          <div class="label">Phone Number</div>
+          <div class="value">{{ staff.contact_phone|default:"N/A" }}</div>
+        </div>
+        {% if is_own_profile or is_admin_viewing %}
+        <div class="info-item">
+          <div class="label">Work Email</div>
+          <div class="value">{{ staff.contact_email|default:staff.user.email }}</div>
+        </div>
+        {% endif %}
+        <div class="info-item">
+          <div class="label">Hire Date</div>
+          <div class="value">{{ staff.employment_start_date|date:"d M Y" }}</div>
+        </div>
+        <div class="info-item">
+          <div class="label">Staff Type</div>
+          <div class="value">{{ staff.get_staff_category_display }}</div>
+        </div>
+        {% if is_own_profile or is_admin_viewing %}
+        <div class="info-item">
+          <div class="label">Contract Ends</div>
+          <div class="value">
+            {% if staff.contract_end_date %}
+              {{ staff.contract_end_date|date:"d M Y" }}
+              {% if staff.contract_expiring_soon %}<span class="chip chip-amber" style="margin-left:6px">Renewal due</span>{% endif %}
+            {% else %}Ongoing{% endif %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Class Assignments — moved to top below profile header -->
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-title-row">
+        <h2 class="card-title" style="margin:0; font-size:16px">Academic Assignments</h2>
+        <div style="display:flex; gap:8px">
+          {% if is_admin_viewing %}
+          <a href="{% url 'users:user_edit' staff.user.pk %}#tab-assignments" class="hf-btn hf-btn-primary" style="padding:6px 14px; font-size:12px">Edit Assignments</a>
+          {% endif %}
+          <a href="{% url 'hr:staff_detail' staff.pk %}" class="hf-btn hf-btn-secondary" style="padding:6px 14px; font-size:12px">Preview Staff Documents</a>
+        </div>
+      </div>
+      <div id="assignment-grid-area" style="margin-top:20px"></div>
+    </div>
+
+    <script>
+    (function() {
+      var gridData = {{ assignment_grid_json|safe }};
+      var subjectColors = {{ subject_colors_json|safe }};
+      var currentTermId = '{{ current_term_id }}';
+      var container = document.getElementById('assignment-grid-area');
+      if (!container || !Object.keys(gridData).length) {
+        container.innerHTML = '<div style="text-align:center; padding:40px; color:#94A3B8; border:2px dashed #F1F5F9; border-radius:16px">No active teaching assignments found.</div>';
+        return;
+      }
+      var html = '';
+      for (var tid in gridData) {
+        var term = gridData[tid];
+        var classes = term.classes;
+        var classNames = Object.keys(classes);
+        if (!classNames.length) continue;
+
+        var isPrevTerm = tid !== currentTermId;
+
+        /* Collect all subjects across classes */
+        var allSubjects = [];
+        for (var c = 0; c < classNames.length; c++) {
+          var subs = classes[classNames[c]].subjects || [];
+          for (var s = 0; s < subs.length; s++) {
+            if (allSubjects.indexOf(subs[s]) === -1) allSubjects.push(subs[s]);
+          }
+        }
+        allSubjects.sort();
+
+        html += '<div style="margin-bottom:20px' + (isPrevTerm ? ';opacity:0.4' : '') + '">';
+        html += '<div style="display:flex; align-items:center; gap:8px; margin-bottom:12px">';
+        html += '<span style="font-weight:700; font-size:13px; color:var(--text-primary)">' + term.term_name + '</span>';
+        html += '<span style="font-size:11px; color:#94A3B8">' + term.year_name + '</span>';
+        if (isPrevTerm) {
+          html += '<span style="font-size:10px; color:#94A3B8; font-style:italic">(Previous term)</span>';
+        }
+        html += '</div>';
+        html += '<div style="overflow-x:auto; border:1px solid #E8EDF5; border-radius:10px">';
+        html += '<table style="width:100%; border-collapse:collapse; font-size:12px">';
+        /* Header */
+        html += '<thead><tr>';
+        html += '<th style="text-align:left;padding:10px 12px;font-size:12px;font-weight:600;color:var(--text-secondary);border-bottom:1px solid #E8EDF5;min-width:140px;position:sticky;left:0;background:#fff;z-index:1">Class</th>';
+        for (var s = 0; s < allSubjects.length; s++) {
+          var color = subjectColors[allSubjects[s]] || '#023AA5';
+          html += '<th style="text-align:center;padding:8px 6px;border-bottom:1px solid #E8EDF5;white-space:nowrap"><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:' + color + ';flex-shrink:0"></span><span style="font-weight:600;font-size:11px;color:var(--text-primary)">' + allSubjects[s] + '</span></span></th>';
+        }
+        html += '<th style="text-align:center;padding:8px 6px;border-bottom:1px solid #E8EDF5;font-size:11px;font-weight:600;color:var(--text-secondary)">Role</th>';
+        html += '</tr></thead>';
+        /* Body */
+        html += '<tbody>';
+        for (var c = 0; c < classNames.length; c++) {
+          var cls = classes[classNames[c]];
+          html += '<tr>';
+          html += '<td style="padding:10px 12px;font-weight:600;font-size:12px;color:var(--text-primary);border-bottom:1px solid #F1F5F9;position:sticky;left:0;background:#fff;z-index:1">' + cls.name + '</td>';
+          for (var s = 0; s < allSubjects.length; s++) {
+            var has = cls.subjects.indexOf(allSubjects[s]) !== -1;
+            var color = subjectColors[allSubjects[s]] || '#023AA5';
+            if (has) {
+              html += '<td style="text-align:center;padding:6px;border-bottom:1px solid #F1F5F9"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;border:1.5px solid ' + color + ';background:' + color + '12"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="' + color + '" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></span></td>';
+            } else {
+              html += '<td style="text-align:center;padding:6px;border-bottom:1px solid #F1F5F9"><span style="color:#CBD5E1;font-size:14px">-</span></td>';
+            }
+          }
+          html += '<td style="text-align:center;padding:6px;border-bottom:1px solid #F1F5F9">';
+          if (cls.is_ct) {
+            html += '<span style="display:inline-block;font-size:10px;font-weight:700;color:#fff;background:#2563EB;padding:2px 8px;border-radius:99px">Class Teacher</span>';
+          } else {
+            html += '<span style="font-size:11px;color:#64748B">Teacher</span>';
+          }
+          html += '</td></tr>';
+        }
+        html += '</tbody></table></div></div>';
+      }
+      container.innerHTML = html;
+    })();
+    </script>
+
+    <!-- Personal Details (own profile or admin) -->
+    {% if is_own_profile or is_admin_viewing %}
+    <div class="card" style="padding:24px; margin-bottom:24px">
+      <h2 class="card-title" style="margin:0 0 16px">Personal Details</h2>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:20px">
+        <div class="info-item">
+          <div class="label">Date of Birth</div>
+          <div class="value">{{ staff.date_of_birth|date:"d M Y"|default:"Not set" }}</div>
+        </div>
+        <div class="info-item">
+          <div class="label">Gender</div>
+          <div class="value">{{ staff.get_gender_display|default:"Not set" }}</div>
+        </div>
+        <div class="info-item">
+          <div class="label">Nationality</div>
+          <div class="value">{{ staff.nationality|default:"Not set" }}</div>
+        </div>
+        <div class="info-item">
+          <div class="label">Marital Status</div>
+          <div class="value">{{ staff.get_marital_status_display|default:"Not set" }}</div>
+        </div>
+        <div class="info-item" style="grid-column:1/-1">
+          <div class="label">Residential Address</div>
+          <div class="value">{{ staff.residential_address|default:"Not set" }}</div>
+        </div>
+      </div>
+
+      <div style="margin-top:24px; padding-top:20px; border-top:1px solid #F1F5F9">
+        <h3 style="font-size:14px; font-weight:700; color:#1E293B; margin:0 0 12px; display:flex; align-items:center; gap:8px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          Emergency Contact
+        </h3>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px">
+          <div class="info-item">
+            <div class="label">Contact Name</div>
+            <div class="value">{{ staff.emergency_contact_name|default:"Not set" }}</div>
+          </div>
+          <div class="info-item">
+            <div class="label">Contact Phone</div>
+            <div class="value">{{ staff.emergency_contact_phone|default:"Not set" }}</div>
+          </div>
+          <div class="info-item">
+            <div class="label">Relationship</div>
+            <div class="value">{{ staff.emergency_contact_relationship|default:"Not set" }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Employment Details (admin or own profile) -->
+    {% if is_own_profile or is_admin_viewing %}
+    <div class="card" style="padding:24px; margin-bottom:24px">
+      <h2 class="card-title" style="margin:0 0 16px">Employment Details</h2>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:20px">
+        <div class="info-item">
+          <div class="label">Employment Type</div>
+          <div class="value">{{ staff.get_employment_type_display|default:"Not set" }}</div>
+        </div>
+        <div class="info-item">
+          <div class="label">Probation End</div>
+          <div class="value">{{ staff.probation_end_date|date:"d M Y"|default:"Not set" }}</div>
+        </div>
+        <div class="info-item">
+          <div class="label">Confirmation Date</div>
+          <div class="value">{{ staff.confirmation_date|date:"d M Y"|default:"Not confirmed" }}</div>
+        </div>
+        <div class="info-item">
+          <div class="label">Years of Experience</div>
+          <div class="value">{{ staff.years_of_experience|default:"0" }} years</div>
+        </div>
+        <div class="info-item">
+          <div class="label">Highest Qualification</div>
+          <div class="value">{{ staff.highest_qualification|default:"Not set" }}</div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Salary & Banking (admin only) -->
+    {% if is_admin_viewing %}
+    <div class="card" style="padding:24px; margin-bottom:24px">
+      <h2 class="card-title" style="margin:0 0 16px; display:flex; align-items:center; gap:8px">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        Salary & Banking
+      </h2>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:20px">
+        <div class="info-item">
+          <div class="label">Basic Salary</div>
+          <div class="value">TZS {{ staff.basic_salary|floatformat:2|default:"0.00" }}</div>
+        </div>
+        <div class="info-item">
+          <div class="label">Housing Allowance</div>
+          <div class="value">TZS {{ staff.housing_allowance|floatformat:2|default:"0.00" }}</div>
+        </div>
+        <div class="info-item">
+          <div class="label">Transport Allowance</div>
+          <div class="value">TZS {{ staff.transport_allowance|floatformat:2|default:"0.00" }}</div>
+        </div>
+        <div class="info-item">
+          <div class="label">Bank Name</div>
+          <div class="value">{{ staff.bank_name|default:"Not set" }}</div>
+        </div>
+        <div class="info-item">
+          <div class="label">Account Number</div>
+          <div class="value">{{ staff.bank_account_number|default:"Not set" }}</div>
+        </div>
+        <div class="info-item">
+          <div class="label">Branch</div>
+          <div class="value">{{ staff.bank_branch|default:"Not set" }}</div>
+        </div>
+        <div class="info-item">
+          <div class="label">NSSF Number</div>
+          <div class="value">{{ staff.nssf_number|default:"Not set" }}</div>
+        </div>
+        <div class="info-item">
+          <div class="label">TIN Number</div>
+          <div class="value">{{ staff.tin_number|default:"Not set" }}</div>
+        </div>
+        <div class="info-item">
+          <div class="label">NHIF Number</div>
+          <div class="value">{{ staff.nhif_number|default:"Not set" }}</div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+  <!-- Right Side: Attendance & Actions -->
+  <div>
+    <div class="att-calendar">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px">
+        <div style="font-size:13px; font-weight:800; color:#1E293B; text-transform:uppercase; letter-spacing:0.05em">Attendance Log</div>
+        <div style="font-size:11px; font-weight:700; color:var(--hodari-blue)">{{ current_month_name }}</div>
+      </div>
+      
+      <div style="display:grid; grid-template-columns: repeat(7, 1fr); gap:6px; text-align:center; margin-bottom:8px">
+        <div style="font-size:9px; font-weight:800; color:#94A3B8">M</div>
+        <div style="font-size:9px; font-weight:800; color:#94A3B8">T</div>
+        <div style="font-size:9px; font-weight:800; color:#94A3B8">W</div>
+        <div style="font-size:9px; font-weight:800; color:#94A3B8">T</div>
+        <div style="font-size:9px; font-weight:800; color:#94A3B8">F</div>
+        <div style="font-size:9px; font-weight:800; color:#94A3B8">S</div>
+        <div style="font-size:9px; font-weight:800; color:#94A3B8">S</div>
+      </div>
+
+      <div class="att-grid">
+        {% for day in calendar_days %}
+        <div class="att-day day-{{ day.color }} {% if not day.is_current_month %}day-dim{% endif %}" title="{{ day.date|date:'d M' }}: {{ day.status }}">
+          {{ day.date.day }}
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="att-legend">
+        <div class="leg-item"><div class="leg-dot day-green" style="background:#10B981; border:none"></div>Present</div>
+        <div class="leg-item"><div class="leg-dot day-red" style="background:#EF4444; border:none"></div>Absent</div>
+        <div class="leg-item"><div class="leg-dot day-yellow" style="background:#F59E0B; border:none"></div>Late</div>
+        <div class="leg-item"><div class="leg-dot day-blue" style="background:#3B82F6; border:none"></div>Excused</div>
+      </div>
+    </div>
+
+    <!-- Onboarding Progress -->
+    <div class="side-card" style="margin-top:24px">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px">
+        <div style="font-size:12px; font-weight:800; color:#94A3B8; text-transform:uppercase; letter-spacing:0.05em">Onboarding</div>
+        {% if staff.onboarding_completed %}
+          <span class="chip chip-green" style="font-size:10px">Complete</span>
+        {% elif staff.onboarding_step > 0 %}
+          <span class="chip chip-blue" style="font-size:10px;background:#EFF6FF;color:#1E40AF">Step {{ onboarding_display_step|default:staff.onboarding_step }}/5</span>
+        {% else %}
+          <span class="chip chip-amber" style="font-size:10px">Not started</span>
+        {% endif %}
+      </div>
+      <div style="background:#F1F5F9; border-radius:99px; height:10px; overflow:hidden">
+        <div style="height:100%; border-radius:99px; transition:width 0.6s ease; {% if staff.onboarding_completed %}background:#16a34a{% elif staff.onboarding_step > 0 %}background:var(--hodari-blue){% else %}background:#CBD5E1{% endif %}; width:{{ onboarding_pct }}%"></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-top:8px; font-size:11px; color:#94A3B8; font-weight:600">
+        <span>{{ onboarding_pct }}% complete</span>
+        {% if not staff.onboarding_completed and staff.onboarding_step > 0 %}
+          <a href="{% url 'hr:onboarding_tabbed' staff.pk %}?tab={{ onboarding_display_step|default:staff.onboarding_step }}" style="color:var(--hodari-blue); text-decoration:none">Continue &rarr;</a>
+        {% elif not staff.onboarding_completed and staff.onboarding_step == 0 %}
+          <a href="{% url 'hr:onboarding_start' staff.pk %}" style="color:var(--hodari-blue); text-decoration:none">Start &rarr;</a>
+        {% endif %}
+      </div>
+    </div>
+
+    {% has_perm user "hr.view_staffdocument" as can_view_staff_docs %}
+    {% has_perm user "hr.add_staffdocument" as can_upload_docs %}
+    {% if can_view_staff_docs %}
+    <div class="side-card" style="margin-top:24px">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px">
+        <div style="font-size:12px; font-weight:800; color:#94A3B8; text-transform:uppercase; letter-spacing:0.05em">Staff Documents</div>
+        {% if can_upload_docs %}
+        <button onclick="toggleDocUpload()" id="doc-upload-toggle" style="font-size:11px; font-weight:600; color:var(--hodari-blue); background:none; border:none; cursor:pointer; padding:4px 8px; border-radius:6px; transition:background 0.2s" onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background='none'">+ Upload</button>
+        {% endif %}
+      </div>
+
+      {% if can_upload_docs %}
+      <div id="doc-upload-form" style="display:none; margin-bottom:16px; padding:14px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px;">
+        <form method="post" action="{% url 'hr:staff_document_upload' staff.pk %}" enctype="multipart/form-data" style="display:flex; flex-direction:column; gap:10px">
+          {% csrf_token %}
+          <div>
+            <label style="font-size:11px; font-weight:600; color:#64748B; display:block; margin-bottom:4px">Document Type</label>
+            <select name="document_type" required style="width:100%; padding:7px 10px; font-size:12px; border:1px solid #E2E8F0; border-radius:6px; background:#fff; color:#1E293B">
+              <option value="id_card">National ID / Passport (NIDA)</option>
+              <option value="certification">Professional Certification</option>
+              <option value="degree">Degree / Diploma Certificate</option>
+              <option value="contract">Employment Contract</option>
+              <option value="nssf">NSSF Statement</option>
+              <option value="nhif">NHIF Card</option>
+              <option value="tin">TIN Certificate</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px; font-weight:600; color:#64748B; display:block; margin-bottom:4px">Document Name</label>
+            <input type="text" name="document_name" placeholder="e.g. NIDA ID Copy" required style="width:100%; padding:7px 10px; font-size:12px; border:1px solid #E2E8F0; border-radius:6px; background:#fff; color:#1E293B; box-sizing:border-box">
+          </div>
+          <div>
+            <label style="font-size:11px; font-weight:600; color:#64748B; display:block; margin-bottom:4px">File</label>
+            <input type="file" name="document_file" required accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" style="width:100%; font-size:11px; color:#64748B; box-sizing:border-box">
+          </div>
+          <div>
+            <label style="font-size:11px; font-weight:600; color:#64748B; display:block; margin-bottom:4px">Notes (optional)</label>
+            <textarea name="document_notes" rows="2" placeholder="Optional notes..." style="width:100%; padding:7px 10px; font-size:12px; border:1px solid #E2E8F0; border-radius:6px; background:#fff; color:#1E293B; resize:vertical; box-sizing:border-box"></textarea>
+          </div>
+          <button type="submit" style="padding:8px 16px; font-size:12px; font-weight:600; color:#fff; background:var(--hodari-blue); border:none; border-radius:6px; cursor:pointer; transition:background 0.2s" onmouseover="this.style.background='#1D4ED8'" onmouseout="this.style.background='var(--hodari-blue)'">Upload Document</button>
+        </form>
+      </div>
+      {% endif %}
+
+      {% if staff.documents.all %}
+        {% for doc in staff.documents.all %}
+        <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:#F8FAFC; border:1px solid #F1F5F9; border-radius:8px; margin-bottom:8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{% if '.pdf' in doc.file.name %}#DC2626{% elif '.jpg' in doc.file.name or '.jpeg' in doc.file.name or '.png' in doc.file.name %}#16A34A{% else %}#2563EB{% endif %}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:12px; font-weight:600; color:#1E293B; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ doc.name }}</div>
+            <div style="font-size:10px; color:#94A3B8">{{ doc.get_document_type_display }} &middot; {{ doc.created_at|date:"d M Y" }}</div>
+          </div>
+          <div style="display:flex; gap:6px; flex-shrink:0">
+            <button type="button" onclick="previewDoc('{{ doc.file.url }}', '{{ doc.name|escapejs }}')" style="padding:3px 8px; font-size:11px; font-weight:600; border:1px solid #E2E8F0; border-radius:6px; background:#fff; color:#64748B; cursor:pointer; display:inline-flex; align-items:center; gap:4px">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              View
+            </button>
+            <a href="{% url 'hr:staff_document_download' doc.pk %}" style="padding:3px 8px; font-size:11px; font-weight:600; border:1px solid #E2E8F0; border-radius:6px; background:#fff; color:var(--hodari-blue); text-decoration:none; display:inline-flex; align-items:center; gap:4px">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download
+            </a>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div style="text-align:center; padding:20px; color:#94A3B8; font-size:12px; border:1px dashed #E2E8F0; border-radius:8px;">No documents uploaded yet.</div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <script>
+    function toggleDocUpload() {
+      var el = document.getElementById('doc-upload-form');
+      if (!el) return;
+      if (el.style.display === 'none') {
+        el.style.display = 'block';
+        el.style.animation = 'fadeIn 0.2s ease';
+      } else {
+        el.style.display = 'none';
+      }
+    }
+    </script>
+
+    {# Document Preview Modal — identical to admissions _documents.html #}
+    <div id="docPreviewModal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px)" onclick="closeDocModal(event)">
+      <div style="position:absolute; inset:20px; background:#fff; border-radius:12px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-bottom:1px solid var(--border); background:var(--bg-metric)">
+          <span id="docPreviewTitle" style="font-size:14px; font-weight:700; color:var(--text-primary)">Document</span>
+          <div style="display:flex; gap:8px; align-items:center">
+            <a id="docPreviewDownload" href="#" target="_blank" style="padding:5px 12px; font-size:12px; text-decoration:none; color:var(--text-muted); border:1px solid var(--border); border-radius:6px; display:flex; align-items:center; gap:4px">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download
+            </a>
+            <button type="button" onclick="closeDocModal()" style="background:none; border:none; cursor:pointer; padding:4px; color:var(--text-muted); border-radius:6px" onmouseover="this.style.background='var(--bg-metric)'" onmouseout="this.style.background='none'">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        </div>
+        <div id="docPreviewBody" style="flex:1; display:flex; align-items:center; justify-content:center; overflow:auto; background:var(--bg-metric); padding:10px"></div>
+      </div>
+    </div>
+    <script>
+    function previewDoc(url, title) {
+      var modal = document.getElementById('docPreviewModal');
+      var body = document.getElementById('docPreviewBody');
+      var titleEl = document.getElementById('docPreviewTitle');
+      var downloadBtn = document.getElementById('docPreviewDownload');
+      titleEl.textContent = title;
+      downloadBtn.href = url;
+      body.innerHTML = '';
+      var ext = url.split('.').pop().toLowerCase().split('?')[0];
+      if (['jpg','jpeg','png','gif','webp','bmp','svg'].indexOf(ext) !== -1) {
+        var img = document.createElement('img');
+        img.src = url;
+        img.style.maxWidth = '100%';
+        img.style.maxHeight = '100%';
+        img.style.borderRadius = '8px';
+        body.appendChild(img);
+      } else if (ext === 'pdf') {
+        var iframe = document.createElement('iframe');
+        iframe.src = url;
+        iframe.style.width = '100%';
+        iframe.style.height = '100%';
+        iframe.style.border = 'none';
+        iframe.style.borderRadius = '8px';
+        body.appendChild(iframe);
+      } else {
+        body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:12px">&#128196;</div><div style="font-size:14px;font-weight:600">' + title + '</div><div style="font-size:12px;margin-top:8px;color:var(--text-muted)">Click Download to view this file</div></div>';
+      }
+      modal.style.display = 'block';
+      document.body.style.overflow = 'hidden';
+    }
+    function closeDocModal(e) {
+      if (e && e.target !== e.currentTarget) return;
+      var modal = document.getElementById('docPreviewModal');
+      modal.style.display = 'none';
+      document.body.style.overflow = '';
+      document.getElementById('docPreviewBody').innerHTML = '';
+    }
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeDocModal();
+    });
+    </script>
+
+    <div class="side-card" style="margin-top:24px">
+      <div style="font-size:12px; font-weight:800; color:#94A3B8; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:16px">Quick Actions</div>
+      <div style="display:flex; flex-direction:column; gap:10px">
+        <a href="{% url 'hr:staff_list' %}" class="hf-btn hf-btn-secondary" style="text-align:center; font-size:12px">View All Staff</a>
+        {% has_perm user "hr.change_staffprofile" as can_manage_staff %}
+        {% if can_manage_staff and staff.is_active %}
+        <button onclick="document.getElementById('departureModal').style.display='flex'" class="hf-btn hf-btn-secondary" style="color:#EF4444; font-size:12px; border-color:#FEE2E2">Mark Departure</button>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Restored -->
+<div id="departureModal" style="display:none; position:fixed; inset:0; background:rgba(15, 23, 42, 0.6); backdrop-filter:blur(4px); z-index:1000; align-items:center; justify-content:center; transition: all 0.3s">
+  <div class="card" style="max-width:400px; width:90%; border-top: 4px solid #EF4444; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25)">
+    <div class="card-title" style="color:#EF4444">Confirm Staff Departure</div>
+    <p style="font-size:13px; color:#64748B; margin-bottom:20px">This will deactivate the staff profile and system account. This action is logged for audit compliance.</p>
+    <form method="post" action="{% url 'hr:staff_departure' staff.pk %}">
+      {% csrf_token %}
+      <div class="hf2-form-group">
+        <label class="hf2-label">Last Work Day</label>
+        <input type="date" name="departure_date" class="hf2-input" required>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:24px">
+        <button type="submit" class="hf-btn" style="background:#EF4444; color:#fff; flex:1">Deactivate Account</button>
+        <button type="button" onclick="document.getElementById('departureModal').style.display='none'" class="hf-btn hf-btn-secondary" style="flex:1">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

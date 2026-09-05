@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% load hodari_forms %}
+{% block title %}Broadcast Details &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Communications{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:800px;margin:0 auto">
+  <div class="card-title-row">
+    <div class="card-title" style="margin:0">Broadcast Preview</div>
+    <div class="chip {% if broadcast.status == 'sent' %}chip-green{% else %}chip-amber{% endif %}">
+      {{ broadcast.get_status_display|upper }}
+    </div>
+  </div>
+
+  <div style="margin-top:24px;background:#F9FAFB;border-radius:12px;padding:24px;border:1px solid var(--border)">
+    <div style="display:flex;gap:32px;margin-bottom:20px;font-size:13px;border-bottom:1px solid #E5E7EB;padding-bottom:16px">
+      <div><span style="color:var(--text-muted)">To:</span> <span style="font-weight:600">{{ broadcast.get_audience_display }}{% if broadcast.target_grade %} ({{ broadcast.target_grade }}){% endif %}</span></div>
+      <div><span style="color:var(--text-muted)">From:</span> <span style="font-weight:600">{{ broadcast.created_by.get_full_name|default:broadcast.created_by.username }}</span></div>
+      <div><span style="color:var(--text-muted)">Date:</span> <span style="font-weight:600">{{ broadcast.created_at|date:"d M Y" }}</span></div>
+    </div>
+    
+    <h3 style="font-size:18px;font-weight:700;color:var(--text-primary);margin-bottom:12px">{{ broadcast.subject }}</h3>
+    <div style="font-size:14px;line-height:1.6;color:var(--text-secondary);white-space:pre-wrap">{{ broadcast.body }}</div>
+  </div>
+
+  <div class="hf2-actions" style="margin-top:24px">
+    {% if not perms.communications.change_broadcast %}
+      <a href="{% url 'parent_portal:communications' %}" class="btn-secondary" style="margin-right:auto">Back to Communications</a>
+    {% else %}
+      <a href="{% url 'communications:broadcast_list' %}" class="btn-secondary" style="margin-right:auto">Back to list</a>
+    {% endif %}
+    {% if broadcast.status == 'draft' and perms.communications.change_broadcast %}
+      <form method="post" action="{% url 'communications:broadcast_send' broadcast.pk %}" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        {% csrf_token %}
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-secondary);cursor:pointer;white-space:nowrap">
+          <input type="checkbox" name="send_email" value="on" checked>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          Also send as email
+        </label>
+        <div style="display:flex;gap:8px">
+          <a href="{% url 'communications:broadcast_edit' broadcast.pk %}" class="btn-secondary btn-sm">Edit</a>
+          {% if perms.communications.delete_broadcast %}
+          <button type="button" class="btn-secondary btn-sm" style="color:var(--red)"
+              onclick="confirmDeleteModal({title:'Delete Draft?',body:'Are you sure you want to delete this draft broadcast?',confirmText:'Delete Draft',url:'{% url 'communications:broadcast_delete' broadcast.pk %}'})">Delete</button>
+          {% endif %}
+          <button type="submit" class="btn-primary" onclick="return confirm('Send this broadcast to all selected recipients now?')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            Send Broadcast Now
+          </button>
+        </div>
+      </form>
+    {% elif broadcast.status == 'sent' %}
+      <div style="font-size:12px;color:var(--text-muted)">Sent to {{ broadcast.recipient_count }} recipients on {{ broadcast.sent_at|date:"d M Y, H:i" }}</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

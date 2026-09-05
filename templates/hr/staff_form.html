@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% load hodari_forms %}
+{% block title %}{% if form.instance.pk %}Onboard{% else %}New{% endif %} Staff member — {{ brand.school_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .onboarding-container { max-width: 800px; margin: 0 auto; }
+  .stepper { display: flex; justify-content: space-between; margin-bottom: 40px; position: relative; }
+  .stepper::before { content: ''; position: absolute; top: 18px; left: 0; right: 0; height: 2px; background: var(--border); z-index: 0; }
+  .step { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; }
+  .step-circle { width: 38px; height: 38px; border-radius: 50%; background: var(--bg-card); border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--text-muted); transition: all 0.3s ease; }
+  .step-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  
+  .step.active .step-circle { border-color: var(--hodari-blue); background: var(--hodari-blue); color: white; box-shadow: 0 0 0 4px rgba(2, 58, 165, 0.1); }
+  .step.active .step-label { color: var(--hodari-blue); }
+  .step.completed .step-circle { border-color: var(--green); background: var(--green); color: white; }
+  .step.completed .step-label { color: var(--green); }
+
+  .step-content { display: none; animation: fadeIn 0.4s ease; }
+  .step-content.active { display: block; }
+  
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  
+  .form-actions { display: flex; justify-content: space-between; margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border); }
+  .btn-nav { padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; border: 1px solid transparent; }
+  .btn-prev { background: var(--bg-page); border-color: var(--border); color: var(--text-secondary); }
+  .btn-next { background: var(--hodari-blue); color: white; }
+  .btn-submit { background: var(--green); color: white; display: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "hr/_top_tabs.html" %}
+<div class="onboarding-container">
+  <div class="section-hdr">
+    <span class="section-title">Teacher Onboarding</span>
+    <span class="chip chip-blue">Staff ID: {{ form.instance.employee_id|default:"Pending" }}</span>
+  </div>
+
+  <div class="stepper">
+    <div class="step active" id="s1">
+      <div class="step-circle">1</div>
+      <div class="step-label">Personal Details</div>
+    </div>
+    <div class="step" id="s2">
+      <div class="step-circle">2</div>
+      <div class="step-label">Professional Info</div>
+    </div>
+    <div class="step" id="s3">
+      <div class="step-circle">3</div>
+      <div class="step-label">Certifications</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <form method="post" enctype="multipart/form-data" id="onboardingForm">
+      {% csrf_token %}
+      
+      <!-- Step 1: Personal -->
+      <div class="step-content active" id="content1">
+        <div class="card-title" style="margin-bottom: 24px;">Personal Information</div>
+        <div class="hf2-grid-2">
+           {% field form.full_name %}
+           {% field form.contact_phone %}
+        </div>
+        <div style="margin-top: 16px;">
+           {% field form.contact_email %}
+        </div>
+      </div>
+
+      <!-- Step 2: Professional -->
+      <div class="step-content" id="content2">
+        <div class="card-title" style="margin-bottom: 24px;">Employment & Job Details</div>
+        <div class="hf2-grid-2">
+           {% field form.employee_id %}
+           {% field form.job_title %}
+        </div>
+        <div class="hf2-grid-2" style="margin-top: 16px;">
+           {% field form.department %}
+           {% field form.employment_start_date %}
+        </div>
+      </div>
+
+      <!-- Step 3: Documents -->
+      <div class="step-content" id="content3">
+        <div class="card-title" style="margin-bottom: 24px;">Certifications & Documents</div>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 24px;">Please upload scans or professional copies of your teaching credentials and identification documents.</p>
+        
+        <div style="display: grid; gap: 20px;">
+          <div style="background: #F8FAFC; border: 1.5px dashed var(--border); border-radius: 12px; padding: 20px;">
+             {% field form.certification_file %}
+          </div>
+          <div style="background: #F8FAFC; border: 1.5px dashed var(--border); border-radius: 12px; padding: 20px;">
+             {% field form.id_document %}
+          </div>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn-nav btn-prev" id="prevBtn" onclick="changeStep(-1)" style="visibility: hidden;">Back</button>
+        <div style="display: flex; gap: 12px;">
+          <a href="{% url 'hr:staff_list' %}" class="btn-nav btn-prev" style="text-decoration:none">Cancel Onboarding</a>
+          <button type="button" class="btn-nav btn-next" id="nextBtn" onclick="changeStep(1)">Continue</button>
+          {% if form.instance.pk %}
+            {% has_perm user "hr.change_staffprofile" as can_save %}
+          {% else %}
+            {% has_perm user "hr.add_staffprofile" as can_save %}
+          {% endif %}
+          {% if can_save %}
+          <button type="submit" class="btn-nav btn-submit" id="submitBtn">Finalize & Save Profile</button>
+          {% endif %}
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  let currentStep = 1;
+  const totalSteps = 3;
+
+  function changeStep(n) {
+    // Basic validation for Step 1
+    if (n === 1 && currentStep === 1) {
+      const name = document.querySelector('[name="full_name"]').value;
+      const email = document.querySelector('[name="contact_email"]').value;
+      if (!name || !email) {
+        alert("Please fill in the required personal details.");
+        return;
+      }
+    }
+
+    document.getElementById(`content${currentStep}`).classList.remove('active');
+    document.getElementById(`s${currentStep}`).classList.remove('active');
+    if (n === 1) document.getElementById(`s${currentStep}`).classList.add('completed');
+    
+    currentStep += n;
+
+    document.getElementById(`content${currentStep}`).classList.add('active');
+    document.getElementById(`s${currentStep}`).classList.add('active');
+    document.getElementById(`s${currentStep}`).classList.remove('completed');
+
+    // Button visibility
+    document.getElementById('prevBtn').style.visibility = currentStep === 1 ? 'hidden' : 'visible';
+    
+    if (currentStep === totalSteps) {
+      document.getElementById('nextBtn').style.display = 'none';
+      document.getElementById('submitBtn').style.display = 'block';
+    } else {
+      document.getElementById('nextBtn').style.display = 'block';
+      document.getElementById('submitBtn').style.display = 'none';
+    }
+  }
+</script>
+{% endblock %}

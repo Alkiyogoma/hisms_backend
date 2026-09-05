@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% load hodari_forms %}
+{% block title %}Invoices &mdash; Finance &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Finance{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+<div class="section-hdr">
+  <span class="section-title">Student Invoices</span>
+  <div style="display:flex;align-items:center;gap:8px">
+    <a href="{% url 'finance:dashboard' %}" class="btn btn-secondary btn-sm">&larr; Dashboard</a>
+  </div>
+</div>
+
+<!-- Metric Summary Cards -->
+<div class="metrics" style="grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Total billed</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#023AA5">{{ total_billed|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#5A697D">All invoices</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF9F0,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Collected</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#059669">{{ total_collected|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#059669">Payments received</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FFF0F0,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Overdue</span>
+      <span class="mc-currency" style="background:#FEE2E2;color:#DC2626">{{ overdue_count }}</span>
+    </div>
+    <div class="mc-val" style="color:#DC2626">{{ overdue_count }}</div>
+    <div class="mc-sub" style="color:#DC2626">Past due date</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FFF8ED,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Open invoices</span>
+      <span class="mc-currency">{{ open_count }}</span>
+    </div>
+    <div class="mc-val" style="color:#B45309">{{ open_count }}</div>
+    <div class="mc-sub" style="color:#B45309">Not yet paid</div>
+  </div>
+</div>
+
+<!-- Filter bar -->
+<div class="card" style="padding:14px 16px;margin-bottom:16px">
+  <form method="get" id="filterForm">
+    <div class="hf2-toolbar" style="margin:0;flex-wrap:wrap">
+      <div class="hf2-search-wrap" style="flex:1;min-width:200px">
+        <svg class="hf2-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" name="q" value="{{ q }}" class="hf2-search" placeholder="Search name, ID, or invoice #...">
+      </div>
+      <select name="status" class="hf2-select" style="width:auto;min-width:130px" onchange="this.form.submit()">
+        <option value="">All statuses</option>
+        {% for code, label in statuses %}
+        <option value="{{ code }}" {% if selected_status == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <select name="term" class="hf2-select" style="width:auto;min-width:130px" onchange="this.form.submit()">
+        <option value="">All terms</option>
+        {% for t in terms %}
+        <option value="{{ t.pk }}" {% if selected_term|slugify == t.pk|slugify %}selected{% endif %}>{{ t.name }} ({{ t.academic_year.name }})</option>
+        {% endfor %}
+      </select>
+      <input type="date" name="from" class="hf2-input" style="width:140px" value="{{ date_from }}" placeholder="From">
+      <input type="date" name="to" class="hf2-input" style="width:140px" value="{{ date_to }}" placeholder="To">
+      <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+      <a href="{% url 'finance:invoice_list' %}" class="btn btn-secondary btn-sm">Reset</a>
+    </div>
+  </form>
+</div>
+
+<div class="card" style="padding:0;overflow:hidden">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg-metric)">
+    <span style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">
+      {{ invoices|length }} invoice{% if invoices|length != 1 %}s{% endif %}
+    </span>
+    {% has_perm user "finance.view_invoice" as can_print %}
+    {% if can_print %}
+    <button type="button" class="btn btn-secondary btn-sm" onclick="bulkPrint()" id="bulkPrintBtn" disabled style="font-size:11px">
+      Print selected (0)
+    </button>
+    {% endif %}
+  </div>
+  <form id="bulkForm" method="get" action="{% url 'finance:bulk_invoice_print' %}">
+  <table style="width:100%;border-collapse:collapse">
+    <thead>
+      <tr style="text-align:left;background:var(--bg-metric);border-bottom:1px solid var(--border)">
+        <th style="padding:10px 10px;width:36px">
+          <input type="checkbox" id="selectAll" onchange="toggleAll(this)" style="width:16px;height:16px;cursor:pointer">
+        </th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Invoice #</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Student</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Term</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Total due</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Due date</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Status</th>
+        <th style="padding:10px 14px"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for inv in invoices %}
+      <tr style="border-bottom:1px solid var(--border);font-size:13px;transition:background .1s" onmouseover="this.style.background='var(--bg-metric)'" onmouseout="this.style.background=''">
+        <td style="padding:10px 10px">
+          <input type="checkbox" name="ids" value="{{ inv.pk }}" class="invoice-check" onchange="updateBulkBtn()" style="width:16px;height:16px;cursor:pointer">
+        </td>
+        <td style="padding:10px 14px;font-family:var(--font-mono);font-size:12px;color:var(--text-muted)">{{ inv.invoice_number|default:"N/A" }}</td>
+        <td style="padding:10px 14px">
+          {% if inv.student %}
+            <div style="font-weight:600">{{ inv.student.first_name }} {{ inv.student.last_name }}</div>
+            <div style="font-size:11px;color:var(--text-muted)">{{ inv.student.admission_no }}</div>
+          {% elif inv.applicant %}
+            <div style="font-weight:600">{{ inv.applicant.child_full_name }}</div>
+            <div style="font-size:11px;color:var(--text-muted)">{{ inv.applicant.reference_number }}</div>
+          {% else %}
+            <div style="font-weight:600;color:var(--text-muted)">N/A</div>
+          {% endif %}
+        </td>
+        <td style="padding:10px 14px;color:var(--text-secondary);font-size:12px">{{ inv.term.name|default:"N/A" }}</td>
+        <td style="padding:10px 14px;font-weight:700;font-family:var(--font-mono)">TZS {{ inv.total_due|floatformat:0 }}</td>
+        <td style="padding:10px 14px;font-family:var(--font-mono);font-size:12px">
+          {% if inv.due_date %}{{ inv.due_date|date:"d M Y" }}{% else %}N/A{% endif %}
+        </td>
+        <td style="padding:10px 14px">
+          <span class="chip chip-{% if inv.status == 'paid' %}green{% elif inv.status == 'overdue' %}red{% elif inv.status == 'partial' %}amber{% else %}grey{% endif %}">
+            {{ inv.get_status_display }}
+          </span>
+        </td>
+        <td style="padding:10px 14px;text-align:right">
+          <a href="{% url 'finance:invoice_detail' inv.pk %}" class="btn btn-secondary btn-sm" style="padding:3px 8px;font-size:11px">View</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="8" style="padding:32px;text-align:center">
+        {% include '_partials/empty_state.html' with title='No invoices found' desc='No invoices match your current filters.' icon='search' icon_color='grey' %}
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </form>
+
+  {% if is_paginated %}
+  <div style="display:flex;align-items:center;justify-content:center;gap:12px;padding:14px 16px;border-top:1px solid var(--border)">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_term %}&term={{ selected_term }}{% endif %}" class="btn btn-secondary btn-sm">&larr; Prev</a>
+    {% endif %}
+    <span style="font-size:13px;color:var(--text-muted)">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_term %}&term={{ selected_term }}{% endif %}" class="btn btn-secondary btn-sm">Next &rarr;</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleAll(master) {
+  document.querySelectorAll('.invoice-check').forEach(cb => cb.checked = master.checked);
+  updateBulkBtn();
+}
+function updateBulkBtn() {
+  const checked = document.querySelectorAll('.invoice-check:checked').length;
+  const btn = document.getElementById('bulkPrintBtn');
+  btn.disabled = checked === 0;
+  btn.textContent = `Print selected (${checked})`;
+}
+function bulkPrint() {
+  const checked = document.querySelectorAll('.invoice-check:checked');
+  if (checked.length === 0) return;
+  const ids = Array.from(checked).map(cb => cb.value).join(',');
+  const baseUrl = document.getElementById('bulkForm').action;
+  window.open(baseUrl + '?ids=' + ids, '_blank');
+}
+</script>
+{% endblock %}

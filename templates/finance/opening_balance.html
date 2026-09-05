@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Opening Balances &mdash; {{ period.name }} &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Opening Balances{% endblock %}
+{% block topbar_date %}{{ period.name }}{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:13px">
+  <a href="{% url 'finance:dashboard' %}" style="color:var(--hodari-blue);text-decoration:none;font-weight:500">Dashboard</a>
+  <span style="color:var(--text-muted)">&rarr;</span>
+  <a href="{% url 'finance:period_list' %}" style="color:var(--hodari-blue);text-decoration:none;font-weight:500">Periods</a>
+  <span style="color:var(--text-muted)">&rarr;</span>
+  <a href="{% url 'finance:period_detail' pk=period.pk %}" style="color:var(--hodari-blue);text-decoration:none;font-weight:500">{{ period.name }}</a>
+  <span style="color:var(--text-muted)">&rarr;</span>
+  <span style="color:var(--text-secondary);font-weight:500">Opening Balances</span>
+</div>
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+  <div>
+    <h1 style="font-family:var(--font-display);font-size:20px;font-weight:700;color:var(--text-primary);margin:0">Opening Balances</h1>
+    <p style="font-size:13px;color:var(--text-muted);margin:4px 0 0 0">{{ period.name }}</p>
+  </div>
+  {% if period.is_reconciled %}
+  <span class="chip chip-grey">Period is reconciled — read-only</span>
+  {% endif %}
+</div>
+
+<!-- Summary Cards -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px">
+  <div class="metric-compact" style="background:linear-gradient(135deg,#ECFDF5,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Total Debit</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#059669">{{ total_debit|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#059669">Assets / Receivables</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FEF2F2,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Total Credit</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#DC2626">{{ total_credit|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#DC2626">Liabilities / Payables</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Net Balance</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="{% if net_balance >= 0 %}color:#059669{% else %}color:#DC2626{% endif %}">{{ net_balance|floatformat:0 }}</div>
+    <div class="mc-sub">Debit minus Credit</div>
+  </div>
+</div>
+
+<div class="grid-2" style="gap:20px">
+  <!-- Add Entry Form -->
+  {% if not period.is_reconciled %}
+  <div class="card">
+    <div class="card-title" style="margin-bottom:14px">Add Opening Balance Entry</div>
+    {% has_perm user "finance.change_financeperiod" as can_edit %}
+    {% if can_edit %}
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="add">
+
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Balance Type *</label>
+        <select name="balance_type" class="hf2-select" style="width:100%">
+          {% for code, label in balance_types %}
+          <option value="{{ code }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Description *</label>
+        <input type="text" name="description" required class="hf2-input" style="width:100%" placeholder="e.g. Opening cash on hand">
+      </div>
+
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Amount (TZS) *</label>
+        <input type="number" name="amount" step="0.01" min="1" required class="hf2-input" style="width:100%" placeholder="100000">
+      </div>
+
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Type</label>
+        <label style="display:inline-flex;align-items:center;gap:6px;margin-right:16px;cursor:pointer">
+          <input type="radio" name="is_debit" value="true" checked> Debit (Asset)
+        </label>
+        <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="radio" name="is_debit" value="false"> Credit (Liability)
+        </label>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Reference</label>
+        <input type="text" name="reference" class="hf2-input" style="width:100%" placeholder="Optional reference document">
+      </div>
+
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Notes</label>
+        <textarea name="notes" class="hf2-input" style="width:100%;min-height:60px;resize:vertical" placeholder="Optional notes"></textarea>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-sm">Add Entry</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Existing Balances -->
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="padding:14px 16px 0">
+      <div class="card-title" style="margin-bottom:12px">Current Entries</div>
+    </div>
+    {% if balances %}
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="text-align:left;background:var(--bg-metric);border-bottom:1px solid var(--border)">
+          <th style="padding:8px 12px;font-size:10.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase">Type</th>
+          <th style="padding:8px 12px;font-size:10.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase">Description</th>
+          <th style="padding:8px 12px;font-size:10.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;text-align:right">Amount</th>
+          <th style="padding:8px 12px;font-size:10.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;text-align:center">D/C</th>
+          {% if not period.is_reconciled %}
+          <th style="padding:8px 12px;font-size:10.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase"></th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in balances %}
+        <tr style="border-bottom:1px solid var(--border);font-size:12.5px">
+          <td style="padding:8px 12px"><span class="chip chip-grey">{{ b.get_balance_type_display }}</span></td>
+          <td style="padding:8px 12px;font-weight:500">{{ b.description }}</td>
+          <td style="padding:8px 12px;font-family:var(--font-mono);text-align:right;font-weight:600">TZS {{ b.amount|floatformat:0 }}</td>
+          <td style="padding:8px 12px;text-align:center;font-weight:700">
+            {% if b.is_debit %}
+            <span style="color:var(--green)">Dr</span>
+            {% else %}
+            <span style="color:#DC2626">Cr</span>
+            {% endif %}
+          </td>
+          {% if not period.is_reconciled %}
+          <td style="padding:8px 12px;text-align:center">
+            {% has_perm user "finance.change_financeperiod" as can_edit %}
+            {% if can_edit %}
+            <button type="button" class="btn btn-sm" style="background:none;border:none;color:#DC2626;cursor:pointer;padding:2px 6px;font-size:11px"
+              onclick="confirmDeleteModal({title:'Remove Entry?',body:'Are you sure you want to remove this opening balance entry?',detail:'This action cannot be undone.',confirmText:'Remove Entry',url:'',type:'danger',extraData:[{name:'action',value:'delete'},{name:'entry_id',value:'{{ b.pk }}'}]})">
+              Remove
+            </button>
+            {% endif %}
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="padding:32px;text-align:center">
+      {% include '_partials/empty_state.html' with title='No opening balance entries' desc='Add entries to establish opening balances for this period.' icon='doc' icon_color='grey' %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div style="margin-top:16px">
+  <a href="{% url 'finance:period_detail' pk=period.pk %}" class="btn btn-secondary btn-sm">&larr; Back to Period</a>
+</div>
+{% endblock %}

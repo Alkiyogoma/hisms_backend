@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block title %}PTC - Enrichment Grades{% endblock %}
+
+{% block extra_head %}
+<style>
+  .egrid { display:grid; grid-template-columns: 260px 1fr; gap:20px; align-items:start; }
+  .sidebar-card { background:#fff; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .sidebar-hdr { padding:12px 16px; background:var(--hodari-blue); color:#fff; font-size:13px; font-weight:700; display:flex; align-items:center; gap:8px; }
+  .sidebar-list { max-height:calc(100vh - 220px); overflow-y:auto; }
+  .s-item { display:flex; align-items:center; gap:10px; padding:10px 14px; cursor:pointer; border-bottom:1px solid #F0F4FB; transition:background .1s; }
+  .s-item:hover { background:#F7F9FC; }
+  .s-item.active { background:var(--hodari-blue-pale,#E8EEF9); border-left:3px solid var(--hodari-blue); }
+  .s-avatar { width:30px; height:30px; border-radius:50%; background:var(--hodari-blue-pale,#E8EEF9); color:var(--hodari-blue); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; flex-shrink:0; }
+  .s-name { flex:1; font-size:12px; font-weight:600; color:var(--text-primary); }
+  .s-class { font-size:10px; color:var(--text-muted); }
+  .content-card { background:#fff; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .content-hdr { padding:14px 20px; background:var(--hodari-blue); color:#fff; display:flex; align-items:center; gap:12px; }
+  .content-hdr h3 { margin:0; font-size:15px; font-weight:700; }
+  .content-hdr .sub { font-size:11px; opacity:.75; }
+  .grade-btn { display:inline-flex; align-items:center; justify-content:center; min-width:44px; height:32px; padding:0 10px; border-radius:6px; border:2px solid var(--border); background:#fff; cursor:pointer; font-size:12px; font-weight:700; transition:all .12s; user-select:none; }
+  .grade-btn:hover { transform:translateY(-1px); box-shadow:0 2px 6px rgba(0,0,0,.08); }
+  .grade-btn.selected { transform:translateY(-1px); box-shadow:0 2px 8px rgba(0,0,0,.12); }
+  .grade-btn.grade-a-star { border-color:#B7DFBF; color:#1B7B34; }
+  .grade-btn.grade-a-star.selected { background:#E8F5EC; border-color:#1B7B34; }
+  .grade-btn.grade-a { border-color:#B7DFBF; color:#1B7B34; }
+  .grade-btn.grade-a.selected { background:#E8F5EC; border-color:#1B7B34; }
+  .grade-btn.grade-b { border-color:#BFCFE9; color:var(--hodari-blue); }
+  .grade-btn.grade-b.selected { background:#E8EEF9; border-color:var(--hodari-blue); }
+  .grade-btn.grade-c { border-color:#FCD34D; color:#92550A; }
+  .grade-btn.grade-c.selected { background:#FEF3C7; border-color:#F59E0B; }
+  .grade-btn.grade-d { border-color:#FECACA; color:#9B1C1C; }
+  .grade-btn.grade-d.selected { background:#FEF2F2; border-color:#DC2626; }
+  .grade-btn.grade-e { border-color:#FECACA; color:#9B1C1C; }
+  .grade-btn.grade-e.selected { background:#FEF2F2; border-color:#DC2626; }
+  .grade-btn.grade-na { border-color:var(--border); color:var(--text-muted); }
+  .grade-btn.grade-na.selected { background:#F7F9FC; border-color:var(--text-muted); }
+  .lock-badge { display:inline-flex; align-items:center; gap:4px; padding:4px 14px; border-radius:99px; font-size:12px; font-weight:700; background:#F7F9FC; color:var(--text-muted); border:1px solid var(--border); }
+  .subj-row { display:flex; align-items:center; padding:12px 20px; border-bottom:1px solid #F0F4FB; gap:12px; }
+  .subj-label { flex:1; font-size:13px; font-weight:600; color:var(--text-primary); }
+  .subj-grade { display:flex; gap:4px; flex-wrap:wrap; }
+  @media (max-width:768px) { .egrid { grid-template-columns:1fr; } .sidebar-list { max-height:180px; } }
+</style>
+{% endblock %}
+
+{% block topbar_greeting %}
+<h1 class="topbar-title">Enrichment Grade Entry</h1>
+{% endblock %}
+
+{% block content %}
+{% include "ptc/_top_tabs.html" %}
+<div style="max-width:1100px;margin:0 auto">
+
+  <div style="background:#F7F9FC;border:1px solid var(--border);border-radius:8px;padding:8px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <span style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase">Key:</span>
+    <span style="padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;background:#E8F5EC;color:#1B7B34">A*</span><span style="font-size:11px;color:var(--text-secondary)">90-100</span>
+    <span style="padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;background:#E8F5EC;color:#1B7B34">A</span><span style="font-size:11px;color:var(--text-secondary)">80-89</span>
+    <span style="padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;background:#E8EEF9;color:var(--hodari-blue)">B</span><span style="font-size:11px;color:var(--text-secondary)">70-79</span>
+    <span style="padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;background:#FEF3C7;color:#92550A">C</span><span style="font-size:11px;color:var(--text-secondary)">60-69</span>
+    <span style="padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;background:#FEF2F2;color:#9B1C1C">D</span><span style="font-size:11px;color:var(--text-secondary)">50-59</span>
+    <span style="padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;background:#FEF2F2;color:#9B1C1C">E</span><span style="font-size:11px;color:var(--text-secondary)">0-49</span>
+  </div>
+
+  {% if not students_data %}
+  <div style="padding:20px">
+    {% include '_partials/empty_state.html' with icon='doc' icon_color='grey' title='No enrichment subjects assigned' desc='Enrichment subjects will appear here once assigned.' %}
+  </div>
+  {% else %}
+
+  <form method="post" id="enrichmentForm">
+    {% csrf_token %}
+    <div class="egrid">
+      <!-- Sidebar: student list -->
+      <div class="sidebar-card">
+        <div class="sidebar-hdr">
+          <span>Students</span>
+          <span style="margin-left:auto;font-size:11px;opacity:.8" id="countBadge">{{ students_data|length }}</span>
+        </div>
+        <div class="sidebar-list" id="studentSidebar">
+          {% for item in students_data %}
+          <div class="s-item {% if forloop.first %}active{% endif %}" data-id="{{ item.student.id }}" onclick="selectStudent(this)">
+            <div class="s-avatar">{{ item.student.first_name|slice:":1" }}{{ item.student.last_name|first }}.</div>
+            <div style="flex:1;min-width:0">
+              <div class="s-name">{{ item.student.first_name }} {{ item.student.last_name|first }}.</div>
+              <div class="s-class">{{ item.student.class_name }}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Main panel -->
+      <div>
+        <div class="content-card">
+          <div class="content-hdr">
+            <h3 id="contentName">Select a student</h3>
+            <span class="sub" id="contentMeta"></span>
+          </div>
+          <div id="contentRows"></div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:14px;justify-content:space-between">
+          <button type="button" class="hf-btn" onclick="prevStudent()" style="padding:8px 18px;font-size:13px">Previous</button>
+          <button type="submit" style="padding:8px 24px;border-radius:7px;font-size:13px;font-weight:600;background:var(--hodari-blue);color:#fff;border:none;cursor:pointer">
+            Save All Grades
+          </button>
+          <button type="button" class="hf-btn hf-btn-primary" onclick="nextStudent()" style="padding:8px 18px;font-size:13px">Next</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="hiddenInputs"></div>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+var SUBJECTS = {{ enrichment_subjects_json|safe }};
+var DATA = {{ enrichment_json|safe }};
+
+function renderStudent(id) {
+  var d = DATA.find(function(x) { return x.id == id; });
+  if (!d) return;
+  document.getElementById('contentName').textContent = d.first + ' ' + d.last;
+  document.getElementById('contentMeta').textContent = d.class + ' | ' + d.adm;
+
+  var html = '';
+  for (var i = 0; i < d.subjects.length; i++) {
+    var sg = d.subjects[i];
+    html += '<div class="subj-row">';
+    html += '<div class="subj-label">' + sg.subject_name + '</div>';
+    html += '<div class="subj-grade">';
+    if (sg.is_locked) {
+      html += '<span class="lock-badge">' + (sg.grade || '-') + ' locked</span>';
+    } else {
+      var grades = ['A*', 'A', 'B', 'C', 'D', 'E'];
+      for (var g = 0; g < grades.length; g++) {
+        var grade = grades[g];
+        var sel = sg.grade === grade;
+        var gclass = grade === 'A*' ? 'a-star' : grade.toLowerCase();
+        html += '<button type="button" class="grade-btn grade-' + gclass + (sel ? ' selected' : '') + (sel ? '' : ' grade-na') + '" ' +
+                'data-student="' + id + '" data-subject="' + sg.subject_id + '" onclick="selectGrade(this,\'' + grade + '\')">' + grade + '</button>';
+      }
+    }
+    html += '</div></div>';
+  }
+  document.getElementById('contentRows').innerHTML = html;
+  // Re-init grade-na for unselected
+  document.querySelectorAll('.grade-btn:not(.selected)').forEach(function(b) {
+    if (!b.classList.contains('grade-na')) b.classList.add('grade-na');
+  });
+}
+
+function selectStudent(el) {
+  document.querySelectorAll('.s-item').forEach(function(s) { s.classList.remove('active'); });
+  el.classList.add('active');
+  renderStudent(el.getAttribute('data-id'));
+}
+
+function nextStudent() {
+  var active = document.querySelector('.s-item.active');
+  var next = active ? active.nextElementSibling : null;
+  if (next) selectStudent(next);
+}
+
+function prevStudent() {
+  var active = document.querySelector('.s-item.active');
+  var prev = active ? active.previousElementSibling : null;
+  if (prev) selectStudent(prev);
+}
+
+function selectGrade(btn, grade) {
+  var container = btn.parentNode;
+  container.querySelectorAll('.grade-btn').forEach(function(b) {
+    b.classList.remove('selected');
+    b.className = b.className.replace(/grade-\w+/g, '').trim() + ' grade-btn grade-na';
+  });
+  btn.classList.remove('grade-na');
+  btn.classList.add('selected');
+  var gclass = grade === 'A*' ? 'a-star' : grade.toLowerCase();
+  btn.className = btn.className.replace(/grade-\w+/g, '').trim() + ' grade-btn grade-' + gclass;
+
+  var student = btn.getAttribute('data-student');
+  var subject = btn.getAttribute('data-subject');
+  var inputName = 'grade_' + student + '_' + subject;
+  var existing = document.querySelector('input[name="' + inputName + '"]');
+  if (existing) {
+    existing.value = grade;
+  } else {
+    var input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = inputName;
+    input.value = grade;
+    document.getElementById('hiddenInputs').appendChild(input);
+  }
+}
+
+// Init: show first student
+document.addEventListener('DOMContentLoaded', function() {
+  if (DATA.length > 0) renderStudent(DATA[0].id);
+});
+</script>
+{% endblock %}

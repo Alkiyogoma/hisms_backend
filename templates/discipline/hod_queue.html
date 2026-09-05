@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Discipline Review Queue — {{ brand.school_name }}{% endblock %}
+
+{% block topbar_greeting %}Discipline Review Queue{% endblock %}
+{% block topbar_date %}{{ today_date }}{% endblock %}
+
+{% block content %}
+{% include "discipline/_top_tabs.html" %}
+<div class="section-hdr">
+  <span class="section-title">Incidents requiring review</span>
+</div>
+
+<!-- Stats -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px">
+  {% include '_partials/stat_card.html' with label='Pending Review' value=stats.pending sub='Awaiting your action' variant='red' %}
+  {% include '_partials/stat_card.html' with label='High / Critical' value=stats.high_critical sub='Requires immediate attention' variant='amber' %}
+  {% include '_partials/stat_card.html' with label='Total Incidents' value=stats.total sub='All time in department' variant='blue' %}
+</div>
+
+<!-- Pending List -->
+<div class="card">
+  {% if pending_incidents %}
+    {% for inc in pending_incidents %}
+      <div style="display:flex;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border);{% if forloop.first %}border-top:none{% endif %}">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span class="chip {% if inc.severity == 'critical' or inc.severity == 'high' %}chip-red{% elif inc.severity == 'medium' %}chip-amber{% else %}chip-blue{% endif %}" style="font-size:10px">
+              {{ inc.get_severity_display }}
+            </span>
+            <span style="font-size:14px;font-weight:700;color:#1A1A2E">{{ inc.student.first_name }} {{ inc.student.last_name }}</span>
+            <span style="font-size:12px;color:#64748B">&middot; {{ inc.student.class_name }}</span>
+          </div>
+          <div style="font-size:12.5px;color:#475569;line-height:1.4;margin-bottom:4px">{{ inc.summary|truncatechars:150 }}</div>
+          <div style="font-size:11px;color:#94A3B8">
+            Reported by {{ inc.reported_by.get_full_name|default:inc.reported_by.username }}
+            &middot; {{ inc.created_at|timesince }} ago
+          </div>
+        </div>
+        <div style="flex-shrink:0;margin-left:16px">
+          <a href="{% url 'discipline:detail' inc.pk %}" class="hf-btn hf-btn-primary" style="padding:7px 16px;font-size:12px;text-decoration:none;white-space:nowrap">
+            Review →
+          </a>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    {% include '_partials/empty_state.html' with icon='check' icon_color='green' title='All caught up' desc='No discipline incidents pending review.' %}
+  {% endif %}
+</div>
+{% endblock %}

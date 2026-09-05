@@ -1,0 +1,61 @@
+260:       {% endif %}
+261:     </div>
+262:   </div>
+263: 
+264:   <!-- Actions -->
+265:   <div class="profile-actions">
+266:     {% if request.user.role in "super_admin,admin_officer" %}
+267:       <a href="{% url 'students:edit' student.pk %}" class="hf-btn hf-btn-primary" style="white-space:nowrap">
+268:         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+269:         Edit Profile
+270:       </a>
+271:     {% endif %}
+272:     <a href="{% url 'students:print_id' student.pk %}" target="_blank" class="hf-btn hf-btn-secondary" style="white-space:nowrap">
+273:       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+274:       Print ID
+275:     </a>
+276:     {% if request.user.role in "super_admin,admin_officer" %}
+277:       {% if student.is_archived %}
+278:         <form method="post" action="{% url 'students:restore' student.pk %}" style="margin:0">
+279:           {% csrf_token %}
+280:           <button type="submit" class="hf-btn hf-btn-secondary" style="white-space:nowrap; color:#16a34a; border-color:#BBF7D0">
+281:             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+282:             Restore
+283:           </button>
+284:         </form>
+285:       {% else %}
+286:         <form method="post" action="{% url 'students:archive' student.pk %}" style="margin:0" onsubmit="return confirm('Are you sure you want to archive {{ student.first_name }} {{ student.last_name }}? This will mark them as Withdrawn.')">
+287:           {% csrf_token %}
+288:           <button type="submit" class="hf-btn hf-btn-secondary" style="white-space:nowrap; color:#d97706; border-color:#FDE68A">
+289:             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+290:             Archive
+291:           </button>
+292:         </form>
+293:       {% endif %}
+294:     {% endif %}
+295:     {% if request.user.role == "super_admin" %}
+296:       <form method="post" action="{% url 'students:delete' student.pk %}" style="margin:0" onsubmit="return confirm('Permanently delete {{ student.first_name }} {{ student.last_name }}? This cannot be undone.')">
+297:         {% csrf_token %}
+298:         <button type="submit" class="hf-btn hf-btn-secondary" style="white-space:nowrap; color:#dc2626; border-color:#FECACA">
+299:           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+300:           Delete
+301:         </button>
+302:       </form>
+303:     {% endif %}
+304:   </div>
+305: </div>
+306: 
+307: <!-- 
+308:      MAIN CONTENT: TWO-COLUMN LAYOUT
+309:       -->
+310: <div style="display:grid; grid-template-columns: 1fr 340px; gap:24px; align-items:start">
+311: 
+312:   <!--  LEFT COLUMN  -->
+313:   <div style="display:flex; flex-direction:column; gap:24px">
+314: 
+315:     <!-- 1. Academic & Attendance Performance -->
+316:     <div class="card" style="border-top: 4px solid var(--hodari-blue)">
+317:       <div class="card-title-row">
+318:         <h2 class="card-title" style="margin:0">Academic & Attendance Performance</h2>
+319:         {% if recent_report %}
+320:           <a href="{% url 'academics:report_preview' recent_report.pk %}" class="section-link">View Full Report →</a>

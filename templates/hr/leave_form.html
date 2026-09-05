@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% load static %}
+
+{% block title %}New Leave Request — {{ brand.school_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  :root {
+    --hodari-blue: #023AA5; --hodari-blue-dark: #012880; --hodari-blue-mid: #1A56C4;
+    --hodari-blue-light: #E8EEF9; --hodari-blue-pale: #F0F4FB;
+    --hodari-gold: #FBBC05; --hodari-gold-dark: #E0A800; --hodari-gold-light: #FEF3C7;
+    --hodari-charcoal: #474747; --hodari-charcoal-lt: #6B6B6B;
+    --bg-page: #F2F5FA; --bg-card: #FFFFFF; --bg-sidebar: #023AA5;
+    --text-primary: #1A1A2E; --text-secondary: #474747; --text-muted: #8492A6;
+    --border: #DDE3EE; --border-strong: #B8C4D8;
+    --green: #1B7B34; --green-bg: #E8F5EC;
+    --amber: #92550A; --amber-bg: #FEF3C7;
+    --red: #9B1C1C; --red-bg: #FEF2F2;
+    --blue-st: #023AA5; --blue-st-bg: #E8EEF9;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Roboto', sans-serif; background: var(--bg-page); color: var(--text-primary); }
+  .leave-form-page { padding: 24px 28px; max-width: 700px; margin: 0 auto; }
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin-bottom: 24px; }
+  .section-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); font-weight: 500; margin-bottom: 16px; }
+  .form-group { margin-bottom: 18px; }
+  .form-group label { display: block; font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; }
+  .hf2-input, .hf2-select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 14px; background: #fff; transition: border-color .15s; }
+  .hf2-input:focus, .hf2-select:focus { outline: none; border-color: var(--hodari-blue); box-shadow: 0 0 0 3px var(--hodari-blue-light); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .btn-primary { background: var(--hodari-blue); color: #fff; border: none; padding: 10px 24px; border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; }
+  .btn-primary:hover { background: var(--hodari-blue-dark); }
+  .btn-secondary { background: #fff; color: var(--hodari-blue); border: 1px solid var(--border-strong); padding: 10px 24px; border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; text-decoration: none; display: inline-block; }
+  .btn-secondary:hover { border-color: var(--hodari-blue); }
+  .actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "hr/_top_tabs.html" %}
+<div class="leave-form-page">
+  <h1 style="font-family:'Merriweather',serif;font-size:22px;font-weight:700;color:var(--text-primary);margin-bottom:24px;">New Leave Request</h1>
+
+  <div class="card">
+    <form method="POST" enctype="multipart/form-data">
+      {% csrf_token %}
+
+      {% if not selected_staff %}
+      <div class="form-group">
+        <label>Staff Member</label>
+        <select name="staff" class="hf2-select" required>
+          <option value="">-- Select Staff --</option>
+          {% for s in staff_list %}
+          <option value="{{ s.pk }}">{{ s.full_name }} ({{ s.job_title }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% else %}
+      <div class="form-group">
+        <label>Staff Member</label>
+        <p style="font-size:14px;font-weight:500;padding:8px 0;">{{ selected_staff.full_name }}</p>
+        <input type="hidden" name="staff" value="{{ selected_staff.pk }}">
+      </div>
+      {% endif %}
+
+      <div class="form-group">
+        <label>Leave Type</label>
+        <select name="leave_type" class="hf2-select">
+          {% for code, label in form.fields.leave_type.choices %}
+          <option value="{{ code }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Start Date</label>
+          <input type="date" name="start_date" class="hf2-input" required>
+        </div>
+        <div class="form-group">
+          <label>End Date</label>
+          <input type="date" name="end_date" class="hf2-input" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Reason</label>
+        <textarea name="reason" class="hf2-input" rows="3" placeholder="Reason for leave..."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Contact During Leave</label>
+        <input type="text" name="contact_during_leave" class="hf2-input" placeholder="Phone number">
+      </div>
+
+      <div class="form-group">
+        <label>Handover Notes</label>
+        <textarea name="handover_notes" class="hf2-input" rows="2" placeholder="Work handover notes..."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Supporting Document (optional)</label>
+        <input type="file" name="supporting_document" class="hf2-input">
+      </div>
+
+      <div class="actions">
+        <a href="{% url 'hr:leave_list' %}" class="btn-secondary">Cancel</a>
+        {% has_perm user "hr.add_leaverequest" as can_create %}
+        {% if can_create %}
+        <button type="submit" class="btn-primary">Submit Request</button>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

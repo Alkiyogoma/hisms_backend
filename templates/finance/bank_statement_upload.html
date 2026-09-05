@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Bank Statement Reconciliation &mdash; Finance{% endblock %}
+{% block topbar_greeting %}Bank Statement Reconciliation{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+<div class="section-hdr">
+  <span class="section-title">Bank Statement Reconciliation</span>
+  <a href="{% url 'finance:dashboard' %}" class="btn btn-secondary btn-sm">&larr; Dashboard</a>
+</div>
+
+<div class="row" style="display:flex;gap:20px;flex-wrap:wrap">
+
+  <!-- Left Column: Upload -->
+  <div style="flex:1;min-width:300px">
+    <div class="card" style="margin-bottom:20px">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border)">
+        <div class="card-title" style="margin:0">Upload Bank Statement</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px">CSV format: <code>date, reference, amount, description</code></div>
+      </div>
+      <div style="padding:20px">
+        {% has_perm user "finance.add_payment" as can_upload %}
+        {% if can_upload %}
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+          <div style="border:2px dashed var(--border);border-radius:10px;padding:32px 24px;text-align:center;transition:border-color .2s;background:var(--bg-metric)" id="dropZone">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--hodari-blue)" stroke-width="1.5" style="margin-bottom:8px">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <div style="font-size:14px;font-weight:600;color:var(--text-primary)">Drop CSV file here or click to browse</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:4px">.csv files only</div>
+            <input type="file" name="csv_file" accept=".csv" style="display:none" id="csvInput">
+            <div id="fileInfo" style="display:none;margin-top:12px;padding:8px 12px;background:var(--hodari-blue-pale);border-radius:6px;font-size:13px"></div>
+          </div>
+          <div style="margin-top:16px;text-align:right">
+            <button type="submit" class="btn btn-primary" id="uploadBtn" disabled>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:middle"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+              Upload &amp; Parse
+            </button>
+          </div>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="metrics" style="grid-template-columns:repeat(2,1fr);gap:14px;margin-top:16px">
+      <div class="metric-compact" style="background:linear-gradient(135deg,#FFF8ED,#fff)">
+        <div class="mc-lbl-row">
+          <span class="mc-lbl">Unmatched</span>
+          <span class="mc-currency">count</span>
+        </div>
+        <div class="mc-val" style="color:#B45309">{{ unmatched_payments|length }}</div>
+        <div class="mc-sub" style="color:#B45309">Pending reconciliation</div>
+      </div>
+      <div class="metric-compact" style="background:linear-gradient(135deg,#EEF9F0,#fff)">
+        <div class="mc-lbl-row">
+          <span class="mc-lbl">Resolved</span>
+          <span class="mc-currency">count</span>
+        </div>
+        <div class="mc-val" style="color:#059669">{{ resolved_count }}</div>
+        <div class="mc-sub" style="color:#059669">Matched</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Unmatched Payments -->
+  <div style="flex:2;min-width:400px">
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <div class="card-title" style="margin:0">Unmatched Payments Queue</div>
+        <span class="chip {% if unmatched_payments %}chip-amber{% else %}chip-green{% endif %}">{{ unmatched_payments|length }} pending</span>
+      </div>
+
+      {% if unmatched_payments %}
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="text-align:left;background:var(--bg-metric);border-bottom:1px solid var(--border)">
+              <th style="padding:10px 12px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Date</th>
+              <th style="padding:10px 12px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Reference</th>
+              <th style="padding:10px 12px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;text-align:right">Amount</th>
+              <th style="padding:10px 12px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Details</th>
+              <th style="padding:10px 12px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Match</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in unmatched_payments %}
+            <tr style="border-bottom:1px solid var(--border);font-size:13px;transition:background .1s" onmouseover="this.style.background='var(--hodari-blue-pale)'" onmouseout="this.style.background=''">
+              <td style="padding:10px 12px;color:var(--text-muted);font-size:12px;white-space:nowrap">{{ p.payment_date|date:"d M Y" }}</td>
+              <td style="padding:10px 12px;font-family:var(--font-mono);font-weight:600;font-size:12px">{{ p.reference|default:"N/A" }}</td>
+              <td style="padding:10px 12px;text-align:right;font-family:var(--font-mono);font-weight:700;color:var(--green)">TZS {{ p.amount|floatformat:0 }}</td>
+              <td style="padding:10px 12px;font-size:12px;color:var(--text-secondary);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ p.bank_statement_details }}">{{ p.bank_statement_details|truncatechars:40 }}</td>
+              <td style="padding:10px 12px">
+                {% has_perm user "finance.change_payment" as can_match %}
+                {% if can_match %}
+                <form method="post" action="{% url 'finance:bank_statement_upload' %}" style="display:flex;gap:4px;align-items:center">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="match">
+                  <input type="hidden" name="payment_id" value="{{ p.id }}">
+                  <select name="invoice_id" required class="hf2-select" style="width:160px;height:30px;padding:0 6px;font-size:11px">
+                    <option value="">Select invoice…</option>
+                    {% for inv in invoicelist %}
+                    <option value="{{ inv.id }}">{{ inv.invoice_number|default:inv.id }} — {{ inv.student.get_full_name|default:"N/A" }} ({{ inv.student.class_name|default:"N/A" }})</option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit" class="btn btn-primary" style="padding:4px 8px;font-size:11px;height:30px">Match</button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div style="padding:10px 14px;border-top:1px solid var(--border);text-align:center;font-size:12px;color:var(--text-muted)">
+        <a href="{% url 'finance:unmatched_payments' %}" class="section-link">View full unmatched payments queue &rarr;</a>
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:40px 24px">
+        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" style="margin-bottom:6px"><polyline points="20 6 9 17 4 12"/></svg>
+        <div style="font-size:15px;font-weight:600;color:var(--text-primary)">All reconciled!</div>
+        <div style="font-size:13px;color:var(--text-muted);margin-top:4px">No unmatched payments. Upload a bank statement or check the full queue.</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+  // Drag & drop / file select
+  const dropZone = document.getElementById('dropZone');
+  const csvInput = document.getElementById('csvInput');
+  const fileInfo = document.getElementById('fileInfo');
+  const uploadBtn = document.getElementById('uploadBtn');
+
+  dropZone.addEventListener('click', () => csvInput.click());
+
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.style.borderColor = 'var(--hodari-blue)';
+    dropZone.style.background = 'var(--hodari-blue-light)';
+  });
+
+  dropZone.addEventListener('dragleave', () => {
+    dropZone.style.borderColor = 'var(--border)';
+    dropZone.style.background = 'var(--bg-metric)';
+  });
+
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.style.borderColor = 'var(--border)';
+    dropZone.style.background = 'var(--bg-metric)';
+    if (e.dataTransfer.files.length) {
+      csvInput.files = e.dataTransfer.files;
+      handleFile(e.dataTransfer.files[0]);
+    }
+  });
+
+  csvInput.addEventListener('change', () => {
+    if (csvInput.files.length) handleFile(csvInput.files[0]);
+  });
+
+  function handleFile(file) {
+    if (!file.name.endsWith('.csv')) {
+      fileInfo.style.display = 'block';
+      fileInfo.style.color = 'var(--red)';
+      fileInfo.textContent = 'Please select a .csv file.';
+      uploadBtn.disabled = true;
+      return;
+    }
+    fileInfo.style.display = 'block';
+    fileInfo.style.color = 'var(--text-primary)';
+    fileInfo.innerHTML = `<strong>${file.name}</strong> (${(file.size / 1024).toFixed(1)} KB)`;
+    uploadBtn.disabled = false;
+  }
+</script>
+
+<style>
+  #dropZone:hover {
+    border-color: var(--hodari-blue) !important;
+    background: var(--hodari-blue-light) !important;
+    cursor: pointer;
+  }
+</style>
+{% endblock %}

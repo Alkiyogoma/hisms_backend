@@ -1,0 +1,28 @@
+{% load static %}
+{% load role_tags %}
+<div class="sub-nav">
+  {% if perms.ptc.change_ptcsubjectcomment %}
+  <a href="{% url 'ptc:student_picker' %}" class="sub-tab {% if ptc_tab == 'student_picker' %}active{% endif %}">Student Picker</a>
+  {% endif %}
+  {% if perms.ptc.change_ptcsubjectcomment %}
+  <a href="{% url 'ptc:comment_entry' %}" class="sub-tab {% if ptc_tab == 'comment_entry' %}active{% endif %}">Subject Comments</a>
+  {% endif %}
+  {% if perms.ptc.change_learnerattributeratingentry %}
+  <a href="{% url 'ptc:attribute_entry' %}" class="sub-tab {% if ptc_tab == 'attribute_entry' %}active{% endif %}">Learner Attributes</a>
+  {% endif %}
+  {% if perms.ptc.change_enrichmentgrade %}
+  <a href="{% url 'ptc:enrichment_entry' %}" class="sub-tab {% if ptc_tab == 'enrichment_entry' %}active{% endif %}">Enrichment Grades</a>
+  {% endif %}
+  {% if perms.ptc.manage_enrichment_config %}
+  <a href="{% url 'ptc:enrichment_config' %}" class="sub-tab {% if ptc_tab == 'enrichment_config' %}active{% endif %}">Enrichment Config</a>
+  {% endif %}
+  {% if perms.ptc.view_ptcwindow %}
+  <a href="{% url 'ptc:compliance_dashboard' %}" class="sub-tab {% if ptc_tab == 'compliance_dashboard' %}active{% endif %}">Compliance</a>
+  {% endif %}
+  {% if perms.ptc.view_ptcwindow %}
+  <a href="{% url 'ptc:generation_log' %}" class="sub-tab {% if ptc_tab == 'generation_log' %}active{% endif %}">Generation Log</a>
+  {% endif %}
+  {% if perms.ptc.view_ptcwindow %}
+   <a href="{% url 'ptc:calendar_config' %}" class="sub-tab {% if ptc_tab == 'calendar_config' %}active{% endif %}">Calendar Setup</a>
+  {% endif %}
+</div>

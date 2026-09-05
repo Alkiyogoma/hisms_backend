@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Timetable &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Timetable{% endblock %}
+{% block topbar_date %}{{ current_term.name }} &middot; {{ current_term.academic_year.name }}{% endblock %}
+
+{% block extra_head %}
+{% include "includes/hodari_print_styles.html" %}
+<style>
+  .tt-container {
+    width: 100%;
+    max-width: 1300px;
+    margin: 0 auto;
+  }
+
+  .tt-grid { 
+    display: grid; 
+    grid-template-columns: 80px repeat(5, 1fr); 
+    border: 1px solid var(--tt-border); 
+    border-radius: 16px; 
+    overflow: hidden; 
+    background: #fff;
+  }
+  
+  .tt-head { 
+    background: #f8fafc; 
+    color: #475569; 
+    font-size: 11px; 
+    font-weight: 700; 
+    text-transform: uppercase; 
+    letter-spacing: 0.1em; 
+    padding: 16px 12px; 
+    text-align: center; 
+    border-right: 1px solid #e2e8f0;
+    border-bottom: 2px solid #e2e8f0;
+  }
+  
+  .tt-head:last-child { border-right: none; }
+  
+  .tt-time-col { 
+    background: #f8fafc; 
+    border-right: 2px solid #e2e8f0; 
+    border-bottom: 1px solid #e2e8f0; 
+    display: flex; 
+    flex-direction: column;
+    align-items: center; 
+    justify-content: center; 
+    font-size: 10px; 
+    font-weight: 700; 
+    color: #64748b;
+    padding: 12px 4px;
+    text-transform: uppercase;
+  }
+  
+  .tt-cell { 
+    background: #fff; 
+    border-right: 1px solid #f1f5f9; 
+    border-bottom: 1px solid #f1f5f9; 
+    padding: 8px; 
+    min-height: 110px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .tt-cell:hover { background: #fafafa; }
+  
+  .tt-cell:last-child { border-right: none; }
+  
+  .tt-slot { 
+    position: relative;
+    border-radius: 8px; 
+    padding: 10px 12px; 
+    border: 1px solid color-mix(in srgb, var(--subject-color), transparent 80%);
+    background: color-mix(in srgb, var(--subject-color), transparent 94%);
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 56px;
+  }
+  
+  .tt-slot:hover { 
+    background: color-mix(in srgb, var(--subject-color), transparent 88%);
+    transform: translateX(2px);
+    z-index: 5;
+  }
+
+  .tt-slot::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    border-radius: 4px 0 0 4px;
+    background: var(--subject-color, var(--hodari-blue));
+  }
+  
+  .tt-slot-subj { 
+    font-weight: 800; 
+    font-size: 13.5px;
+    color: color-mix(in srgb, var(--subject-color), #000 65%);
+    margin-bottom: 2px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .tt-slot-code {
+    font-weight: 900;
+    letter-spacing: -0.01em;
+  }
+
+  .tt-slot-teacher {
+    font-size: 10px;
+    font-weight: 700;
+    color: color-mix(in srgb, var(--subject-color), #000 50%);
+    background: rgba(255,255,255,0.6);
+    padding: 2px 6px;
+    border-radius: 4px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .lp-badge {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .lp-badge.lp-green { background: #16A34A; }
+  .lp-badge.lp-yellow { background: #D97706; }
+  .lp-badge.lp-red { background: #DC2626; }
+  .lp-badge.lp-grey { background: #94A3B8; }
+  .lp-badge.lp-blue { background: #2563EB; }
+
+  .week-nav { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .week-nav-btn { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border); background: #fff; cursor: pointer; transition: all 0.15s; text-decoration: none; color: var(--text-primary); }
+  .week-nav-btn:hover { background: var(--hodari-blue-pale); border-color: var(--hodari-blue); }
+  .week-label { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+  
+  .tt-slot-meta { 
+    color: color-mix(in srgb, var(--subject-color), #000 30%);
+    font-size: 11px; 
+    font-weight: 600;
+    opacity: 0.8;
+  }
+  
+  .filter-row { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
+  .view-toggle { display: inline-flex; background: #f1f5f9; padding: 4px; border-radius: 8px; margin-bottom: 14px; }
+  .view-btn { padding: 8px 16px; border-radius: 6px; font-size: 12px; font-weight: 600; text-decoration: none; color: #64748b; transition: all 0.2s; }
+  .view-btn.active { background: #fff; color: var(--hodari-blue); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .print-only { display: none; }
+  
+  @media print {
+    .print-only-header { display: block !important; }
+    .print-only-header .print-header-inner { display: flex !important; }
+    body { background: #fff !important; padding: 0 !important; }
+    .tt-grid { border: 1px solid #000; font-size: 11px; }
+    .tt-grid .tt-head { background: #f0f0f0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 10px 8px; font-size: 10px; }
+    .tt-grid .tt-cell { min-height: 80px; padding: 6px; }
+    .tt-grid .tt-slot { padding: 6px 8px; min-height: 40px; border: 1px solid #ccc; }
+    .tt-grid .tt-slot-subj { font-size: 11px; }
+    .tt-grid .tt-slot-teacher { font-size: 9px; }
+    .tt-grid .tt-slot-meta { font-size: 9px; }
+    .tt-grid .tt-time-col { font-size: 9px; padding: 8px 4px; }
+    .filter-row, .view-toggle, .btn-primary, .btn-secondary, .hf-btn,
+    .week-nav, .tt-container .card-title-row, .no-print-area,
+    .slot-select, .tt-slot a[title="Edit slot"], .tt-slot button[title="Delete slot"],
+    .bulk-delete-bar, #bulkDeleteBar, .legend, .tt-container .info-bar,
+    .ecd-break-banner, .nap-schedule-banner,
+    .tt-slot a, .tt-slot button,
+    input[type="checkbox"] { display: none !important; }
+    .topbar, #sidebar, header { display: none !important; }
+    .card { border: none !important; box-shadow: none !important; margin: 0 !important; padding: 0 !important; }
+    .tt-container { max-width: 100% !important; }
+    .print-only { display: block !important; }
+    .doc-container { box-shadow: none; border-radius: 0; max-width: 100%; margin: 0; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+    <!-- Print-only branded header (uses shared include) -->
+    <div class="print-only-header" style="display:none;margin-bottom:16px;padding:20px 24px;background:#fff;border:1px solid #DDE3EE;border-radius:12px">
+        <div class="print-header-inner" style="display:none;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+            {% include "includes/hodari_print_header.html" %}
+            <div class="doc-meta" style="text-align:right;font-size:12px;color:var(--text-muted)">
+                <div class="doc-badge" style="font-weight:700;color:var(--hodari-blue);font-size:14px">SCHOOL TIMETABLE</div>
+                <div style="margin-top:4px">{{ active_term.name|default:"" }}</div>
+                <div>{{ active_term.academic_year.name|default:"" }}</div>
+            </div>
+        </div>
+    </div>
+
+<div class="card-title-row">
+  <div style="display:flex; align-items:center; gap:20px">
+    <h1 style="font-size:22px; font-weight:700; margin:0">School Timetable</h1>
+    <div class="view-toggle">
+        <a href="?view=grid&class_name={{ class_filter }}&teacher_id={{ teacher_filter }}&q={{ q }}&week={{ week_offset }}" class="view-btn {% if view_type == 'grid' %}active{% endif %}">Weekly Grid</a>
+        <a href="?view=list&day={{ day }}&class_name={{ class_filter }}&teacher_id={{ teacher_filter }}&q={{ q }}&week={{ week_offset }}" class="view-btn {% if view_type == 'list' %}active{% endif %}">Daily List</a>
+    </div>
+  </div>
+  <div style="display:flex; align-items:center; gap:12px; margin-left: auto;">
+      <button onclick="window.print()" class="hf-btn hf-btn-secondary" style="font-size:12px; padding:8px 16px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle; margin-right:8px"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z"/></svg>
+          Print Timetable
+      </button>
+      {% if can_edit %}
+        <a href="{% url 'timetable:new' %}" class="btn-primary">+ New Slot</a>
+        <a href="{% url 'timetable:break_config_list' %}" class="hf-btn hf-btn-secondary" style="font-size:12px; padding:8px 16px; text-decoration:none">ECD Breaks</a>
+      {% endif %}
+      {% if can_publish %}
+        <button type="button" data-url="{% url 'timetable:publish' %}" data-title="Publish Timetable?" data-body="Publish all timetable slots for the current term? <strong>Teachers will be able to see them.</strong>" data-confirm="Publish" data-type="info" class="hf-btn hf-btn-primary tt-confirm-btn" style="font-size:12px; padding:8px 16px; background:#16A34A; color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:600">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle; margin-right:6px"><path d="M12 2v10M12 2l-4 4M12 2l4 4"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2v-7"/></svg>
+          Publish
+        </button>
+        <button type="button" data-url="{% url 'timetable:unpublish' %}" data-title="Unpublish Timetable?" data-body="Unpublish all timetable slots? <strong>Teachers will no longer see them.</strong>" data-confirm="Unpublish" data-type="warning" class="hf-btn hf-btn-secondary tt-confirm-btn" style="font-size:12px; padding:8px 16px; color:#92550A; background:var(--hodari-gold-light); border:1px solid var(--hodari-gold); border-radius:8px; cursor:pointer; font-weight:600">
+          Unpublish
+        </button>
+      {% endif %}
+  </div>
+</div>
+
+<!-- Legend -->
+<div style="display:flex;gap:14px;margin-bottom:14px;font-size:11px;color:var(--text-muted)">
+  <span><span class="lp-badge lp-green" style="display:inline-block;vertical-align:middle;margin-right:3px"></span> Approved</span>
+  <span><span class="lp-badge lp-yellow" style="display:inline-block;vertical-align:middle;margin-right:3px"></span> Submitted / Draft</span>
+  <span><span class="lp-badge lp-red" style="display:inline-block;vertical-align:middle;margin-right:3px"></span> Missing</span>
+  <span><span class="lp-badge lp-grey" style="display:inline-block;vertical-align:middle;margin-right:3px"></span> No plan</span>
+</div>
+
+<!-- Filters -->
+<div class="card" style="margin-bottom:20px; padding:16px 20px">
+  <form method="GET" action="." class="filter-row"
+        hx-get="{% url 'timetable:index' %}"
+        hx-target="#timetable-content" hx-swap="outerHTML" hx-push-url="true"
+        hx-include="[name='view'], [name='class_name'], [name='teacher_id'], [name='q'], [name='day']">
+    <input type="hidden" name="view" value="{{ view_type }}">
+    
+    {% if view_type == 'list' %}
+    <div style="width:140px">
+      <label class="field-lbl">Day</label>
+      <select name="day" class="hf-select mt-1">
+        {% for val, lbl in days %}
+          <option value="{{ val }}" {% if day == val %}selected{% endif %}>{{ lbl }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+
+    <div style="width:160px">
+      <label class="field-lbl">Filter by Class</label>
+      <select name="class_name" class="hf-select mt-1"
+              hx-get="{% url 'timetable:index' %}"
+              hx-target="#timetable-content" hx-swap="outerHTML" hx-push-url="true"
+              hx-include="[name='view'], [name='class_name'], [name='teacher_id'], [name='q'], [name='day']">
+        <option value="">All Classes</option>
+        {% for c in class_names %}
+          <option value="{{ c }}" {% if class_filter == c %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div style="width:200px">
+      <label class="field-lbl">Filter by Teacher</label>
+      <select name="teacher_id" class="hf-select mt-1"
+              hx-get="{% url 'timetable:index' %}"
+              hx-target="#timetable-content" hx-swap="outerHTML" hx-push-url="true"
+              hx-include="[name='view'], [name='class_name'], [name='teacher_id'], [name='q'], [name='day']">
+        <option value="">All Teachers</option>
+        {% for t in teachers %}
+          <option value="{{ t.id }}" {% if teacher_filter == t.id|stringformat:"s" %}selected{% endif %}>{{ t.get_full_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div style="flex:1; min-width:200px">
+      <label class="field-lbl">Search Subjects</label>
+      <input name="q" value="{{ q }}" placeholder="e.g. Mathematics..." class="hf-input mt-1">
+    </div>
+
+    <button type="submit" class="btn-primary" style="height:38px">Apply Filters</button>
+    <a href="{% url 'timetable:index' %}" class="btn-secondary" style="height:38px; display:inline-flex; align-items:center; text-decoration:none">Clear</a>
+  </form>
+</div>
+
+{% if ecd_breaks %}
+<div style="margin-bottom:20px; background:#FFF7ED; border:1px solid #FED7AA; border-radius:10px; padding:12px 20px">
+  <div style="font-size:12px; font-weight:700; color:#9A3412; margin-bottom:8px">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle; margin-right:6px"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+    ECD Break &amp; Nap Schedule
+  </div>
+  <div style="font-size:11px; color:#9A3412; background:#fff; border-radius:6px; padding:6px 12px; border:1px solid #FED7AA">
+    <strong style="color:#7C2D12">{% for cfg in ecd_breaks %}{{ cfg.class_name }}{% if not forloop.last %}, {% endif %}{% endfor %}</strong>
+    &middot; Snack: {{ ecd_breaks.0.snack_break_start|time:"H:i" }}–{{ ecd_breaks.0.snack_break_end|time:"H:i" }}
+    &middot; Lunch: {{ ecd_breaks.0.lunch_break_start|time:"H:i" }}–{{ ecd_breaks.0.lunch_break_end|time:"H:i" }}
+    {% if ecd_breaks.0.nap_time_start %}&middot; Nap: {{ ecd_breaks.0.nap_time_start|time:"H:i" }}–{{ ecd_breaks.0.nap_time_end|time:"H:i" }}{% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% if can_edit and unassigned_teachers %}
+<div class="no-print-area" style="margin-bottom:20px; background:#FFFBEB; border:1px solid #FDE68A; border-radius:10px; padding:12px 20px">
+  <div style="font-size:12px; font-weight:700; color:#92400E; margin-bottom:6px">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle; margin-right:6px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    Teachers with classes but no timetable slots
+  </div>
+  <div style="font-size:12px; color:#92400E; background:#fff; border-radius:6px; padding:8px 12px; border:1px solid #FDE68A">
+    {% for t in unassigned_teachers %}
+      <strong>{{ t.get_full_name|default:t.username }}</strong>{% if not forloop.last %}, {% endif %}
+    {% endfor %}
+    <a href="{% url 'timetable:new' %}" style="color:#92400E; font-weight:600; text-decoration:underline; margin-left:6px">Create slots for them</a>
+  </div>
+</div>
+{% endif %}
+
+{% include "timetable/_timetable_content.html" %}
+
+<!-- Print-only footer -->
+<div class="print-only" style="max-width:1100px;margin:20px auto 0;padding:12px 24px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted);text-align:center">
+  This is a computer-generated timetable from {{ brand.school_name|default:"the school" }}. &middot; {{ active_term.name|default:"" }} {{ active_term.academic_year.name|default:"" }}
+</div>
+
+<div class="no-print-area" style="margin-top:20px; background:var(--blue-st-bg); border:1px solid var(--blue-st-bd); padding:12px 20px; border-radius:10px; display:flex; align-items:center; gap:12px">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+    <div style="font-size:12.5px; color:var(--hodari-blue)">
+        <strong>Double-booking protection is active.</strong> The system automatically prevents assigning a teacher or class to overlapping slots.
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.tt-confirm-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    confirmDeleteModal({
+      title: btn.dataset.title,
+      body: btn.dataset.body,
+      confirmText: btn.dataset.confirm,
+      url: btn.dataset.url,
+      type: btn.dataset.type || 'danger'
+    });
+  });
+});
+</script>
+{% endblock %}

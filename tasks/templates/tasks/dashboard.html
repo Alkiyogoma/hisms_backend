@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Tasks & Todo — {{ brand.school_name }}{% endblock %}
+
+{% block topbar_greeting %}Tasks & Todo{% endblock %}
+{% block topbar_date %}{{ today_date }} • {{ stats.total_pending }} pending task{{ stats.total_pending|pluralize }}{% endblock %}
+
+{% block topbar_badges %}
+{% if stats.overdue > 0 %}
+<div class="topbar-badge badge-red"><span class="badge-dot"></span>{{ stats.overdue }} overdue</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_head %}
+<style>
+  .filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 16px;
+    align-items: flex-end;
+  }
+  .filter-group { display: flex; flex-direction: column; gap: 6px; }
+  .filter-group .filter-label {
+    font-size: 11px; font-weight: 700; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .filter-group .hf2-select {
+    min-width: 160px;
+  }
+  .active-filters {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .active-filter-tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px; background: var(--hodari-blue-light);
+    color: var(--hodari-blue); border-radius: 6px;
+    font-size: 12px; font-weight: 600;
+    text-decoration: none;
+    transition: background 0.15s;
+  }
+  .active-filter-tag:hover { background: #d5e2f5; }
+  .active-filter-tag .af-close {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--hodari-blue); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; line-height: 1;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "tasks/_top_tabs.html" %}
+<div class="metrics" style="grid-template-columns:repeat(3,1fr);gap:14px">
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Total pending</span>
+    </div>
+    <div class="mc-val" style="color:#023AA5">{{ stats.total_pending }}</div>
+    <div class="mc-sub" style="color:#5A697D">Assigned to you</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FFF8ED,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Due this week</span>
+    </div>
+    <div class="mc-val" style="color:#B45309">{{ stats.due_this_week }}</div>
+    <div class="mc-sub" style="color:#B45309">Active deadlines</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FFF0F0,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Overdue</span>
+    </div>
+    <div class="mc-val" style="color:#DC2626">{{ stats.overdue }}</div>
+    <div class="mc-sub" style="color:#DC2626">{% if stats.overdue > 0 %}Urgent attention needed{% else %}All clear{% endif %}</div>
+  </div>
+</div>
+
+<!-- FILTERS -->
+<form method="get" class="filter-bar">
+  <div class="filter-group" style="flex:1; min-width:160px">
+    <span class="filter-label">Status</span>
+    <select name="status" class="hf2-select" onchange="this.form.submit()">
+      <option value="" {% if not current_status %}selected{% endif %}>All statuses</option>
+      <option value="pending" {% if current_status == 'pending' %}selected{% endif %}>Pending</option>
+      <option value="in_progress" {% if current_status == 'in_progress' %}selected{% endif %}>In Progress</option>
+      <option value="completed" {% if current_status == 'completed' %}selected{% endif %}>Completed</option>
+    </select>
+  </div>
+  <div class="filter-group" style="flex:1; min-width:160px">
+    <span class="filter-label">Priority</span>
+    <select name="priority" class="hf2-select" onchange="this.form.submit()">
+      <option value="" {% if not current_priority %}selected{% endif %}>All priorities</option>
+      <option value="critical" {% if current_priority == 'critical' %}selected{% endif %}> Critical</option>
+      <option value="high" {% if current_priority == 'high' %}selected{% endif %}> High</option>
+      <option value="medium" {% if current_priority == 'medium' %}selected{% endif %}> Medium</option>
+      <option value="low" {% if current_priority == 'low' %}selected{% endif %}> Low</option>
+    </select>
+  </div>
+  <div class="filter-group" style="flex:1; min-width:160px">
+    <span class="filter-label">Category</span>
+    <select name="category" class="hf2-select" onchange="this.form.submit()">
+      <option value="" {% if not current_category %}selected{% endif %}>All categories</option>
+      {% for cat_val, cat_label in categories %}
+      <option value="{{ cat_val }}" {% if current_category == cat_val %}selected{% endif %}>{{ cat_label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div style="display:flex; gap:8px; align-self:flex-end">
+    <button type="submit" class="btn-primary" style="padding:10px 20px">Apply</button>
+    {% if current_status or current_priority or current_category %}
+    <a href="{% url 'tasks:dashboard' %}" class="btn-secondary" style="padding:10px 16px; text-decoration:none">Reset</a>
+    {% endif %}
+  </div>
+</form>
+
+{% if current_status or current_priority or current_category %}
+<div class="active-filters">
+  <span style="font-size:12px; color:var(--text-muted); font-weight:600; line-height:30px">Active filters:</span>
+  {% if current_status %}
+  <a href="?status=&priority={{ current_priority }}&category={{ current_category }}" class="active-filter-tag">
+    Status: {{ current_status|title }} <span class="af-close">&times;</span>
+  </a>
+  {% endif %}
+  {% if current_priority %}
+  <a href="?status={{ current_status }}&priority=&category={{ current_category }}" class="active-filter-tag">
+    Priority: {{ current_priority|title }} <span class="af-close">&times;</span>
+  </a>
+  {% endif %}
+  {% if current_category %}
+  <a href="?status={{ current_status }}&priority={{ current_priority }}&category=" class="active-filter-tag">
+    Category: {{ current_category|title }} <span class="af-close">&times;</span>
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- TASK COLUMNS: Overdue + Due This Week -->
+<div class="grid-2">
+  <!-- LEFT: Overdue & Critical -->
+  <div class="card">
+    <div class="card-title">Overdue &amp; Critical{% if overdue_tasks %} <span class="chip chip-red" style="margin-left:6px">{{ overdue_tasks|length }}</span>{% endif %}</div>
+    {% for task in overdue_tasks %}
+    <div class="queue-item qi-red">
+      <div class="qi-body">
+        <div class="qi-label">{{ task.title }}</div>
+        <div class="qi-sub">{{ task.get_task_type_display }} &middot; {{ task.get_priority_display }}</div>
+        <div class="qi-meta">Due: {{ task.due_date|date:"d M" }}{% if task.is_overdue %} — overdue{% endif %}</div>
+        <div class="qi-actions">
+          {% if task.task_type == 'assessment_report' %}
+          {% for pk_val, pct_val in task_progress.items %}{% if pk_val == task.pk %}
+          <div style="margin-bottom:6px;width:100%">
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:2px">
+              <span>{% if pct_val == 100 %}Complete{% elif pct_val > 0 %}In progress{% else %}Not started{% endif %}</span>
+              <span style="font-weight:600">{{ pct_val }}%</span>
+            </div>
+            <div style="width:100%;height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+              <div style="width:{{ pct_val }}%;height:100%;background:{% if pct_val == 100 %}var(--green){% elif pct_val > 50 %}var(--hodari-blue){% elif pct_val > 0 %}var(--hodari-gold){% else %}var(--border){% endif %};border-radius:3px;transition:width 0.3s"></div>
+            </div>
+          </div>
+          {% endif %}{% endfor %}
+          <button type="button" class="qi-btn" style="background:var(--hodari-blue);color:#fff;border:none;cursor:pointer"
+            hx-get="{% url 'tasks:assessment_report_submit' task.pk %}"
+            hx-target="#modal-body"
+            hx-swap="innerHTML"
+            onclick="document.getElementById('assessment-modal').style.display='flex'">Fill Report</button>
+          {% else %}
+            {% if task.metadata.module_url %}
+            <a href="{{ task.metadata.module_url }}" class="qi-btn">View</a>
+            {% endif %}
+            <form method="post" action="{% url 'tasks:mark_complete' task.pk %}" style="display:inline">
+              {% csrf_token %}
+              <button type="submit" class="qi-btn">Complete</button>
+            </form>
+            <form method="post" action="{% url 'tasks:take_action' task.pk %}" style="display:inline">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="mark_in_progress">
+              <button type="submit" class="qi-btn">Start</button>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    {% include '_partials/empty_state.html' with title='All clear!' desc='No overdue tasks.' icon='check' icon_color='green' %}
+    {% endfor %}
+  </div>
+
+  <!-- RIGHT: Due This Week -->
+  <div class="card">
+    <div class="card-title">Due This Week{% if due_this_week %} <span class="chip chip-blue" style="margin-left:6px">{{ due_this_week|length }}</span>{% endif %}</div>
+    {% for task in due_this_week %}
+    <div class="queue-item qi-blue">
+      <div class="qi-body">
+        <div class="qi-label">{{ task.title }}</div>
+        <div class="qi-sub">{{ task.get_task_type_display }} &middot; {{ task.get_priority_display }}</div>
+        <div class="qi-meta">Due: {{ task.due_date|date:"D, d M" }}</div>
+        <div class="qi-actions">
+          {% if task.task_type == 'assessment_report' %}
+          {% for pk_val, pct_val in task_progress.items %}{% if pk_val == task.pk %}
+          <div style="margin-bottom:6px;width:100%">
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:2px">
+              <span>{% if pct_val == 100 %}Complete{% elif pct_val > 0 %}In progress{% else %}Not started{% endif %}</span>
+              <span style="font-weight:600">{{ pct_val }}%</span>
+            </div>
+            <div style="width:100%;height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+              <div style="width:{{ pct_val }}%;height:100%;background:{% if pct_val == 100 %}var(--green){% elif pct_val > 50 %}var(--hodari-blue){% elif pct_val > 0 %}var(--hodari-gold){% else %}var(--border){% endif %};border-radius:3px;transition:width 0.3s"></div>
+            </div>
+          </div>
+          {% endif %}{% endfor %}
+          <button type="button" class="qi-btn" style="background:var(--hodari-blue);color:#fff;border:none;cursor:pointer"
+            hx-get="{% url 'tasks:assessment_report_submit' task.pk %}"
+            hx-target="#modal-body"
+            hx-swap="innerHTML"
+            onclick="document.getElementById('assessment-modal').style.display='flex'">Fill Report</button>
+          {% else %}
+            {% if task.metadata.module_url %}
+            <a href="{{ task.metadata.module_url }}" class="qi-btn">View</a>
+            {% endif %}
+            <form method="post" action="{% url 'tasks:mark_complete' task.pk %}" style="display:inline">
+              {% csrf_token %}
+              <button type="submit" class="qi-btn">Complete</button>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    <div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">
+      <div style="font-weight:600">No tasks due this week</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ALL TASKS TABLE -->
+<div class="card" style="margin-top:14px">
+  <div class="card-title-row">
+    <span class="card-title" style="margin-bottom:0">All tasks</span>
+    <span class="chip chip-blue">{{ task_count }} total</span>
+  </div>
+
+  {% for task in all_tasks %}
+  <div class="trow">
+    <div class="trow-left">
+      <div class="trow-name">
+        {% if task.priority == 'critical' %}<span style="color:#DC2626" title="Critical"> </span>
+        {% elif task.priority == 'high' %}<span style="color:#D97706" title="High"> </span>
+        {% elif task.priority == 'medium' %}<span style="color:var(--hodari-blue)" title="Medium"> </span>
+        {% else %}<span style="color:var(--text-muted)" title="Low"> </span>{% endif %}
+        {{ task.title }}
+      </div>
+      <div class="trow-sub">{{ task.get_task_type_display }} &middot; Due: {{ task.due_date|date:"d M" }}{% if task.is_overdue %} (overdue){% endif %}{% if task.metadata.class_name %} &middot; {{ task.metadata.class_name }}{% endif %}</div>
+    </div>
+    <div class="trow-right">
+      {% if task.is_overdue %}
+        <span class="chip chip-red">Overdue</span>
+      {% elif task.status == 'in_progress' %}
+        <span class="chip chip-amber">In Progress</span>
+      {% elif task.priority == 'critical' %}
+        <span class="chip chip-red">Critical</span>
+      {% elif task.priority == 'high' %}
+        <span class="chip chip-amber">High</span>
+      {% else %}
+        <span class="chip chip-blue">Pending</span>
+      {% endif %}
+
+      {% if task.task_type == 'assessment_report' %}
+      <div style="display:flex;align-items:center;gap:8px">
+        {% for pk_val, pct_val in task_progress.items %}{% if pk_val == task.pk %}
+        <div style="width:80px">
+          <div style="font-size:10px;color:var(--text-muted);text-align:right;margin-bottom:1px">{{ pct_val }}%</div>
+          <div style="width:100%;height:5px;background:var(--border);border-radius:3px;overflow:hidden">
+            <div style="width:{{ pct_val }}%;height:100%;background:{% if pct_val == 100 %}var(--green){% elif pct_val > 50 %}var(--hodari-blue){% elif pct_val > 0 %}var(--hodari-gold){% else %}var(--border){% endif %};border-radius:3px"></div>
+          </div>
+        </div>
+        {% endif %}{% endfor %}
+        <button type="button" class="qi-btn" style="font-size:10px;padding:2px 8px;background:var(--hodari-blue);color:#fff;border:none;cursor:pointer"
+          hx-get="{% url 'tasks:assessment_report_submit' task.pk %}"
+          hx-target="#modal-body"
+          hx-swap="innerHTML"
+          onclick="document.getElementById('assessment-modal').style.display='flex'">Fill Report</button>
+      </div>
+      {% elif task.actions_available %}
+      <div style="display:flex;gap:4px">
+        {% for action in task.actions_available %}
+          {% if action == 'mark_complete' or action == 'approve' or action == 'sign_off' %}
+          <form method="post" action="{% url 'tasks:take_action' task.pk %}" style="display:inline">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="{{ action }}">
+            <button type="submit" class="qi-btn" style="font-size:10px;padding:2px 8px" title="{{ action }}">{{ action|title }}</button>
+          </form>
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% empty %}
+  {% include '_partials/empty_state.html' with title='No tasks found' desc="You're all caught up!" icon='check' icon_color='green' %}
+  {% endfor %}
+</div>
+
+<!-- Full-screen Assessment Modal -->
+<div id="assessment-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;padding:20px;overflow-y:auto">
+  <div style="background:#fff;width:100%;max-width:900px;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.3);position:relative;margin:auto">
+    <div style="position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;border-radius:12px 12px 0 0">
+      <h3 style="font-size:16px;font-weight:700;margin:0;color:var(--text-primary)">Primary Assessment Form</h3>
+      <button type="button" onclick="document.getElementById('assessment-modal').style.display='none'"
+        style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--text-muted);padding:4px 8px;line-height:1">&times;</button>
+    </div>
+    <div id="modal-body" style="padding:20px;max-height:calc(100vh - 100px);overflow-y:auto">
+      <div style="text-align:center;padding:40px;color:var(--text-muted)">Loading...</div>
+    </div>
+  </div>
+</div>
+
+<style>
+  #assessment-modal.open { display: flex; }
+  body.modal-open { overflow: hidden; }
+</style>
+{% endblock %}

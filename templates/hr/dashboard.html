@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}HR Dashboard — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}HR Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+  .hr-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .hr-metric { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .hr-metric-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+  .hr-metric-value { font-size: 28px; font-weight: 800; color: #1E293B; line-height: 1; }
+  .hr-metric-sub { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+  .hr-metric-change { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 99px; margin-top: 6px; }
+  .hr-charts { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .hr-charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .hr-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; }
+  .hr-card-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #F3F4F6; }
+  .hr-card-header a { text-decoration: none; color: inherit; display: flex; align-items: center; justify-content: space-between; width: 100%; }
+  .hr-card-header a:hover .hr-card-title { color: var(--hodari-blue); }
+  .hr-card-title { font-size: 14px; font-weight: 700; color: #1E293B; transition: color .15s; }
+  .hr-card-title-link { font-size: 12px; color: var(--hodari-blue); font-weight: 600; text-decoration: none; flex-shrink: 0; margin-left: 12px; }
+  .hr-card-title-link:hover { text-decoration: underline; }
+  .hr-card-body { padding: 20px; }
+  .hr-item-list { list-style: none; padding: 0; margin: 0; }
+  .hr-item-list li { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #F3F4F6; font-size: 13px; }
+  .hr-item-list li:last-child { border-bottom: none; }
+  .hr-item-name { font-weight: 600; color: #1E293B; }
+  .hr-item-detail { font-size: 12px; color: var(--text-muted); }
+  .hr-chip { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 99px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .hr-chip-blue { background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; }
+  .hr-chip-green { background: #F0FDF4; color: #16A34A; border: 1px solid #BBF7D0; }
+  .hr-chip-amber { background: #FFFBEB; color: #D97706; border: 1px solid #FDE68A; }
+  .hr-chip-red { background: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }
+  .hr-chip-grey { background: #F3F4F6; color: #6B7280; border: 1px solid #E5E7EB; }
+  .hr-empty { text-align: center; padding: 32px 20px; color: var(--text-muted); font-size: 13px; }
+  .hr-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: background .15s; text-decoration: none; }
+  .hr-btn-primary { background: var(--hodari-blue); color: #fff; }
+  .hr-btn-primary:hover { background: #012A80; }
+  .hr-btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+  .hr-btn-ghost:hover { background: #F9FAFB; }
+  .section-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .section-title { font-family: 'Merriweather', serif; font-size: 20px; font-weight: 700; color: #1E293B; }
+  @media (max-width: 1100px) { .hr-grid { grid-template-columns: repeat(2, 1fr); } .hr-charts { grid-template-columns: 1fr; } .hr-charts-row { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) { .hr-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "users/_top_tabs.html" %}
+
+<!-- Key Metrics -->
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px">
+  {% include '_partials/stat_card.html' with label='Total Staff' value=total_staff sub='All registered staff' variant='blue' %}
+  {% include '_partials/stat_card.html' with label='Active' value=active_staff sub='Currently employed' variant='green' %}
+  {% include '_partials/stat_card.html' with label='Teaching' value=teaching_staff sub='Teaching staff members' variant='blue' %}
+  {% include '_partials/stat_card.html' with label='Non-Teaching' value=non_teaching_staff sub='Support & admin staff' variant='blue' %}
+</div>
+
+<!-- Second row metrics -->
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px">
+  {% include '_partials/stat_card.html' with label='Pending Onboarding' value=onboarding_pending sub='In progress' variant='amber' %}
+  {% include '_partials/stat_card.html' with label='Onboarding Not Started' value=onboarding_not_started sub='Awaiting setup' variant='red' %}
+  {% include '_partials/stat_card.html' with label='Leave Pending' value=leave_pending sub='Awaiting approval' variant='amber' %}
+  {% include '_partials/stat_card.html' with label='Overdue Filings' value=overdue_filings sub='Statutory compliance' variant='red' %}
+</div>
+
+<!-- Charts Row 1: Contracts + Department Breakdown -->
+<div class="hr-charts">
+  <div class="hr-card">
+    <div class="hr-card-header" style="cursor:pointer" onclick="window.location='{% url 'hr:staff_list' %}'">
+      <span class="hr-card-title">Contracts Expiring Soon</span>
+      <span style="font-size:11px;color:var(--text-muted)">Next 60 days</span>
+    </div>
+    <div class="hr-card-body">
+      {% if expiring_contracts %}
+        <ul class="hr-item-list">
+          {% for s in expiring_contracts %}
+          <li>
+            <div>
+              <span class="hr-item-name">{{ s.full_name }}</span>
+              <span class="hr-item-detail" style="margin-left:8px">{{ s.contract_end_date|date:"d M Y" }}</span>
+            </div>
+            <a href="{% url 'hr:staff_detail' s.pk %}" class="hr-btn hr-btn-ghost" style="padding:4px 12px;font-size:11px">View</a>
+          </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="hr-empty">No contracts expiring within 60 days.</div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="hr-card">
+    <div class="hr-card-header" style="cursor:pointer" onclick="window.location='{% url 'hr:staff_list' %}'">
+      <span class="hr-card-title">Department Breakdown</span>
+    </div>
+    <div class="hr-card-body">
+      <ul class="hr-item-list">
+        {% for dept_code, count in dept_breakdown.items %}
+        <li>
+          <span class="hr-item-name">{{ dept_code }}</span>
+          <span class="hr-chip hr-chip-blue">{{ count }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Charts Row 2: Birthdays + Active Offboardings -->
+<div class="hr-charts-row">
+  <div class="hr-card">
+    <div class="hr-card-header" style="cursor:pointer" onclick="window.location='{% url 'hr:staff_list' %}'">
+      <span class="hr-card-title">Birthdays This Month</span>
+    </div>
+    <div class="hr-card-body">
+      {% if birthdays_this_month %}
+        <ul class="hr-item-list">
+          {% for s in birthdays_this_month %}
+          <li>
+            <span class="hr-item-name">{{ s.full_name }}</span>
+            <span class="hr-item-detail">{{ s.date_of_birth|date:"j F" }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="hr-empty">No birthdays this month.</div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="hr-card">
+    <div class="hr-card-header">
+      <span class="hr-card-title">Staff on Leave Today</span>
+    </div>
+    <div class="hr-card-body">
+      {% if staff_on_leave %}
+        <ul class="hr-item-list">
+          {% for leave in staff_on_leave %}
+          <li>
+            <div>
+              <span class="hr-item-name">{{ leave.staff.full_name }}</span>
+              <span class="hr-item-detail" style="margin-left:8px">{{ leave.get_leave_type_display }} · until {{ leave.end_date|date:"d M" }}</span>
+            </div>
+            <span class="hr-chip hr-chip-amber">{{ leave.total_days }}d</span>
+          </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="hr-empty">No staff on leave today.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Rollover Conflicts -->
+{% if rollover_conflict_count > 0 %}
+<div class="hr-card" style="margin-bottom:20px; border-color: #FECACA;">
+  <div class="hr-card-header" style="background: #FEF2F2;">
+    <span class="hr-card-title" style="color: #DC2626;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:6px;vertical-align:middle"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+      Assignment Rollover Conflicts
+    </span>
+    <span class="hr-chip hr-chip-red">{{ rollover_conflict_count }} pending</span>
+  </div>
+  <div class="hr-card-body" style="padding:0">
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="border-bottom:1px solid #F3F4F6;text-align:left">
+          <th style="padding:10px 20px;color:var(--text-muted);font-weight:600">Teacher</th>
+          <th style="padding:10px 0;color:var(--text-muted);font-weight:600">Class</th>
+          <th style="padding:10px 0;color:var(--text-muted);font-weight:600">Target Term</th>
+          <th style="padding:10px 0;color:var(--text-muted);font-weight:600">Issue</th>
+          <th style="padding:10px 20px;color:var(--text-muted);font-weight:600;text-align:right">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in rollover_conflicts %}
+        <tr style="border-bottom:1px solid #F3F4F6" id="conflict-row-{{ c.pk }}">
+          <td style="padding:10px 20px">
+            <span class="hr-item-name">{{ c.teacher.full_name }}</span>
+          </td>
+          <td style="padding:10px 0">{{ c.grade_class.name }}</td>
+          <td style="padding:10px 0">{{ c.target_term.name }}</td>
+          <td style="padding:10px 0">
+            <span class="hr-chip {% if c.conflict_type == 'teacher_inactive' %}hr-chip-red{% elif c.conflict_type == 'contract_expired' %}hr-chip-amber{% else %}hr-chip-blue{% endif %}">
+              {{ c.get_conflict_type_display }}
+            </span>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;max-width:300px">{{ c.conflict_detail|truncatewords:20 }}</div>
+          </td>
+          <td style="padding:10px 20px;text-align:right;white-space:nowrap">
+            <button onclick="resolveConflict({{ c.pk }}, 'skip')" class="hr-btn hr-btn-ghost" style="padding:4px 10px;font-size:11px;color:#DC2626">Skip</button>
+            <button onclick="resolveConflict({{ c.pk }}, 'force')" class="hr-btn hr-btn-primary" style="padding:4px 10px;font-size:11px">Force Create</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Quick Actions -->
+<div class="hr-card" style="margin-bottom:24px">
+  <div class="hr-card-header">
+    <span class="hr-card-title">Quick Actions</span>
+  </div>
+  <div class="hr-card-body" style="display:flex;gap:12px;flex-wrap:wrap">
+    <a href="{% url 'users:user_create' %}" class="hr-btn hr-btn-primary">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+      New Staff Member
+    </a>
+    <a href="{% url 'hr:staff_list' %}" class="hr-btn hr-btn-ghost">View All Staff</a>
+  </div>
+</div>
+
+<script>
+function resolveConflict(conflictId, action) {
+    const row = document.getElementById('conflict-row-' + conflictId);
+    if (!row) return;
+    fetch('{% url "hr:rollover_conflict_resolve" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}',
+        },
+        body: JSON.stringify({ conflict_id: conflictId, action: action }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            row.style.opacity = '0.4';
+            row.style.textDecoration = 'line-through';
+            const btns = row.querySelectorAll('button');
+            btns.forEach(b => b.disabled = true);
+            // Update counter
+            const chip = document.querySelector('.hr-chip-red');
+            if (chip) {
+                const current = parseInt(chip.textContent) || 0;
+                const next = current - 1;
+                chip.textContent = next > 0 ? next + ' pending' : '0 pending';
+                if (next <= 0) {
+                    const card = chip.closest('.hr-card');
+                    if (card) card.style.display = 'none';
+                }
+            }
+        } else {
+            alert(data.error || 'Failed to resolve conflict');
+        }
+    })
+    .catch(err => alert('Network error: ' + err.message));
+}
+</script>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% load hodari_forms role_tags %}
+{% block title %}Broadcasts &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Communications{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-title-row">
+    <div class="card-title" style="margin:0">School Broadcasts</div>
+    {% has_perm user "communications.add_broadcast" as can_compose %}
+    {% if can_compose %}
+    <a href="{% url 'communications:broadcast_compose' %}" class="btn-primary btn-sm">+ Compose Broadcast</a>
+    {% endif %}
+  </div>
+  
+  <div style="margin-top:20px;border-top:1px solid var(--border)">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="text-align:left;border-bottom:2px solid #F3F4F6">
+          <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Created</th>
+          <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Audience</th>
+          <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Subject</th>
+          <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Status</th>
+          <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Recipients</th>
+          <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in broadcasts %}
+        <tr style="border-bottom:1px solid #F3F4F6;font-size:13px">
+          <td style="padding:12px 8px;color:var(--text-muted)">{{ b.created_at|date:"d M Y" }}</td>
+          <td style="padding:12px 8px">
+            <span style="font-weight:600">{{ b.get_audience_display }}</span>
+            {% if b.target_grade %}<br><span style="font-size:11px;color:var(--text-muted)">{{ b.target_grade }}</span>{% endif %}
+          </td>
+          <td style="padding:12px 8px;font-weight:500">{{ b.subject }}</td>
+          <td style="padding:12px 8px">
+            <span class="chip {% if b.status == 'sent' %}chip-green{% else %}chip-amber{% endif %}">
+              {{ b.get_status_display }}
+            </span>
+          </td>
+          <td style="padding:12px 8px">{{ b.recipient_count|default:"N/A" }}</td>
+          <td style="padding:12px 8px;text-align:right">
+            <a href="{% url 'communications:broadcast_detail' b.pk %}" class="btn-secondary btn-sm">View</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" style="padding:32px">{% include '_partials/empty_state.html' with title='No broadcasts created yet' desc='Create your first broadcast to get started.' icon='doc' icon_color='blue' action_url='../compose/' action_text='Compose Broadcast' action_btn='true' %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

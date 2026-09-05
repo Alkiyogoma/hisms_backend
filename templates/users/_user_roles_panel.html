@@ -1,0 +1,143 @@
+{# _user_roles_panel.html — Slide-out panel for assigning extra roles to a user #}
+
+<div id="userRolesPanel" style="display:none; position:fixed; top:0; right:0; width:420px; height:100vh; background:#fff; box-shadow:-8px 0 30px rgba(0,0,0,0.12); z-index:1000; overflow-y:auto; transition:transform 0.3s ease">
+  <!-- Header -->
+  <div style="position:sticky; top:0; background:#fff; z-index:1; padding:20px 24px; border-bottom:1px solid #E8EDF5">
+    <div style="display:flex; align-items:center; justify-content:space-between">
+      <div>
+        <div style="font-size:16px; font-weight:700; color:#1E293B" id="rolesPanelUserName">—</div>
+        <div style="font-size:12px; color:#64748B" id="rolesPanelUserRole">—</div>
+      </div>
+      <button onclick="closeRolesPanel()" style="background:none; border:none; cursor:pointer; padding:4px; color:#64748B">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Extra Roles Section -->
+  <div style="padding:20px 24px">
+    <div style="font-size:13px; font-weight:700; color:#1E293B; margin-bottom:8px; display:flex; align-items:center; gap:6px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Assign Custom Roles
+    </div>
+    <p style="font-size:11px; color:#94A3B8; margin:0 0 16px 0">Check one or more roles to assign them as additional roles for this user.</p>
+    <div id="rolesPanelList" style="display:flex; flex-direction:column; gap:8px">
+      {# Populated by JS #}
+    </div>
+  </div>
+
+  <!-- Save Button -->
+  <div style="position:sticky; bottom:0; background:#fff; padding:16px 24px; border-top:1px solid #E8EDF5; display:flex; justify-content:flex-end; gap:8px">
+    <button onclick="closeRolesPanel()" style="padding:8px 16px; border-radius:8px; font-size:12px; font-weight:600; background:#F1F5F9; color:#475569; border:none; cursor:pointer">Cancel</button>
+    <button onclick="saveRolesPanel()" id="saveRolesBtn" style="padding:8px 20px; border-radius:8px; font-size:12px; font-weight:700; background:#2563EB; color:#fff; border:none; cursor:pointer; transition:all 0.15s">
+      Save Roles
+    </button>
+  </div>
+</div>
+
+{# Backdrop #}
+<div id="rolesBackdrop" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.3); z-index:999" onclick="closeRolesPanel()"></div>
+
+{# CSRF token from template tag — works even when Tracking Prevention blocks cookies #}
+<input type="hidden" id="rolesPanelCsrf" value="{{ csrf_token }}">
+
+<script>
+let _rolesPanelUserId = null;
+
+function openRolesPanel(userId) {
+  _rolesPanelUserId = userId;
+  document.getElementById('userRolesPanel').style.display = 'block';
+  document.getElementById('rolesBackdrop').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+
+  fetch(`/accounts/users/${userId}/permissions/`)
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('rolesPanelUserName').textContent = data.username;
+      document.getElementById('rolesPanelUserRole').textContent = 'Primary: ' + data.role.replace(/_/g, ' ');
+
+      renderRolesPanelCheckboxes(data.extra_roles, data.all_custom_roles);
+    });
+}
+
+function closeRolesPanel() {
+  document.getElementById('userRolesPanel').style.display = 'none';
+  document.getElementById('rolesBackdrop').style.display = 'none';
+  document.body.style.overflow = '';
+  _rolesPanelUserId = null;
+}
+
+function renderRolesPanelCheckboxes(currentExtraRoles, allCustomRoles) {
+  const container = document.getElementById('rolesPanelList');
+  const currentIds = new Set(currentExtraRoles.map(r => r.id));
+
+  let html = '';
+  allCustomRoles.forEach(role => {
+    const checked = currentIds.has(role.id) ? 'checked' : '';
+    const borderColor = currentIds.has(role.id) ? role.color : '#E2E8F0';
+    const bg = currentIds.has(role.id) ? role.color + '10' : '#fff';
+    const sysBadge = role.is_system ? '<span style="font-size:9px; font-weight:700; color:#94A3B8; background:#F1F5F9; padding:1px 6px; border-radius:4px; text-transform:uppercase; letter-spacing:0.04em">System</span>' : '';
+    html += `
+      <label style="display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:10px; border:1.5px solid ${borderColor}; background:${bg}; cursor:pointer; transition:all 0.15s">
+        <input type="checkbox" class="roles-panel-cb" value="${role.id}" ${checked}
+          onchange="this.closest('label').style.borderColor=this.checked?'${role.color}':'#E2E8F0'; this.closest('label').style.background=this.checked?'${role.color}10':'#fff'"
+          style="width:16px; height:16px; accent-color:${role.color}; flex-shrink:0">
+        <span style="width:10px; height:10px; border-radius:50%; background:${role.color}; flex-shrink:0"></span>
+        <span style="font-size:13px; font-weight:600; color:#1E293B">${role.label}</span>
+        ${sysBadge}
+      </label>
+    `;
+  });
+  container.innerHTML = html || '<div style="padding:20px; text-align:center; font-size:13px; color:#94A3B8">No roles available.</div>';
+}
+
+function saveRolesPanel() {
+  if (!_rolesPanelUserId) return;
+
+  const btn = document.getElementById('saveRolesBtn');
+  btn.textContent = 'Saving...';
+  btn.disabled = true;
+
+  const roleIds = [];
+  document.querySelectorAll('.roles-panel-cb:checked').forEach(cb => {
+    roleIds.push(parseInt(cb.value));
+  });
+
+  fetch(`/accounts/users/${_rolesPanelUserId}/extra-roles/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': document.getElementById('rolesPanelCsrf').value
+    },
+    body: JSON.stringify({role_ids: roleIds})
+  }).then(r => r.json().then(d => ({ok: r.ok, data: d}))).then(({ok, data}) => {
+    if (!ok) {
+      btn.textContent = data.error || 'Error — try again';
+      btn.style.background = '#DC2626';
+      setTimeout(() => {
+        btn.textContent = 'Save Roles';
+        btn.style.background = '#2563EB';
+        btn.disabled = false;
+      }, 3000);
+      return;
+    }
+    btn.textContent = 'Saved!';
+    btn.style.background = '#059669';
+    setTimeout(() => {
+      closeRolesPanel();
+      btn.textContent = 'Save Roles';
+      btn.style.background = '#2563EB';
+      btn.disabled = false;
+      window.location.reload();
+    }, 800);
+  }).catch(err => {
+    btn.textContent = 'Error — try again';
+    btn.style.background = '#DC2626';
+    setTimeout(() => {
+      btn.textContent = 'Save Roles';
+      btn.style.background = '#2563EB';
+      btn.disabled = false;
+    }, 2000);
+  });
+}
+</script>

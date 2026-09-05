@@ -1,0 +1,308 @@
+{% extends "base.html" %}
+{% load hodari_forms %}
+{% load role_tags %}
+{% block title %}Overdue Accounts &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Overdue Accounts{% endblock %}
+{% block topbar_date %}{{ today|date:"d F Y" }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .overdue-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .overdue-table th { padding:10px 12px; text-align:left; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); background:var(--bg-page); border-bottom:2px solid var(--border); white-space:nowrap; cursor:pointer; user-select:none; }
+  .overdue-table th:hover { color:var(--hodari-blue); }
+  .overdue-table th .sort-icon { margin-left:4px; opacity:.5; }
+  .overdue-table td { padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  .overdue-table tr:hover td { background:var(--hodari-blue-pale); }
+  .overdue-table tr.selected td { background:var(--hodari-blue-light); }
+  .checkbox-cell { width:36px; text-align:center; }
+  .checkbox-cell input { width:16px; height:16px; cursor:pointer; accent-color:var(--hodari-blue); }
+  .badge-days { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:99px; font-size:11px; font-weight:600; font-family:var(--font-mono); }
+  .badge-days.gold { background:var(--hodari-gold-light); color:#8B6914; border:1px solid var(--hodari-gold-dark); }
+  .badge-days.amber { background:var(--amber-bg); color:var(--amber); border:1px solid var(--amber-bd); }
+  .badge-days.red { background:var(--red-bg); color:var(--red); border:1px solid var(--red-bd); }
+  .bucket-card { flex:1; padding:16px; border-radius:10px; border:1px solid var(--border); background:var(--bg-card); }
+  .bucket-card .bucket-val { font-size:22px; font-weight:700; font-family:var(--font-mono); }
+  .bucket-card .bucket-label { font-size:12px; color:var(--text-muted); margin-top:2px; }
+  .bucket-card .bucket-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px; }
+  .reminder-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:1000; display:none; align-items:center; justify-content:center; }
+  .reminder-modal-overlay.active { display:flex; }
+  .reminder-modal { background:#fff; border-radius:12px; padding:24px; width:520px; max-width:90vw; max-height:80vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.15); }
+  .reminder-modal h3 { margin:0 0 16px; font-size:16px; font-weight:700; }
+  .filter-bar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; align-items:center; }
+  .filter-bar select, .filter-bar input { padding:6px 10px; border:1px solid var(--border); border-radius:6px; font-size:12.5px; background:#fff; }
+  .filter-bar .btn { padding:6px 14px; font-size:12px; }
+  .stat-row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .reminder-log-item { padding:6px 0; display:flex; gap:8px; align-items:flex-start; border-bottom:1px solid var(--border); font-size:12px; }
+  .reminder-log-item:last-child { border-bottom:none; }
+  .reminder-log-item .rl-time { color:var(--text-muted); white-space:nowrap; font-size:11px; font-family:var(--font-mono); min-width:70px; }
+  .reminder-log-item .rl-info { flex:1; }
+</style>
+{% endblock %}
+
+{% block topbar_badges %}
+{% if total_accounts > 0 %}
+<div class="topbar-badge badge-red"><span class="badge-dot"></span>{{ total_accounts }} overdue</div>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+
+<!-- Page Header -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+  <div>
+    <h1 style="font-size:20px;font-weight:700;margin:0;color:var(--text-primary)">Overdue Accounts</h1>
+    <p style="margin:3px 0 0;font-size:12.5px;color:var(--text-muted)">Manage and send reminders for overdue fee accounts</p>
+  </div>
+  <div style="display:flex;gap:8px">
+    <a href="{% url 'finance:dashboard' %}" class="btn btn-secondary btn-sm">&larr; Dashboard</a>
+    {% has_perm user "finance.change_invoice" as can_send_reminder %}
+    {% if can_send_reminder %}
+    <button class="btn btn-sm" id="bulkRemindBtn" disabled style="background:var(--hodari-blue);color:#fff;padding:7px 16px;border-radius:6px;font-size:12.5px;font-weight:500;border:none;cursor:pointer">Send Reminder</button>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Metric Cards -->
+<div class="metrics" style="grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px">
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FFF8ED,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Total accounts</span>
+      <span class="mc-currency">count</span>
+    </div>
+    <div class="mc-val" style="color:#B45309">{{ total_accounts }}</div>
+    <div class="mc-sub" style="color:#B45309">with overdue balance</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Total billed</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#023AA5">{{ total_billed|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#5A697D">across all overdue accounts</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FFF0F0,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Outstanding</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#DC2626">{{ total_outstanding|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#DC2626">{{ collection_rate }}% collected to date</div>
+  </div>
+</div>
+
+<!-- Aging Buckets -->
+<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+  {% for bucket in aging_buckets %}
+  <div class="bucket-card">
+    <div style="display:flex;align-items:center;margin-bottom:6px">
+      <span class="bucket-dot" style="background:{% if bucket.color == 'gold' %}#FBBC05{% elif bucket.color == 'amber' %}#F59E0B{% else %}#DC2626{% endif %}"></span>
+      <span style="font-size:12px;font-weight:600;color:var(--text-secondary)">{{ bucket.label }}</span>
+    </div>
+    <div class="bucket-val">{{ bucket.total|floatformat:0 }}</div>
+    <div class="bucket-label">{{ bucket.count }} account{{ bucket.count|pluralize }}</div>
+  </div>
+  {% empty %}
+  <div class="bucket-card" style="flex:1;text-align:center">
+    {% include '_partials/empty_state.html' with title='No aging data available' desc='Aging buckets will appear once overdue accounts exist.' icon='search' icon_color='grey' %}
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Filter Bar -->
+<form method="get" class="filter-bar">
+  <label style="font-size:12px;font-weight:600;color:var(--text-secondary)">Filter:</label>
+  <select name="sort">
+    <option value="days_desc" {% if selected_sort == 'days_desc' %}selected{% endif %}>Days Overdue &darr;</option>
+    <option value="days_asc" {% if selected_sort == 'days_asc' %}selected{% endif %}>Days Overdue &uarr;</option>
+    <option value="amount_desc" {% if selected_sort == 'amount_desc' %}selected{% endif %}>Balance &darr;</option>
+    <option value="amount_asc" {% if selected_sort == 'amount_asc' %}selected{% endif %}>Balance &uarr;</option>
+    <option value="name_asc" {% if selected_sort == 'name_asc' %}selected{% endif %}>Name A&ndash;Z</option>
+    <option value="name_desc" {% if selected_sort == 'name_desc' %}selected{% endif %}>Name Z&ndash;A</option>
+    <option value="class_asc" {% if selected_sort == 'class_asc' %}selected{% endif %}>Class A&ndash;Z</option>
+    <option value="class_desc" {% if selected_sort == 'class_desc' %}selected{% endif %}>Class Z&ndash;A</option>
+  </select>
+  <select name="class">
+    <option value="">All classes</option>
+    {% for cls in classes %}
+    <option value="{{ cls }}" {% if selected_class == cls %}selected{% endif %}>{{ cls }}</option>
+    {% endfor %}
+  </select>
+  <input type="number" name="days_min" placeholder="Min days overdue" value="{{ days_min }}" style="width:120px">
+  <button type="submit" class="btn btn-secondary btn-sm">Apply</button>
+  <a href="{% url 'finance:overdue_accounts' %}" class="btn btn-secondary btn-sm" style="font-size:12px">Clear</a>
+</form>
+
+<!-- Overdue Accounts Table -->
+<div class="card" style="padding:0;overflow:hidden">
+  {% if accounts %}
+  <form id="reminderForm" method="post" action="{% url 'finance:send_bulk_reminder' %}">
+    {% csrf_token %}
+    <input type="hidden" name="channel" value="email">
+    <table class="overdue-table">
+      <thead>
+        <tr>
+          <th class="checkbox-cell"><input type="checkbox" id="selectAll" onchange="toggleAll(this)"></th>
+          <th>Student</th>
+          <th>Class</th>
+          <th style="text-align:right">Total Billed</th>
+          <th style="text-align:right">Paid</th>
+          <th style="text-align:right">Balance</th>
+          <th>Days Overdue</th>
+          <th>Last Reminder</th>
+          <th style="text-align:center">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for account in accounts %}
+        <tr>
+          <td class="checkbox-cell"><input type="checkbox" name="invoice_ids[]" value="{{ account.invoice.pk }}" class="select-row" onchange="updateBulkBtn()"></td>
+          <td>
+            <div style="font-weight:600;color:var(--text-primary)">{{ account.student_name }}</div>
+            <div style="font-size:11px;color:var(--text-muted)">#{{ account.invoice.invoice_number|default:account.invoice.pk }}</div>
+          </td>
+          <td><span style="font-size:12px">{{ account.class_name }}</span></td>
+          <td style="text-align:right;font-family:var(--font-mono);font-weight:500">TZS {{ account.total_billed|floatformat:0 }}</td>
+          <td style="text-align:right;font-family:var(--font-mono);color:var(--green)">TZS {{ account.total_paid|floatformat:0 }}</td>
+          <td style="text-align:right;font-family:var(--font-mono);font-weight:700;color:var(--red)">TZS {{ account.balance|floatformat:0 }}</td>
+          <td>
+            <span class="badge-days {{ account.days_color }}">{{ account.days_overdue }} day{{ account.days_overdue|pluralize }}</span>
+          </td>
+          <td style="font-size:12px;color:var(--text-muted)">
+            {% if account.last_reminder %}
+              {{ account.last_reminder|date:"d M Y" }}
+            {% else %}
+              <span style="font-style:italic">Never</span>
+            {% endif %}
+          </td>
+          <td style="text-align:center">
+            <a href="{% url 'finance:invoice_detail' account.invoice.pk %}" class="btn btn-secondary btn-sm" style="padding:3px 8px;font-size:11px">View</a>
+            {% has_perm user "finance.change_invoice" as can_send_reminder %}
+            {% if can_send_reminder %}
+            <form method="post" action="{% url 'finance:send_reminder' account.invoice.pk %}" style="display:inline">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-secondary btn-sm" style="padding:3px 8px;font-size:11px" onclick="return confirm('Send reminder to parent?')">Remind</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </form>
+  {% else %}
+  <div style="padding:48px 24px;text-align:center">
+    {% include '_partials/empty_state.html' with title='All accounts up to date' desc='No overdue accounts match your current filters.' icon='check' icon_color='green' %}
+    {% if selected_class or days_min %}
+    <div style="margin-top:12px"><a href="{% url 'finance:overdue_accounts' %}" class="btn btn-secondary btn-sm">Clear filters</a></div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- Reminder Modal -->
+<div class="reminder-modal-overlay" id="reminderModal">
+  <div class="reminder-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="margin:0">Send Fee Reminder</h3>
+      <button onclick="closeReminderModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">&times;</button>
+    </div>
+    <div id="selectedCount" style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">
+      <span id="countDisplay">0</span> account(s) selected
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Notification Channel</label>
+      <select id="reminderChannel" class="hf2-select" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px">
+        <option value="email">Email</option>
+        <option value="in_app">In-App Notification</option>
+        <option value="both">Both Email &amp; In-App</option>
+      </select>
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Custom Message (optional)</label>
+      <textarea id="customMessage" rows="4" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12.5px;resize:vertical" placeholder="Leave blank to use default reminder template"></textarea>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button onclick="closeReminderModal()" class="btn btn-secondary btn-sm">Cancel</button>
+      <button onclick="submitReminders()" class="btn btn-sm" style="background:var(--hodari-blue);color:#fff;padding:7px 20px;border-radius:6px;font-size:12.5px;font-weight:500;border:none;cursor:pointer">Send Reminder</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reminder Activity Log -->
+{% if reminder_log %}
+<div class="card" style="margin-top:16px">
+  <div class="card-title" style="margin-bottom:8px">Recent Reminder Activity</div>
+  {% for log in reminder_log %}
+  <div class="reminder-log-item">
+    <span class="rl-time">{{ log.created_at|date:"d M" }}</span>
+    <div class="rl-info">
+      <div style="font-weight:500;color:var(--text-primary)">{{ log.description|truncatechars:80 }}</div>
+      <div style="color:var(--text-muted);font-size:11px">{{ log.actor|default:"System" }}</div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleAll(master) {
+  document.querySelectorAll('.select-row').forEach(cb => cb.checked = master.checked);
+  updateBulkBtn();
+}
+
+function updateBulkBtn() {
+  const checked = document.querySelectorAll('.select-row:checked').length;
+  const btn = document.getElementById('bulkRemindBtn');
+  const display = document.getElementById('countDisplay');
+  btn.disabled = checked === 0;
+  btn.textContent = checked > 0 ? `Send Reminder (${checked})` : 'Send Reminder';
+  if (display) display.textContent = checked;
+}
+
+function openReminderModal() {
+  const checked = document.querySelectorAll('.select-row:checked');
+  if (checked.length === 0) return;
+  document.getElementById('countDisplay').textContent = checked.length;
+  document.getElementById('reminderModal').classList.add('active');
+}
+
+function closeReminderModal() {
+  document.getElementById('reminderModal').classList.remove('active');
+}
+
+function submitReminders() {
+  const form = document.getElementById('reminderForm');
+  const channel = document.getElementById('reminderChannel').value;
+  const customMessage = document.getElementById('customMessage').value;
+  
+  // Add channel and custom message fields
+  const channelInput = document.createElement('input');
+  channelInput.type = 'hidden';
+  channelInput.name = 'channel';
+  channelInput.value = channel;
+  form.appendChild(channelInput);
+  
+  if (customMessage) {
+    const msgInput = document.createElement('input');
+    msgInput.type = 'hidden';
+    msgInput.name = 'custom_message';
+    msgInput.value = customMessage;
+    form.appendChild(msgInput);
+  }
+  
+  form.submit();
+}
+
+// Wire up bulk remind button
+document.getElementById('bulkRemindBtn').addEventListener('click', openReminderModal);
+
+// Close modal on overlay click
+document.getElementById('reminderModal').addEventListener('click', function(e) {
+  if (e.target === this) closeReminderModal();
+});
+</script>
+{% endblock %}

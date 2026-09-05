@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+{% load static hodari_forms %}
+
+{% block title %}Parent Portal - Dashboard{% endblock %}
+
+{% block topbar_greeting %}{{ greeting }}, {{ user.get_full_name|default:user.username }}{% endblock %}
+{% block topbar_date %}{{ today_display }} - Parent Portal{% endblock %}
+
+{% block content %}
+
+<div class="page-hdr">
+  <h1>My Children</h1>
+  <p>Overview of your children's attendance and grades</p>
+</div>
+
+{% if children %}
+
+<div class="parent-children-grid">
+  {% for child in children %}
+  <div class="card parent-child-card">
+    <!-- Child Header -->
+    <div class="child-header">
+      <div class="child-avatar">{{ child.first_name.0 }}{{ child.last_name.0 }}</div>
+      <div class="child-info">
+        <div class="child-name">{{ child.get_full_name }}</div>
+        <div class="child-class">{{ child.class_name|default:"No class assigned" }}</div>
+      </div>
+      {% with bal=fee_summary|get_item:child.id %}
+      {% if bal and bal > 0 %}
+      <div class="child-balance">
+        <div class="child-bal-val">TZS {{ bal|floatformat:0 }}</div>
+        <div class="child-bal-lbl">Outstanding</div>
+      </div>
+      {% endif %}
+      {% endwith %}
+    </div>
+
+    <div class="child-body">
+      <!-- Today's Attendance -->
+      <div class="child-section">
+        <div class="section-title">Today's Attendance</div>
+        {% for eid, entry in attendance_map.items %}
+          {% if entry.student_id == child.id %}
+            <div class="trow" style="padding:6px 0">
+              <div class="trow-name">
+                {% if "present" in entry.status|lower %}
+                <span class="chip chip-green">Present</span>
+                {% elif "absent" in entry.status|lower %}
+                <span class="chip chip-red">Absent</span>
+                {% elif "late" in entry.status|lower %}
+                <span class="chip chip-amber">Late</span>
+                {% elif "excus" in entry.status|lower %}
+                <span class="chip chip-blue">Excused</span>
+                {% else %}
+                <span class="chip chip-grey">{{ entry.status }}</span>
+                {% endif %}
+              </div>
+              {% if entry.check_in_time %}
+              <div class="trow-right t-muted" style="font-size:12px">{{ entry.check_in_time|time:"H:i" }}</div>
+              {% endif %}
+            </div>
+          {% endif %}
+        {% empty %}
+          {% include '_partials/empty_state.html' with title='No attendance record yet today' desc='Attendance will appear here once marked.' icon='calendar' icon_color='grey' %}
+        {% endfor %}
+      </div>
+
+      <!-- 30-Day Attendance -->
+      {% with stats=attendance_summary|get_item:child.id %}
+      {% if stats %}
+        <div class="child-section">
+          <div class="section-title">30-Day Attendance</div>
+          <div class="att-rate-row">
+            <span class="att-rate-val">{{ stats.rate }}%</span>
+            <span class="t-muted" style="font-size:11px">{{ stats.present }}P / {{ stats.absent }}A / {{ stats.late }}L</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill {% if stats.rate >= 90 %}bg-green{% elif stats.rate >= 75 %}bg-amber{% else %}bg-red{% endif %}" style="width:{{ stats.rate }}%"></div>
+          </div>
+        </div>
+      {% endif %}
+      {% endwith %}
+
+      <!-- Latest Grades -->
+      {% with scores=latest_scores|get_item:child.id %}
+      {% if scores %}
+        <div class="child-section">
+          <div class="section-title">Latest Grades</div>
+          {% for score in scores %}
+          <div class="trow" style="padding:4px 0">
+            <div class="trow-name" style="font-size:12px">{{ score.subject_name }}</div>
+            <span class="trow-val {% if score.score >= 80 %}t-green{% elif score.score >= 50 %}t-amber{% else %}t-red{% endif %}" style="font-size:13px">
+              {{ score.score|floatformat:0 }}{% if score.max_score %}/{{ score.max_score|floatformat:0 }}{% endif %}
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+      {% endwith %}
+
+      <!-- Performance Trend Graph -->
+      {% with trend=performance_trend|get_item:child.id %}
+      {% if trend %}
+      <div class="child-section">
+        <div class="section-title">Performance Trend</div>
+        <div class="chart-wrap">
+          <canvas id="trend-{{ child.id }}"></canvas>
+        </div>
+      </div>
+      {% endif %}
+      {% endwith %}
+
+      <!-- Quick Links -->
+      <div class="quick-links">
+        <a href="{% url 'parent_portal:child_detail' child.id %}" class="qlink">Profile</a>
+        <a href="{% url 'parent_portal:attendance' %}?student={{ child.id }}" class="qlink">Attendance</a>
+        <a href="{% url 'parent_portal:grades' %}?student={{ child.id }}" class="qlink">Grades</a>
+        <a href="{% url 'parent_portal:invoices' %}?student={{ child.id }}" class="qlink">Fees</a>
+        <a href="{% url 'academics:progression_parent_view' %}?student={{ child.id }}" class="qlink">Progression</a>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="card" style="padding:48px;text-align:center">
+  {% include '_partials/empty_state.html' with title='No Children Found' desc='No students are linked to your parent account. Please contact the school administration.' icon='users' icon_color='blue' %}
+</div>
+{% endif %}
+
+<!-- Parent Tasks -->
+{% if parent_tasks %}
+<div class="card" style="margin-top:16px">
+  <div class="card-title-row" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <span class="section-title">To-Do</span>
+    <a href="/tasks/" style="font-size:11px;font-weight:600;color:var(--hodari-blue);text-decoration:none">View All</a>
+  </div>
+  {% for task in parent_tasks %}
+  <div class="trow" style="padding:8px 0;{% if task.priority == 'urgent' or task.priority == 'high' %}background:#FFFBEB;border-radius:6px;padding:8px 10px;margin-bottom:4px{% endif %}">
+    <div style="flex:1;min-width:0">
+      <div class="trow-name" style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ task.title }}</div>
+      <div class="trow-sub">
+        {% if task.task_type == 'discipline_contact' %}
+          Discipline
+        {% elif task.task_type == 'report_card_ready' %}
+          Report Card
+        {% elif task.task_type == 'open_invoice' or task.task_type == 'overdue_collection' or task.task_type == 'fee_payment_reminder' %}
+          Finance
+        {% elif task.task_type == 'welfare_alert' or task.task_type == 'welfare_followup' %}
+          Welfare
+        {% elif task.task_type == 'attendance_alert' %}
+          Attendance
+        {% else %}
+          {{ task.get_task_type_display|default:task.task_type }}
+        {% endif %}
+        {% if task.due_date %} &middot; Due {{ task.due_date|date:"d M" }}{% endif %}
+      </div>
+    </div>
+    <div class="trow-right">
+      {% if task.priority == 'urgent' %}
+        <span class="chip chip-red">Urgent</span>
+      {% elif task.priority == 'high' %}
+        <span class="chip chip-amber">High</span>
+      {% elif task.priority == 'medium' %}
+        <span class="chip chip-blue">Med</span>
+      {% else %}
+        <span class="chip chip-grey">Low</span>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<style>
+  .parent-children-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+  .parent-child-card { padding: 0; overflow: hidden; }
+  .child-header {
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: linear-gradient(135deg, var(--hodari-blue-pale) 0%, #fff 100%);
+    border-bottom: 1px solid var(--border);
+  }
+  .child-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--hodari-blue); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; flex-shrink: 0;
+  }
+  .child-info { flex: 1; min-width: 0; }
+  .child-name { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+  .child-class { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+  .child-balance {
+    text-align: right; flex-shrink: 0;
+  }
+  .child-bal-val { font-size: 12px; font-weight: 700; color: #dc2626; }
+  .child-bal-lbl { font-size: 10px; color: var(--text-muted); }
+  .child-body { padding: 10px 12px 12px; }
+  .child-section { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .child-section:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+  .att-rate-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+  .att-rate-val { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+  .chart-wrap { position: relative; height: 140px; margin-top: 6px; }
+  .quick-links {
+    margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border);
+    display: flex; gap: 5px; flex-wrap: wrap;
+  }
+  .qlink {
+    padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: 600;
+    background: var(--hodari-blue-pale); color: var(--hodari-blue); text-decoration: none;
+    transition: background 0.15s;
+  }
+  .qlink:active { background: var(--hodari-blue); color: #fff; }
+
+  @media(min-width: 541px) {
+    .parent-children-grid { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+    .child-header { padding: 14px 16px; gap: 12px; }
+    .child-avatar { width: 40px; height: 40px; font-size: 15px; }
+    .child-name { font-size: 14px; }
+    .child-bal-val { font-size: 14px; }
+    .child-body { padding: 12px 16px 14px; }
+    .att-rate-val { font-size: 22px; }
+    .chart-wrap { height: 160px; }
+    .quick-links { gap: 6px; }
+    .qlink { font-size: 11px; padding: 5px 10px; }
+  }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+  var trendData = {{ performance_trend_json|safe }};
+
+  Object.keys(trendData).forEach(function(childId) {
+    var data = trendData[childId];
+    if (!data || data.length === 0) return;
+
+    var labels = data.map(function(d) { return d.term + ' ' + d.year; });
+    var averages = data.map(function(d) { return d.average; });
+
+    var canvas = document.getElementById('trend-' + childId);
+    if (!canvas) return;
+
+    new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Overall Average %',
+          data: averages,
+          borderColor: '#023AA5',
+          backgroundColor: 'rgba(2,58,165,0.08)',
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: '#023AA5',
+          tension: 0.3,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) { return ctx.parsed.y + '%'; }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: false, min: 0, max: 100,
+            ticks: { font: { size: 9 }, callback: function(v) { return v + '%'; } },
+            grid: { color: 'rgba(0,0,0,0.04)' }
+          },
+          x: {
+            ticks: { font: { size: 9 }, maxRotation: 45 },
+            grid: { display: false }
+          }
+        }
+      }
+    });
+  });
+})();
+</script>
+{% endblock %}

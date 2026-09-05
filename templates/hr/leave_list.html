@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+{% load role_tags %}
+
+{% block title %}Leave Management — {{ brand.school_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  :root {
+    --hodari-blue: #023AA5; --hodari-blue-dark: #012880; --hodari-blue-mid: #1A56C4;
+    --hodari-blue-light: #E8EEF9; --hodari-blue-pale: #F0F4FB;
+    --hodari-gold: #FBBC05; --hodari-gold-dark: #E0A800; --hodari-gold-light: #FEF3C7;
+    --hodari-charcoal: #474747; --hodari-charcoal-lt: #6B6B6B;
+    --bg-page: #F2F5FA; --bg-card: #FFFFFF; --bg-sidebar: #023AA5;
+    --text-primary: #1A1A2E; --text-secondary: #474747; --text-muted: #8492A6;
+    --border: #DDE3EE; --border-strong: #B8C4D8;
+    --green: #1B7B34; --green-bg: #E8F5EC; --green-bd: #B7DFBF;
+    --amber: #92550A; --amber-bg: #FEF3C7; --amber-bd: #FCD34D;
+    --red: #9B1C1C; --red-bg: #FEF2F2; --red-bd: #FECACA;
+    --blue-st: #023AA5; --blue-st-bg: #E8EEF9; --blue-st-bd: #93C5FD;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Roboto', sans-serif; background: var(--bg-page); color: var(--text-primary); }
+  .leave-page { padding: 24px 28px; max-width: 1200px; margin: 0 auto; }
+  .section-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); font-weight: 500; margin-bottom: 12px; }
+  .metric-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .metric-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; }
+  .metric-card .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+  .metric-card .value { font-family: 'Roboto Mono', monospace; font-size: 26px; font-weight: 500; margin-top: 4px; }
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 24px; }
+  .filter-bar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+  .filter-bar input, .filter-bar select { padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 13px; background: var(--bg-card); }
+  .filter-bar input:focus, .filter-bar select:focus { outline: none; border-color: var(--hodari-blue); }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { background: var(--bg-page); font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
+  tbody td { padding: 12px; font-size: 13px; border-bottom: 1px solid var(--border); }
+  tbody tr:hover { background: var(--hodari-blue-pale); }
+  .badge-pill { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 11px; font-weight: 500; }
+  .badge-pill.green { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-bd); }
+  .badge-pill.amber { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-bd); }
+  .badge-pill.red { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-bd); }
+  .badge-pill.blue { background: var(--blue-st-bg); color: var(--blue-st); border: 1px solid var(--blue-st-bd); }
+  .btn-primary { background: var(--hodari-blue); color: #fff; border: none; padding: 8px 18px; border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-primary:hover { background: var(--hodari-blue-dark); }
+  .btn-secondary { background: #fff; color: var(--hodari-blue); border: 1px solid var(--border-strong); padding: 8px 18px; border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-secondary:hover { border-color: var(--hodari-blue); }
+  .btn-sm { padding: 5px 12px; font-size: 12px; }
+  .btn-danger { background: var(--red); color: #fff; border: none; padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; }
+  .actions { display: flex; gap: 6px; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "hr/_top_tabs.html" %}
+<div class="leave-page">
+  {% has_perm user "hr.add_leaverequest" as can_add_leave %}
+  {% has_perm user "hr.change_leaverequest" as can_approve_leave %}
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+    <div>
+      <h1 style="font-family:'Merriweather',serif;font-size:22px;font-weight:700;color:var(--text-primary);margin-bottom:4px;">Leave Management</h1>
+      <p style="font-size:13px;color:var(--text-muted);">Manage staff leave requests</p>
+    </div>
+    {% if can_add_leave %}
+    <a href="{% url 'hr:leave_create' %}" class="btn-primary">+ New Leave Request</a>
+    {% endif %}
+  </div>
+
+  <!-- Metric Cards -->
+  <div class="metric-row">
+    <div class="metric-card">
+      <div class="label">Total Requests</div>
+      <div class="value" style="color:var(--hodari-blue);">{{ total_requests }}</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">Pending</div>
+      <div class="value" style="color:var(--amber);">{{ pending_count }}</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">Approved</div>
+      <div class="value" style="color:var(--green);">{{ approved_count }}</div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="card">
+    <form method="GET" class="filter-bar">
+      <input type="text" name="q" placeholder="Search staff..." value="{{ q }}" style="flex:1;">
+      <select name="leave_type">
+        <option value="">All Types</option>
+        {% for code, label in leave_types %}
+        <option value="{{ code }}" {% if selected_leave_type == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <select name="status">
+        <option value="">All Status</option>
+        {% for code, label in statuses %}
+        <option value="{{ code }}" {% if selected_status == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn-primary btn-sm">Filter</button>
+      <a href="{% url 'hr:leave_list' %}" class="btn-secondary btn-sm">Clear</a>
+    </form>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Staff</th>
+          <th>Type</th>
+          <th>Start</th>
+          <th>End</th>
+          <th>Days</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for leave in leave_requests %}
+        <tr>
+          <td><strong>{{ leave.staff.full_name }}</strong></td>
+          <td>{{ leave.get_leave_type_display }}</td>
+          <td>{{ leave.start_date|date:"d M Y" }}</td>
+          <td>{{ leave.end_date|date:"d M Y" }}</td>
+          <td>{{ leave.total_days }}</td>
+          <td>
+            {% if leave.status == 'approved' %}
+            <span class="badge-pill green">{{ leave.get_status_display }}</span>
+            {% elif leave.status == 'pending' %}
+            <span class="badge-pill amber">{{ leave.get_status_display }}</span>
+            {% elif leave.status == 'rejected' %}
+            <span class="badge-pill red">{{ leave.get_status_display }}</span>
+            {% else %}
+            <span class="badge-pill blue">{{ leave.get_status_display }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if leave.status == 'pending' and can_approve_leave %}
+            <form method="POST" action="{% url 'hr:leave_approve' leave.pk %}" style="display:inline;">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="approve">
+              <button type="submit" class="btn-primary btn-sm">Approve</button>
+            </form>
+            <button onclick="showRejectModal({{ leave.pk }}, '{{ leave.staff.full_name }}')" class="btn-danger btn-sm">Reject</button>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7">{% include '_partials/empty_state.html' with title='No leave requests' desc='Leave requests will appear here.' icon='calendar' icon_color='grey' %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Reject Modal -->
+<div id="rejectModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:10px;padding:24px;max-width:480px;width:90%;">
+    <h3 style="margin-bottom:12px;">Reject Leave Request</h3>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;" id="rejectStaffName"></p>
+    <form method="POST" id="rejectForm">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="reject">
+      <textarea name="rejection_reason" rows="3" placeholder="Reason for rejection (required)..." style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;font-family:'Roboto',sans-serif;font-size:13px;margin-bottom:16px;" required></textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" onclick="closeRejectModal()" class="btn-secondary btn-sm">Cancel</button>
+        <button type="submit" class="btn-danger btn-sm">Reject</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function showRejectModal(pk, name) {
+  document.getElementById('rejectForm').action = "{% url 'hr:leave_approve' 0 %}".replace('0', pk);
+  document.getElementById('rejectStaffName').textContent = 'Reject leave for: ' + name;
+  document.getElementById('rejectModal').style.display = 'flex';
+}
+function closeRejectModal() {
+  document.getElementById('rejectModal').style.display = 'none';
+}
+</script>
+{% endblock %}

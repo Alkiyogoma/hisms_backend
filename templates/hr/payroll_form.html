@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% load static %}
+
+{% block title %}New Payroll Run — {{ brand.school_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  :root {
+    --hodari-blue: #023AA5; --hodari-blue-dark: #012880;
+    --hodari-blue-light: #E8EEF9;
+    --bg-page: #F2F5FA; --bg-card: #FFFFFF;
+    --text-primary: #1A1A2E; --text-secondary: #474747; --text-muted: #8492A6;
+    --border: #DDE3EE; --border-strong: #B8C4D8;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Roboto', sans-serif; background: var(--bg-page); color: var(--text-primary); }
+  .payroll-form-page { padding: 24px 28px; max-width: 700px; margin: 0 auto; }
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin-bottom: 24px; }
+  .form-group { margin-bottom: 18px; }
+  .form-group label { display: block; font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; }
+  .hf2-input, .hf2-select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 14px; background: #fff; }
+  .hf2-input:focus, .hf2-select:focus { outline: none; border-color: var(--hodari-blue); box-shadow: 0 0 0 3px var(--hodari-blue-light); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .btn-primary { background: var(--hodari-blue); color: #fff; border: none; padding: 10px 24px; border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; }
+  .btn-primary:hover { background: var(--hodari-blue-dark); }
+  .btn-secondary { background: #fff; color: var(--hodari-blue); border: 1px solid var(--border-strong); padding: 10px 24px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; text-decoration: none; display: inline-block; }
+  .actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "hr/_top_tabs.html" %}
+<div class="payroll-form-page">
+  <h1 style="font-family:'Merriweather',serif;font-size:22px;font-weight:700;color:var(--text-primary);margin-bottom:24px;">
+    {% if is_new %}New Payroll Run{% else %}Edit Payroll Run{% endif %}
+  </h1>
+
+  <div class="card">
+    <form method="POST">
+      {% csrf_token %}
+      <div class="form-group">
+        <label>Period Name</label>
+        <input type="text" name="period_name" class="hf2-input" placeholder="e.g. January 2026" required>
+      </div>
+      <div class="form-group">
+        <label>Payroll Type</label>
+        <select name="payroll_type" class="hf2-select">
+          <option value="monthly">Monthly Salary</option>
+          <option value="bonus">Bonus Payment</option>
+          <option value="termination">Termination Benefits</option>
+          <option value="special">Special Payment</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Term (optional)</label>
+        <select name="term" class="hf2-select">
+          <option value="">-- No Term --</option>
+          {% for t in form.fields.term.queryset %}
+          <option value="{{ t.pk }}">{{ t.name }} ({{ t.academic_year.name }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Period Start</label>
+          <input type="date" name="period_start" class="hf2-input">
+        </div>
+        <div class="form-group">
+          <label>Period End</label>
+          <input type="date" name="period_end" class="hf2-input">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Payment Date</label>
+        <input type="date" name="payment_date" class="hf2-input">
+      </div>
+
+      <div class="actions">
+        <a href="{% url 'hr:payroll_list' %}" class="btn-secondary">Cancel</a>
+        {% has_perm user "hr.add_payrollrun" as can_create %}
+        {% if can_create %}
+        <button type="submit" class="btn-primary">Create Payroll Run</button>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

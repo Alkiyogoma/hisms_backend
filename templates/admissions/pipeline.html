@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Admissions Pipeline &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Admissions{% endblock %}
+{% block topbar_date %}{{ today_display }}{% endblock %}
+{% block topbar_badges %}
+  <a href="{% url 'admissions:actions_needed' %}" class="topbar-badge badge-red" style="background:#FEF2F2;color:#9B1C1C;border-color:#FECACA;text-decoration:none;cursor:pointer">
+    <span class="badge-dot"></span>{{ critical_action_count }} actions needed
+  </a>
+{% endblock %}
+
+{% block content %}
+
+{% include "admissions/_top_tabs.html" %}
+
+<!-- Phase summary strip -->
+<div class="phase-strip">
+  {% for pg in phase_groups %}
+    <div class="phase-card{% if pg.total > 0 %} active{% endif %}" onclick="togglePhase('{{ pg.key }}')">
+      <div class="phase-num">{{ pg.total }}</div>
+      <div class="phase-lbl">{{ pg.label }}</div>
+      <div class="phase-sub">{{ pg.columns|length }} stages</div>
+    </div>
+  {% endfor %}
+</div>
+
+{% load hodari_forms %}
+<!-- Filter toolbar — single row -->
+<form method="get" class="hf2-toolbar" style="margin-bottom:24px">
+  <div class="hf2-search-wrap">
+    <svg class="hf2-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+    <input type="text" name="q" value="{{ request.GET.q }}" class="hf2-search" placeholder="Search applicants...">
+  </div>
+
+  <select name="status" class="hf2-select">
+    <option value="">All statuses</option>
+    {% for choice in filter_form.status.field.choices %}
+      {% if choice.0 %}<option value="{{ choice.0 }}" {% if request.GET.status == choice.0 %}selected{% endif %}>{{ choice.1 }}</option>{% endif %}
+    {% endfor %}
+  </select>
+
+  <select name="grade" class="hf2-select">
+    <option value="">All grades</option>
+    {% for choice in filter_form.grade.field.choices %}
+      {% if choice.0 %}<option value="{{ choice.0 }}" {% if request.GET.grade == choice.0 %}selected{% endif %}>{{ choice.1 }}</option>{% endif %}
+    {% endfor %}
+  </select>
+
+  <select name="channel" class="hf2-select">
+    <option value="">All channels</option>
+    {% for choice in filter_form.channel.field.choices %}
+      {% if choice.0 %}<option value="{{ choice.0 }}" {% if request.GET.channel == choice.0 %}selected{% endif %}>{{ choice.1 }}</option>{% endif %}
+    {% endfor %}
+  </select>
+
+  <input type="date" name="start_date" value="{{ request.GET.start_date }}" class="hf2-input hf2-date">
+  <span style="font-size:12px;color:#9CA3AF">to</span>
+  <input type="date" name="end_date" value="{{ request.GET.end_date }}" class="hf2-input hf2-date">
+
+  <button type="submit" class="btn-primary btn-sm">Apply</button>
+  <a href="{% url 'admissions:pipeline' %}" class="btn-secondary btn-sm">Clear</a>
+  {% has_perm user "admissions.add_applicant" as can_add %}
+  {% if can_add and user.role != 'head_of_school' %}
+  <a href="{% url 'admissions:new_inquiry' %}" class="btn-primary btn-sm" style="margin-left:auto">+ New Inquiry</a>
+  {% endif %}
+</form>
+
+<!-- Pipeline board -->
+{% include "admissions/_pipeline_board.html" %}
+
+{% endblock %}

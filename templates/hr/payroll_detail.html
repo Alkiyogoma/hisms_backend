@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+{% load role_tags %}
+
+{% block title %}{{ payroll_run.period_name }} — {{ brand.school_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  :root {
+    --hodari-blue: #023AA5; --hodari-blue-dark: #012880; --hodari-blue-mid: #1A56C4;
+    --hodari-blue-light: #E8EEF9; --hodari-blue-pale: #F0F4FB;
+    --hodari-gold: #FBBC05;
+    --bg-page: #F2F5FA; --bg-card: #FFFFFF;
+    --text-primary: #1A1A2E; --text-secondary: #474747; --text-muted: #8492A6;
+    --border: #DDE3EE; --border-strong: #B8C4D8;
+    --green: #1B7B34; --green-bg: #E8F5EC; --green-bd: #B7DFBF;
+    --amber: #92550A; --amber-bg: #FEF3C7; --amber-bd: #FCD34D;
+    --red: #9B1C1C; --red-bg: #FEF2F2; --red-bd: #FECACA;
+    --blue-st: #023AA5; --blue-st-bg: #E8EEF9; --blue-st-bd: #93C5FD;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Roboto', sans-serif; background: var(--bg-page); color: var(--text-primary); }
+  .payroll-detail { padding: 24px 28px; max-width: 1200px; margin: 0 auto; }
+  .section-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); font-weight: 500; margin-bottom: 12px; }
+  .metric-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .metric-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; }
+  .metric-card .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+  .metric-card .value { font-family: 'Roboto Mono', monospace; font-size: 26px; font-weight: 500; margin-top: 4px; }
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 24px; }
+  .badge-pill { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 11px; font-weight: 500; }
+  .badge-pill.green { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-bd); }
+  .badge-pill.amber { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-bd); }
+  .badge-pill.blue { background: var(--blue-st-bg); color: var(--blue-st); border: 1px solid var(--blue-st-bd); }
+  .badge-pill.muted { background: var(--bg-page); color: var(--text-muted); border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { background: var(--bg-page); font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; padding: 10px; text-align: left; border-bottom: 1px solid var(--border); }
+  tbody td { padding: 10px; font-size: 13px; border-bottom: 1px solid var(--border); }
+  tbody tr:hover { background: var(--hodari-blue-pale); }
+  tbody tr.total-row { background: var(--hodari-blue-light); font-weight: 600; }
+  .btn-primary { background: var(--hodari-blue); color: #fff; border: none; padding: 8px 18px; border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-primary:hover { background: var(--hodari-blue-dark); }
+  .btn-secondary { background: #fff; color: var(--hodari-blue); border: 1px solid var(--border-strong); padding: 8px 18px; border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: none; }
+  .btn-secondary:hover { border-color: var(--hodari-blue); }
+  .btn-danger { background: var(--red); color: #fff; border: none; padding: 8px 18px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; }
+  .btn-sm { padding: 5px 12px; font-size: 12px; }
+  .action-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "hr/_top_tabs.html" %}
+<div class="payroll-detail">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+    <div>
+      <h1 style="font-family:'Merriweather',serif;font-size:22px;font-weight:700;color:var(--text-primary);margin-bottom:4px;">{{ payroll_run.period_name }}</h1>
+      <p style="font-size:13px;color:var(--text-muted);">
+        {{ payroll_run.get_payroll_type_display }} ·
+        {% if payroll_run.status == 'paid' %}
+        <span class="badge-pill green">{{ payroll_run.get_status_display }}</span>
+        {% elif payroll_run.status == 'approved' %}
+        <span class="badge-pill blue">{{ payroll_run.get_status_display }}</span>
+        {% elif payroll_run.status == 'pending_approval' %}
+        <span class="badge-pill amber">{{ payroll_run.get_status_display }}</span>
+        {% else %}
+        <span class="badge-pill muted">{{ payroll_run.get_status_display }}</span>
+        {% endif %}
+      </p>
+    </div>
+  </div>
+
+  <!-- Action buttons -->
+  {% has_perm user "hr.add_payrollentry" as can_populate_entries %}
+  {% has_perm user "hr.change_payrollrun" as can_change_payroll %}
+  {% has_perm user "hr.add_statutoryfiling" as can_add_statutory %}
+  <div class="action-bar">
+    {% if payroll_run.status == 'draft' %}
+    {% if can_populate_entries %}
+    <form method="POST" action="{% url 'hr:payroll_auto_populate' payroll_run.pk %}" style="display:inline;">
+      {% csrf_token %}
+      <button type="submit" class="btn-secondary btn-sm"> Auto-Populate Staff</button>
+    </form>
+    {% endif %}
+    {% if can_change_payroll %}
+    <form method="POST" action="{% url 'hr:payroll_submit' payroll_run.pk %}" style="display:inline;">
+      {% csrf_token %}
+      <button type="submit" class="btn-primary btn-sm"> Submit for Approval</button>
+    </form>
+    {% endif %}
+    {% endif %}
+    {% if payroll_run.status == 'pending_approval' %}
+    {% if can_change_payroll %}
+    <form method="POST" action="{% url 'hr:payroll_approve' payroll_run.pk %}" style="display:inline;">
+      {% csrf_token %}
+      <button type="submit" class="btn-primary btn-sm"> Approve Payroll</button>
+    </form>
+    {% endif %}
+    {% endif %}
+    {% if payroll_run.status == 'approved' or payroll_run.status == 'paid' %}
+    {% if can_add_statutory %}
+    <a href="{% url 'hr:statutory_filing_generate' payroll_run.pk %}" class="btn-secondary btn-sm"> Generate Statutory Filings</a>
+    {% endif %}
+    {% if can_change_payroll %}
+    <button type="button" class="btn-secondary btn-sm"
+      onclick="confirmDeleteModal({title:'Lock Payroll?',body:'Are you sure you want to lock this payroll?',detail:'It will become read-only and no further edits will be allowed.',confirmText:'Lock Payroll',url:'{% url 'hr:payroll_lock' payroll_run.pk %}',type:'warning'})">
+      Lock Payroll
+    </button>
+    {% endif %}
+    {% endif %}
+    <a href="{% url 'hr:payroll_list' %}" class="btn-secondary btn-sm">← Back</a>
+  </div>
+
+  <!-- Metric cards -->
+  <div class="metric-row">
+    <div class="metric-card">
+      <div class="label">Total Staff</div>
+      <div class="value" style="color:var(--hodari-blue);">{{ total_staff }}</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">Gross Pay</div>
+      <div class="value" style="color:var(--text-primary);">TZS {{ total_gross|floatformat:0|intcomma }}</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">Total Deductions</div>
+      <div class="value" style="color:var(--amber);">TZS {{ total_deductions|floatformat:0|intcomma }}</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">Net Pay</div>
+      <div class="value" style="color:var(--green);">TZS {{ total_net|floatformat:0|intcomma }}</div>
+    </div>
+  </div>
+
+  <!-- Payroll Entries Table -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="font-size:14px;font-weight:500;">Payroll Entries</h3>
+      {% if payroll_run.status == 'draft' and available_staff %}
+      <form method="POST" action="{% url 'hr:payroll_auto_populate' payroll_run.pk %}" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" class="btn-secondary btn-sm">+ Add Staff</button>
+      </form>
+      {% endif %}
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Staff</th>
+          <th>Basic Pay</th>
+          <th>Allowances</th>
+          <th>Gross</th>
+          <th>PAYE</th>
+          <th>NSSF</th>
+          <th>NHIF</th>
+          <th>Deductions</th>
+          <th>Net Pay</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in entries %}
+        <tr>
+          <td><strong>{{ entry.staff.full_name }}</strong></td>
+          <td style="font-family:'Roboto Mono',monospace;">TZS {{ entry.basic_pay|floatformat:0|intcomma }}</td>
+          <td style="font-family:'Roboto Mono',monospace;">TZS {{ entry.housing_allowance|add:entry.transport_allowance|add:entry.medical_allowance|add:entry.other_allowances|floatformat:0|intcomma }}</td>
+          <td style="font-family:'Roboto Mono',monospace;font-weight:500;">TZS {{ entry.gross_pay|floatformat:0|intcomma }}</td>
+          <td style="font-family:'Roboto Mono',monospace;">TZS {{ entry.paye_tax|floatformat:0|intcomma }}</td>
+          <td style="font-family:'Roboto Mono',monospace;">TZS {{ entry.nssf_employee|floatformat:0|intcomma }}</td>
+          <td style="font-family:'Roboto Mono',monospace;">TZS {{ entry.nhif_deduction|floatformat:0|intcomma }}</td>
+          <td style="font-family:'Roboto Mono',monospace;">TZS {{ entry.total_deductions|floatformat:0|intcomma }}</td>
+          <td style="font-family:'Roboto Mono',monospace;font-weight:600;color:var(--green);">TZS {{ entry.net_pay|floatformat:0|intcomma }}</td>
+          <td>
+            {% if payroll_run.status == 'draft' %}
+            <a href="{% url 'hr:payroll_entry_edit' entry.pk %}" class="btn-secondary btn-sm">Edit</a>
+            {% endif %}
+            <a href="{% url 'hr:payroll_payslip' entry.pk %}" class="btn-secondary btn-sm">Payslip</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="10">{% include '_partials/empty_state.html' with title='No entries yet' desc='Click "Auto-Populate Staff" to add staff members.' icon='users' icon_color='grey' %}</td></tr>
+        {% endfor %}
+      </tbody>
+      {% if entries %}
+      <tfoot>
+        <tr class="total-row">
+          <td><strong>Total ({{ entries|length }})</strong></td>
+          <td>TZS {{ total_gross|floatformat:0|intcomma }}</td>
+          <td></td>
+          <td>TZS {{ total_gross|floatformat:0|intcomma }}</td>
+          <td>TZS {{ total_paye|floatformat:0|intcomma }}</td>
+          <td>TZS {{ total_nssf|floatformat:0|intcomma }}</td>
+          <td>TZS {{ total_nhif|floatformat:0|intcomma }}</td>
+          <td>TZS {{ total_deductions|floatformat:0|intcomma }}</td>
+          <td>TZS {{ total_net|floatformat:0|intcomma }}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Report Review Queue — {{ brand.school_name }}{% endblock %}
+
+{% block topbar_greeting %}Report Review Queue{% endblock %}
+{% block topbar_date %}{{ term.academic_year.name }} — {{ term.name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .rq-table-wrap { overflow-x: auto; }
+  .metrics-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .metric-compact:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "academics/_top_tabs_reports.html" %}
+{% is_hos_signoff user as can_publish %}
+
+{% if not term %}
+<div class="card" style="text-align:center;padding:60px 24px">
+  <h3 style="margin:0 0 8px;font-size:18px;color:var(--text-primary);font-weight:700">No active term</h3>
+  <p style="margin:0;color:var(--text-muted);font-size:14px">Configure an active term to review report cards.</p>
+</div>
+{% else %}
+
+{% if status_filter == 'published' %}
+<div class="metrics metrics-4">
+  <div class="metric-compact" style="background:linear-gradient(135deg,#F0FDF4,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Published</span></div>
+    <div class="mc-val" style="color:#059669">{{ total_published }}</div>
+    <div class="mc-sub" style="color:#059669">Visible to parents</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Pending Review</span></div>
+    <div class="mc-val" style="color:#023AA5">{{ total_pending }}</div>
+    <div class="mc-sub" style="color:#5A697D">Awaiting HOD/HOS action</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF9F0,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Ready to Publish</span></div>
+    <div class="mc-val" style="color:#059669">{{ total_ready }}</div>
+    <div class="mc-sub" style="color:#059669">All scores approved, comments complete</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FFF8ED,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Total Reports</span></div>
+    <div class="mc-val" style="color:#B45309">{{ total_published|add:total_pending }}</div>
+    <div class="mc-sub" style="color:#B45309">All reports this term</div>
+  </div>
+</div>
+{% else %}
+<div class="metrics metrics-4">
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Pending Review</span></div>
+    <div class="mc-val" style="color:#023AA5">{{ total_pending }}</div>
+    <div class="mc-sub" style="color:#5A697D">Reports with comments submitted</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF9F0,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Ready to Publish</span></div>
+    <div class="mc-val" style="color:#059669">{{ total_ready }}</div>
+    <div class="mc-sub" style="color:#059669">All scores approved, comments complete</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FFF8ED,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Blocked</span></div>
+    <div class="mc-val" style="color:#B45309">{{ total_pending|add:"-total_ready" }}</div>
+    <div class="mc-sub" style="color:#B45309">Pending scores or incomplete comments</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#F0FDF4,#fff);cursor:pointer" onclick="window.location.href='?status=published'" title="Show published reports">
+    <div class="mc-lbl-row"><span class="mc-lbl">Published</span></div>
+    <div class="mc-val" style="color:#059669">{{ total_published }}</div>
+    <div class="mc-sub" style="color:#059669">Visible to parents</div>
+  </div>
+</div>
+{% endif %}
+
+<div class="section-hdr">
+  <span class="section-title">
+    {% if status_filter == 'published' %}Published Reports{% else %}Reports awaiting HOD and HOS review{% endif %}
+  </span>
+  <div style="display:flex;gap:6px;margin-left:auto">
+    <a href="?" class="hf-btn hf-btn-secondary" style="font-size:11px;padding:4px 12px;{% if not status_filter or status_filter == 'pending' %}background:var(--hodari-blue);color:#fff;border-color:var(--hodari-blue){% endif %}">Pending</a>
+    <a href="?status=published" class="hf-btn hf-btn-secondary" style="font-size:11px;padding:4px 12px;{% if status_filter == 'published' %}background:var(--hodari-blue);color:#fff;border-color:var(--hodari-blue){% endif %}">Published</a>
+  </div>
+</div>
+
+{% regroup reports by class_name as class_groups %}
+{% for group in class_groups %}
+<div class="card" style="margin-bottom:20px;padding:0;overflow:hidden">
+  <div class="card-title-row" style="padding:14px 20px;border-bottom:1px solid var(--border);margin-bottom:0">
+    <span style="font-weight:700;font-size:15px;color:var(--text-primary)">{{ group.grouper }}</span>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:12px;color:var(--text-muted)">{{ group.list|length }} {{ group.list|length|pluralize:"student,students" }}</span>
+      {% if not status_filter or status_filter == 'pending' %}
+      <a href="?generate={{ group.grouper }}" class="hf-btn hf-btn-secondary" style="font-size:11px;padding:4px 10px" onclick="return confirm('Generate missing report cards for {{ group.grouper }}?')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:2px"><path d="M12 5v14M5 12h14"/></svg>
+        Generate Reports
+      </a>
+      {% endif %}
+    </div>
+  </div>
+  <div class="rq-table-wrap">
+  <table class="h-table">
+    <thead>
+      <tr>
+        <th style="padding-left:20px">Student</th>
+        <th>Average</th>
+        <th>Scores</th>
+        <th>Comment</th>
+        <th>Teacher</th>
+        <th style="padding-right:20px;text-align:right">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in group.list %}
+      <tr>
+        <td style="padding-left:20px">
+          <div style="font-weight:600;font-size:13px;color:var(--text-primary)">{{ item.student.get_full_name }}</div>
+          <div style="font-size:11px;color:var(--text-muted)">{{ item.student.admission_no }}</div>
+        </td>
+        <td>
+          {% if item.overall_average %}
+            <span style="font-weight:700;font-size:14px;font-family:var(--font-mono)">{{ item.overall_average }}%</span>
+          {% else %}
+            <span class="t-muted">N/A</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if item.all_scores_approved %}
+            <a href="{% url 'academics:primary_assessment' %}?class_name={{ item.class_name|urlencode }}&term_id={{ term.id }}" target="_blank" class="chip chip-green" style="cursor:pointer;text-decoration:none" title="View scores for {{ item.class_name }}">Approved</a>
+          {% elif item.pending_score_count > 0 %}
+            <a href="{% url 'academics:primary_assessment' %}?class_name={{ item.class_name|urlencode }}&term_id={{ term.id }}" target="_blank" class="chip chip-amber" style="cursor:pointer;text-decoration:none" title="View {{ item.pending_score_count }} pending score(s)">{{ item.pending_score_count }} pending</a>
+          {% else %}
+            <a href="{% url 'academics:primary_assessment' %}?class_name={{ item.class_name|urlencode }}&term_id={{ term.id }}" target="_blank" class="chip chip-red" style="cursor:pointer;text-decoration:none" title="No scores entered">No scores</a>
+          {% endif %}
+        </td>
+        <td>
+          {% if item.comment_ok %}
+            <a href="{% url 'academics:primary_comments_entry' %}?class_name={{ item.class_name|urlencode }}&term_id={{ term.id }}" target="_blank" class="chip chip-green" style="cursor:pointer;text-decoration:none" title="View comments for {{ item.class_name }}">Ready</a>
+          {% else %}
+            <a href="{% url 'academics:primary_comments_entry' %}?class_name={{ item.class_name|urlencode }}&term_id={{ term.id }}" target="_blank" class="chip chip-red" style="cursor:pointer;text-decoration:none" title="Comment needs at least 50 characters">Min 50 chars</a>
+          {% endif %}
+        </td>
+        <td style="font-size:12px;color:var(--text-muted)">{{ item.teacher.get_full_name|default:item.teacher.username }}</td>
+        <td style="padding-right:20px;text-align:right">
+          <div style="display:flex;gap:6px;justify-content:flex-end">
+            <a href="{% url 'academics:report_preview' item.report.pk %}" class="hf-btn hf-btn-secondary" style="font-size:11px;padding:5px 12px" target="_blank">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              Preview
+            </a>
+            {% if item.report.status == 'published' %}
+              <span class="chip chip-green" style="font-size:10px">Published</span>
+            {% else %}
+              {% if item.is_ecd and item.all_scores_approved and item.comment_ok and not item.report.ecd_hod_approved_by %}
+              <form method="post" style="display:inline">
+                {% csrf_token %}
+                <input type="hidden" name="report_id" value="{{ item.report.pk }}">
+                <input type="hidden" name="action" value="ecd_hod_approve">
+                <button type="submit" class="hf-btn hf-btn-primary" style="font-size:11px;padding:5px 12px;background:#7C3AED;border-color:#7C3AED">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:3px"><path d="M20 6L9 17l-5-5"/></svg>
+                  HOD Approve
+                </button>
+              </form>
+              {% endif %}
+              {% if can_publish and item.all_scores_approved and item.comment_ok %}
+              <button type="button" class="hf-btn hf-btn-primary" style="font-size:11px;padding:5px 12px"
+                onclick="confirmDeleteModal({title:'Publish Report?',body:'Approve and publish the report for <strong>{{ item.student.get_full_name }}</strong>?',detail:'This report will become visible to parents immediately.',confirmText:'Publish Report',url:'{% url 'academics:signoff_action' %}',type:'info',extraData:[{name:'report_id',value:'{{ item.report.pk }}'},{name:'action',value:'approve'}]})">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:3px"><path d="M20 6L9 17l-5-5"/></svg>
+                Approve and Publish
+              </button>
+              {% elif not can_publish and item.all_scores_approved and item.comment_ok %}
+              <span class="chip chip-amber" style="font-size:10px">Awaiting HOS Sign-Off</span>
+              {% endif %}
+              <button class="hf-btn hf-btn-secondary" style="font-size:11px;padding:5px 12px;color:var(--red);border-color:var(--red-bd)" onclick="showReject({{ item.report.pk }})">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                Return
+              </button>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% empty %}
+<div class="card">
+  {% if status_filter == 'published' %}
+    {% include '_partials/empty_state.html' with title='No published reports' desc='No reports have been published yet.' icon='check' icon_color='green' %}
+  {% else %}
+    {% include '_partials/empty_state.html' with title='No reports pending review' desc='All submitted reports have been reviewed and published.' icon='check' icon_color='green' %}
+  {% endif %}
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- Reject Modal -->
+<div id="rejectModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.2);width:100%;max-width:480px;margin:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border)">
+      <h3 style="margin:0;font-size:16px;font-weight:700;color:var(--text-primary)">Return Report for Correction</h3>
+      <button onclick="closeReject()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted);padding:0 4px">&times;</button>
+    </div>
+    <form method="post" id="rejectForm">
+      {% csrf_token %}
+      <input type="hidden" name="report_id" id="rejectReportId">
+      <input type="hidden" name="action" value="reject">
+      <div style="padding:20px 22px">
+        <label style="display:block;font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px">Reason for returning (required)</label>
+        <textarea name="reason" id="rejectReason" style="width:100%;min-height:100px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--font-ui);resize:vertical;outline:none" placeholder="Explain what needs to be corrected..." required></textarea>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 22px;border-top:1px solid var(--border)">
+        <button type="button" class="hf-btn hf-btn-secondary" onclick="closeReject()">Cancel</button>
+        <button type="submit" class="hf-btn hf-btn-primary" style="background:var(--red);color:#fff;border-color:var(--red)">Return Report</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function showReject(reportId) {
+  document.getElementById('rejectReportId').value = reportId;
+  var modal = document.getElementById('rejectModal');
+  modal.style.display = 'flex';
+}
+function closeReject() {
+  var modal = document.getElementById('rejectModal');
+  modal.style.display = 'none';
+  document.getElementById('rejectReportId').value = '';
+  document.getElementById('rejectReason').value = '';
+}
+document.getElementById('rejectModal').addEventListener('click', function(e) {
+  if (e.target === this) closeReject();
+});
+</script>
+{% endblock %}

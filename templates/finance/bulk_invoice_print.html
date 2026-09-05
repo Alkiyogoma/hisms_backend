@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Bulk Invoices — {{ brand.school_name }}</title>
+  {% include "includes/hodari_print_styles.html" %}
+  <style>
+    .invoice-page { page-break-after: always; }
+    .invoice-page:last-child { page-break-after: avoid; }
+    @media print {
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+{% load static %}
+  <div class="no-print" style="text-align:center;padding:16px;background:var(--bg-page);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10">
+    <button type="button" class="btn btn-primary" onclick="window.print()">Print all ({{ invoice_data|length }} invoices)</button>
+    <button type="button" class="btn btn-secondary" onclick="window.history.back()">Back</button>
+    <span style="margin-left:12px;font-size:12px;color:var(--text-muted)">{{ today|date:"d F Y" }}</span>
+  </div>
+
+  {% for item in invoice_data %}
+  {% with invoice=item.invoice %}
+  <div class="invoice-page">
+    <div class="doc-container">
+      {% include "includes/hodari_print_header.html" %}
+          <div class="doc-meta">
+            <div><strong>{{ invoice.invoice_number }}</strong></div>
+            <div>Date: {{ today|date:"d F Y" }}</div>
+            {% if invoice.due_date %}<div>Due: {{ invoice.due_date|date:"d F Y" }}</div>{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="doc-body">
+        <p style="font-size:13px;margin-bottom:16px">
+          <strong>Bill to:</strong>
+          {% if invoice.student %}{{ invoice.student.get_full_name }} • {{ invoice.student.class_name }}{% endif %}
+          {% if invoice.term %}<br><span style="color:var(--text-muted)">Term: {{ invoice.term.name }}</span>{% endif %}
+        </p>
+
+        <table class="doc-table">
+          <thead>
+            <tr><th>Description</th><th class="num">Amount (TZS)</th></tr>
+          </thead>
+          <tbody>
+            {% for li in item.line_items %}
+            <tr>
+              <td>{{ li.description }}{% if li.is_discount %} (discount){% endif %}</td>
+              <td class="num">{{ li.amount|floatformat:0 }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td>Term fees</td>
+              <td class="num">{{ invoice.total_due|floatformat:0 }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <div class="doc-total">
+          <span>Total due</span>
+          <span>TZS {{ invoice.total_due|floatformat:0 }}</span>
+        </div>
+
+        {% if item.total_paid %}
+        <p style="font-size:12px;color:var(--text-muted);margin-top:8px">
+          Amount paid: TZS {{ item.total_paid|floatformat:0 }} &middot;
+          Balance: TZS {{ item.balance|floatformat:0 }}
+        </p>
+        {% endif %}
+
+        <div class="signatures">
+          <div>
+            <div class="sig-line"></div>
+            <div class="sig-label">Finance Officer</div>
+          </div>
+          <div>
+            <div class="sig-line"></div>
+            <div class="sig-label">Parent / Guardian</div>
+          </div>
+        </div>
+
+        <div class="doc-footer">
+          {{ brand.address }} &middot; {{ brand.phone }} &middot; {{ brand.email }}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endwith %}
+  {% endfor %}
+</body>
+</html>

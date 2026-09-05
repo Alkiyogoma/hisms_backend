@@ -1,0 +1,90 @@
+{% if kanban_column_count %}
+{% for pg in phase_groups %}
+  {% if pg.columns %}
+  <div class="phase-section{% if pg.key != 'intake' %} collapsed{% endif %}" id="phase-{{ pg.key }}">
+    <div class="phase-section-header" onclick="togglePhase('{{ pg.key }}')">
+      <svg class="phase-section-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      <span class="phase-section-title">{{ pg.label }}</span>
+      <span class="phase-section-count">{{ pg.total }}</span>
+    </div>
+    <div class="kanban" style="grid-template-columns:repeat({{ pg.columns|length }},minmax(140px,1fr))">
+    {% for column in pg.columns %}
+      <section class="k-col">
+        <header class="k-header">
+          <div>{{ column.label }}</div>
+          <span class="k-count">{{ column.total }}</span>
+        </header>
+
+        <div style="display:flex;flex-direction:column;gap:8px">
+          {% for item in column.items %}
+            <a href="{% url 'admissions:detail' item.applicant.id %}" class="k-card">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <div class="k-avatar">
+                  {% if item.applicant.photo %}
+                    <img src="{{ item.applicant.photo.url }}" alt="{{ item.applicant.child_full_name }}" style="width:32px;height:32px;object-fit:cover">
+                  {% else %}
+                    <span style="font-size:12px;font-weight:700">{{ item.applicant.child_full_name|slice:":1" }}</span>
+                  {% endif %}
+                </div>
+                <div class="k-name" style="min-width:0;overflow:hidden;text-overflow:ellipsis">{{ item.applicant.child_full_name }}</div>
+              </div>
+              <div class="k-meta">
+                {{ item.applicant.grade_applying_for }} &middot; {{ item.applicant.created_at|date:"d M" }}
+              </div>
+              {% if item.applicant.parent_full_name %}
+              <div class="k-meta" style="margin-top:3px;opacity:0.9">
+                {{ item.applicant.parent_full_name }}
+                {% if item.applicant.parent_phone %}<span class="k-phone">&middot; {{ item.applicant.parent_phone }}</span>{% endif %}
+              </div>
+              {% endif %}
+
+              {% if column.key == "meeting_scheduled" and item.applicant.assessment %}
+                <div style="margin-top:5px">
+                  <span class="k-flag kf-blue">{{ item.applicant.assessment.scheduled_date }} {{ item.applicant.assessment.scheduled_time|time:"H:i" }}</span>
+                </div>
+              {% endif %}
+
+              {% if item.assessment_badge %}
+                <div style="margin-top:5px">
+                  {% if item.assessment_badge == 'fee_unpaid' %}
+                    <span class="k-flag kf-red">Fee unpaid</span>
+                  {% elif item.assessment_badge == 'confirmed' %}
+                    <span class="k-flag kf-green">Confirmed</span>
+                  {% elif item.assessment_badge == 'fee_paid_wait_logistics' %}
+                    <span class="k-flag kf-amber">Send logistics</span>
+                  {% endif %}
+                </div>
+              {% endif %}
+
+              {% if column.key == "hos_review" %}
+                <div style="margin-top:5px">
+                  <span class="k-flag kf-amber">HOD review pending</span>
+                </div>
+              {% endif %}
+
+              {% if item.docs_badge %}
+                <div style="margin-top:5px">
+                  {% if item.docs_badge == 'pending' %}
+                    <span class="k-flag kf-amber">Docs pending</span>
+                  {% elif item.docs_badge == 'complete' %}
+                    <span class="k-flag kf-green">Docs complete</span>
+                  {% endif %}
+                </div>
+              {% endif %}
+            </a>
+          {% endfor %}
+        </div>
+      </section>
+    {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+{% endfor %}
+
+<script>
+function togglePhase(key) {
+  var el = document.getElementById('phase-' + key);
+  if (el) el.classList.toggle('collapsed');
+}
+</script>
+{% endif %}

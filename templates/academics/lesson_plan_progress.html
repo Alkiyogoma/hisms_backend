@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Lesson Plan Progress &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Lesson Plan Progress{% endblock %}
+{% block extra_head %}
+<style>
+  .progress-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:14px; margin-bottom:24px; }
+  .progress-stat { background:#fff; border:1px solid #E2E8F0; border-radius:14px; padding:18px; text-align:center; transition:all 0.2s; }
+  .progress-stat:hover { border-color:var(--hodari-blue); box-shadow:0 4px 12px rgba(2,58,165,0.05); }
+  .progress-stat .num { font-size:28px; font-weight:800; }
+  .progress-stat .lbl { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; margin-top:4px; }
+  .status-bar { display:flex; height:12px; border-radius:6px; overflow:hidden; margin:16px 0; }
+  .status-bar > div { transition:width 0.4s ease; }
+  .plan-row { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid #F1F5F9; transition:background 0.15s; }
+  .plan-row:last-child { border-bottom:none; }
+  .plan-row:hover { background:#F8FAFC; }
+  .week-col { font-size:12px; font-weight:700; color:var(--hodari-blue); min-width:80px; }
+  .subject-col { font-size:13px; font-weight:600; color:#1E293B; flex:1; }
+  .class-col { font-size:12px; color:#64748B; font-weight:600; min-width:80px; }
+</style>
+{% endblock %}
+{% block content %}
+{% include "academics/_lesson_plan_tabs.html" %}
+
+{% if stats %}
+<!-- Status Summary Cards -->
+<div class="progress-grid">
+  <div class="progress-stat">
+    <div class="num" style="color:#023AA5">{{ stats.total }}</div>
+    <div class="lbl" style="color:#023AA5">Total Plans</div>
+  </div>
+  <div class="progress-stat">
+    <div class="num" style="color:#059669">{{ stats.approved }}</div>
+    <div class="lbl" style="color:#059669">Approved</div>
+  </div>
+  <div class="progress-stat">
+    <div class="num" style="color:#2563EB">{{ stats.submitted }}</div>
+    <div class="lbl" style="color:#2563EB">Submitted</div>
+  </div>
+  <div class="progress-stat">
+    <div class="num" style="color:#B45309">{{ stats.draft }}</div>
+    <div class="lbl" style="color:#B45309">Draft</div>
+  </div>
+  <div class="progress-stat">
+    <div class="num" style="color:#7C3AED">{{ stats.revision }}</div>
+    <div class="lbl" style="color:#7C3AED">Revision</div>
+  </div>
+  <div class="progress-stat">
+    <div class="num" style="color:#DC2626">{{ stats.missing }}</div>
+    <div class="lbl" style="color:#DC2626">Missing</div>
+  </div>
+</div>
+
+<!-- Status Distribution Bar -->
+{% if stats.total > 0 %}
+<div class="card" style="margin-bottom:20px">
+  <div class="card-title">Status Distribution</div>
+  <div class="status-bar">
+    {% widthratio stats.approved stats.total 100 as app_pct %}
+    {% widthratio stats.submitted stats.total 100 as sub_pct %}
+    {% widthratio stats.draft stats.total 100 as drf_pct %}
+    {% widthratio stats.revision stats.total 100 as rev_pct %}
+    {% widthratio stats.rejected stats.total 100 as rej_pct %}
+    {% widthratio stats.missing stats.total 100 as mis_pct %}
+    <div style="width:{{ app_pct }}%; background:#059669" title="Approved {{ stats.approved }}"></div>
+    <div style="width:{{ sub_pct }}%; background:#2563EB" title="Submitted {{ stats.submitted }}"></div>
+    <div style="width:{{ drf_pct }}%; background:#94A3B8" title="Draft {{ stats.draft }}"></div>
+    <div style="width:{{ rev_pct }}%; background:#B45309" title="Revision {{ stats.revision }}"></div>
+    <div style="width:{{ rej_pct }}%; background:#DC2626" title="Rejected {{ stats.rejected }}"></div>
+    <div style="width:{{ mis_pct }}%; background:#F87171" title="Missing {{ stats.missing }}"></div>
+  </div>
+  <div style="display:flex; gap:16px; flex-wrap:wrap; font-size:11px; font-weight:600">
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#059669;margin-right:4px"></span>Approved {{ stats.approved }}</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#2563EB;margin-right:4px"></span>Submitted {{ stats.submitted }}</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#94A3B8;margin-right:4px"></span>Draft {{ stats.draft }}</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#B45309;margin-right:4px"></span>Revision {{ stats.revision }}</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#DC2626;margin-right:4px"></span>Rejected {{ stats.rejected }}</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#F87171;margin-right:4px"></span>Missing {{ stats.missing }}</span>
+  </div>
+</div>
+{% endif %}
+
+<!-- Weekly Approved Chart -->
+{% if weekly_approved %}
+<div class="card" style="margin-bottom:20px">
+  <div class="card-title">Weekly Approved Plans</div>
+  <div style="display:flex; align-items:flex-end; gap:8px; height:140px; padding:16px 0; border-bottom:1px solid #F1F5F9">
+    {% for w in weekly_approved %}
+    <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:4px">
+      <span style="font-size:11px; font-weight:700; color:var(--hodari-blue)">{{ w.count }}</span>
+      <div style="width:100%; background:linear-gradient(180deg, var(--hodari-blue), #0252C7); border-radius:4px 4px 0 0; height:{{ w.count }}0px; min-height:4px"></div>
+      <span style="font-size:9px; color:#94A3B8; font-weight:600">{{ w.week|date:"d/m" }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Recent Plans Table -->
+{% if recent_plans %}
+<div class="card">
+  <div class="card-title">Recent Plans</div>
+  <table class="h-table">
+    <thead>
+      <tr><th>Week</th><th>Subject</th><th>Class</th><th>Teacher</th><th>Status</th><th>Updated</th></tr>
+    </thead>
+    <tbody>
+    {% for p in recent_plans %}
+      <tr>
+        <td class="week-col">{{ p.week_start_date|date:"d M" }}</td>
+        <td class="subject-col">{{ p.subject_name }}</td>
+        <td class="class-col">{{ p.class_name }}</td>
+        <td style="font-size:12px; color:#475569">{{ p.teacher.get_full_name|default:p.teacher.username }}</td>
+        <td>
+          <span class="status-tag {% if p.status == 'approved' %}st-approved{% elif p.status == 'rejected' %}st-rejected{% elif p.status == 'submitted' %}st-submitted{% elif p.status == 'revision_requested' %}st-revision-requested{% elif p.status == 'missing' %}st-missing{% else %}st-draft{% endif %}">
+            {{ p.get_status_display }}
+          </span>
+        </td>
+        <td style="font-size:11px; color:#94A3B8">{{ p.updated_at|timesince }} ago</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if rp_total_pages > 1 %}
+  <div style="display:flex;justify-content:center;align-items:center;gap:6px;padding-top:12px;border-top:1px solid var(--border)">
+    {% if rp_has_prev %}<a href="?rp_page={{ rp_page|add:'-1' }}" style="padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;background:#F1F5F9;color:#475569;text-decoration:none">&larr;</a>{% endif %}
+    <span style="font-size:11px;color:#64748B;font-weight:600">Page {{ rp_page }}/{{ rp_total_pages }}</span>
+    {% if rp_has_next %}<a href="?rp_page={{ rp_page|add:'1' }}" style="padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;background:#F1F5F9;color:#475569;text-decoration:none">&rarr;</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div style="text-align:center; padding:60px; background:#fff; border-radius:16px; border:1px solid #E2E8F0">
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5" style="margin-bottom:16px"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+  <h3 style="margin:0 0 8px; font-size:16px; color:#1E293B; font-weight:700">No data yet</h3>
+  <p style="margin:0; font-size:13px; color:#64748B">Lesson plan progress will appear here once plans are created.</p>
+</div>
+{% endif %}
+{% endblock %}

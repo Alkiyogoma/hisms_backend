@@ -1,0 +1,18 @@
+{% load hodari_forms %}
+<div style="background:var(--bg-secondary);border-radius:8px;padding:12px;margin-top:8px">
+  <form
+    method="post"
+    action="{% url 'admissions:internal_note_edit' note.pk %}"
+    hx-post="{% url 'admissions:internal_note_edit' note.pk %}"
+    hx-target="#note-edit-{{ note.pk }}"
+    hx-swap="outerHTML"
+    style="display:flex;flex-direction:column;gap:8px"
+  >
+    {% csrf_token %}
+    <textarea name="body" rows="3" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:12.5px;font-family:var(--font-ui);resize:vertical">{{ note.body }}</textarea>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button type="button" onclick="document.getElementById('note-edit-{{ note.pk }}').style.display='none'" class="btn-secondary" style="font-size:11px;padding:4px 10px">Cancel</button>
+      <button type="submit" class="btn-primary" style="font-size:11px;padding:4px 10px">Save</button>
+    </div>
+  </form>
+</div>

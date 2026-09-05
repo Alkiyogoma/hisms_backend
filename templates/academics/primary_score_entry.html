@@ -1,0 +1,768 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Primary Assessment — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Primary Assessment{% endblock %}
+{% block topbar_date %}{{ today_display }}{% endblock %}
+
+{% block extra_head %}
+<style>
+/* Premium ECD-style Tabs */
+.class-tabs-container {
+    background: #fff;
+    border-bottom: 1px solid #E2E8F0;
+    margin: 0 -28px 24px -28px;
+    padding: 0 28px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    position: sticky;
+    top: 108px;
+    z-index: 39;
+}
+.class-tabs-container::-webkit-scrollbar { display: none; }
+
+.class-tab {
+    padding: 16px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #64748B;
+    text-decoration: none;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+.class-tab:hover { color: #023AA5; background: #F8FAFC; }
+.class-tab.active {
+    color: #023AA5;
+    border-bottom-color: #023AA5;
+}
+
+/* Sidebar & Layout */
+.grading-grid {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 24px;
+    align-items: start;
+}
+
+.student-sidebar {
+    background: #fff;
+    border: 1px solid #E2E8F0;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    position: sticky;
+    top: 80px;
+    align-self: start;
+}
+
+.sidebar-header {
+    padding: 20px;
+    background: #F8FAFC;
+    border-bottom: 1px solid #E2E8F0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.student-list {
+    max-height: calc(100vh - 180px);
+    overflow-y: auto;
+}
+
+.student-card {
+    padding: 16px 20px;
+    border-bottom: 1px solid #F1F5F9;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.student-card:hover { background: #F8FAFC; }
+.student-card.active {
+    background: #F0F7FF;
+    border-left: 4px solid #023AA5;
+    padding-left: 16px;
+}
+
+/* Subject Sections */
+.subject-section {
+    background: #fff;
+    border: 1px solid #E2E8F0;
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.subject-header {
+    font-size: 14px;
+    font-weight: 700;
+    color: #023AA5;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.score-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+.score-box {
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.score-field {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid #E2E8F0;
+    border-radius: 10px;
+    font-size: 18px;
+    font-weight: 700;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 8px;
+}
+.score-field:focus {
+    border-color: #023AA5;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(2, 58, 165, 0.1);
+}
+
+/* Status Chips */
+.status-chip {
+    padding: 4px 10px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+.status-pending { background: #F1F5F9; color: #64748B; }
+.status-saved { background: #E0F2FE; color: #0369A1; }
+.status-approved { background: #D1FAE5; color: #065F46; }
+.status-returned { background: #FEE2E2; color: #991B1B; }
+
+/* Per-score status badge */
+.score-status-badge {
+    display: none;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-top: 4px;
+    text-align: center;
+}
+.score-status-badge.badge-approved { display: block; background: #D1FAE5; color: #065F46; }
+.score-status-badge.badge-returned { display: block; background: #FEE2E2; color: #991B1B; }
+
+/* HOD feedback tooltip */
+.score-feedback {
+    display: none;
+    font-size: 10px;
+    color: #991B1B;
+    background: #FFF5F5;
+    border: 1px solid #FECACA;
+    border-radius: 6px;
+    padding: 4px 8px;
+    margin-top: 4px;
+    line-height: 1.3;
+}
+.score-feedback.visible { display: block; }
+.score-feedback .fb-label {
+    font-weight: 700;
+    color: #991B1B;
+    text-transform: uppercase;
+    font-size: 9px;
+}
+
+.progress-bar-container {
+    background: #fff;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 16px 24px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "academics/_top_tabs_progress.html" %}
+<div class="class-tabs-container">
+    {% for cls in classes %}
+    <a href="?class_name={{ cls }}" class="class-tab {% if selected_class == cls %}active{% endif %}">
+        {{ cls }}{% if cls in class_teacher_classes %} <span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#fff;background:#2563EB;padding:2px 8px;border-radius:99px;margin-left:6px;vertical-align:middle">&#9733; Class Teacher</span>{% endif %}
+    </a>
+    {% endfor %}
+</div>
+
+<div class="progress-bar-container">
+    <div style="flex: 1">
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px">
+            <span style="font-size:13px; font-weight:600; color:#64748B">Grading Progress &middot; {{ selected_class }}</span>
+            <span id="progress-text" style="font-size:13px; font-weight:700; color:#023AA5">0 of 0 students complete</span>
+        </div>
+        <div style="height:10px; background:#F1F5F9; border-radius:5px; overflow:hidden">
+            <div id="progress-fill" style="width:0%; height:100%; background:#023AA5; transition: width 0.5s ease"></div>
+        </div>
+    </div>
+    <div style="display:flex; gap:12px; align-items:center">
+        <div style="text-align:right">
+            <div style="font-size:11px; color:#64748B; font-weight:700; text-transform:uppercase">Active Term</div>
+            <div style="font-size:14px; font-weight:700; color:#1E293B">{{ current_term.name }}</div>
+        </div>
+        {% has_perm user "academics.change_examscore" as can_submit %}
+        {% if can_submit %}
+        <button id="submit-hod-btn" onclick="submitAllToHOD()" class="hf-btn hf-btn-success" {% if class_submitted %}disabled style="background:#059669;cursor:default"{% endif %}>{% if class_submitted %}&#10003; Submitted{% elif returned_count > 0 %}Submit {{ returned_count }} to HOD{% else %}Submit all to HOD{% endif %}</button>
+        {% endif %}
+    </div>
+</div>
+
+<div class="grading-grid">
+    <!-- Student Sidebar -->
+    <div class="student-sidebar">
+        <div class="sidebar-header">
+            <span style="font-size:12px; font-weight:700; color:#64748B; text-transform:uppercase">Students</span>
+            <span id="student-count" class="status-chip status-pending">0</span>
+        </div>
+        <div id="student-list" class="student-list">
+            <!-- Dynamic Students -->
+        </div>
+    </div>
+
+    <!-- Main Content Panel -->
+    <div>
+        <div style="background:#fff; border:1px solid #E2E8F0; border-radius:16px; padding:24px; margin-bottom:24px; display:flex; justify-content:space-between; align-items:center">
+            <div>
+                <h2 id="active-student-name" style="margin:0; font-size:26px; color:#1E293B">Select a student</h2>
+                <div style="color:#64748B; font-size:14px; margin-top:4px">Primary Department &middot; {{ selected_class }} &middot; {{ current_term.name }}</div>
+            </div>
+            <div id="total-avg-card" style="background:#1E293B; border-radius:12px; padding:12px 24px; text-align:center; color:#fff; min-width:140px">
+                <div style="font-size:10px; font-weight:700; color:#94A3B8; text-transform:uppercase; margin-bottom:2px">Grand Average</div>
+                <div id="grand-avg" style="font-size:24px; font-weight:800; font-family:'JetBrains Mono'">--%</div>
+            </div>
+        </div>
+
+        <div id="subjects-container">
+            <!-- Subject Sections will be injected here -->
+            {% for sub in subjects %}
+            <div class="subject-section" style="opacity:{% if editable_subjects and sub not in editable_subjects %}0.7{% else %}1{% endif %}">
+                <div class="subject-header">
+                    <span>{{ sub }}{% if editable_subjects and sub not in editable_subjects %} <span style="font-size:10px;font-weight:400;color:#94A3B8;margin-left:6px">(read-only)</span>{% endif %}</span>
+                    <span id="avg-{{ sub|slugify }}" style="font-family:'JetBrains Mono'; color:#64748B">Avg: --%</span>
+                </div>
+                <div class="score-grid">
+                    {% for et in exam_types %}
+                    <div class="score-box" style="background:{% if editable_subjects and sub not in editable_subjects %}#F1F5F9{% elif et.code in open_exam_codes %}#F8FAFC{% else %}#F1F5F9{% endif %}">
+                        <div style="display:flex; justify-content:space-between; align-items:center">
+                            <span style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase">{{ et.name }}</span>
+                            <span style="font-size:10px; font-weight:600; color:#94A3B8; background:#F1F5F9; padding:2px 6px; border-radius:4px">{{ et.weight_percentage|floatformat:0 }}%</span>
+                        </div>
+                        <input type="number" step="1" min="0" max="{{ et.max_score }}"
+                               data-subject="{{ sub }}" data-type="{{ et.code }}" data-weight="{{ et.weight_percentage }}" data-max_score="{{ et.max_score }}"
+                               class="score-field score-input-val" placeholder="0" oninput="calcSubjectAverage('{{ sub|slugify }}')" onblur="validatePrimaryScore(this)"
+                               {% if editable_subjects and sub not in editable_subjects or et.code not in open_exam_codes %}readonly style="background:#F1F5F9;color:#94A3B8;cursor:not-allowed"{% endif %}>
+                        {% if et.code not in open_exam_codes %}
+                        <div style="font-size:9px;color:{% if et.code in closed_exam_codes %}#EF4444{% else %}#F59E0B{% endif %};margin-top:3px;font-weight:500">{% if et.code in closed_exam_codes %}{{ et.name }} window has ended{% else %}Opens when {{ et.name }} window starts{% endif %}</div>
+                        {% endif %}
+                        <div class="score-status-badge" id="badge-{{ sub|slugify }}-{{ et.code }}"></div>
+                        <div class="score-feedback" id="fb-{{ sub|slugify }}-{{ et.code }}"></div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div style="background:#fff; border:1px solid #E2E8F0; border-radius:16px; padding:24px; display:flex; justify-content:space-between; align-items:center">
+            <button onclick="movePrev()" class="btn" style="border:1px solid #E2E8F0; padding:12px 24px; font-weight:600; border-radius:10px">&larr; Previous Student</button>
+            <div style="display:flex; gap:12px">
+                <button onclick="saveAllScores()" class="hf-btn hf-btn-primary">Save Student Assessment</button>
+                <button onclick="saveAndNext()" class="hf-btn hf-btn-warning">Save &amp; Next &rarr;</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const CLASS_NAME = "{{ selected_class }}";
+const TERM_ID = "{{ current_term.id }}";
+const API = "/academics/api/primary/";
+const CSRF = "{{ csrf_token }}";
+const RETURNED_COUNT = {{ returned_count|default:"0" }};
+const OPEN_EXAM_CODES = [{% for code in open_exam_codes %}'{{ code }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+const CLOSED_EXAM_CODES = [{% for code in closed_exam_codes %}'{{ code }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+{% has_perm user "academics.change_examscore" as can_submit_hod %}
+const CAN_SUBMIT_HOD = {{ can_submit_hod|yesno:"true,false" }};
+
+let students = [];
+let current = null;
+
+async function init() {
+  const r = await fetch(API + "students/?class_name=" + encodeURIComponent(CLASS_NAME) + "&term=" + TERM_ID);
+  const d = await r.json();
+  students = d.students || [];
+  renderList();
+  if (students.length) {
+    loadStudent(students[0].id);
+  }
+}
+
+function renderList() {
+  document.getElementById("student-count").textContent = students.length;
+  document.getElementById("student-list").innerHTML = students.map(s => {
+    let statusText, statusClass;
+    if (s.score_status === 'returned') { statusText = 'Returned'; statusClass = 'status-returned'; }
+    else if (s.score_status === 'approved') { statusText = 'Approved'; statusClass = 'status-approved'; }
+    else if (s.report_card_status && s.report_card_status !== 'draft') { statusText = 'Submitted'; statusClass = 'status-saved'; }
+    else if (s.has_scores) { statusText = 'Saved'; statusClass = 'status-saved'; }
+    else { statusText = 'Pending'; statusClass = 'status-pending'; }
+    return `
+    <div id="card-${s.id}" class="student-card ${current && current.id === s.id ? 'active' : ''}" onclick="loadStudent(${s.id})">
+      <div style="width:40px; height:40px; background:#023AA5; color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px">
+        ${s.first_name[0]}${s.last_name[0]}
+      </div>
+      <div style="flex:1">
+        <div style="font-size:14px; font-weight:700; color:#1E293B">${s.first_name} ${s.last_name}</div>
+        <div style="font-size:11px; color:#64748B">${s.admission_no}</div>
+      </div>
+      <span class="status-chip ${statusClass}" id="st-${s.id}">${statusText}</span>
+    </div>`;
+  }).join('');
+}
+
+function updateProgress() {
+    const savedCount = students.filter(s => {
+        const chip = document.getElementById("st-" + s.id);
+        if (!chip) return false;
+        var txt = chip.textContent.trim().toLowerCase();
+        return txt === 'saved' || txt === 'submitted' || txt === 'returned' || txt === 'approved';
+    }).length;
+    const pct = students.length ? (savedCount / students.length) * 100 : 0;
+    document.getElementById("progress-text").textContent = `${savedCount} of ${students.length} students complete`;
+    document.getElementById("progress-fill").style.width = pct + "%";
+}
+
+async function loadStudent(id) {
+  current = students.find(s => s.id === id);
+  
+  document.querySelectorAll('.student-card').forEach(c => c.classList.remove('active'));
+  document.getElementById(`card-${id}`).classList.add('active');
+  document.getElementById("active-student-name").textContent = current.first_name + " " + current.last_name;
+  
+  // Clear all inputs and reset lock state
+  document.querySelectorAll(".score-input-val").forEach(i => { i.value = ""; i.readOnly = false; i.removeAttribute("data-returned"); });
+  document.querySelectorAll(".score-status-badge").forEach(b => { b.className = 'score-status-badge'; b.textContent = ''; });
+  document.querySelectorAll(".score-feedback").forEach(f => { f.classList.remove('visible'); f.innerHTML = ''; });
+  
+  const r = await fetch(API + "scores/" + id + "/?term=" + TERM_ID);
+  const d = await r.json();
+  
+  const isGlobalLocked = d.report_card_status && d.report_card_status !== 'draft';
+  
+  if (d.scores) {
+      let hasReturned = false, hasApproved = false, allApproved = true, hasAny = false;
+      Object.keys(d.scores).forEach(subject => {
+          Object.keys(d.scores[subject]).forEach(type => {
+              const inp = document.querySelector(`input[data-subject="${subject}"][data-type="${type}"]`);
+              const slug = subject.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+              const badge = document.getElementById("badge-" + slug + "-" + type);
+              const fb = document.getElementById("fb-" + slug + "-" + type);
+              if(inp) {
+                  inp.value = d.scores[subject][type].score;
+                  hasAny = true;
+                  const sc = d.scores[subject][type].status;
+                   if (sc === 'returned') {
+                       hasReturned = true;
+                       allApproved = false;
+                       inp.setAttribute("data-returned", "1");
+                       inp.readOnly = false;
+                   } else if (sc === 'approved') {
+                       hasApproved = true;
+                   } else {
+                       allApproved = false;
+                   }
+                   if(sc === 'approved' || (d.scores[subject][type].is_locked && sc !== 'returned')) inp.readOnly = true;
+                   if (CLOSED_EXAM_CODES.indexOf(type) !== -1 && sc !== 'returned') inp.readOnly = true;
+                   if (badge) {
+                       badge.className = 'score-status-badge';
+                       if (sc === 'approved') { badge.classList.add('badge-approved'); badge.textContent = 'Approved'; }
+                       else if (sc === 'returned') { badge.classList.add('badge-returned'); badge.textContent = 'Returned'; }
+                   }
+                   if (fb) {
+                       const reason = d.scores[subject][type].correction_reason || d.scores[subject][type].hod_feedback || '';
+                       if (sc === 'returned' && reason) {
+                           fb.innerHTML = '<span class="fb-label">HOD feedback: </span>' + reason;
+                           fb.classList.add('visible');
+                       } else {
+                           fb.classList.remove('visible');
+                           fb.innerHTML = '';
+                       }
+                   }
+               }
+           });
+       });
+
+       const chip = document.getElementById("st-" + id);
+       if(chip) {
+           if (hasReturned) {
+               chip.textContent = "Returned";
+               chip.className = "status-chip status-returned";
+           } else if (hasApproved && allApproved) {
+               chip.textContent = "Approved";
+               chip.className = "status-chip status-approved";
+           } else if (isGlobalLocked) {
+               chip.textContent = "Submitted";
+               chip.className = "status-chip status-saved";
+           } else if(hasAny) {
+              chip.textContent = "Saved";
+              chip.className = "status-chip status-saved";
+              current.has_scores = true;
+          }
+      }
+  }
+
+  // Lock approved scores and closed-window scores
+  document.querySelectorAll(".score-input-val").forEach(inp => {
+      const slug = inp.dataset.subject.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const badge = document.getElementById("badge-" + slug + "-" + inp.dataset.type);
+      if (badge && badge.classList.contains('badge-approved')) inp.readOnly = true;
+      if (CLOSED_EXAM_CODES.indexOf(inp.dataset.type) !== -1 && !inp.hasAttribute("data-returned")) inp.readOnly = true;
+  });
+  
+  calcGrandAverage();
+  updateProgress();
+}
+
+async function reloadScores() {
+  if (!current) return;
+  const r = await fetch(API + "scores/" + current.id + "/?term=" + TERM_ID);
+  const d = await r.json();
+  const isGlobalLocked = d.report_card_status && d.report_card_status !== 'draft';
+  if (d.scores) {
+      let hasReturned = false, hasApproved = false, allApproved = true, hasAny = false;
+      Object.keys(d.scores).forEach(subject => {
+          Object.keys(d.scores[subject]).forEach(type => {
+              const inp = document.querySelector(`input[data-subject="${subject}"][data-type="${type}"]`);
+              const slug = subject.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+              const badge = document.getElementById("badge-" + slug + "-" + type);
+              const fb = document.getElementById("fb-" + slug + "-" + type);
+              if(inp) {
+                  inp.value = d.scores[subject][type].score;
+                  hasAny = true;
+                  const sc = d.scores[subject][type].status;
+                  inp.removeAttribute("data-returned");
+                  if (sc === 'returned') {
+                      hasReturned = true; allApproved = false;
+                      inp.setAttribute("data-returned", "1");
+                      inp.readOnly = false;
+                  } else if (sc === 'approved') { hasApproved = true; }
+                  else { allApproved = false; }
+                  if(sc === 'approved' || (d.scores[subject][type].is_locked && sc !== 'returned')) inp.readOnly = true;
+                  if (CLOSED_EXAM_CODES.indexOf(type) !== -1 && sc !== 'returned') inp.readOnly = true;
+                  if (badge) {
+                      badge.className = 'score-status-badge';
+                      if (sc === 'approved') { badge.classList.add('badge-approved'); badge.textContent = 'Approved'; }
+                      else if (sc === 'returned') { badge.classList.add('badge-returned'); badge.textContent = 'Returned'; }
+                  }
+                  if (fb) {
+                      const reason = d.scores[subject][type].correction_reason || d.scores[subject][type].hod_feedback || '';
+                      if (sc === 'returned' && reason) {
+                          fb.innerHTML = '<span class="fb-label">HOD feedback: </span>' + reason;
+                          fb.classList.add('visible');
+                      } else { fb.classList.remove('visible'); fb.innerHTML = ''; }
+                  }
+              }
+          });
+      });
+      const chip = document.getElementById("st-" + current.id);
+      if(chip) {
+          if (hasReturned) { chip.textContent = "Returned"; chip.className = "status-chip status-returned"; }
+          else if (hasApproved && allApproved) { chip.textContent = "Approved"; chip.className = "status-chip status-approved"; }
+          else if (isGlobalLocked) { chip.textContent = "Submitted"; chip.className = "status-chip status-saved"; }
+          else if (hasAny) { chip.textContent = "Saved"; chip.className = "status-chip status-saved"; }
+      }
+  }
+  calcGrandAverage();
+}
+
+function calcSubjectAverage(slug) {
+    // This is called when an input changes, but we usually just calc everything
+    calcGrandAverage();
+}
+
+/* Validate a single primary score field on blur */
+window.validatePrimaryScore = function(inp) {
+    var raw = inp.value.trim();
+    var maxScore = parseInt(inp.getAttribute("data-max_score") || "100", 10);
+    inp.style.borderColor = "#E2E8F0";
+    inp.title = "";
+    if (raw === "") return;
+    if (raw.indexOf('.') !== -1) {
+        inp.style.borderColor = "#EF4444";
+        inp.title = "Score must be a whole number (integer) between 0 and " + maxScore + ".";
+        return;
+    }
+    var val = parseInt(raw, 10);
+    if (isNaN(val) || val < 0 || val > maxScore || String(val) !== raw) {
+        inp.style.borderColor = "#EF4444";
+        inp.title = "Score must be a whole number (integer) between 0 and " + maxScore + ".";
+    }
+};
+
+function calcGrandAverage() {
+    const subjects = {};
+    document.querySelectorAll(".score-input-val").forEach(inp => {
+        const sub = inp.getAttribute("data-subject");
+        if(!subjects[sub]) subjects[sub] = { weightedSum: 0, totalWeight: 0 };
+        
+        if(inp.value !== "") {
+            const score = parseFloat(inp.value);
+            const maxScore = parseInt(inp.getAttribute("data-max_score") || "100", 10);
+            if(score >= 0 && score <= maxScore) {
+                inp.style.borderColor = "#E2E8F0";
+                const weight = parseFloat(inp.getAttribute("data-weight"));
+                subjects[sub].weightedSum += score * (weight / 100);
+                subjects[sub].totalWeight += weight;
+            } else {
+                inp.style.borderColor = "#EF4444";
+            }
+        } else {
+            inp.style.borderColor = "#E2E8F0";
+        }
+    });
+
+    let totalWeightedSum = 0;
+    let subjectCount = 0;
+
+    Object.keys(subjects).forEach(sub => {
+        const data = subjects[sub];
+        const slug = sub.toLowerCase().replace(/ /g, '-');
+        const display = document.getElementById("avg-" + slug);
+        
+        if(data.totalWeight > 0) {
+            const avg = (data.weightedSum / (data.totalWeight / 100)).toFixed(1);
+            if(display) display.textContent = `Avg: ${avg}%`;
+            totalWeightedSum += parseFloat(avg);
+            subjectCount++;
+        } else {
+            if(display) display.textContent = `Avg: --%`;
+        }
+    });
+
+    const grandDisplay = document.getElementById("grand-avg");
+    if(subjectCount > 0) {
+        const grandAvg = (totalWeightedSum / subjectCount).toFixed(1);
+        grandDisplay.textContent = grandAvg + "%";
+        grandDisplay.style.color = grandAvg >= 50 ? "#10B981" : "#EF4444";
+    } else {
+        grandDisplay.textContent = "--%";
+        grandDisplay.style.color = "#94A3B8";
+    }
+}
+
+async function saveAllScores() {
+    if(!current) return;
+    const scores = {};
+    let hasInvalid = false;
+    
+    document.querySelectorAll(".score-input-val").forEach(inp => {
+        if(inp.value === "") return;
+        const raw = inp.value;
+        const maxScore = parseInt(inp.getAttribute("data-max_score") || "100", 10);
+        /* Reject decimals */
+        if (raw.indexOf('.') !== -1) {
+            hasInvalid = true;
+            inp.style.borderColor = "#EF4444";
+            inp.title = "Score must be a whole number (integer) between 0 and " + maxScore + ".";
+            return;
+        }
+        const val = parseInt(raw, 10);
+        if (isNaN(val) || val < 0 || val > maxScore || String(val) !== raw) {
+            hasInvalid = true;
+            inp.style.borderColor = "#EF4444";
+            inp.title = "Score must be a whole number (integer) between 0 and " + maxScore + ".";
+            return;
+        }
+        const sub = inp.getAttribute("data-subject");
+        const type = inp.getAttribute("data-type");
+        if(!scores[sub]) scores[sub] = {};
+        scores[sub][type] = inp.value;
+    });
+
+    if(hasInvalid) {
+        showToast("Please correct invalid scores (must be within configured range)", "error");
+        return;
+    }
+    if(Object.keys(scores).length === 0) return;
+
+    const r = await fetch(API + "scores/" + current.id + "/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": CSRF },
+        body: JSON.stringify({ term: TERM_ID, scores: scores })
+    });
+    
+    const resp = await r.json();
+    
+    if(!r.ok) {
+        showToast(resp.error || "Failed to save scores", "error");
+        return;
+    }
+
+    if(resp.updated === 0 && resp.window_warnings && resp.window_warnings.length > 0) {
+        showToast("Score entry blocked: " + resp.window_warnings.join("; "), "error");
+        return;
+    }
+
+    if(resp.window_warnings && resp.window_warnings.length > 0) {
+        showToast("Saved with warnings: " + resp.window_warnings.join("; "), "warning");
+    } else {
+        showToast("Student assessment saved", "success");
+    }
+
+    current.has_scores = true;
+    const chip = document.getElementById("st-" + current.id);
+    if(chip) { chip.textContent = "Saved"; chip.className = "status-chip status-saved"; }
+    updateProgress();
+    await reloadScores();
+}
+
+async function saveAndNext() {
+    await saveAllScores();
+    moveNext();
+}
+
+function moveNext() {
+    const idx = students.findIndex(s => s.id === current.id);
+    if (idx < students.length - 1) loadStudent(students[idx + 1].id);
+}
+
+function movePrev() {
+    const idx = students.findIndex(s => s.id === current.id);
+    if (idx > 0) loadStudent(students[idx - 1].id);
+}
+
+async function submitAllToHOD() {
+    if (!CAN_SUBMIT_HOD) {
+        showToast("You are not authorized to submit scores to HOD", "error");
+        return;
+    }
+
+    // Scan students for missing marks
+    var missingStudents = [];
+    students.forEach(function(s) {
+        if (s.report_card_status && s.report_card_status !== 'draft') return;
+        if (!s.has_scores) {
+            missingStudents.push(s);
+        }
+    });
+
+    window._submitToHOD = function doSubmit() {
+        var btn = document.getElementById("submit-hod-btn");
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="animation:btn-spin 1s linear infinite;vertical-align:middle;margin-right:6px"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> Submitting...';
+            btn.style.opacity = "0.7";
+            btn.style.cursor = "wait";
+        }
+        fetch(API + "submit-all/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": CSRF },
+            body: JSON.stringify({ class_name: CLASS_NAME, term: TERM_ID })
+        }).then(function(r) {
+            if (r.ok) {
+                r.json().then(function(d) {
+                    showToast(d.message, "success");
+                    if (btn) { btn.innerHTML = "&#10003; Submitted"; btn.style.background = "#059669"; btn.style.cursor = "default"; btn.style.opacity = "1"; }
+                    setTimeout(function(){ window.location.reload(); }, 1200);
+                });
+            } else {
+                showToast("Submission failed. Please try again.", "error");
+                if (btn) { btn.disabled = false; btn.innerHTML = "Submit all to HOD"; btn.style.opacity = "1"; btn.style.cursor = "pointer"; }
+            }
+        }).catch(function() {
+            showToast("Network error. Please check your connection.", "error");
+            if (btn) { btn.disabled = false; btn.innerHTML = "Submit all to HOD"; btn.style.opacity = "1"; btn.style.cursor = "pointer"; }
+        });
+    }
+
+    if (missingStudents.length > 0) {
+        var nameList = missingStudents.map(function(s) {
+            return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #F1F5F9">' +
+                '<div style="width:28px;height:28px;background:#EF4444;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px">' +
+                s.first_name[0] + s.last_name[0] + '</div>' +
+                '<div><div style="font-size:13px;font-weight:600;color:#1E293B">' + s.first_name + ' ' + s.last_name + '</div>' +
+                '<div style="font-size:11px;color:#64748B">' + s.admission_no + '</div></div></div>';
+        }).join('');
+        var modal = document.createElement('div');
+        modal.id = 'missing-marks-modal';
+        modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center';
+        modal.innerHTML =
+            '<div style="background:#fff;border-radius:16px;padding:0;width:420px;max-height:80vh;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,0.15)">' +
+              '<div style="padding:20px 24px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center">' +
+                '<div style="display:flex;align-items:center;gap:10px">' +
+                  '<div style="width:36px;height:36px;background:#FEF3C7;border-radius:50%;display:flex;align-items:center;justify-content:center">' +
+                    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.5"><path d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>' +
+                  '<div><div style="font-size:15px;font-weight:700;color:#1E293B">Missing Marks Warning</div>' +
+                  '<div style="font-size:12px;color:#64748B">' + missingStudents.length + ' student' + (missingStudents.length > 1 ? 's have' : ' has') + ' no scores</div></div>' +
+                '</div>' +
+                '<button onclick="document.getElementById(\'missing-marks-modal\').remove()" style="background:none;border:none;cursor:pointer;padding:4px;color:#64748B">' +
+                  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>' +
+              '</div>' +
+              '<div style="padding:16px 24px;max-height:300px;overflow-y:auto">' +
+                '<p style="margin:0 0 12px;font-size:13px;color:#64748B">The following students have not been assessed yet. Their reports will show <strong>--%</strong> for all subjects.</p>' +
+                nameList +
+              '</div>' +
+              '<div style="padding:16px 24px;border-top:1px solid #E2E8F0;display:flex;gap:10px;justify-content:flex-end">' +
+                '<button onclick="document.getElementById(\'missing-marks-modal\').remove()" style="padding:10px 20px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;font-weight:600;color:#475569;background:#fff;cursor:pointer">Go Back</button>' +
+                '<button id="mm-submit-btn" onclick="document.getElementById(\'missing-marks-modal\').remove();window._submitToHOD()" style="padding:10px 20px;border:none;border-radius:8px;font-size:13px;font-weight:600;color:#fff;background:#F59E0B;cursor:pointer">Submit Anyway</button>' +
+              '</div>' +
+            '</div>';
+        document.body.appendChild(modal);
+        modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+    } else {
+        var origConfirm = confirmDeleteAction;
+        var origClose = closeConfirmDeleteModal;
+        closeConfirmDeleteModal = function() {
+            confirmDeleteAction = origConfirm;
+            closeConfirmDeleteModal = origClose;
+            origClose();
+        };
+        confirmDeleteAction = function() {
+            closeConfirmDeleteModal();
+            confirmDeleteAction = origConfirm;
+            closeConfirmDeleteModal = origClose;
+            window._submitToHOD();
+        };
+        confirmDeleteModal({
+            title: RETURNED_COUNT > 0 ? "Resubmit " + RETURNED_COUNT + " Corrected?" : "Submit All to HOD?",
+            body: RETURNED_COUNT > 0
+                ? 'You have <strong>' + RETURNED_COUNT + ' corrected student(s)</strong> in <strong>' + CLASS_NAME + '</strong> to resubmit to the HOD.'
+                : 'Are you sure you want to submit all scores for <strong>' + CLASS_NAME + '</strong> to the HOD for review?',
+            detail: RETURNED_COUNT > 0
+                ? "The HOD will review the corrected scores. Current entries will be locked."
+                : "This will lock current entries and prevent further edits.",
+            confirmText: RETURNED_COUNT > 0 ? "Resubmit " + RETURNED_COUNT : "Submit All",
+            type: "warning"
+        });
+    }
+}
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+{% endblock %}

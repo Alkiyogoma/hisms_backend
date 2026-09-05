@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Payslip — {{ entry.staff.full_name }} — {{ brand.school_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  :root {
+    --hodari-blue: #023AA5; --hodari-blue-dark: #012880;
+    --bg-page: #F2F5FA; --bg-card: #FFFFFF;
+    --text-primary: #1A1A2E; --text-secondary: #474747; --text-muted: #8492A6;
+    --border: #DDE3EE; --border-strong: #B8C4D8;
+    --green: #1B7B34; --green-bg: #E8F5EC;
+    --blue-st-bg: #E8EEF9;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Roboto', sans-serif; background: var(--bg-page); color: var(--text-primary); }
+  .payslip-page { padding: 24px 28px; max-width: 800px; margin: 0 auto; }
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 32px; margin-bottom: 24px; }
+  .payslip-header { text-align: center; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 2px solid var(--hodari-blue); }
+  .payslip-header h1 { font-family: 'Merriweather', serif; font-size: 24px; color: var(--hodari-blue); margin-bottom: 4px; }
+  .payslip-header .school-info { font-size: 13px; color: var(--text-muted); }
+  .payslip-header .period { font-size: 16px; font-weight: 500; margin-top: 8px; }
+  .employee-info { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; padding: 16px; background: var(--blue-st-bg); border-radius: 8px; }
+  .employee-info div { font-size: 13px; }
+  .employee-info .label { color: var(--text-muted); }
+  .employee-info .value { font-weight: 500; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+  thead th { background: var(--bg-page); font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; padding: 10px; text-align: left; border-bottom: 1px solid var(--border); }
+  tbody td { padding: 10px; font-size: 13px; border-bottom: 1px solid var(--border); }
+  .total-row td { font-weight: 600; background: var(--green-bg); }
+  .net-pay { text-align: center; padding: 20px; margin-top: 16px; background: var(--blue-st-bg); border-radius: 8px; }
+  .net-pay .label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+  .net-pay .amount { font-family: 'Roboto Mono', monospace; font-size: 32px; font-weight: 700; color: var(--hodari-blue); }
+  .btn-primary { background: var(--hodari-blue); color: #fff; border: none; padding: 8px 18px; border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-primary:hover { background: var(--hodari-blue-dark); }
+  .btn-secondary { background: #fff; color: var(--hodari-blue); border: 1px solid var(--border-strong); padding: 8px 18px; border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: none; }
+  .btn-secondary:hover { border-color: var(--hodari-blue); }
+  .action-bar { display: flex; gap: 8px; justify-content: center; margin-top: 16px; }
+  @media print { .action-bar, .no-print { display: none !important; } }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "hr/_top_tabs.html" %}
+<div class="payslip-page">
+  <div class="no-print action-bar">
+    <a href="{% url 'hr:payroll_detail' entry.payroll_run.pk %}" class="btn-secondary">← Back to Payroll</a>
+    <button onclick="window.print()" class="btn-primary"> Print Payslip</button>
+  </div>
+
+  <div class="card">
+    <div class="payslip-header">
+      <img src="{% static 'branding/hodari-logo.png' %}" alt="{{ brand.school_name }}" style="height:48px;width:auto;margin-bottom:12px">
+      <h1 style="font-family: 'Merriweather', serif; font-size: 24px; color: #023AA5; margin-bottom: 4px;">{{ brand.school_name|upper }}</h1>
+      <div class="school-info">Payslip · {{ entry.payroll_run.period_name }}</div>
+      <div class="period">{{ entry.payroll_run.get_payroll_type_display }}</div>
+    </div>
+
+    <div class="employee-info">
+      <div><span class="label">Employee:</span> <span class="value">{{ entry.staff.full_name }}</span></div>
+      <div><span class="label">Employee ID:</span> <span class="value">{{ entry.staff.employee_id|default:"N/A" }}</span></div>
+      <div><span class="label">Job Title:</span> <span class="value">{{ entry.staff.job_title }}</span></div>
+      <div><span class="label">Department:</span> <span class="value">{{ entry.staff.get_department_display }}</span></div>
+      <div><span class="label">NSSF No:</span> <span class="value">{{ entry.staff.nssf_number|default:"N/A" }}</span></div>
+      <div><span class="label">TIN:</span> <span class="value">{{ entry.staff.tin_number|default:"N/A" }}</span></div>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th style="width:60%;">Earnings</th><th style="width:40%;text-align:right;">Amount (TZS)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Basic Pay</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.basic_pay|floatformat:2|intcomma }}</td></tr>
+        {% if entry.housing_allowance %}<tr><td>Housing Allowance</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.housing_allowance|floatformat:2|intcomma }}</td></tr>{% endif %}
+        {% if entry.transport_allowance %}<tr><td>Transport Allowance</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.transport_allowance|floatformat:2|intcomma }}</td></tr>{% endif %}
+        {% if entry.medical_allowance %}<tr><td>Medical Allowance</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.medical_allowance|floatformat:2|intcomma }}</td></tr>{% endif %}
+        {% if entry.other_allowances %}<tr><td>Other Allowances</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.other_allowances|floatformat:2|intcomma }}</td></tr>{% endif %}
+        {% if entry.overtime_pay %}<tr><td>Overtime Pay</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.overtime_pay|floatformat:2|intcomma }}</td></tr>{% endif %}
+        {% if entry.bonus_pay %}<tr><td>Bonus Pay</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.bonus_pay|floatformat:2|intcomma }}</td></tr>{% endif %}
+        <tr class="total-row"><td><strong>Gross Pay</strong></td><td style="text-align:right;font-family:'Roboto Mono',monospace;"><strong>{{ entry.gross_pay|floatformat:2|intcomma }}</strong></td></tr>
+      </tbody>
+    </table>
+
+    <table>
+      <thead>
+        <tr><th style="width:60%;">Deductions</th><th style="width:40%;text-align:right;">Amount (TZS)</th></tr>
+      </thead>
+      <tbody>
+        {% if entry.paye_tax %}<tr><td>PAYE Tax</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.paye_tax|floatformat:2|intcomma }}</td></tr>{% endif %}
+        {% if entry.nssf_employee %}<tr><td>NSSF (Employee 5%)</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.nssf_employee|floatformat:2|intcomma }}</td></tr>{% endif %}
+        {% if entry.nhif_deduction %}<tr><td>NHIF Deduction</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.nhif_deduction|floatformat:2|intcomma }}</td></tr>{% endif %}
+        {% if entry.hesb_deduction %}<tr><td>HESLB Loan Repayment</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.hesb_deduction|floatformat:2|intcomma }}</td></tr>{% endif %}
+        {% if entry.other_deductions %}<tr><td>Other Deductions</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.other_deductions|floatformat:2|intcomma }}</td></tr>{% endif %}
+        {% if entry.leave_deduction %}<tr><td>Unpaid Leave Deduction ({{ entry.unpaid_leave_days }} days)</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.leave_deduction|floatformat:2|intcomma }}</td></tr>{% endif %}
+        <tr class="total-row"><td><strong>Total Deductions</strong></td><td style="text-align:right;font-family:'Roboto Mono',monospace;"><strong>{{ entry.total_deductions|floatformat:2|intcomma }}</strong></td></tr>
+      </tbody>
+    </table>
+
+    <div class="net-pay">
+      <div class="label">Net Pay</div>
+      <div class="amount">TZS {{ entry.net_pay|floatformat:2|intcomma }}</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Receipt PAY-{{ payment.pk }} — {{ brand.school_name }}</title>
+  {% include "includes/hodari_print_styles.html" %}
+</head>
+<body>
+{% load static %}
+  <div class="no-print">
+    <button type="button" class="btn btn-primary" onclick="window.print()">Print / Save PDF</button>
+    <button type="button" class="btn btn-outline" onclick="window.history.back()">Back</button>
+  </div>
+
+  <div class="doc-container">
+    {% include "includes/hodari_print_header.html" %}
+        <div class="doc-meta">
+          <div><strong>RECEIPT #{{ payment.pk }}</strong></div>
+          <div>Date: {{ payment.created_at|date:"d F Y" }}</div>
+          {% if payment.invoice %}<div>Invoice: {{ payment.invoice.invoice_number }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="doc-body">
+      <p style="font-size:13px;margin-bottom:16px">
+        <strong>Received from:</strong>
+        {% if payment.invoice and payment.invoice.student %}
+          {{ payment.invoice.student.get_full_name }} • {{ payment.invoice.student.class_name }}
+        {% else %}N/A{% endif %}
+      </p>
+
+      <table class="doc-table">
+        <tr><td>Amount received</td><td class="num">TZS {{ payment.amount|floatformat:0 }}</td></tr>
+        <tr><td>Payment method</td><td class="num">{{ payment.method|title }}</td></tr>
+        {% if payment.reference %}<tr><td>Reference</td><td class="num">{{ payment.reference }}</td></tr>{% endif %}
+        {% if payment.invoice %}
+        <tr><td>Invoice balance after payment</td><td class="num">TZS {{ balance_after|floatformat:0 }}</td></tr>
+        {% endif %}
+      </table>
+
+      <div class="signatures">
+        <div>
+          <div class="sig-line"></div>
+          <div class="sig-label">Finance Officer</div>
+        </div>
+        <div>
+          <div class="sig-line"></div>
+          <div class="sig-label">Parent / Guardian</div>
+        </div>
+      </div>
+
+      <div class="doc-footer">
+        This receipt confirms payment received. Keep for your records.<br>
+        {{ brand.school_name }} &middot; {{ brand.email }}
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{% load role_tags %}
+<div class="sub-nav">
+  {% if perms.discipline.view_disciplineincident %}
+  <a href="{% url 'discipline:list' %}" class="sub-tab {% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'detail' or request.resolver_match.url_name == 'review' or request.resolver_match.url_name == 'parent_confirm' %}active{% endif %}">Incidents</a>
+  {% endif %}
+  {% if perms.discipline.add_disciplineincident %}
+  <a href="{% url 'discipline:submit' %}" class="sub-tab {% if request.resolver_match.url_name == 'submit' %}active{% endif %}">Report Incident</a>
+  {% endif %}
+  {% if perms.discipline.view_disciplineincident %}
+  <a href="{% url 'discipline:hod_queue' %}" class="sub-tab {% if request.resolver_match.url_name == 'hod_queue' %}active{% endif %}">HOD Queue</a>
+  {% endif %}
+</div>

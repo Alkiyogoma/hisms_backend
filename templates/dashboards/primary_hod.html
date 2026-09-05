@@ -1,0 +1,368 @@
+{% extends "base.html" %}
+{% load static hodari_forms role_tags %}
+
+{% block title %}Primary HOD Dashboard — {{ brand.school_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Local overrides for high-fidelity widgets */
+  .metrics-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .metric.m-gold::after { background: var(--hodari-gold-dark); }
+  .t-gold { color: var(--hodari-gold-dark); }
+  
+  .ev-widget { background: #F7F9FC; border: 1px solid #DDE3EE; border-radius: 10px; padding: 14px; margin-top: 14px; }
+  .ev-title { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #8492A6; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
+  .ev-link { font-size: 12px; color: #023AA5; font-weight: 500; cursor: pointer; text-transform: none; letter-spacing: 0; text-decoration: none; }
+  .ev-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 0.5px solid #DDE3EE; }
+  .ev-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .ev-date { flex-shrink: 0; width: 44px; text-align: center; background: #fff; border: 1px solid #DDE3EE; border-radius: 7px; padding: 5px 3px; }
+  .ev-day { font-size: 17px; font-weight: 700; color: #023AA5; font-family: monospace; line-height: 1; }
+  .ev-mon { font-size: 9px; color: #8492A6; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; margin-top: 1px; }
+  .ev-body { flex: 1; min-width: 0; }
+  .ev-name { font-size: 12.5px; font-weight: 600; color: #1A1A2E; line-height: 1.3; }
+  .ev-meta { font-size: 11px; color: #8492A6; margin-top: 2px; }
+  .ev-badge { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 99px; font-size: 10px; font-weight: 700; margin-top: 5px; border: 1px solid transparent; }
+  .ev-today { background: #E8F5EC; color: #1B7B34; border-color: #B7DFBF; }
+  .ev-soon { background: #FEF3C7; color: #92550A; border-color: #FCD34D; }
+  .ev-normal { background: #E8EEF9; color: #023AA5; border-color: #BFCFE9; }
+
+
+  
+  .perf-card { margin-bottom: 14px; border-left: 4px solid #9B1C1C; border-radius: 10px; padding: 18px 20px; background: #fff; border: 1px solid var(--border); border-left-width: 4px; }
+
+  .hm-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .hm-table th { text-align: left; padding: 8px 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #8492A6; background: #F7F9FC; border-bottom: 1px solid #DDE3EE; }
+  .hm-table td { padding: 7px 10px; border-bottom: 1px solid #F1F5F9; color: #1A1A2E; }
+  .hm-table tr:hover td { background: #F8FAFC; }
+  .hm-cell { text-align: center; font-weight: 700; font-family: var(--font-mono); border-radius: 4px; padding: 3px 0; min-width: 40px; }
+  .hm-cell.hm-green { background: #E8F5EC; color: #1B7B34; }
+  .hm-cell.hm-amber { background: #FEF3C7; color: #92400E; }
+  .hm-cell.hm-red { background: #FEF2F2; color: #9B1C1C; }
+  .hm-cell.hm-none { color: #CBD5E1; }
+
+  .at-risk-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .at-risk-card { display: block; text-decoration: none; color: inherit; border-radius: 8px; padding: 12px; border: 1px solid var(--border); background: #fff; transition: box-shadow .12s; }
+  .at-risk-card:hover { box-shadow: 0 2px 8px rgba(2,58,165,0.1); }
+  .at-risk-card.red { border-left: 3px solid #DC2626; }
+  .at-risk-card.amber { border-left: 3px solid #D97706; }
+  .at-risk-name { font-size: 13px; font-weight: 600; color: #1A1A2E; margin-bottom: 2px; }
+  .at-risk-class { font-size: 11px; color: #8492A6; }
+  .at-risk-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid #F1F5F9; }
+  .at-risk-avg { font-size: 12px; color: #8492A6; }
+</style>
+{% endblock %}
+
+{% block topbar_greeting %}Good {% if hour < 12 %}morning{% elif hour < 17 %}afternoon{% else %}evening{% endif %}, {{ user.get_full_name|default:user.username }}{% endblock %}
+{% block topbar_date %}{{ today_display }} &middot; Primary Department{% endblock %}
+
+{% block topbar_badges %}
+  <div class="topbar-badge badge-amber"><span class="badge-dot"></span>{{ plans_to_review_count }} plans to review</div>
+{% endblock %}
+
+{% block content %}
+<div id="dashboard-content" hx-target="this" hx-swap="innerHTML" hx-trigger="every 60s">
+  <!-- Section Header -->
+  <div class="section-hdr">
+    <span class="section-title">Primary dept{% if current_week %} &middot; week {{ current_week }}{% endif %}</span>
+    <a href="{% url 'academics:lesson_plan_compliance' %}" class="section-link">Full compliance report &rarr;</a>
+  </div>
+
+  <!-- Primary Metrics -->
+  <div class="metrics metrics-4">
+    <div class="metric-compact" style="background:linear-gradient(135deg,#FFF8ED,#fff)">
+      <div class="mc-lbl-row"><span class="mc-lbl">Lesson plans to review</span></div>
+      <div class="mc-val" style="color:#B45309">{{ plans_to_review_count }}</div>
+      <div class="mc-sub" style="color:#B45309">Awaiting your approval</div>
+    </div>
+    <div class="metric-compact" style="background:linear-gradient(135deg,#FFF0F0,#fff)">
+      <div class="mc-lbl-row"><span class="mc-lbl">Discipline entries pending</span></div>
+      <div class="mc-val" style="color:#DC2626">{{ behaviour_pending_count }}</div>
+      <div class="mc-sub" style="color:#DC2626">Require HOD review</div>
+    </div>
+    <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
+      <div class="mc-lbl-row"><span class="mc-lbl">Next report deadline</span></div>
+      <div class="mc-val" style="color:#023AA5">{{ report_deadline_days }}<span class="mc-currency" style="margin-left:4px;vertical-align:middle">days</span></div>
+      <div class="mc-sub" style="color:#5A697D">{{ term_label }} reports due soon</div>
+    </div>
+    <div class="metric-compact" style="background:linear-gradient(135deg,#FFFBEB,#fff)">
+      <div class="mc-lbl-row"><span class="mc-lbl">Primary dept average</span></div>
+      <div class="mc-val" style="color:#B45309">{{ dept_performance.avg }}<span class="mc-currency" style="margin-left:4px;vertical-align:middle">%</span></div>
+      <div class="mc-sub" style="color:#B45309">Grade {{ dept_performance.grade }} &middot; {{ dept_performance.trend }}</div>
+    </div>
+  </div>
+
+  <!-- Staff Presence Card -->
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title-row">
+      <span class="card-title" style="margin-bottom:0">Primary staff in school today</span>
+      {% if staff_absent_count > 0 %}
+        <span class="chip chip-red">{{ staff_absent_count }} absent with classes</span>
+      {% else %}
+        <span class="chip chip-green">Full attendance</span>
+      {% endif %}
+    </div>
+    
+    {% for staff in staff_attendance %}
+      <div class="trow">
+        <div>
+          <div class="trow-name">{{ staff.name }}</div>
+          <div class="trow-sub">{{ staff.role }}{% if staff.check_in %} · checked in {{ staff.check_in }}{% elif staff.is_teacher %} · {% if staff.has_classes_today %}has classes today{% else %}no classes today{% endif %}{% endif %}</div>
+        </div>
+        <span class="trow-right">
+          <span class="chip {% if staff.status == 'Present' %}chip-green{% elif staff.status == 'Unconfirmed' %}chip-amber{% else %}chip-red{% endif %}">
+            {{ staff.status }}
+          </span>
+        </span>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="grid-6-4">
+    <!-- Performance Pulse -->
+    <div class="perf-card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px">
+        <div>
+          <div style="font-size:10.5px;font-weight:700;color:#8492A6;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Performance pulse &middot; {{ term_label }} &middot; Primary</div>
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <span style="font-size:28px;font-weight:700;color:#1A1A2E;font-family:monospace;line-height:1">{{ dept_performance.avg }}%</span>
+            <span class="chip chip-blue" style="font-size:11px;font-weight:700">Grade {{ dept_performance.grade }}</span>
+            <span style="font-size:12px;color:#1B7B34;font-weight:600">{{ dept_performance.trend }}</span>
+          </div>
+          <div style="font-size:12px;color:#8492A6;margin-top:4px">Primary dept average &middot; {{ dept_performance.student_count }} students</div>
+        </div>
+        <a href="{% url 'academics:analytics' %}" style="padding:8px 16px;background:#023AA5;color:#fff;border-radius:8px;font-size:12.5px;font-weight:600;text-decoration:none;white-space:nowrap;flex-shrink:0">View full report &rarr;</a>
+      </div>
+      
+      {% if flagged_class %}
+        <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:12px;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:700;color:#9B1C1C;margin-bottom:6px">{{ flagged_class.name }} requires immediate attention</div>
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+            <div style="text-align:center"><div style="font-size:18px;font-weight:700;color:#9B1C1C;font-family:monospace">{{ flagged_class.avg }}%</div><div style="font-size:10.5px;color:#9B1C1C;font-weight:600">Class avg</div></div>
+            <div style="text-align:center"><div style="font-size:18px;font-weight:700;color:#9B1C1C;font-family:monospace">{{ flagged_class.trend }}</div><div style="font-size:10.5px;color:#9B1C1C;font-weight:600">vs Term 1</div></div>
+            <div style="text-align:center"><div style="font-size:18px;font-weight:700;color:#9B1C1C;font-family:monospace">{{ flagged_class.critical_count }}</div><div style="font-size:10.5px;color:#9B1C1C;font-weight:600">Students at E</div></div>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Upcoming Events Widget -->
+    <div class="ev-widget" style="margin-top:0">
+      <div class="ev-title">Upcoming events
+        <a href="{% url 'events:list' %}" class="ev-link">View calendar &rarr;</a>
+      </div>
+      {% for event in upcoming_events %}
+        <div class="ev-item">
+          <div class="ev-date">
+            <div class="ev-day">{{ event.start_date|date:"d" }}</div>
+            <div class="ev-mon">{{ event.start_date|date:"M" }}</div>
+          </div>
+          <div class="ev-body">
+            <div class="ev-name">{{ event.title }}</div>
+            <div class="ev-meta">{{ event.location|default:"School Campus" }}</div>
+          </div>
+        </div>
+      {% empty %}
+        <div style="padding:16px;text-align:center">{% include '_partials/empty_state.html' with title='No upcoming events' desc='Events will appear here once scheduled.' icon='calendar' icon_color='grey' %}</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <!-- Lesson Plan Queue -->
+    <div class="card">
+      <div class="card-title-row">
+        <span class="card-title" style="margin-bottom:0">Lesson plan review queue</span>
+        <span class="chip chip-amber">{{ plans_to_review_count }} pending</span>
+      </div>
+      {% for plan in plans_queue %}
+        <div class="trow">
+          <div>
+            <div class="trow-name">{{ plan.teacher.get_full_name }} &middot; {{ plan.subject_name }} {{ plan.class_name }}</div>
+            <div class="trow-sub">Submitted {{ plan.updated_at|timesince }} ago &middot; Week of {{ plan.week_start_date }}</div>
+          </div>
+          <span class="trow-right">
+            <a href="{% url 'academics:review_lesson_plan' plan.pk %}" class="chip chip-amber" style="text-decoration:none">Review</a>
+          </span>
+        </div>
+      {% empty %}
+        <div style="padding:24px;text-align:center">{% include '_partials/empty_state.html' with title='No plans pending review' desc='All lesson plans have been reviewed.' icon='check' icon_color='green' %}</div>
+      {% endfor %}
+    </div>
+
+    <!-- Compliance -->
+    <div class="card">
+      <div class="card-title">Department compliance &middot; this week</div>
+      {% for item in compliance_list %}
+        <div class="trow">
+          <div>
+            <div class="trow-name">{{ item.name }}</div>
+            <div class="trow-sub">Primary Department</div>
+          </div>
+          <span class="trow-right">
+            <span class="chip {% if item.status == 'Approved' %}chip-green{% elif item.status == 'Submitted' %}chip-amber{% else %}chip-red{% endif %}">
+              {{ item.status }}
+            </span>
+          </span>
+        </div>
+      {% empty %}
+        <div style="padding:24px;text-align:center">{% include '_partials/empty_state.html' with title='No compliance data' desc='No compliance data available this week.' icon='inbox' icon_color='grey' %}</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% if hos_review_queue %}
+  <div class="card" style="margin-bottom:14px;border-left:4px solid #1A56C4">
+    <div class="card-title-row">
+      <span class="card-title" style="margin-bottom:0">Applicants awaiting your HOS review</span>
+      <span class="chip chip-blue">{{ hos_review_count }} pending</span>
+    </div>
+    {% for item in hos_review_queue %}
+    <a href="{% url 'admissions:detail' item.applicant.pk %}" class="trow" style="text-decoration:none;color:inherit;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-left:3px solid #1A56C4;margin-left:12px">
+      <div>
+        <div class="trow-name">{{ item.applicant.child_full_name }} &middot; {{ item.applicant.grade_applying_for }}</div>
+        <div class="trow-sub">Assessment result: {{ item.result_display }}{% if item.teacher_comments %} &middot; {{ item.teacher_comments|truncatewords:12 }}{% endif %}</div>
+      </div>
+      <span class="trow-right" style="display:flex;gap:6px;align-items:center">
+        <a href="{% url 'admissions:detail' item.applicant.pk %}" style="font-size:11px;color:var(--text-muted);text-decoration:none;white-space:nowrap">Detail &rarr;</a>
+        {% has_perm user "admissions.submit_hos_review" as can_forward %}
+        {% if can_forward %}
+        <button type="button" style="padding:4px 10px;font-size:11px;font-weight:600;border:1px solid #BBF7D0;border-radius:6px;background:#DCFCE7;color:#166534;cursor:pointer;white-space:nowrap"
+          onclick="confirmDeleteModal({title:'Forward to HOS?',body:'Forward <strong>{{ item.applicant.child_full_name }}</strong> to HOS for decision?',detail:'The applicant will be moved to the HOS review queue.',confirmText:'Forward to HOS',url:'{% url 'admissions:hos_review_submit' item.applicant.pk %}',type:'info',extraData:[{name:'hod_comments',value:'Reviewed and recommended.'}]})">
+          Forward to HOS
+        </button>
+        {% endif %}
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if admission_actions %}
+  <div class="card" style="margin-bottom:14px;border-left:4px solid var(--hodari-gold)">
+    <div class="card-title-row">
+      <span class="card-title" style="margin-bottom:0">Admissions requiring your attention</span>
+      <a href="{% url 'admissions:pipeline' %}" class="section-link" style="margin-left:auto">View all &rarr;</a>
+    </div>
+    {% for action in admission_actions %}
+    <a href="{{ action.link }}" class="trow" style="text-decoration:none;color:inherit;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px">
+      <div>
+        <div class="trow-name">{{ action.applicant.child_full_name|default:action.description }}</div>
+        <div class="trow-sub">{{ action.applicant.grade_applying_for|default:"N/A" }} &middot; {{ action.type|title }} &middot; {{ action.description }}</div>
+      </div>
+      <span class="trow-right">
+        <span class="chip {% if action.severity == 'high' %}chip-red{% else %}chip-amber{% endif %}">{{ action.severity|title }}</span>
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="grid-2">
+    <!-- Attendance -->
+    <div class="card">
+      <div class="card-title">Class attendance &middot; Primary today</div>
+      {% for item in class_attendance %}
+        <div class="trow">
+          <div>
+            <div class="trow-name">{{ item.name }}</div>
+            {% if item.pct < 85 %}<span class="chip chip-amber" style="font-size:10px">&#9679; Attention</span>{% endif %}
+          </div>
+          <span class="trow-right">
+            <span class="status-dot dot-{{ item.status }}"></span>
+            <span class="trow-val t-{{ item.status }}">{{ item.pct }}%</span>
+          </span>
+        </div>
+      {% endfor %}
+    </div>
+
+    <!-- Discipline -->
+    <div class="card">
+      <div class="card-title">Discipline entries to review</div>
+      {% for inc in behaviour_review %}
+        <a href="{% url 'discipline:detail' inc.pk %}" class="trow" style="text-decoration:none; color:inherit; display:flex">
+          <div style="flex:1">
+            <div class="trow-name">{{ inc.student.get_full_name }} &middot; {{ inc.student.class_name }}</div>
+            <div class="trow-sub">{{ inc.severity|title }} concern &middot; {{ inc.reported_by.get_full_name }} &middot; {{ inc.created_at|date:"D d M" }}</div>
+          </div>
+          <span class="trow-right">
+            <span class="chip {% if inc.severity == 'critical' or inc.severity == 'high' %}chip-red{% else %}chip-amber{% endif %}">
+              {% if inc.escalated %}Escalated{% else %}Review{% endif %}
+            </span>
+          </span>
+        </a>
+      {% empty %}
+        <div style="padding:24px;text-align:center">{% include '_partials/empty_state.html' with title='No discipline incidents for review' desc='All incidents have been reviewed.' icon='check' icon_color='green' %}</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Subject x Class Heatmap -->
+  {% if heatmap_data %}
+  <div class="card" style="margin-top:14px">
+    <div class="card-title-row">
+      <span class="card-title" style="margin-bottom:0">Subject performance by class &middot; {{ term_label }}</span>
+      <a href="{% url 'academics:analytics' %}" class="section-link">Full analytics &rarr;</a>
+    </div>
+    <div style="overflow-x:auto">
+    <table class="hm-table">
+      <thead>
+        <tr>
+          <th>Subject</th>
+          {% for cls in heatmap_classes %}
+          <th style="text-align:center">{{ cls }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in heatmap_data %}
+        <tr>
+          <td style="font-weight:600">{{ row.subject }}</td>
+          {% for cls in heatmap_classes %}
+            {% with avg=row.classes|get_item:cls %}
+            <td>
+              <div class="hm-cell {% if avg is None %}hm-none{% elif avg >= 70 %}hm-green{% elif avg >= 50 %}hm-amber{% else %}hm-red{% endif %}">
+                {{ avg|default:"N/A" }}
+              </div>
+            </td>
+            {% endwith %}
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <div class="bar-note">
+      <span class="hm-cell hm-green" style="display:inline;padding:1px 6px">70%+</span> Good
+      &middot; <span class="hm-cell hm-amber" style="display:inline;padding:1px 6px">50-69%</span> Fair
+      &middot; <span class="hm-cell hm-red" style="display:inline;padding:1px 6px">Below 50%</span> Needs Attention
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- At-Risk Students -->
+  {% if at_risk_students %}
+  <div class="card" style="margin-top:14px">
+    <div class="card-title-row">
+      <span class="card-title" style="margin-bottom:0">At-risk students &middot; D or below in any subject</span>
+      <span class="chip chip-red">{{ at_risk_students|length }} flagged</span>
+    </div>
+    <div class="at-risk-grid">
+    {% for item in at_risk_students %}
+    <a href="{% url 'academics:student_academic_record' item.student.pk %}" class="at-risk-card {% if item.flag_color == 'red' %}red{% else %}amber{% endif %}">
+      <div class="at-risk-name">{{ item.student.get_full_name }}</div>
+      <div class="at-risk-class">{{ item.student.class_name }} &middot; {{ item.subject }}</div>
+      <div class="at-risk-footer">
+        <span class="at-risk-avg">{{ item.average }}% in {{ item.subject }}</span>
+        <span class="chip {% if item.flag_color == 'red' %}chip-red{% else %}chip-amber{% endif %}" style="font-size:10px">
+          {% if item.average < 50 %}Grade E{% else %}Grade D{% endif %}
+        </span>
+      </div>
+    </a>
+    {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+

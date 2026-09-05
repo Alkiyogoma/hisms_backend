@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Onboarding: {{ staff.full_name }} — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Staff Onboarding{% endblock %}
+
+{% block extra_head %}
+{% include "hr/_onboarding_styles.html" %}
+{% endblock %}
+
+{% block content %}
+{% include "hr/_top_tabs.html" %}
+<div class="ob-page">
+  {% include "hr/_onboarding_sidebar.html" with total_steps=total_steps %}
+
+  <main class="ob-content">
+    <div class="ob-content-header">
+      <h1>{{ step_label }}</h1>
+      <div class="ob-step-badge">Step {{ current_step }} of {{ total_steps|default:5 }}</div>
+    </div>
+
+    {% include "hr/onboarding_step_content.html" with step=current_step form=step_form staff=staff checklist_items=checklist_items current_assignments=current_assignments onboarding=onboarding departments=departments staff_documents=staff_documents terms=terms grade_classes=grade_classes subjects=subjects role_choices=role_choices document_upload_fields=document_upload_fields total_steps=total_steps %}
+  </main>
+</div>
+{% endblock %}

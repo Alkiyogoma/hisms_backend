@@ -1,0 +1,1601 @@
+{% extends "base.html" %}
+{% load hodari_forms %}
+{% block title %}Manage User &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}User Management{% endblock %}
+
+{% block extra_head %}
+<style>
+  .term-pill:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
+  .term-pill.active { box-shadow: 0 2px 4px rgba(37,99,235,0.25); }
+  /*  Tab System  */
+  .tab-bar {
+    display: flex;
+    border-bottom: 2px solid #E8EDF5;
+    background: #F9FBFF;
+    padding: 0;
+    flex-wrap: nowrap;
+  }
+  .tab-btn {
+    padding: 14px 22px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #64748B;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-family: var(--font-ui);
+    white-space: nowrap;
+    flex: 1;
+    text-align: center;
+  }
+  .tab-btn:hover { color: var(--hodari-blue); background: rgba(2,58,165,0.04); }
+  .tab-btn.active { color: var(--hodari-blue); border-bottom-color: var(--hodari-blue); background: rgba(2,58,165,0.06); }
+  .tab-btn svg { width: 17px; height: 17px; flex-shrink: 0; }
+  .tab-content { display: none; padding: 32px 40px; }
+  .tab-content.active { display: block; animation: tabFadeIn 0.35s ease; }
+  @keyframes tabFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  /*  Checkbox overrides  */
+  input[type="checkbox"].hf2-input,
+  .hf2-input[type="checkbox"],
+  #permissions-container input[type="checkbox"],
+  .hf2-scroll-list input[type="checkbox"],
+  .perm-checkbox {
+    width: 18px !important;
+    height: 18px !important;
+    min-width: 18px !important;
+    min-height: 18px !important;
+    appearance: auto !important;
+    -webkit-appearance: checkbox !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 4px !important;
+    display: inline-block !important;
+    accent-color: var(--hodari-blue) !important;
+  }
+
+  .scroll-wrapper ul {
+    max-height: 250px !important;
+    overflow-y: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+    padding: 10px !important;
+    border: 1.5px solid #D1D9E8 !important;
+    background: #fff !important;
+    list-style: none !important;
+    border-radius: 10px;
+  }
+  .hf2-permissions-list .scroll-wrapper ul { max-height: 400px !important; }
+
+  .clean-check-list {
+    list-style: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+  }
+  .clean-check-list li {
+    display: flex !important;
+    align-items: center !important;
+    padding: 8px 12px !important;
+    border-radius: 8px !important;
+    transition: background 0.2s !important;
+  }
+  .clean-check-list li:hover { background: #F1F5F9 !important; }
+  .clean-check-list label {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    width: 100% !important;
+    cursor: pointer !important;
+    margin: 0 !important;
+    font-size: 13.5px !important;
+    font-weight: 500 !important;
+    color: var(--text-primary) !important;
+  }
+  .clean-check-list input[type="checkbox"] {
+    width: 18px !important;
+    height: 18px !important;
+    min-width: 18px !important;
+    appearance: auto !important;
+    -webkit-appearance: checkbox !important;
+    accent-color: var(--hodari-blue) !important;
+    margin: 0 !important;
+    cursor: pointer !important;
+  }
+
+  /*  Profile picture pill  */
+  .avatar-upload-wrap {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 20px 24px;
+    background: #F8FAFC;
+    border: 1.5px dashed #CBD5E1;
+    border-radius: 16px;
+    transition: all 0.25s;
+    cursor: pointer;
+  }
+  .avatar-upload-wrap:hover {
+    border-color: var(--hodari-blue);
+    background: #F0F4FB;
+  }
+  .avatar-circle {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: #E2E8F0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: 800;
+    color: #94A3B8;
+    overflow: hidden;
+    position: relative;
+    flex-shrink: 0;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  .avatar-circle img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    position: absolute;
+    inset: 0;
+  }
+  .avatar-upload-hint { font-size: 12px; color: #64748B; line-height: 1.5; }
+  .avatar-upload-hint strong { color: var(--text-primary); }
+
+  /*  Grid helpers  */
+  .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; }
+  .form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px 24px; }
+  @media (max-width: 700px) {
+    .form-grid-2, .form-grid-3 { grid-template-columns: 1fr; }
+    .tab-btn { padding: 10px 14px; font-size: 12px; }
+    .tab-content { padding: 20px; }
+  }
+
+  /*  Status badges  */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .status-badge.active { background: #DCFCE7; color: #166534; }
+  .status-badge.inactive { background: #FEE2E2; color: #991B1B; }
+
+  /*  Section card  */
+  .section-card {
+    background: #fff;
+    border: 1.5px solid #E8EDF5;
+    border-radius: 14px;
+    padding: 24px;
+    margin-bottom: 20px;
+    transition: box-shadow 0.2s;
+  }
+  .section-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.03); }
+  .section-card-title {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--hodari-blue);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .hf2-section { overflow: visible !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "users/_top_tabs.html" %}
+<div class="card" style="margin:0 auto; padding:0; overflow:hidden; border:none; box-shadow:0 10px 30px rgba(0,0,0,0.06); border-radius:16px">
+  <!-- Premium Header -->
+  <div style="background: linear-gradient(135deg, var(--hodari-blue) 0%, #1A237E 100%); padding:28px 36px; color:#fff">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:20px">
+      <div style="display:flex; align-items:center; gap:20px">
+        <!-- Avatar in header -->
+        <div style="width:56px; height:56px; border-radius:50%; overflow:hidden; background:rgba(255,255,255,0.12); border:2px solid rgba(255,255,255,0.2); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:800; color:#fff">
+          {% if object and object.profile_picture %}
+            <img src="{{ object.profile_picture.url }}" style="width:100%; height:100%; object-fit:cover">
+          {% else %}
+            {{ object.first_name|first|default:"N" }}{{ object.last_name|first|default:"A" }}
+          {% endif %}
+        </div>
+        <div>
+          <h1 style="font-size:22px; font-weight:800; margin:0; letter-spacing:-0.02em">
+            {% if object %}{{ object.get_full_name|default:object.username }}{% else %}Create New Account{% endif %}
+          </h1>
+          <p style="font-size:13px; color:rgba(255,255,255,0.65); margin-top:3px; font-weight:500">
+            {% if object %}
+              {{ object.get_role_display }} &middot; 
+              <span class="{% if object.is_active %}active{% else %}inactive{% endif %}" style="color:rgba(255,255,255,0.65)">
+                {{ object.is_active|yesno:"Active,Inactive" }}
+              </span>
+            {% else %}
+              Set up a new staff member's system access and profile
+            {% endif %}
+          </p>
+        </div>
+      </div>
+      {% if object %}
+      <div style="display:flex; gap:8px; align-items:center">
+        <button type="button" id="deactivateBtn"
+          style="padding:8px 16px; border-radius:10px; border:1.5px solid {{ object.is_active|yesno:'rgba(239,68,68,0.5),rgba(34,197,94,0.5)' }}; background:{{ object.is_active|yesno:'rgba(239,68,68,0.12),rgba(34,197,94,0.12)' }}; color:{{ object.is_active|yesno:'#FCA5A5,#86EFAC' }}; font-size:12px; font-weight:700; cursor:pointer; transition:all 0.2s; white-space:nowrap"
+          onclick="document.getElementById('id_is_active').checked = !document.getElementById('id_is_active').checked; this.style.display='none'; document.getElementById('deactivateConfirm').style.display='flex'">
+          {{ object.is_active|yesno:"Deactivate Account,Activate Account" }}
+        </button>
+        <div id="deactivateConfirm" style="display:none; align-items:center; gap:8px; font-size:12px; color:rgba(255,255,255,0.7)">
+          <span>{{ object.is_active|yesno:"Deactivate,Reactivate" }} this account?</span>
+          <span style="font-size:10px; color:rgba(255,255,255,0.4)">(save to confirm)</span>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+    <form method="post" enctype="multipart/form-data" style="background:#fff" onsubmit="var hj=document.getElementById('selected-terms-json');if(hj){var ap=document.querySelector('.term-pill[data-term-id=all]');if(ap&&ap.classList.contains('active')){hj.value=JSON.stringify(['all']);}else{var s2=document.getElementById('term-multi-select');var sv=[];if(s2){for(var i=0;i<s2.options.length;i++){if(s2.options[i].selected)sv.push(s2.options[i].value);}}hj.value=JSON.stringify(sv);}}">
+      {% csrf_token %}
+
+      <!-- Tabs -->
+      <div class="tab-bar" role="tablist">
+        <button type="button" class="tab-btn active" data-tab="tab-personal" role="tab" aria-selected="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Personal Details
+        </button>
+        <button type="button" class="tab-btn" data-tab="tab-employment" role="tab" aria-selected="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+          Employment Details
+        </button>
+        <button type="button" class="tab-btn" data-tab="tab-salary" role="tab" aria-selected="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          Salary &amp; Banking
+        </button>
+        <button type="button" class="tab-btn" data-tab="tab-assignments" role="tab" aria-selected="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+          User Role &amp; Teaching Assignments
+        </button>
+
+      </div>
+
+    <!--  TAB 1: PERSONAL DETAILS  -->
+    <div id="tab-personal" class="tab-content active" role="tabpanel">
+      <div class="section-card">
+        <div class="section-card-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Profile Photo
+        </div>
+        <!-- Profile picture upload area -->
+        <div class="avatar-upload-wrap" onclick="document.getElementById('id_profile_picture').click()">
+          <div class="avatar-circle" id="avatarPreview">
+            {% if object and object.profile_picture %}
+              <img src="{{ object.profile_picture.url }}" id="avatarImg" style="display:block">
+            {% endif %}
+            <div id="avatarInitials" style="display:{% if object and object.profile_picture %}none{% else %}flex{% endif %}; align-items:center; justify-content:center; width:100%; height:100%; font-size:28px; font-weight:800; color:#94A3B8">
+              {% if object %}{{ object.first_name|first|default:"" }}{{ object.last_name|first|default:"" }}{% else %}?{% endif %}
+            </div>
+          </div>
+          <div class="avatar-upload-hint">
+            <strong>Profile photo</strong><br>
+            <span id="avatarStatus">{% if object and object.profile_picture %}Click to change photo{% else %}Click to upload a photo (JPG, PNG). Max 2MB.{% endif %}</span>
+          </div>
+          <div style="display:none">{{ form.profile_picture }}</div>
+        </div>
+        {% for err in form.profile_picture.errors %}
+          <p style="color:#DC2626; font-size:12px; margin:8px 0 0 0; font-weight:500">{{ err }}</p>
+        {% endfor %}
+      </div>
+
+      <div class="section-card">
+        <div class="section-card-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          Identity and Contact
+        </div>
+        <div class="form-grid-2">
+          {% field form.username placeholder="e.g. j.doe" %}
+          {% field form.email placeholder="email@hodari.edu" %}
+        </div>
+        <div class="form-grid-2" style="margin-top:4px">
+          {% field form.first_name placeholder="First name" %}
+          {% field form.last_name placeholder="Last name" %}
+        </div>
+        {% if not object %}
+          <div style="margin-top:16px; max-width:320px">
+            {% field form.password placeholder="********" %}
+          </div>
+        {% else %}
+          {% if can_reset_password %}
+          <div style="margin-top:20px; padding:16px 20px; background:#FFF7ED; border:1px solid #FED7AA; border-radius:10px">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9A3412" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <span style="font-weight:700; font-size:13px; color:#9A3412">Reset Password</span>
+            </div>
+            <div style="max-width:320px">
+              {% field form.new_password placeholder="Enter new password" %}
+            </div>
+            <p style="font-size:11px; color:#92400E; margin:6px 0 0 0">Leave blank to keep the existing password. Must be at least 8 characters with at least one number.</p>
+          </div>
+          {% endif %}
+        {% endif %}
+      </div>
+
+      <div class="section-card">
+        <div class="section-card-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          Emergency Contact
+        </div>
+        <p style="font-size:13px; color:#64748B; margin:0 0 20px 0; line-height:1.5">
+          Who should we contact in case of an emergency involving this staff member?
+        </p>
+        <div class="form-grid-2">
+          {% field form.emergency_contact_name %}
+          {% field form.emergency_contact_phone %}
+        </div>
+        <div style="max-width:400px; margin-top:4px">
+          {% field form.emergency_contact_relationship %}
+          <div id="rel-other-wrap" style="margin-top:8px; display:none">
+            {% field form.emergency_contact_relationship_other %}
+          </div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-card-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+          Additional Personal Information
+        </div>
+        <div class="form-grid-2">
+          {% field form.marital_status %}
+          {% field form.residential_address %}
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-card-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l2 2"/></svg>
+          User Role
+        </div>
+        <p style="font-size:13px; color:#64748B; margin:0 0 20px 0; line-height:1.5">
+          Select the system role for this user. This determines their permissions and access level.
+        </p>
+        <div class="form-grid-2">
+          {% field form.role %}
+          <div id="staff-category-wrap" style="display:none">
+            {% field form.staff_category %}
+          </div>
+        </div>
+        {% if object %}
+        <div style="margin-top:16px; padding:14px 18px; background:#F0F4FB; border:1px solid #DBEAFE; border-radius:10px; display:flex; align-items:center; justify-content:space-between">
+          <div>
+            <div style="font-size:13px; font-weight:600; color:#1E40AF">Additional Roles</div>
+            <div style="font-size:11px; color:#60A5FA; margin-top:2px">Assign extra roles for additional permissions</div>
+          </div>
+          <button type="button" onclick="openRolesPanel({{ object.pk }})" style="padding:6px 16px; border-radius:8px; font-size:12px; font-weight:600; background:#2563EB; color:#fff; border:none; cursor:pointer; transition:all 0.15s">
+            Manage Roles
+          </button>
+        </div>
+        <div id="role-reason-wrap" style="display:none; margin-top:12px">
+          <label class="hf2-label" for="id_role_change_reason">Reason for Role Change <span style="color:#EF4444">*</span></label>
+          <textarea name="role_change_reason" id="id_role_change_reason" rows="2" class="hf2-input" placeholder="Enter the reason for this role change..." style="margin-top:6px"></textarea>
+          <p style="font-size:11px; color:#64748B; margin:4px 0 0 0">Required for audit trail. This will be logged.</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!--  TAB 2: EMPLOYMENT DETAILS  -->
+    <div id="tab-employment" class="tab-content" role="tabpanel">
+      <div class="section-card">
+        <div class="section-card-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+          Employment Information
+        </div>
+        <div class="form-grid-2">
+          {% field form.job_title %}
+          {% field form.employee_id hint="Auto-generated if left blank" %}
+        </div>
+        <div class="form-grid-3" style="margin-top:4px">
+          {% field form.employment_type %}
+          {% field form.employment_start_date %}
+          {% field form.probation_end_date %}
+        </div>
+        <div style="max-width:400px; margin-top:8px">
+          {% field form.contract_end_date hint="Leave blank if permanent. Used for renewal reminders." %}
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-card-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Personal Information
+        </div>
+        <div class="form-grid-3">
+          {% field form.gender %}
+          {% field form.date_of_birth %}
+          {% field form.nationality %}
+        </div>
+        <div class="form-grid-3" style="margin-top:4px">
+          {% field form.contact_phone %}
+          {% field form.years_of_experience %}
+          {% field form.highest_qualification %}
+        </div>
+      </div>
+    </div>
+
+    <!--  TAB 3: SALARY & BANKING (merged with Statutory)  -->
+    <div id="tab-salary" class="tab-content" role="tabpanel">
+      <div class="section-card">
+        <div class="section-card-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          Compensation and Allowances
+        </div>
+        <div class="form-grid-3">
+          {% field form.basic_salary %}
+          {% field form.housing_allowance %}
+          {% field form.transport_allowance %}
+        </div>
+        <div class="form-grid-3" style="margin-top:4px">
+          {% field form.medical_allowance %}
+          {% field form.other_allowances %}
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-card-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          Banking Details
+        </div>
+        <div class="form-grid-3">
+          {% field form.bank_name %}
+          {% field form.bank_account_number %}
+          {% field form.bank_branch %}
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-card-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Government and Statutory Registration
+        </div>
+        <p style="font-size:13px; color:#64748B; margin:0 0 20px 0; line-height:1.5">
+          Statutory registration numbers for tax, pension, and health insurance.
+        </p>
+        <div class="form-grid-3">
+          {% field form.nssf_number %}
+          {% field form.tin_number %}
+          {% field form.nhif_number %}
+        </div>
+        <div class="form-grid-2" style="margin-top:8px">
+          {% field form.confirmation_date %}
+        </div>
+      </div>
+    </div>
+
+    <!--  TAB 4: STAFF ROLE & TEACHING ASSIGNMENTS  -->
+    <div id="tab-assignments" class="tab-content" role="tabpanel">
+
+      <!-- Department & Teaching Assignments -->
+      <div class="section-card">
+        <div class="section-card-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Department &amp; Teaching Assignments
+        </div>
+        <div style="margin-top:20px; display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:start">
+          <div>
+            <label class="hf2-label">Departments</label>
+            <div id="dept-pills" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px">
+              {% for val, label in form.departments.field.choices %}
+              <button type="button" class="dept-pill" data-dept="{{ val }}"
+                style="padding:7px 16px; border-radius:99px; border:none; background:#f1f5f9; color:#475569; cursor:pointer; font-size:12px; font-weight:700; transition:all 0.15s; text-align:center">
+                {{ label }}
+              </button>
+              {% endfor %}
+            </div>
+            <select name="departments" id="dept-multi-select" multiple style="display:none">
+              {% for val, label in form.departments.field.choices %}
+              <option value="{{ val }}" {% if form.departments.initial and val in form.departments.initial %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          {% if form.assignment_term %}
+          <div id="teaching-assignments-section" style="display:none">
+            <label class="hf2-label">Academic Terms</label>
+            <div id="term-pills" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px">
+              <button type="button" id="repeat-pill" class="term-pill repeat-pill"
+                data-term-id="repeat"
+                style="padding:6px 14px; border-radius:99px; border:2px solid #D97706; background:{% if form.repeat_across_terms.value %}#D97706{% else %}%23FFFBEB{% endif %}; color:{% if form.repeat_across_terms.value %}#fff{% else %}%2392400E{% endif %}; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.15s; white-space:nowrap">
+                &#x2713; Repeat
+              </button>
+              <button type="button" class="term-pill" data-term-id="all"
+                style="padding:6px 14px; border-radius:99px; border:none; background:#f1f5f9; color:#475569; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.15s; white-space:nowrap">
+                All Terms
+              </button>
+              {% for term in available_terms %}
+              <button type="button" class="term-pill {% if term.pk in assigned_term_ids or term == current_term %}active{% endif %}" data-term-id="{{ term.pk }}"
+                style="padding:6px 14px; border-radius:99px; border:none; background:{% if term.pk in assigned_term_ids or term == current_term %}var(--hodari-blue, #2563EB){% else %}#f1f5f9{% endif %}; color:{% if term.pk in assigned_term_ids or term == current_term %}#fff{% else %}#475569{% endif %}; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.15s; white-space:nowrap">
+                {{ term.name }}
+                {% if term.start_date and term.end_date %}<span style="font-weight:400; opacity:0.7; margin-left:4px">({{ term.start_date|date:"M d" }} – {{ term.end_date|date:"M d" }})</span>{% endif %}
+              </button>
+              {% endfor %}
+            </div>
+            <select name="assignment_terms" id="term-multi-select" multiple style="display:none">
+              {% for term in available_terms %}
+              <option value="{{ term.pk }}" {% if term.pk in assigned_term_ids or term == current_term %}selected{% endif %}>{{ term.name }}</option>
+              {% endfor %}
+            </select>
+            <input type="hidden" name="selected_terms_json" id="selected-terms-json" value="">
+            <input type="hidden" name="repeat_across_terms" id="repeat-across-terms" value="{% if form.repeat_across_terms.value %}on{% endif %}">
+          </div>
+          {% endif %}
+        </div>
+
+        {% if form.teacher_role %}
+        <div id="teaching-details-section" style="display:none">
+
+          <div id="conflict-warnings" style="display:none; margin:16px 0; padding:12px 16px; background:#FFFBEB; border:1px solid #FDE68A; border-radius:8px; font-size:13px">
+            <div style="display:flex; align-items:start; gap:8px">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; margin-top:1px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <div>
+                <div style="font-weight:600; color:#92400E; margin-bottom:4px">Assignment Conflicts Detected</div>
+                <ul id="conflict-messages" style="margin:0; padding-left:16px; color:#78350F; line-height:1.6"></ul>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-top:16px; align-items:end">
+            <div>
+              <label class="hf2-label">Teacher Role</label>
+              {{ form.teacher_role }}
+            </div>
+            <div id="ct-class-wrap" style="display:none">
+              {% field form.class_teacher_class label="Class Teacher For" %}
+            </div>
+            <div id="ct-assistant-display" style="display:none; padding:10px 12px; background:#FFF7ED; border:1px solid #FED7AA; border-radius:6px; font-size:14px; min-height:42px; box-sizing:border-box; display:flex; align-items:center">
+              <span style="font-weight:600; color:#9A3412">Assistant:</span>
+              <span id="ct-assistant-name" style="color:#7C2D12; margin-left:6px">—</span>
+            </div>
+            <div id="asst-class-teacher-display" style="display:none; padding:10px 12px; background:#F0F9FF; border:1px solid #BAE6FD; border-radius:6px; font-size:14px; min-height:42px; box-sizing:border-box; display:flex; align-items:center">
+              <span style="font-weight:600; color:#0369A1">Class Teacher:</span>
+              <span id="asst-class-teacher-name" style="color:#0C4A6E; margin-left:6px">—</span>
+            </div>
+          </div>
+
+          <div style="border-top:1px solid #E8EDF5; margin:20px 0"></div>
+
+          <div style="margin-bottom:16px">
+            <div style="font-weight:600; font-size:13px; color:var(--text-primary); margin-bottom:10px">Teaching Classes</div>
+            <div id="class-pills" style="display:flex; flex-wrap:wrap; gap:6px">
+              {% for item in class_items_list %}
+              <button type="button" class="class-pill" data-class-id="{{ item.id }}" data-dept="{{ item.dept }}"
+                style="padding:6px 12px; border-radius:99px; border:none; background:#f1f5f9; color:#475569; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.15s; white-space:nowrap">
+                {{ item.name }}
+              </button>
+              {% endfor %}
+            </div>
+            <select name="teaching_classes" id="class-multi-select" multiple style="display:none">
+              {% for item in class_items_list %}
+              <option value="{{ item.id }}" {% if form.teaching_classes and item.id in form.teaching_classes.value %}selected{% endif %}>{{ item.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div id="subjects-grid-wrap" style="display:none; margin-top:16px">
+            <div style="font-weight:600; font-size:13px; color:var(--text-primary); margin-bottom:10px">Subjects per Class</div>
+            <div style="overflow-x:auto; border:1px solid #E8EDF5; border-radius:10px">
+              <table id="subjects-grid" style="width:100%; border-collapse:collapse; font-size:12px">
+                <thead id="subjects-grid-head"></thead>
+                <tbody id="subjects-grid-body"></tbody>
+              </table>
+            </div>
+            <div id="no-subjects-msg" style="display:none; margin-top:8px">
+              {% include '_partials/empty_state.html' with title='No subjects available for selected classes' desc='Create subjects to assign them to teachers.' icon='doc' icon_color='grey' action_url='/academics/subjects/' action_text='Create Subject' %}
+            </div>
+          </div>
+          <input type="hidden" name="class_subjects_json" id="class-subjects-json" value="{{ initial_class_subjects_json|default:'{}' }}">
+          <select name="subjects_taught" id="subject-multi-select" multiple style="display:none">
+            {% if form.subjects_taught %}
+            {% for val, label in form.subjects_taught.field.choices %}
+            <option value="{{ val }}" {% if val in form.subjects_taught.value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+            {% endif %}
+          </select>
+
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+
+    <div style="display:none">{{ form.is_active }}</div>
+
+    <!-- Footer Actions -->
+    <div style="padding:20px 40px; border-top:1px solid #E8EDF5; background:#FAFBFC; display:flex; justify-content:space-between; align-items:center">
+      <div style="font-size:12px; color:#94A3B8">
+        {% if object %}
+          User ID: <strong>{{ object.id }}</strong> &middot; Created: <strong>{{ object.date_joined|date:"M j, Y" }}</strong>
+        {% endif %}
+      </div>
+      <div style="display:flex; gap:12px; align-items:center">
+        <a href="{% url 'users:user_list' %}" class="hf-btn hf-btn-secondary" style="text-decoration:none; display:flex; align-items:center; padding:10px 24px">Cancel</a>
+        {% if not object %}
+          <button type="submit" name="action" value="skip" class="hf-btn hf-btn-secondary" style="padding:10px 24px; height:42px; display:flex; align-items:center; gap:8px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            Create &amp; Start Onboarding
+          </button>
+        {% elif object.staff_profile %}
+          <a href="{% url 'hr:onboarding_tabbed' pk=object.staff_profile.pk %}" class="hf-btn {% if object.staff_profile.onboarding_completed %}hf-btn-disabled{% else %}hf-btn-secondary{% endif %}" style="text-decoration:none; display:flex; align-items:center; padding:10px 24px; height:42px; gap:8px; {% if object.staff_profile.onboarding_completed %}pointer-events:none; opacity:0.5{% endif %}" title="{% if object.staff_profile.onboarding_completed %}Onboarding already completed{% else %}Continue with onboarding setup{% endif %}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            {% if object.staff_profile.onboarding_completed %}Onboarding Done{% else %}Go to Onboarding{% endif %}
+          </a>
+        {% endif %}
+        <button type="submit" name="action" value="create" class="hf-btn hf-btn-primary" style="padding:10px 32px; height:42px; display:flex; align-items:center; gap:8px; min-width:140px; justify-content:center">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></polyline></svg>
+          {% if object %}Update Account{% else %}Create Account{% endif %}
+        </button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    /*  Tab switching  */
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = {
+        'tab-personal': document.getElementById('tab-personal'),
+        'tab-employment': document.getElementById('tab-employment'),
+        'tab-salary': document.getElementById('tab-salary'),
+        'tab-assignments': document.getElementById('tab-assignments'),
+    };
+
+    /*  Open tab from URL hash on load  */
+    var hashTab = location.hash.replace('#', '');
+    if (hashTab && tabContents[hashTab]) {
+        var targetBtn = document.querySelector('[data-tab="' + hashTab + '"]');
+        if (targetBtn) targetBtn.click();
+    }
+
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const tabId = this.getAttribute('data-tab');
+            tabBtns.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); });
+            this.classList.add('active');
+            this.setAttribute('aria-selected', 'true');
+            Object.entries(tabContents).forEach(([id, el]) => {
+                if (el) el.classList.toggle('active', id === tabId);
+            });
+        });
+    });
+
+    /*  Skip button: remove required from staff fields so HTML5 validation passes  */
+    var skipBtn = document.querySelector('button[name="action"][value="skip"]');
+    if (skipBtn) {
+        skipBtn.addEventListener('click', function() {
+            var staffFields = ['id_departments', 'id_job_title', 'id_employee_id', 'id_contact_phone', 'id_national_id_number'];
+            staffFields.forEach(function(name) {
+                var el = document.querySelector('[name="' + name + '"]');
+                if (el) { el.removeAttribute('required'); el.setCustomValidity(''); }
+            });
+        });
+    }
+
+    /*  Profile picture upload preview  */
+    const fileInput = document.getElementById('id_profile_picture');
+    const avatarImg = document.getElementById('avatarImg');
+    const avatarInitials = document.getElementById('avatarInitials');
+    const avatarStatus = document.getElementById('avatarStatus');
+
+    if (fileInput) {
+        fileInput.addEventListener('change', function() {
+            if (this.files && this.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    if (avatarImg) {
+                        avatarImg.src = e.target.result;
+                        avatarImg.style.display = 'block';
+                    }
+                    if (avatarInitials) avatarInitials.style.display = 'none';
+                    if (avatarStatus) {
+                        avatarStatus.innerText = 'Selected: ' + fileInput.files[0].name;
+                        avatarStatus.style.color = '#10B981';
+                    }
+                };
+                reader.readAsDataURL(this.files[0]);
+            }
+        });
+    }
+
+    /*  User type (teaching/non-teaching) — always visible  */
+    const staffCategoryWrap = document.getElementById('staff-category-wrap');
+    if (staffCategoryWrap) staffCategoryWrap.style.display = 'block';
+
+    /*  Show/hide Teaching Assignments based on role + staff category  */
+    const TEACHING_ROLES = ['teacher', 'head_of_school', 'primary_hod', 'ecd_hod', 'lower_secondary_hod'];
+    const teachingSection = document.getElementById('teaching-assignments-section');
+    const roleSelect2 = document.querySelector('[name="role"]');
+    const staffCatSelect = document.querySelector('[name="staff_category"]');
+
+    function clearTeachingFields() {
+        var tr = document.querySelector('[name="teacher_role"]');
+        if (tr) tr.value = 'normal';
+        var ct = document.querySelector('[name="class_teacher_class"]');
+        if (ct) ct.value = '';
+        var classSel = document.getElementById('class-multi-select');
+        if (classSel) { for (var i = 0; i < classSel.options.length; i++) classSel.options[i].selected = false; }
+        document.querySelectorAll('.class-pill').forEach(function(p) {
+            p.style.background = '#f1f5f9'; p.style.color = '#475569'; p.classList.remove('active');
+        });
+        var jsonInput = document.getElementById('class-subjects-json');
+        if (jsonInput) jsonInput.value = '';
+        var gridWrap = document.getElementById('subjects-grid-wrap');
+        if (gridWrap) gridWrap.style.display = 'none';
+        var ctw = document.getElementById('ct-class-wrap');
+        if (ctw) ctw.style.display = 'none';
+        var asst = document.getElementById('asst-class-teacher-display');
+        if (asst) asst.style.display = 'none';
+        var ctAsst = document.getElementById('ct-assistant-display');
+        if (ctAsst) ctAsst.style.display = 'none';
+        filterSubjectsByDepartment();
+    }
+
+    function updateTeachingVisibility() {
+        if (!teachingSection || !roleSelect2) return;
+        var isTeaching = TEACHING_ROLES.indexOf(roleSelect2.value) !== -1;
+        var staffCatWrap = document.getElementById('staff-category-wrap');
+        var staffCatVisible = staffCatWrap && staffCatWrap.style.display !== 'none';
+        var staffCat = staffCatSelect ? staffCatSelect.value : '';
+        if (staffCatVisible && staffCat === 'non_teaching') isTeaching = false;
+        var teachingDetails = document.getElementById('teaching-details-section');
+        if (isTeaching) {
+            teachingSection.style.display = '';
+            if (teachingDetails) teachingDetails.style.display = '';
+            filterClassesByDepartment();
+            filterSubjectsByDepartment();
+            updateClassTeacherVisibility();
+        } else {
+            teachingSection.style.display = 'none';
+            if (teachingDetails) teachingDetails.style.display = 'none';
+            clearTeachingFields();
+        }
+    }
+
+    if (roleSelect2) {
+        var originalRole = roleSelect2.value;
+        roleSelect2.addEventListener('change', function() {
+            updateTeachingVisibility();
+            autoSelectDeptsForRole(this.value, true);
+            var reasonWrap = document.getElementById('role-reason-wrap');
+            if (reasonWrap) {
+                reasonWrap.style.display = this.value !== originalRole ? 'block' : 'none';
+            }
+        });
+    }
+    if (staffCatSelect) {
+        staffCatSelect.addEventListener('change', updateTeachingVisibility);
+    }
+
+    /*  Auto-select departments based on role  */
+    var ROLE_DEPTS = {{ role_depts_json|safe }};
+    function autoSelectDeptsForRole(role, force) {
+        var target = ROLE_DEPTS[role];
+        var sel = document.getElementById('dept-multi-select');
+        if (!sel) return;
+        if (!target) target = [];
+        // Skip if departments already set (e.g. existing user loading form)
+        if (!force) {
+            var anySelected = false;
+            for (var i = 0; i < sel.options.length; i++) {
+                if (sel.options[i].selected) { anySelected = true; break; }
+            }
+            if (anySelected) return;
+        }
+        // Set the hidden select
+        for (var i = 0; i < sel.options.length; i++) {
+            sel.options[i].selected = target.indexOf(sel.options[i].value) !== -1;
+        }
+        // Update pill UI
+        var pills = document.querySelectorAll('.dept-pill');
+        pills.forEach(function(p) {
+            var d = p.getAttribute('data-dept');
+            var isActive = target.indexOf(d) !== -1;
+            p.classList.toggle('active', isActive);
+            p.style.background = isActive ? 'var(--hodari-blue, #2563EB)' : '#f1f5f9';
+            p.style.color = isActive ? '#fff' : '#475569';
+        });
+        filterClassesByDepartment();
+        filterSubjectsByDepartment();
+        updateClassTeacherVisibility();
+    }
+
+    /*  Teaching Assignments: department-based class/subject filtering  */
+    const classDepts = {{ class_depts_json|default:"{}"|safe }};
+    const deptSubjects = {{ dept_subjects_json|default:"{}"|safe }};
+    const classSubjects = {{ class_subjects_json|default:"{}"|safe }};
+    const classTeachers = {{ class_teachers_json|default:"{}"|safe }};
+    const assistantTeachers = {{ assistant_class_teachers_json|default:"{}"|safe }};
+    const subjectColors = {{ subject_colors_json|default:"{}"|safe }};
+    const deptSelect2 = document.querySelector('[name="departments"]');
+    /*  Re-run visibility now that dept data is available  */
+    updateTeachingVisibility();
+
+    /*  Department pills — init state + click handlers  */
+    (function initPills() {
+        var sel = document.getElementById('dept-multi-select');
+        if (!sel) return;
+        var pills = document.querySelectorAll('.dept-pill');
+        pills.forEach(function(p) {
+            var dept = p.getAttribute('data-dept');
+            for (var i = 0; i < sel.options.length; i++) {
+                if (sel.options[i].value === dept && sel.options[i].selected) {
+                    p.classList.add('active');
+                    p.style.background = 'var(--hodari-blue, #2563EB)';
+                    p.style.color = '#fff';
+                    break;
+                }
+            }
+            p.addEventListener('mouseenter', function() {
+                if (!this.classList.contains('active')) {
+                    this.style.background = '#e2e8f0';
+                }
+            });
+            p.addEventListener('mouseleave', function() {
+                if (!this.classList.contains('active')) {
+                    this.style.background = '#f1f5f9';
+                }
+            });
+            p.addEventListener('click', function() {
+                var d = this.getAttribute('data-dept');
+                var s = document.getElementById('dept-multi-select');
+                if (!s) return;
+                for (var j = 0; j < s.options.length; j++) {
+                    if (s.options[j].value === d) {
+                        s.options[j].selected = !s.options[j].selected;
+                        break;
+                    }
+                }
+                this.classList.toggle('active');
+                if (this.classList.contains('active')) {
+                    this.style.background = 'var(--hodari-blue, #2563EB)';
+                    this.style.color = '#fff';
+                } else {
+                    this.style.background = '#f1f5f9';
+                    this.style.color = '#475569';
+                }
+                filterClassesByDepartment();
+                filterSubjectsByDepartment();
+                updateClassTeacherVisibility();
+            });
+        });
+    })();
+
+    /*  Class pills — init state + click handlers  */
+    (function initClassPills() {
+        var sel = document.getElementById('class-multi-select');
+        if (!sel) return;
+        document.querySelectorAll('.class-pill').forEach(function(pill) {
+            var cid = pill.getAttribute('data-class-id');
+            for (var i = 0; i < sel.options.length; i++) {
+                if (sel.options[i].value === cid && sel.options[i].selected) {
+                    pill.classList.add('active');
+                    pill.style.background = 'var(--hodari-blue, #2563EB)';
+                    pill.style.color = '#fff';
+                    break;
+                }
+            }
+            pill.addEventListener('mouseenter', function() {
+                if (!this.classList.contains('active')) this.style.background = '#e2e8f0';
+            });
+            pill.addEventListener('mouseleave', function() {
+                if (!this.classList.contains('active')) this.style.background = '#f1f5f9';
+            });
+            pill.addEventListener('click', function() {
+                var id = this.getAttribute('data-class-id');
+                for (var j = 0; j < sel.options.length; j++) {
+                    if (sel.options[j].value === id) {
+                        sel.options[j].selected = !sel.options[j].selected;
+                        break;
+                    }
+                }
+                this.classList.toggle('active');
+                if (this.classList.contains('active')) {
+                    this.style.background = 'var(--hodari-blue, #2563EB)';
+                    this.style.color = '#fff';
+                } else {
+                    this.style.background = '#f1f5f9';
+                    this.style.color = '#475569';
+                }
+                filterSubjectsByDepartment();
+            });
+        });
+    })();
+
+    /*  Term pills — init state + click handlers  */
+    (function initTermPills() {
+        var sel = document.getElementById('term-multi-select');
+        if (!sel) return;
+        var hiddenJson = document.getElementById('selected-terms-json');
+        var repeatHidden = document.getElementById('repeat-across-terms');
+        var repeatPill = document.getElementById('repeat-pill');
+        var allPills = document.querySelectorAll('.term-pill');
+
+        function setRepeatPill(active) {
+            if (!repeatPill) return;
+            if (active) {
+                repeatPill.classList.add('active');
+                repeatPill.style.background = '#D97706';
+                repeatPill.style.color = '#fff';
+                repeatPill.style.borderColor = '#D97706';
+                if (repeatHidden) repeatHidden.value = 'on';
+            } else {
+                repeatPill.classList.remove('active');
+                repeatPill.style.background = '#FFFBEB';
+                repeatPill.style.color = '#92400E';
+                repeatPill.style.borderColor = '#D97706';
+                if (repeatHidden) repeatHidden.value = '';
+            }
+        }
+
+        function syncTermsToHidden() {
+            var repeatActive = repeatPill && repeatPill.classList.contains('active');
+            if (repeatActive) {
+                if (hiddenJson) hiddenJson.value = JSON.stringify(["all"]);
+                return;
+            }
+            var selected = [];
+            for (var i = 0; i < sel.options.length; i++) {
+                if (sel.options[i].selected) selected.push(sel.options[i].value);
+            }
+            if (hiddenJson) hiddenJson.value = JSON.stringify(selected);
+            var allPill = document.querySelector('.term-pill[data-term-id="all"]');
+            if (allPill && allPill.classList.contains('active')) {
+                if (hiddenJson) hiddenJson.value = JSON.stringify(["all"]);
+            }
+        }
+        window.syncTermsToHidden = syncTermsToHidden;
+
+        function activateAllTerms() {
+            for (var i = 0; i < sel.options.length; i++) {
+                sel.options[i].selected = true;
+            }
+            allPills.forEach(function(p) {
+                var tid = p.getAttribute('data-term-id');
+                if (tid !== 'all' && tid !== 'repeat') {
+                    p.classList.add('active');
+                    p.style.background = 'var(--hodari-blue, #2563EB)';
+                    p.style.color = '#fff';
+                }
+            });
+            var allBtn = document.querySelector('.term-pill[data-term-id="all"]');
+            if (allBtn) {
+                allBtn.classList.add('active');
+                allBtn.style.background = 'var(--hodari-blue, #2563EB)';
+                allBtn.style.color = '#fff';
+            }
+        }
+
+        function deactivateAllTerms() {
+            for (var i = 0; i < sel.options.length; i++) {
+                sel.options[i].selected = false;
+            }
+            allPills.forEach(function(p) {
+                var tid = p.getAttribute('data-term-id');
+                if (tid !== 'all' && tid !== 'repeat') {
+                    p.classList.remove('active');
+                    p.style.background = '#f1f5f9';
+                    p.style.color = '#475569';
+                }
+            });
+            var allBtn = document.querySelector('.term-pill[data-term-id="all"]');
+            if (allBtn) {
+                allBtn.classList.remove('active');
+                allBtn.style.background = '#f1f5f9';
+                allBtn.style.color = '#475569';
+            }
+        }
+
+        /* Init repeat pill state */
+        if (repeatHidden && repeatHidden.value === 'on') {
+            setRepeatPill(true);
+            activateAllTerms();
+        }
+
+        allPills.forEach(function(pill) {
+            var tid = pill.getAttribute('data-term-id');
+
+            /* Skip "repeat" pill — handled separately */
+            if (tid === 'repeat') return;
+
+            /* Init active state from select */
+            if (tid === 'all') {
+                var allSelected = true;
+                for (var i = 0; i < sel.options.length; i++) {
+                    if (!sel.options[i].selected) { allSelected = false; break; }
+                }
+                if (allSelected && sel.options.length > 0) {
+                    pill.classList.add('active');
+                    pill.style.background = 'var(--hodari-blue, #2563EB)';
+                    pill.style.color = '#fff';
+                }
+            } else {
+                for (var i = 0; i < sel.options.length; i++) {
+                    if (sel.options[i].value === tid && sel.options[i].selected) {
+                        pill.classList.add('active');
+                        pill.style.background = 'var(--hodari-blue, #2563EB)';
+                        pill.style.color = '#fff';
+                        break;
+                    }
+                }
+            }
+
+            pill.addEventListener('mouseenter', function() {
+                if (!this.classList.contains('active')) this.style.background = '#e2e8f0';
+            });
+            pill.addEventListener('mouseleave', function() {
+                if (!this.classList.contains('active')) this.style.background = '#f1f5f9';
+            });
+            pill.addEventListener('click', function() {
+                var id = this.getAttribute('data-term-id');
+
+                if (id === 'all') {
+                    var activate = !this.classList.contains('active');
+                    for (var i = 0; i < sel.options.length; i++) {
+                        sel.options[i].selected = activate;
+                    }
+                    allPills.forEach(function(p) {
+                        var t = p.getAttribute('data-term-id');
+                        if (t !== 'all' && t !== 'repeat') {
+                            p.classList.toggle('active', activate);
+                            p.style.background = activate ? 'var(--hodari-blue, #2563EB)' : '#f1f5f9';
+                            p.style.color = activate ? '#fff' : '#475569';
+                        }
+                    });
+                    this.classList.toggle('active', activate);
+                    this.style.background = activate ? 'var(--hodari-blue, #2563EB)' : '#f1f5f9';
+                    this.style.color = activate ? '#fff' : '#475569';
+                    /* Deactivate repeat when manually toggling All Terms */
+                    setRepeatPill(false);
+                } else {
+                    for (var j = 0; j < sel.options.length; j++) {
+                        if (sel.options[j].value === id) {
+                            sel.options[j].selected = !sel.options[j].selected;
+                            break;
+                        }
+                    }
+                    this.classList.toggle('active');
+                    if (this.classList.contains('active')) {
+                        this.style.background = 'var(--hodari-blue, #2563EB)';
+                        this.style.color = '#fff';
+                    } else {
+                        this.style.background = '#f1f5f9';
+                        this.style.color = '#475569';
+                    }
+                    var allTermPill = document.querySelector('.term-pill[data-term-id="all"]');
+                    var allSelected = true;
+                    for (var k = 0; k < sel.options.length; k++) {
+                        if (!sel.options[k].selected) { allSelected = false; break; }
+                    }
+                    if (allTermPill) {
+                        allTermPill.classList.toggle('active', allSelected);
+                        allTermPill.style.background = allSelected ? 'var(--hodari-blue, #2563EB)' : '#f1f5f9';
+                        allTermPill.style.color = allSelected ? '#fff' : '#475569';
+                    }
+                    /* Deactivate repeat when manually selecting individual terms */
+                    setRepeatPill(false);
+                }
+                syncTermsToHidden();
+                scheduleConflictCheck();
+            });
+        });
+
+        /* Repeat pill click handler */
+        if (repeatPill) {
+            repeatPill.addEventListener('mouseenter', function() {
+                if (!this.classList.contains('active')) this.style.background = '#FEF3C7';
+            });
+            repeatPill.addEventListener('mouseleave', function() {
+                if (!this.classList.contains('active')) this.style.background = '#FFFBEB';
+            });
+            repeatPill.addEventListener('click', function() {
+                var isActive = this.classList.contains('active');
+                if (isActive) {
+                    setRepeatPill(false);
+                    deactivateAllTerms();
+                } else {
+                    setRepeatPill(true);
+                    activateAllTerms();
+                }
+                syncTermsToHidden();
+                scheduleConflictCheck();
+            });
+        }
+
+        syncTermsToHidden();
+    })();
+
+    /*  Conflict checking — debounced AJAX call  */
+    var conflictCheckTimer = null;
+    function scheduleConflictCheck() {
+        if (conflictCheckTimer) clearTimeout(conflictCheckTimer);
+        conflictCheckTimer = setTimeout(runConflictCheck, 500);
+    }
+
+    function runConflictCheck() {
+        var teacherId = '{{ object.staff_profile.pk|default:"" }}';
+        if (!teacherId) return;
+
+        var termSel = document.getElementById('term-multi-select');
+        var classSel = document.getElementById('class-multi-select');
+        var jsonInput = document.getElementById('class-subjects-json');
+        if (!termSel || !classSel) return;
+
+        var termIds = [];
+        for (var i = 0; i < termSel.options.length; i++) {
+            if (termSel.options[i].selected) termIds.push(parseInt(termSel.options[i].value));
+        }
+        var classIds = [];
+        for (var j = 0; j < classSel.options.length; j++) {
+            if (classSel.options[j].selected) classIds.push(parseInt(classSel.options[j].value));
+        }
+        var perClassSubjects = {};
+        if (jsonInput && jsonInput.value) {
+            try { perClassSubjects = JSON.parse(jsonInput.value); } catch(e) {}
+        }
+
+        if (!termIds.length || !classIds.length) {
+            document.getElementById('conflict-warnings').style.display = 'none';
+            return;
+        }
+
+        var csrfToken = '{{ csrf_token }}';
+        fetch('{% url "users:assignment_conflict_check" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                teacher_id: parseInt(teacherId),
+                term_ids: termIds,
+                class_ids: classIds,
+                per_class_subjects: perClassSubjects
+            })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var warnings = data.warnings || [];
+            var banner = document.getElementById('conflict-warnings');
+            var list = document.getElementById('conflict-messages');
+            if (warnings.length === 0) {
+                banner.style.display = 'none';
+                return;
+            }
+            list.innerHTML = '';
+            warnings.forEach(function(w) {
+                var li = document.createElement('li');
+                li.textContent = w.message;
+                list.appendChild(li);
+            });
+            banner.style.display = 'block';
+        })
+        .catch(function() {
+            document.getElementById('conflict-warnings').style.display = 'none';
+        });
+    }
+
+    // Watch for class/subject changes to trigger conflict check
+    var classPillContainer = document.getElementById('class-pills');
+    if (classPillContainer) {
+        classPillContainer.addEventListener('click', function() {
+            setTimeout(scheduleConflictCheck, 100);
+        });
+    }
+
+    /*  Subjects grid — builds a table with classes as rows, subjects as columns  */
+    function buildSubjectsGrid() {
+        var classSel = document.getElementById('class-multi-select');
+        var wrap = document.getElementById('subjects-grid-wrap');
+        var head = document.getElementById('subjects-grid-head');
+        var body = document.getElementById('subjects-grid-body');
+        var jsonInput = document.getElementById('class-subjects-json');
+        if (!classSel || !wrap || !head || !body) return;
+
+        var selectedClasses = [];
+        for (var i = 0; i < classSel.options.length; i++) {
+            if (classSel.options[i].selected) selectedClasses.push(classSel.options[i].value);
+        }
+
+        if (selectedClasses.length === 0) {
+            wrap.style.display = 'none';
+            if (jsonInput) jsonInput.value = '';
+            return;
+        }
+
+        /* Collect all allowed subjects from selected classes + departments */
+        var allowedSubjects = [];
+        for (var i = 0; i < selectedClasses.length; i++) {
+            var subs = classSubjects[selectedClasses[i]] || [];
+            for (var j = 0; j < subs.length; j++) {
+                if (allowedSubjects.indexOf(subs[j]) === -1) allowedSubjects.push(subs[j]);
+            }
+        }
+        var depts = getSelectedDepts();
+        var TEACHING_DEPTS2 = ['ECD', 'PRIMARY', 'LOWER_SECONDARY'];
+        var teachingDepts = depts.filter(function(d) { return TEACHING_DEPTS2.indexOf(d) !== -1; });
+        if (teachingDepts.length > 0) {
+            allowedSubjects = allowedSubjects.filter(function(s) {
+                for (var d = 0; d < teachingDepts.length; d++) {
+                    if ((deptSubjects[teachingDepts[d]] || []).indexOf(s) !== -1) return true;
+                }
+                return false;
+            });
+        }
+        allowedSubjects.sort();
+
+        var msg = document.getElementById('no-subjects-msg');
+        if (allowedSubjects.length === 0) {
+            wrap.style.display = '';
+            head.innerHTML = '';
+            body.innerHTML = '';
+            if (msg) msg.style.display = '';
+            return;
+        }
+        if (msg) msg.style.display = 'none';
+
+        /* Build header row */
+        var headHtml = '<tr><th style="text-align:left;padding:10px 12px;font-size:12px;font-weight:600;color:var(--text-secondary);border-bottom:1px solid #E8EDF5;min-width:140px;position:sticky;left:0;background:#fff;z-index:1">Class</th>';
+        for (var s = 0; s < allowedSubjects.length; s++) {
+            var subj = allowedSubjects[s];
+            var color = subjectColors[subj] || '#023AA5';
+            headHtml += '<th style="text-align:center;padding:8px 6px;border-bottom:1px solid #E8EDF5;white-space:nowrap"><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:' + color + ';flex-shrink:0"></span><span style="font-weight:600;font-size:11px;color:var(--text-primary)">' + subj + '</span></span></th>';
+        }
+        headHtml += '</tr>';
+        head.innerHTML = headHtml;
+
+        /* Build body rows — one per selected class */
+        var bodyHtml = '';
+        for (var c = 0; c < selectedClasses.length; c++) {
+            var cid = selectedClasses[c];
+            var classSubs = classSubjects[cid] || [];
+            var className = '';
+            var opts = classSel.options;
+            for (var o = 0; o < opts.length; o++) {
+                if (opts[o].value === cid) { className = opts[o].text; break; }
+            }
+            bodyHtml += '<tr data-class-id="' + cid + '">';
+            bodyHtml += '<td style="padding:10px 12px;font-weight:600;font-size:12px;color:var(--text-primary);border-bottom:1px solid #F1F5F9;position:sticky;left:0;background:#fff;z-index:1">' + className + '</td>';
+            for (var s = 0; s < allowedSubjects.length; s++) {
+                var subj = allowedSubjects[s];
+                var isAvailable = classSubs.indexOf(subj) !== -1;
+                var isChecked = isAvailable && classSubs.indexOf(subj) !== -1;
+                var color = subjectColors[subj] || '#023AA5';
+                if (isAvailable) {
+                    bodyHtml += '<td style="text-align:center;padding:6px;border-bottom:1px solid #F1F5F9"><label style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;border:1.5px solid #E2E8F0;transition:all 0.15s" class="grid-cell" data-class="' + cid + '" data-subject="' + subj + '" data-color="' + color + '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="' + color + '" stroke-width="2.5" style="opacity:0;pointer-events:none"><path d="M20 6L9 17l-5-5"/></svg></label></td>';
+                } else {
+                    bodyHtml += '<td style="text-align:center;padding:6px;border-bottom:1px solid #F1F5F9"><span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;border:1.5px dashed #E2E8F0;color:#CBD5E1">-</span></td>';
+                }
+            }
+            bodyHtml += '</tr>';
+        }
+        body.innerHTML = bodyHtml;
+
+        /* Restore previously checked cells from hidden input */
+        if (jsonInput && jsonInput.value) {
+            try {
+                var saved = JSON.parse(jsonInput.value);
+                document.querySelectorAll('.grid-cell.checked').forEach(function(c) { c.classList.remove('checked'); c.style.border = '1.5px solid #E2E8F0'; c.style.background = 'transparent'; c.querySelector('svg').style.opacity = '0'; });
+                for (var cid in saved) {
+                    var subs = saved[cid] || [];
+                    for (var si = 0; si < subs.length; si++) {
+                        var cell = document.querySelector('.grid-cell[data-class="' + cid + '"][data-subject="' + subs[si] + '"]');
+                        if (cell) {
+                            cell.classList.add('checked');
+                            cell.style.border = '1.5px solid ' + cell.getAttribute('data-color');
+                            cell.style.background = cell.getAttribute('data-color') + '12';
+                            cell.querySelector('svg').style.opacity = '1';
+                        }
+                    }
+                }
+            } catch(e) {}
+        } else {
+            /* Pre-check: class subjects that match available subjects */
+            for (var c = 0; c < selectedClasses.length; c++) {
+                var cid = selectedClasses[c];
+                var classSubs = classSubjects[cid] || [];
+                for (var si = 0; si < classSubs.length; si++) {
+                    var cell = document.querySelector('.grid-cell[data-class="' + cid + '"][data-subject="' + classSubs[si] + '"]');
+                    if (cell) {
+                        cell.classList.add('checked');
+                        cell.style.border = '1.5px solid ' + cell.getAttribute('data-color');
+                        cell.style.background = cell.getAttribute('data-color') + '12';
+                        cell.querySelector('svg').style.opacity = '1';
+                    }
+                }
+            }
+            syncGridToJson();
+        }
+
+        wrap.style.display = '';
+    }
+
+    function toggleGridCell(cell) {
+        cell.classList.toggle('checked');
+        var color = cell.getAttribute('data-color') || '#2563EB';
+        if (cell.classList.contains('checked')) {
+            cell.style.border = '1.5px solid ' + color;
+            cell.style.background = color + '12';
+            cell.querySelector('svg').style.opacity = '1';
+        } else {
+            cell.style.border = '1.5px solid #E2E8F0';
+            cell.style.background = 'transparent';
+            cell.querySelector('svg').style.opacity = '0';
+        }
+        syncGridToJson();
+    }
+
+    function syncGridToJson() {
+        var mapping = {};
+        document.querySelectorAll('.grid-cell.checked').forEach(function(cell) {
+            var cid = cell.getAttribute('data-class');
+            var subj = cell.getAttribute('data-subject');
+            if (!mapping[cid]) mapping[cid] = [];
+            mapping[cid].push(subj);
+        });
+        var jsonInput = document.getElementById('class-subjects-json');
+        if (jsonInput) jsonInput.value = JSON.stringify(mapping);
+    }
+
+    /* Event delegation for subject grid cells */
+    var gridBody = document.getElementById('subjects-grid-body');
+    if (gridBody) {
+        gridBody.addEventListener('click', function(e) {
+            var cell = e.target.closest('.grid-cell');
+            if (cell) { e.preventDefault(); toggleGridCell(cell); }
+        });
+        gridBody.addEventListener('mouseover', function(e) {
+            var cell = e.target.closest('.grid-cell');
+            if (cell && !cell.classList.contains('checked')) cell.style.background = '#F1F5F9';
+        });
+        gridBody.addEventListener('mouseout', function(e) {
+            var cell = e.target.closest('.grid-cell');
+            if (cell && !cell.classList.contains('checked')) cell.style.background = 'transparent';
+        });
+    }
+
+    /* Auto-select depts on load if role is set and none chosen */
+    if (roleSelect2 && roleSelect2.value) {
+        autoSelectDeptsForRole(roleSelect2.value);
+    }
+
+    function getSelectedDepts() {
+        var sel = document.querySelector('[name="departments"]');
+        if (!sel) return [];
+        var result = [];
+        for (var i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].selected) result.push(sel.options[i].value);
+        }
+        return result;
+    }
+
+    function filterClassesByDepartment() {
+        var depts = getSelectedDepts();
+        var TEACHING_DEPTS = ['ECD', 'PRIMARY', 'LOWER_SECONDARY'];
+        var teachingDepts = depts.filter(function(d) { return TEACHING_DEPTS.indexOf(d) !== -1; });
+        document.querySelectorAll('.class-pill').forEach(function(pill) {
+            var itemDept = pill.getAttribute('data-dept') || '';
+            var show = teachingDepts.length === 0 || teachingDepts.indexOf(itemDept) !== -1;
+            if (show) {
+                pill.style.display = '';
+            } else {
+                pill.style.display = 'none';
+                pill.classList.remove('active');
+                pill.style.background = '#f1f5f9';
+                pill.style.color = '#475569';
+                var classSel = document.getElementById('class-multi-select');
+                if (classSel) {
+                    for (var i = 0; i < classSel.options.length; i++) {
+                        if (classSel.options[i].value === pill.getAttribute('data-class-id')) {
+                            classSel.options[i].selected = false;
+                            break;
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function filterSubjectsByDepartment() {
+        buildSubjectsGrid();
+    }
+
+    function updateClassTeacherVisibility() {
+        const roleSelect = document.querySelector('[name="teacher_role"]');
+        const ctWrap = document.getElementById('ct-class-wrap');
+        const asstDisplay = document.getElementById('asst-class-teacher-display');
+        const ctAsstDisplay = document.getElementById('ct-assistant-display');
+        const ctSelect = document.querySelector('[name="class_teacher_class"]');
+        const role = roleSelect ? roleSelect.value : '';
+        const isCtOrAsst = role === 'class_teacher' || role === 'assistant_class_teacher';
+        if (roleSelect && ctWrap) {
+            ctWrap.style.display = isCtOrAsst ? '' : 'none';
+            const ctLabel = ctWrap.querySelector('label');
+            if (ctLabel) {
+                ctLabel.textContent = role === 'class_teacher' ? 'Class Teacher For' : 'Assistant Class Teacher For';
+            }
+        }
+        if (asstDisplay) {
+            asstDisplay.style.display = role === 'assistant_class_teacher' ? 'flex' : 'none';
+        }
+        if (ctAsstDisplay) {
+            var ctAsstVal = ctSelect ? ctSelect.value : '';
+            var hasAsst = ctAsstVal && (assistantTeachers[ctAsstVal] || []).length > 0;
+            ctAsstDisplay.style.display = (role === 'class_teacher' && hasAsst) ? 'flex' : 'none';
+        }
+        var depts = getSelectedDepts();
+        if (ctSelect) {
+            Array.from(ctSelect.options).forEach(function(opt) {
+                if (!opt.value) return;
+                const optDept = classDepts[opt.value] || '';
+                opt.style.display = (depts.length > 0 && depts.indexOf(optDept) !== -1) ? '' : 'none';
+            });
+        }
+        if (ctSelect) {
+            const selectedVal = ctSelect.value;
+            if (role === 'assistant_class_teacher') {
+                const ctName = classTeachers[selectedVal] || '';
+                const ctNameEl = document.getElementById('asst-class-teacher-name');
+                if (ctNameEl) ctNameEl.textContent = ctName || '—';
+                if (asstDisplay) asstDisplay.style.display = (ctName && role === 'assistant_class_teacher') ? 'flex' : 'none';
+            } else if (role === 'class_teacher') {
+                const asstList = assistantTeachers[selectedVal] || [];
+                const asstNameEl = document.getElementById('ct-assistant-name');
+                if (asstNameEl) asstNameEl.textContent = asstList.length > 0 ? asstList[0] : '—';
+            }
+        }
+    }
+
+    if (deptSelect2) {
+        deptSelect2.addEventListener('change', function() {
+            updateTeachingVisibility();
+            filterClassesByDepartment();
+            filterSubjectsByDepartment();
+            updateClassTeacherVisibility();
+        });
+    }
+
+    const roleSelect = document.querySelector('[name="teacher_role"]');
+    if (roleSelect) {
+        roleSelect.addEventListener('change', updateClassTeacherVisibility);
+    }
+
+    const ctSelect = document.querySelector('[name="class_teacher_class"]');
+    if (ctSelect) {
+        ctSelect.addEventListener('change', function() {
+            const role = roleSelect ? roleSelect.value : '';
+            const selectedVal = ctSelect.value;
+            if (role === 'assistant_class_teacher') {
+                const ctName = classTeachers[selectedVal] || 'None assigned';
+                const ctNameEl = document.getElementById('asst-class-teacher-name');
+                if (ctNameEl) ctNameEl.textContent = ctName;
+            } else if (role === 'class_teacher') {
+                const asstNames = (assistantTeachers[selectedVal] || []).join(', ') || 'None assigned';
+                const asstEl = document.getElementById('ct-assistant-name');
+                if (asstEl) asstEl.textContent = asstNames;
+            }
+            /* Auto-activate CT class pill and select it in hidden multi-select */
+            if (selectedVal) {
+                var classSel = document.getElementById('class-multi-select');
+                document.querySelectorAll('.class-pill').forEach(function(pill) {
+                    var pillId = pill.getAttribute('data-class-id');
+                    if (pillId === selectedVal) {
+                        pill.classList.add('active');
+                        pill.style.background = 'var(--hodari-blue, #2563EB)';
+                        pill.style.color = '#fff';
+                        if (classSel) {
+                            for (var i = 0; i < classSel.options.length; i++) {
+                                if (classSel.options[i].value === selectedVal) {
+                                    classSel.options[i].selected = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                });
+                filterSubjectsByDepartment();
+            }
+        });
+    }
+
+    /* Run once on load */
+    filterClassesByDepartment();
+    filterSubjectsByDepartment();
+    updateClassTeacherVisibility();
+
+    /* Also filter when the Teaching Assignments tab is opened */
+    const assignmentsTabBtn = document.querySelector('[data-tab="tab-assignments"]');
+    if (assignmentsTabBtn) {
+        assignmentsTabBtn.addEventListener('click', function() {
+            filterClassesByDepartment();
+            filterSubjectsByDepartment();
+            updateClassTeacherVisibility();
+        });
+    }
+
+    /* Emergency contact relationship "Other" toggle */
+    const relSelect = document.getElementById('id_emergency_contact_relationship');
+    const relOtherWrap = document.getElementById('rel-other-wrap');
+    if (relSelect && relOtherWrap) {
+        function toggleRelOther() {
+            relOtherWrap.style.display = relSelect.value === 'Other' ? 'block' : 'none';
+        }
+        relSelect.addEventListener('change', toggleRelOther);
+        toggleRelOther();
+    }
+});
+</script>
+<script>
+function showToast(message, type) {
+    var toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;top:20px;right:20px;z-index:9999;padding:14px 20px;border-radius:12px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,0.12);animation:slideIn 0.3s ease;display:flex;align-items:center;gap:8px;max-width:400px';
+    if (type === 'success') {
+        toast.style.background = '#DCFCE7';
+        toast.style.color = '#166534';
+        toast.style.border = '1px solid #BBF7D0';
+    } else {
+        toast.style.background = '#FEE2E2';
+        toast.style.color = '#991B1B';
+        toast.style.border = '1px solid #FECACA';
+    }
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(function() {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s';
+        setTimeout(function() { toast.remove(); }, 400);
+    }, 4000);
+}
+</script>
+<style>
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+</style>
+{% if request.GET.saved %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    showToast('User updated successfully', 'success');
+    history.replaceState(null, '', window.location.pathname + '#tab-assignments');
+});
+</script>
+{% endif %}
+{% if messages %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    {% for msg in messages %}
+    showToast('{{ msg|escapejs }}', '{{ msg.tags }}');
+    {% endfor %}
+});
+</script>
+{% endif %}
+{% if object %}
+{% include "users/_user_roles_panel.html" %}
+{% endif %}
+{% endblock %}

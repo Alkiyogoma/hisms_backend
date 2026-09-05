@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% load hodari_forms %}
+{% load role_tags %}
+{% block title %}{% if is_edit %}Edit{% else %}New{% endif %} Timetable Slot &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Timetable{% endblock %}
+
+{% block content %}
+{% has_perm user "timetable.delete_timetableslot" as can_delete_slot %}
+<div class="card" style="max-width:800px; margin:0 auto">
+  <div class="card-title">{% if is_edit %}Edit Timetable Slot{% else %}New Timetable Slot{% endif %}</div>
+  <div style="font-size:13px; color:var(--text-muted); margin-bottom:24px; margin-top:-6px">
+    Subjects are filtered by the selected class's department. Cross-department assignments validated on save.
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+      <div class="msg-toast msg-error" style="margin-bottom:20px">
+        {% for err in form.non_field_errors %}
+          <div style="display:flex; align-items:center; gap:8px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+            {{ err }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="hf2-section">
+      <div class="hf2-section-title">Assignment</div>
+      <div class="hf2-grid-3">
+        {% field form.class_name %}
+        {% field form.subject_name %}
+        {% field form.teacher %}
+      </div>
+    </div>
+
+    <div class="hf2-section">
+      <div class="hf2-section-title">Schedule</div>
+      <div class="hf2-grid-3">
+        {% field form.day_of_week %}
+        {% field form.start_time %}
+        {% field form.end_time %}
+      </div>
+    </div>
+
+    <div class="hf2-actions">
+      <a href="{% url 'timetable:index' %}" class="hf-btn hf-btn-secondary" style="margin-right:auto; text-decoration:none">Cancel</a>
+      {% if is_edit and slot and can_delete_slot %}
+      <button type="button" class="hf-btn" style="color:#9B1C1C; border-color:#FECACA; background:#FEF2F2; cursor:pointer; text-decoration:none; margin-right:12px"
+        onclick="confirmDeleteModal({title:'Delete Slot?',body:'Delete the <strong>{{ slot.subject_name }}</strong> slot for <strong>{{ slot.class_name }}</strong> taught by <strong>{{ slot.teacher.get_full_name|escapejs }}</strong>?',detail:'This timetable slot will be permanently removed.',confirmText:'Delete Slot',url:'{% url 'timetable:slot_delete' pk=slot.pk %}'})">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle; margin-right:4px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+        Delete
+      </button>
+      {% endif %}
+      <button type="submit" class="hf-btn hf-btn-primary" style="text-decoration:none">
+        {% if is_edit %}Save Changes{% else %}Create Slot{% endif %}
+      </button>
+    </div>
+  </form>
+</div>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var DEPT_DATA = {{ dept_subject_data|safe }};
+  if (!DEPT_DATA) DEPT_DATA = { classes: {}, subjects: {} };
+
+  var classSelect = document.querySelector('select[name="class_name"]');
+  var subjectSelect = document.querySelector('select[name="subject_name"]');
+  var teacherSelect = document.querySelector('select[name="teacher"]');
+
+  if (!classSelect || !subjectSelect || !teacherSelect) return;
+
+  function getTeacherSubjects(teacherId) {
+    if (DEPT_DATA.subjects_by_teacher && DEPT_DATA.subjects_by_teacher[String(teacherId)]) {
+      return DEPT_DATA.subjects_by_teacher[String(teacherId)];
+    }
+    return null;
+  }
+
+  function getTeacherSubjectsByClass(teacherId, className) {
+    var key = String(teacherId) + ':' + className;
+    if (DEPT_DATA.subjects_by_teacher_class && DEPT_DATA.subjects_by_teacher_class[key]) {
+      return DEPT_DATA.subjects_by_teacher_class[key];
+    }
+    return null;
+  }
+
+  function teacherTeachesSubjectInClass(teacherId, subjectName, className) {
+    var classSubjects = getTeacherSubjectsByClass(teacherId, className);
+    if (classSubjects && classSubjects.length > 0) {
+      return classSubjects.indexOf(subjectName) !== -1;
+    }
+    return false;
+  }
+
+  function populateSubjects(subjectNames, preserveSelection) {
+    var currentVal = subjectSelect.value;
+    while (subjectSelect.options.length > 1) {
+      subjectSelect.remove(1);
+    }
+    (subjectNames || []).forEach(function(name) {
+      var opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      subjectSelect.appendChild(opt);
+    });
+    if (preserveSelection && currentVal) {
+      for (var i = 0; i < subjectSelect.options.length; i++) {
+        if (subjectSelect.options[i].value === currentVal) {
+          subjectSelect.value = currentVal;
+          break;
+        }
+      }
+    }
+  }
+
+  function populateTeachers(teachers, preserveSelection) {
+    var currentVal = teacherSelect.value;
+    while (teacherSelect.options.length > 1) {
+      teacherSelect.remove(1);
+    }
+    (teachers || []).forEach(function(t) {
+      var opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.full_name;
+      teacherSelect.appendChild(opt);
+    });
+    if (preserveSelection && currentVal) {
+      for (var i = 0; i < teacherSelect.options.length; i++) {
+        if (teacherSelect.options[i].value == currentVal) {
+          teacherSelect.value = currentVal;
+          break;
+        }
+      }
+    }
+  }
+
+  function filterSubjectAndTeacher() {
+    var className = classSelect.value;
+    var classInfo = DEPT_DATA.classes[className];
+
+    // ── Subjects: only from this class's M2M (GradeClass.subjects) ──
+    var classSubjects = [];
+    if (classInfo && classInfo.subject_names) {
+      classSubjects = classInfo.subject_names;
+    }
+    populateSubjects(classSubjects, true);
+
+    // ── Teachers: all teachers assigned to this class ──
+    var classTeachers = [];
+    if (DEPT_DATA.teachers_by_class && DEPT_DATA.teachers_by_class[className]) {
+      classTeachers = DEPT_DATA.teachers_by_class[className];
+    }
+    populateTeachers(classTeachers, true);
+  }
+
+  // When subject changes → filter teachers to only those who teach that subject IN THIS CLASS
+  subjectSelect.addEventListener('change', function() {
+    var selectedSubject = subjectSelect.value;
+    var className = classSelect.value;
+    var classTeachers = [];
+    if (DEPT_DATA.teachers_by_class && DEPT_DATA.teachers_by_class[className]) {
+      classTeachers = DEPT_DATA.teachers_by_class[className];
+    }
+
+    var filtered;
+    if (selectedSubject && className) {
+      filtered = classTeachers.filter(function(t) {
+        return teacherTeachesSubjectInClass(t.id, selectedSubject, className);
+      });
+    } else {
+      filtered = classTeachers;
+    }
+    populateTeachers(filtered, true);
+  });
+
+  // When teacher changes → filter subjects to that teacher's assigned subjects IN THIS CLASS
+  teacherSelect.addEventListener('change', function() {
+    var className = classSelect.value;
+    var teacherId = teacherSelect.value;
+    var classInfo = DEPT_DATA.classes[className];
+    var classSubjects = (classInfo && classInfo.subject_names) || [];
+
+    var allowedSubjects;
+    if (teacherId && className) {
+      var teacherClassSubjects = getTeacherSubjectsByClass(teacherId, className);
+      if (teacherClassSubjects && teacherClassSubjects.length > 0) {
+        allowedSubjects = classSubjects.filter(function(s) {
+          return teacherClassSubjects.indexOf(s) !== -1;
+        });
+        if (allowedSubjects.length === 0) allowedSubjects = classSubjects;
+      } else {
+        allowedSubjects = classSubjects;
+      }
+    } else {
+      allowedSubjects = classSubjects;
+    }
+    populateSubjects(allowedSubjects, true);
+  });
+
+  classSelect.addEventListener('change', filterSubjectAndTeacher);
+
+  filterSubjectAndTeacher();
+});
+</script>
+{% endblock %}
+{% endblock %}

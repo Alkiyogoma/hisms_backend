@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% load hodari_forms %}
+{% load role_tags %}
+{% block title %}Inbox &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Communications{% endblock %}
+{% block topbar_date %}{{ today_date }}{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-title-row">
+    <div class="card-title" style="margin:0">Notification Inbox</div>
+    <div style="display:flex;gap:10px">
+      <form method="post" action="{% url 'communications:mark_all_read' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn-secondary btn-sm">Mark all as read</button>
+      </form>
+      {% has_perm user "communications.view_broadcast" as can_view_message %}
+      {% if can_view_message %}
+        <a href="{% url 'communications:broadcast_list' %}" class="btn-primary btn-sm">Broadcasts</a>
+      {% endif %}
+      {% if perms.communications.view_weeklyfocus %}
+        <a href="{% url 'communications:weekly_focus_list' %}" class="btn-secondary btn-sm">Weekly Focus</a>
+      {% endif %}
+    </div>
+  </div>
+  
+  <div style="margin-top:20px;border-top:1px solid var(--border)">
+    {% for n in notifications %}
+      <div class="audit-row" style="padding:16px;{% if not n.is_read %}background:rgba(2, 58, 165, 0.03);{% endif %}">
+        <div class="audit-icon {% if not n.is_read %}ai-blue{% else %}ai-grey{% endif %}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </div>
+        <div style="flex:1">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div class="audit-text" style="font-weight:{% if not n.is_read %}600{% else %}400{% endif %}">{{ n.title }}</div>
+            <span class="audit-meta">{{ n.created_at|date:"d M, H:i" }}</span>
+          </div>
+          <div class="audit-meta" style="margin-top:2px;color:var(--text-secondary)">{{ n.body }}</div>
+          {% if n.link or not n.is_read %}
+            <div style="margin-top:8px;display:flex;gap:12px">
+              {% if not n.is_read %}
+                <form method="post" action="{% url 'communications:mark_read' n.pk %}" style="display:inline">
+                  {% csrf_token %}
+                  <button type="submit" style="font-size:12px;color:var(--hodari-blue);background:none;border:none;padding:0;cursor:pointer;font-weight:600">Mark read</button>
+                </form>
+              {% endif %}
+              {% if n.link %}
+                <a href="{{ n.link }}" style="font-size:12px;color:var(--hodari-blue);text-decoration:none;font-weight:600">View details &rarr;</a>
+              {% endif %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    {% empty %}
+      {% include '_partials/empty_state.html' with title='Your inbox is empty' desc='New notifications will appear here.' icon='inbox' icon_color='grey' %}
+    {% endfor %}
+  </div>
+
+  {% if is_paginated %}
+    <div class="hf2-actions" style="margin-top:20px;justify-content:center">
+      {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}" class="btn-secondary btn-sm">&larr; Prev</a>
+      {% endif %}
+      <span style="font-size:13px;color:var(--text-muted)">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}" class="btn-secondary btn-sm">Next &rarr;</a>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

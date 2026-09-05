@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}My Children's Reports &mdash; {{ brand.school_name }}{% endblock %}
+
+{% block content %}
+<div class="section-hdr">
+  <span class="section-title">Academic Reports</span>
+  <span class="chip chip-green">Published</span>
+</div>
+
+<div class="card">
+  <div class="card-title">Term Reports</div>
+  <div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;margin-top:-6px">Official term reports published by the Head of School.</div>
+
+  <!-- Filters -->
+  <form method="GET" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;align-items:end">
+    {% if students %}
+    <div style="flex:1;min-width:150px">
+      <label style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px">Child</label>
+      <select name="student" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:#fff">
+        <option value="">All Children</option>
+        {% for s in students %}
+          <option value="{{ s.id }}" {% if selected_student == s.id|stringformat:"d" %}selected{% endif %}>{{ s.get_full_name }} ({{ s.class_name }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div style="flex:1;min-width:150px">
+      <label style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px">Academic Year</label>
+      <select name="year" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:#fff">
+        <option value="">All Years</option>
+        {% for y in academic_years %}
+          <option value="{{ y.id }}" {% if selected_year == y.id|stringformat:"d" %}selected{% endif %}>{{ y.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="flex:1;min-width:150px">
+      <label style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px">Term</label>
+      <select name="term" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:#fff">
+        <option value="">All Terms</option>
+        {% for t in terms %}
+          <option value="{{ t.id }}" {% if selected_term == t.id|stringformat:"d" %}selected{% endif %}>{{ t.name }} ({{ t.academic_year.name }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" style="padding:8px 20px;background:var(--hodari-blue);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;height:37px">Filter</button>
+    {% if selected_year or selected_term or selected_student %}
+      <a href="{% url 'academics:parent_reports' %}" style="padding:8px 16px;background:#fff;color:var(--text-muted);border:1px solid var(--border);border-radius:6px;font-size:13px;text-decoration:none;height:37px;display:flex;align-items:center">Clear</a>
+    {% endif %}
+  </form>
+  
+  <div style="border-top:1px solid var(--border)">
+    {% for report in reports %}
+      <div class="trow">
+        <div style="flex:1">
+          <div class="trow-name">{{ report.student.first_name }} {{ report.student.last_name }} &middot; {{ report.term.academic_year.name }} {{ report.term.name }}</div>
+          <div class="trow-sub">Class: {{ report.student.class_name }} &middot; Published: {{ report.published_at|date:"d M Y" }}</div>
+        </div>
+        <div class="trow-right">
+          <a href="{% url 'academics:report_preview' report.id %}" target="_blank" style="padding:5px 12px;background:#EBF5FF;border-radius:6px;font-size:11.5px;font-weight:600;color:#1E40AF;text-decoration:none;transition:background 0.1s">View / Print</a>
+        </div>
+      </div>
+    {% empty %}
+      {% if selected_year or selected_term or selected_student %}
+        {% include '_partials/empty_state.html' with title='No reports match filters' desc='Try adjusting your search criteria.' icon='search' icon_color='grey' %}
+      {% else %}
+        {% include '_partials/empty_state.html' with title='No published reports' desc='Published reports will appear here.' icon='doc' icon_color='grey' %}
+      {% endif %}
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

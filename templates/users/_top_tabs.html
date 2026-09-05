@@ -1,0 +1,63 @@
+{% load role_tags %}
+{% with url_name=request.resolver_match.url_name %}
+<div class="sub-nav">
+  {% if perms.hr.view_staffprofile %}
+  <a href="{% url 'hr:dashboard' %}" class="sub-tab">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    Dashboard
+  </a>
+  {% endif %}
+  {% if perms.users.view_user %}
+  <a href="{% url 'users:user_list' %}" class="sub-tab {% if url_name == 'user_list' or url_name == 'user_create' or url_name == 'user_edit' %}active{% endif %}">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    Users
+  </a>
+  {% endif %}
+  {% if perms.users.view_roleconfig %}
+  <a href="{% url 'users:role_list' %}" class="sub-tab {% if url_name == 'role_list' or url_name == 'role_detail' or url_name == 'role_create' or url_name == 'role_edit' or url_name == 'role_delete' %}active{% endif %}">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    Roles
+  </a>
+  {% endif %}
+  {% if url_name == 'role_list' %}
+  <div style="margin-left:auto; display:flex; align-items:center; gap:10px; flex-shrink:0">
+    <div class="view-toggle">
+      <button class="view-toggle-btn" id="grid-view-btn" onclick="setView('grid')" title="Grid view">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      </button>
+      <button class="view-toggle-btn active" id="list-view-btn" onclick="setView('list')" title="List view">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      </button>
+    </div>
+      {% if perms.users.add_roleconfig %}
+      <a href="{% url 'users:role_create' %}" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:8px; font-size:12px; font-weight:700; background:var(--hodari-blue, #023AA5); color:#fff; text-decoration:none; transition:all 0.15s; white-space:nowrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+       Create Custom Role
+    </a>
+      {% endif %}
+  </div>
+  {% elif url_name == 'role_detail' or url_name == 'role_edit' or url_name == 'role_delete' %}
+  <div style="margin-left:auto; display:flex; align-items:center; gap:10px; flex-shrink:0">
+    <a href="{% url 'users:role_list' %}" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:8px; font-size:12px; font-weight:600; background:#F1F5F9; color:#475569; text-decoration:none; transition:all 0.15s; white-space:nowrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      Back to Roles
+    </a>
+  </div>
+  {% elif url_name == 'user_list' or url_name == 'user_create' or url_name == 'user_edit' %}
+  <div style="margin-left:auto; display:flex; align-items:center; gap:10px; flex-shrink:0">
+    {% if perms.users.add_user %}
+    <a href="{% url 'users:user_create' %}" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:8px; font-size:12px; font-weight:700; background:var(--hodari-blue, #023AA5); color:#fff; text-decoration:none; transition:all 0.15s; white-space:nowrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      New User
+    </a>
+    {% endif %}
+    {% if url_name == 'user_list' %}
+    <button onclick="window.print()" class="print-hide" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:8px; font-size:12px; font-weight:600; background:#fff; color:var(--hodari-blue, #023AA5); border:1px solid var(--hodari-blue, #023AA5); cursor:pointer; transition:all 0.15s; white-space:nowrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>
+      Print
+    </button>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endwith %}

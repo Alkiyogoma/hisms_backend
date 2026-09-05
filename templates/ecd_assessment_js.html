@@ -1,0 +1,429 @@
+// Global variables
+let currentStudent = null;
+let students = [];
+let reportCardId = null;
+let currentTerm = null;
+
+// API Base URL
+const API_BASE = '/academics/api/ecd/';
+const ECD_CLASS = (typeof window !== 'undefined' && window.ECD_CLASS_NAME) ? window.ECD_CLASS_NAME : 'Pre-Kindergarten';
+
+// Initialize the page
+document.addEventListener('DOMContentLoaded', function() {
+    loadStudents();
+    setupEventListeners();
+    updateProgress();
+});
+
+// Load students for Pre-Kindergarten class
+async function loadStudents() {
+    try {
+        const response = await fetch(`${API_BASE}students/?class_name=${encodeURIComponent(ECD_CLASS)}`);
+        if (!response.ok) throw new Error('Failed to load students');
+        
+        const data = await response.json();
+        students = data.students;
+        
+        updateStudentList();
+        
+        // Load first student by default
+        if (students.length > 0) {
+            switchStudent(students[0].id);
+        }
+    } catch (error) {
+        console.error('Error loading students:', error);
+        showError('Failed to load students. Please refresh the page.');
+    }
+}
+
+// Update student list in sidebar
+function updateStudentList() {
+    const studentListContainer = document.querySelector('.card[style*="padding:12px 0"]');
+    if (!studentListContainer) return;
+    
+    let html = '<div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8492A6;padding:0 14px 8px">Students (' + students.length + ')</div>';
+    
+    students.forEach(student => {
+        const statusClass = student.completed ? 'chip-green' : 'chip-grey';
+        const statusText = student.completed ? 'Done' : 'Pending';
+        const activeClass = currentStudent && currentStudent.id === student.id ? 'style="background:#F0F4FB;border-left-color:#023AA5"' : '';
+        
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;cursor:pointer;border-left:3px solid transparent;border-bottom:0.5px solid #DDE3EE" onclick="switchStudent(' + student.id + ')" ' + activeClass + '>' +
+                '<div>' +
+                    '<div style="font-size:12.5px;font-weight:600;color:#1A1A2E">' + student.first_name + ' ' + student.last_name + '</div>' +
+                    '<div style="font-size:11px;color:#8492A6">Age ' + calculateAge(student.date_of_birth) + '</div>' +
+                '</div>' +
+                '<span class="chip ' + statusClass + '" style="font-size:10px">' + statusText + '</span>' +
+            '</div>';
+    });
+    
+    studentListContainer.innerHTML = html;
+}
+
+// Calculate age from date of birth
+function calculateAge(dateOfBirth) {
+    if (!dateOfBirth) return 'N/A';
+    const birth = new Date(dateOfBirth);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+        age--;
+    }
+    return age;
+}
+
+// Switch to a specific student
+async function switchStudent(studentId) {
+    const student = students.find(s => s.id === studentId);
+    if (!student) return;
+    
+    currentStudent = student;
+    
+    // Update student display
+    const displayName = document.getElementById('student-name-display');
+    if (displayName) {
+        displayName.textContent = `${student.first_name} ${student.last_name}`;
+    }
+    
+    // Update student initials
+    const initials = document.getElementById('student-initials');
+    if (initials) {
+        initials.textContent = student.first_name.charAt(0) + student.last_name.charAt(0);
+    }
+    
+    // Update student info
+    const studentInfo = document.querySelector('.card div[style*="font-size:12px;color:#8492A6"]');
+    if (studentInfo) {
+        studentInfo.textContent = `Pre-Kindergarten · Age ${calculateAge(student.date_of_birth)} · Term {% if current_term %}{{ current_term.name }}{% else %}--{% endif %}, {% if current_term %}{{ current_term.academic_year.name }}{% else %}--{% endif %}`;
+    }
+    
+    // Load student's evaluation data
+    await loadStudentEvaluation(studentId);
+    
+    // Update student list highlighting
+    updateStudentList();
+}
+
+// Load student evaluation data
+async function loadStudentEvaluation(studentId) {
+    try {
+        const response = await fetch(`${API_BASE}evaluation/${studentId}/`);
+        if (!response.ok) throw new Error('Failed to load evaluation');
+        
+        const data = await response.json();
+        reportCardId = data.report_card_id;
+        
+        // Load evaluations into form
+        loadEvaluations(data.evaluations);
+        
+        // Load teacher comments
+        const commentArea = document.getElementById('teacher-comment');
+        if (commentArea) {
+            commentArea.value = data.teacher_comments;
+            checkComment();
+        }
+        
+        // Update navigation buttons
+        updateNavigationButtons();
+        
+    } catch (error) {
+        console.error('Error loading evaluation:', error);
+        showError('Failed to load student evaluation data.');
+    }
+}
+
+// Load evaluations into the form
+function loadEvaluations(evaluations) {
+    Object.keys(evaluations).forEach(domain => {
+        const rating = evaluations[domain];
+        const fieldId = domain; // Domain names match field IDs
+        
+        // Find and click the appropriate grade button
+        const gradeBtn = document.querySelector(`.ecd-grade-btn[onclick*="${fieldId}"][onclick*="${rating}"]`);
+        if (gradeBtn) {
+            selectGrade(gradeBtn, fieldId, rating);
+        }
+    });
+}
+
+// Enhanced grade selection with API integration
+function selectGrade(el, fieldId, grade) {
+    const group = el.parentElement;
+    group.querySelectorAll(".ecd-grade-btn").forEach(b => {
+        b.className = b.className.replace(/selected-[EGSN]/g,"").trim();
+    });
+    el.classList.add("selected-" + grade);
+    const inp = document.getElementById(fieldId);
+    if(inp) inp.value = grade;
+    const row = el.closest(".domain-row");
+    if(row) row.style.background = grade === "N" ? "#FEF2F2" : "";
+    
+    // Auto-save draft
+    saveDraft();
+}
+
+// Enhanced comment check
+function checkComment() {
+    const ta = document.getElementById("teacher-comment");
+    const cnt = document.getElementById("char-count");
+    if(ta && cnt) { 
+        cnt.textContent = ta.value.length + " / 50 minimum"; 
+        cnt.style.color = ta.value.length >= 50 ? "#1B7B34" : "#9B1C1C"; 
+    }
+}
+
+// Save draft to backend
+async function saveDraft() {
+    if (!currentStudent || !reportCardId) return;
+    
+    try {
+        const evaluations = {};
+        document.querySelectorAll('input[type="hidden"]').forEach(input => {
+            if (input.value && ['E', 'G', 'S', 'N'].includes(input.value)) {
+                evaluations[input.id] = input.value;
+            }
+        });
+        
+        const teacherComments = document.getElementById('teacher-comment').value;
+        
+        const response = await fetch(`${API_BASE}evaluation/${currentStudent.id}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({
+                evaluations: evaluations,
+                teacher_comments: teacherComments
+            })
+        });
+        
+        if (!response.ok) throw new Error('Failed to save draft');
+        
+        showSuccess('Draft saved successfully');
+        
+    } catch (error) {
+        console.error('Error saving draft:', error);
+        // Don't show error for auto-save to avoid annoying user
+    }
+}
+
+// Submit evaluation for HOD review
+async function submitEvaluation() {
+    if (!currentStudent || !reportCardId) {
+        showError('Please select a student first');
+        return;
+    }
+    
+    // Validate teacher comments
+    const commentArea = document.getElementById('teacher-comment');
+    if (!commentArea.value || commentArea.value.trim().length < 50) {
+        showError('Teacher comments must be at least 50 characters long');
+        commentArea.focus();
+        return;
+    }
+    
+    // Check if all domains are evaluated
+    const unevaluatedDomains = [];
+    document.querySelectorAll('input[type="hidden"]').forEach(input => {
+        if (!input.value || !['E', 'G', 'S', 'N'].includes(input.value)) {
+            unevaluatedDomains.push(input.id);
+        }
+    });
+    
+    if (unevaluatedDomains.length > 0) {
+        showError('Please evaluate all domains before submitting');
+        return;
+    }
+    
+    try {
+        // Save final version first
+        await saveDraft();
+        
+        // Submit for review
+        const response = await fetch(`${API_BASE}submit/${currentStudent.id}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            }
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to submit evaluation');
+        }
+        
+        showSuccess('Evaluation submitted for HOD review');
+        
+        // Update student status
+        const studentIndex = students.findIndex(s => s.id === currentStudent.id);
+        if (studentIndex !== -1) {
+            students[studentIndex].completed = true;
+        }
+        updateStudentList();
+        updateProgress();
+        
+        // Move to next student if available
+        moveToNextStudent();
+        
+    } catch (error) {
+        console.error('Error submitting evaluation:', error);
+        showError(error.message || 'Failed to submit evaluation');
+    }
+}
+
+// Update progress bar
+async function updateProgress() {
+    try {
+        const response = await fetch(`${API_BASE}progress/?class_name=${encodeURIComponent(ECD_CLASS)}`);
+        if (!response.ok) return;
+        
+        const data = await response.json();
+        const progress = data.progress;
+        
+        // Update progress bar
+        const progressBar = document.querySelector('.grid-6-4 div[style*="width:7%"]');
+        if (progressBar) {
+            progressBar.style.width = `${progress.percentage}%`;
+        }
+        
+        // Update progress text
+        const progressText = document.querySelector('.grid-6-4 span[style*="white-space:nowrap"]');
+        if (progressText) {
+            progressText.textContent = `${progress.completed} of ${progress.total} students complete`;
+        }
+        
+        // Update badge
+        const badge = document.querySelector('.badge-amber');
+        if (badge) {
+            badge.innerHTML = `<span class="badge-dot"></span>${progress.completed} of ${progress.total} complete`;
+        }
+        
+    } catch (error) {
+        console.error('Error updating progress:', error);
+    }
+}
+
+// Navigation functions
+function updateNavigationButtons() {
+    if (!currentStudent) return;
+    
+    const currentIndex = students.findIndex(s => s.id === currentStudent.id);
+    const prevBtn = document.querySelector('button[onclick*="moveToPreviousStudent"]');
+    const nextBtn = document.querySelector('button[onclick*="moveToNextStudent"]');
+    
+    if (prevBtn) {
+        prevBtn.disabled = currentIndex === 0;
+        prevBtn.style.opacity = currentIndex === 0 ? '0.5' : '1';
+    }
+    
+    if (nextBtn) {
+        nextBtn.disabled = currentIndex === students.length - 1;
+        nextBtn.style.opacity = currentIndex === students.length - 1 ? '0.5' : '1';
+    }
+}
+
+function moveToPreviousStudent() {
+    if (!currentStudent) return;
+    
+    const currentIndex = students.findIndex(s => s.id === currentStudent.id);
+    if (currentIndex > 0) {
+        switchStudent(students[currentIndex - 1].id);
+    }
+}
+
+function moveToNextStudent() {
+    if (!currentStudent) return;
+    
+    const currentIndex = students.findIndex(s => s.id === currentStudent.id);
+    if (currentIndex < students.length - 1) {
+        switchStudent(students[currentIndex + 1].id);
+    }
+}
+
+// Submit all completed evaluations
+async function submitAllToHOD() {
+    const completedStudents = students.filter(s => s.completed);
+    
+    if (completedStudents.length === 0) {
+        showError('No completed evaluations to submit');
+        return;
+    }
+    
+    if (!confirm(`Submit ${completedStudents.length} completed evaluations to HOD for review?`)) {
+        return;
+    }
+    
+    showSuccess('All completed evaluations have been submitted to HOD');
+}
+
+// Utility functions
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function showError(message) {
+    // Create or update error notification
+    let notification = document.getElementById('error-notification');
+    if (!notification) {
+        notification = document.createElement('div');
+        notification.id = 'error-notification';
+        notification.style.cssText = 'position:fixed;top:20px;right:20px;background:#FEF2F2;border:1px solid #FECACA;color:#9B1C1C;padding:12px 16px;border-radius:8px;z-index:9999;max-width:300px;';
+        document.body.appendChild(notification);
+    }
+    notification.textContent = message;
+    notification.style.display = 'block';
+    
+    setTimeout(() => {
+        notification.style.display = 'none';
+    }, 5000);
+}
+
+function showSuccess(message) {
+    // Create or update success notification
+    let notification = document.getElementById('success-notification');
+    if (!notification) {
+        notification = document.createElement('div');
+        notification.id = 'success-notification';
+        notification.style.cssText = 'position:fixed;top:20px;right:20px;background:#E8F5EC;border:1px solid #B7DFBF;color:#1B7B34;padding:12px 16px;border-radius:8px;z-index:9999;max-width:300px;';
+        document.body.appendChild(notification);
+    }
+    notification.textContent = message;
+    notification.style.display = 'block';
+    
+    setTimeout(() => {
+        notification.style.display = 'none';
+    }, 3000);
+}
+
+// Setup event listeners
+function setupEventListeners() {
+    // Auto-save on grade selection
+    document.querySelectorAll('.ecd-grade-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            setTimeout(saveDraft, 500); // Auto-save after grade selection
+        });
+    });
+    
+    // Auto-save on comment change
+    const commentArea = document.getElementById('teacher-comment');
+    if (commentArea) {
+        commentArea.addEventListener('input', () => {
+            checkComment();
+            setTimeout(saveDraft, 2000); // Auto-save after typing stops
+        });
+    }
+}

@@ -1,0 +1,269 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ brand.school_name }}{% endblock %}</title>
+  <link rel="icon" type="image/x-icon" href="{% static 'branding/favicon.ico' %}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --blue: #023AA5;
+      --blue-dark: #012880;
+      --blue-light: #E8EEF9;
+      --gold: #FBBC05;
+      --gold-dark: #E0A800;
+      --text: #1A1A2E;
+      --text-secondary: #474747;
+      --text-muted: #6B7A8D;
+      --border: #D1D9E8;
+      --red: #DC2626;
+      --red-bg: #FEF2F2;
+      --red-bd: #FECACA;
+      --green: #16A34A;
+      --green-bg: #F0FDF4;
+      --green-bd: #BBF7D0;
+      --radius: 12px;
+    }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #F0F4FA;
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .auth-left {
+      flex: 0 0 44%;
+      min-height: 100vh;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 48px 40px;
+      overflow: hidden;
+    }
+    .auth-left-bg {
+      position: absolute; inset: 0;
+      z-index: 0;
+    }
+    .auth-left-bg img {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+    }
+    .auth-left-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.55) 70%, rgba(0,0,0,0.75) 100%);
+      z-index: 1;
+    }
+    .auth-left-content {
+      position: relative; z-index: 2;
+      max-width: 420px;
+    }
+    .auth-left-logo {
+      height: 48px; width: auto;
+      object-fit: contain;
+      margin-bottom: 32px;
+      filter: brightness(0) invert(1);
+    }
+    .auth-left h1 {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 28px;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1.25;
+      letter-spacing: -0.02em;
+    }
+    .auth-left p {
+      margin-top: 14px;
+      font-size: 14.5px;
+      color: rgba(255,255,255,0.78);
+      line-height: 1.65;
+    }
+
+    .auth-right {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+      min-height: 100vh;
+    }
+    .auth-card {
+      width: 100%;
+      max-width: 420px;
+    }
+    .auth-card-logo {
+      height: 40px;
+      width: auto;
+      object-fit: contain;
+      margin-bottom: 28px;
+    }
+    .auth-card h2 {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+    .auth-card .subtitle {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      margin-top: 5px;
+      line-height: 1.5;
+    }
+
+    .field-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 16px; }
+    .field-group label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+    .field-input {
+      display: block;
+      width: 100%;
+      height: 44px;
+      padding: 0 14px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-family: inherit;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      background: #fff;
+    }
+    .field-input::placeholder { color: #A0ADC0; }
+    .field-input:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3.5px rgba(2,58,165,0.1);
+    }
+
+    .btn-primary {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      height: 48px;
+      border: none;
+      border-radius: var(--radius);
+      background: var(--blue);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      margin-top: 4px;
+    }
+    .btn-primary:hover { background: var(--blue-dark); }
+    .btn-primary:active { transform: scale(0.985); }
+
+    .auth-link {
+      text-align: center;
+      font-size: 13px;
+      margin-top: 18px;
+    }
+    .auth-link a {
+      color: var(--blue);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .auth-link a:hover { text-decoration: underline; }
+
+    .auth-footer {
+      margin-top: 32px;
+      text-align: center;
+      font-size: 11.5px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .alert {
+      border-radius: 10px;
+      padding: 11px 14px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      line-height: 1.45;
+    }
+    .alert-error {
+      background: var(--red-bg);
+      border: 1px solid var(--red-bd);
+      color: var(--red);
+    }
+    .alert-success {
+      background: var(--green-bg);
+      border: 1px solid var(--green-bd);
+      color: var(--green);
+    }
+    .alert-info {
+      background: #F0F4FB;
+      border: 1px solid #BFCFE9;
+      color: var(--text-primary, var(--text));
+    }
+
+    @media (max-width: 900px) {
+      body { flex-direction: column; }
+      .auth-left {
+        flex: none;
+        min-height: auto;
+        padding: 32px 24px;
+      }
+      .auth-left-bg img { height: 200px; object-fit: cover; }
+      .auth-left-content { max-width: 100%; }
+      .auth-left h1 { font-size: 22px; }
+      .auth-right { padding: 24px; min-height: auto; }
+    }
+  </style>
+</head>
+<body>
+
+  <section class="auth-left">
+    <div class="auth-left-bg">
+      {% if brand.login_staff_hero_image %}
+        <img src="{{ brand.login_staff_hero_image.url }}" alt="">
+      {% else %}
+        <img src="{% static 'branding/hodari_school_logo.jpg' %}" alt="">
+      {% endif %}
+      <div class="auth-left-overlay"></div>
+    </div>
+    <div class="auth-left-content">
+      {% if brand.login_logo %}
+        <img src="{{ brand.login_logo.url }}" alt="{{ brand.school_name }}" class="auth-left-logo">
+      {% else %}
+        <img src="{% static 'branding/hodari-logo-white.png' %}" alt="{{ brand.school_name }}" class="auth-left-logo">
+      {% endif %}
+      <h1>{{ brand.login_heading|linebreaksbr }}</h1>
+      <p>{{ brand.login_description }}</p>
+    </div>
+  </section>
+
+  <section class="auth-right">
+    <div class="auth-card">
+      {% if brand.login_logo %}
+        <img src="{{ brand.login_logo.url }}" alt="{{ brand.school_name }}" class="auth-card-logo">
+      {% else %}
+        <img src="{% static 'branding/hodari-logo.png' %}" alt="{{ brand.school_name }}" class="auth-card-logo">
+      {% endif %}
+
+      {% block auth_content %}{% endblock %}
+
+      <div class="auth-footer">
+        {{ brand.school_name }}<br>
+        {{ brand.address|truncatechars:80 }}
+      </div>
+    </div>
+  </section>
+
+</body>
+</html>

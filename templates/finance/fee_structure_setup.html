@@ -1,0 +1,736 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% load static %}
+
+{% block title %}Fee Structure Setup — {{ brand.school_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  /*  Fee structure setup page-specific styles  */
+  .fs-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+
+  .fs-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: var(--bg-metric, #F8FAFE);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .fs-section-header h3 {
+    font-family: 'Merriweather', serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+  }
+
+  .fs-section-header .fs-badge {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--text-muted);
+    background: var(--bg-page);
+    padding: 3px 10px;
+    border-radius: 99px;
+  }
+
+  /*  Department tabs  */
+  .dept-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 16px 20px 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-card);
+  }
+
+  .dept-tab {
+    padding: 8px 18px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    transition: all .15s ease;
+    background: transparent;
+  }
+
+  .dept-tab:hover {
+    color: var(--hodari-blue);
+    background: var(--hodari-blue-pale);
+  }
+
+  .dept-tab.active {
+    color: var(--hodari-blue);
+    background: var(--bg-card);
+    border-color: var(--border);
+    font-weight: 600;
+    position: relative;
+  }
+
+  .dept-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--bg-card);
+  }
+
+  .dept-tab .tab-count {
+    display: inline-block;
+    font-size: 10px;
+    background: var(--hodari-blue-light);
+    color: var(--hodari-blue);
+    padding: 0 6px;
+    border-radius: 99px;
+    margin-left: 4px;
+    font-weight: 600;
+  }
+
+  /*  Term selector bar  */
+  .term-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 16px 20px;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .term-bar label {
+    font-size: 11.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-muted);
+  }
+
+  .term-bar select,
+  .term-select-copy {
+    padding: 7px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: 'Roboto', sans-serif;
+    color: var(--text-primary);
+    background: var(--bg-card);
+    min-width: 160px;
+    cursor: pointer;
+  }
+
+  .term-bar select:focus,
+  .term-select-copy:focus {
+    outline: none;
+    border-color: var(--hodari-blue);
+    box-shadow: 0 0 0 3px rgba(2,58,165,.12);
+  }
+
+  /*  Class fee cards grid  */
+  .dept-panel {
+    display: none;
+    padding: 20px;
+  }
+  .dept-panel.active { display: block; }
+
+  .class-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 16px;
+  }
+
+  .class-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: box-shadow .15s ease, border-color .15s ease;
+    position: relative;
+  }
+
+  .class-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--hodari-blue);
+    border-radius: 12px 12px 0 0;
+  }
+
+  .class-card:hover {
+    border-color: var(--border-strong);
+    box-shadow: 0 4px 12px rgba(0,0,0,.06);
+  }
+
+  .class-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .class-card-header h4 {
+    font-family: 'Merriweather', serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+  }
+
+  .class-card-header .class-status {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding: 2px 8px;
+    border-radius: 99px;
+    font-weight: 600;
+  }
+
+  .class-status.configured {
+    color: var(--green);
+    background: var(--green-bg);
+  }
+  .class-status.unconfigured {
+    color: var(--amber);
+    background: var(--amber-bg);
+  }
+
+  /*  Inline editable fields  */
+  .class-card-body {
+    padding: 12px 16px 16px;
+  }
+
+  .fs-field-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+
+  .fs-field-row:last-child {
+    border-bottom: none;
+  }
+
+  .fs-field-label {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .fs-field-label .fs-label-hint {
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+
+  .fs-field-input {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .fs-field-input input[type="text"],
+  .fs-field-input input[type="number"] {
+    width: 100px;
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: 'Roboto Mono', monospace;
+    font-weight: 500;
+    color: var(--text-primary);
+    text-align: right;
+    background: var(--bg-card);
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+
+  .fs-field-input input:focus {
+    outline: none;
+    border-color: var(--hodari-blue);
+    box-shadow: 0 0 0 2px rgba(2,58,165,.1);
+  }
+
+  .fs-field-input input:read-only {
+    background: var(--bg-page);
+    color: var(--text-muted);
+    cursor: not-allowed;
+  }
+
+  .fs-field-input .fs-currency-symbol {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+    font-family: 'Roboto Mono', monospace;
+  }
+
+  /*  Sibling discount toggle  */
+  .sibling-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .sibling-toggle select {
+    width: auto;
+  }
+
+  /*  Activity fee sub-rows  */
+  .activity-sub-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 0 3px 16px;
+    border-bottom: 1px dashed var(--border);
+  }
+
+  .activity-sub-row .activity-label {
+    flex: 1;
+    font-size: 11.5px;
+    color: var(--text-secondary);
+  }
+
+  .activity-sub-row input {
+    width: 90px;
+  }
+
+  /*  Save button row  */
+  .class-card-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 10px 16px 14px;
+    border-top: 1px solid var(--border);
+  }
+
+  .btn-save-fs {
+    padding: 7px 18px;
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background: var(--hodari-blue);
+    color: #fff;
+    transition: background .15s ease, transform .1s ease;
+  }
+
+  .btn-auto-gen {
+    padding: 6px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid var(--hodari-blue);
+    border-radius: 8px;
+    cursor: pointer;
+    background: var(--hodari-blue-pale);
+    color: var(--hodari-blue);
+    transition: background .15s ease, transform .1s ease;
+  }
+
+  .btn-auto-gen:hover {
+    background: var(--hodari-blue);
+    color: #fff;
+  }
+
+  .btn-save-fs:hover {
+    background: var(--hodari-blue-dark);
+    transform: translateY(-1px);
+  }
+
+  .btn-save-fs:active {
+    transform: translateY(0);
+  }
+
+  .btn-save-fs.saving {
+    opacity: .7;
+    pointer-events: none;
+  }
+
+  /*  Copy from previous — now inline in term-bar */
+
+  .btn-copy {
+    padding: 7px 20px;
+    font-size: 12.5px;
+    font-weight: 600;
+    border: 1px solid var(--hodari-blue);
+    border-radius: 8px;
+    cursor: pointer;
+    background: var(--hodari-blue);
+    color: #fff;
+    transition: background .15s ease;
+  }
+
+  .btn-copy:hover {
+    background: var(--hodari-blue-dark);
+  }
+
+  .btn-copy:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+  }
+
+  /*  Quick-add missing classes  */
+  .missing-classes {
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: var(--amber-bg);
+    border: 1px solid var(--amber-bd);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .missing-classes .mc-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--amber);
+  }
+
+  .missing-classes .mc-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: 500;
+    background: #fff;
+    border: 1px solid var(--amber-bd);
+    border-radius: 99px;
+    color: var(--amber);
+  }
+
+  /*  Responsive  */
+  @media (max-width: 900px) {
+    .class-cards {
+      grid-template-columns: 1fr;
+    }
+    .term-bar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .term-bar select,
+    .term-select-copy {
+      min-width: auto;
+      width: 100%;
+    }
+  }
+
+  @media (max-width: 540px) {
+    .fs-field-row {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 4px;
+    }
+    .fs-field-input input {
+      width: 100%;
+    }
+  }
+
+  /*  Success flash highlight  */
+  @keyframes flash-saved {
+    0% { border-color: var(--hodari-blue); box-shadow: 0 0 0 3px rgba(2,58,165,.15); }
+    100% { border-color: var(--border); box-shadow: none; }
+  }
+  .class-card.saved {
+    animation: flash-saved .8s ease;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+<div class="section-hdr">
+  <span class="section-title">Fee Structure Setup</span>
+  <a href="{% url 'finance:dashboard' %}" class="btn-secondary btn-sm">Back to Dashboard</a>
+</div>
+<p style="font-size:13px;color:var(--text-muted);margin:-8px 0 18px">Configure tuition, activity fees, discounts, and assessment fees per class.</p>
+
+{% if messages %}
+<div id="message-container">
+  {% for msg in messages %}
+  <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show" role="alert">
+    {{ msg }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!--  Term Selector  -->
+<div class="fs-section">
+  <div class="term-bar">
+    <label for="term-select">Academic Term</label>
+    <select id="term-select" onchange="switchTerm(this.value)">
+      {% for term in terms %}
+      <option value="{{ term.pk }}" {% if term.pk == selected_term.pk %}selected{% endif %}>
+        {{ term.academic_year.name }} — {{ term.name }}
+        ({{ term.start_date|date:"M j" }} – {{ term.end_date|date:"M j, Y"|default:"TBD" }})
+      </option>
+      {% endfor %}
+    </select>
+
+    {% if source_terms %}
+    <span style="display:flex;align-items:center;gap:10px;">
+      <span style="font-size:12px;color:var(--text-muted);font-weight:600;white-space:nowrap;">Copy Previous</span>
+      <form method="POST" action="{% url 'finance:fee_structure_setup' %}" style="display:flex;align-items:center;gap:10px;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="copy_from_term">
+        <input type="hidden" name="to_term" value="{{ selected_term.pk }}">
+        <select name="from_term" required class="term-select-copy">
+          <option value="">Select source term</option>
+          {% for st in source_terms %}
+          <option value="{{ st.pk }}">{{ st.academic_year.name }} — {{ st.name }}</option>
+          {% endfor %}
+        </select>
+        {% has_perm user "finance.change_feestructure" as can_edit %}
+        {% if can_edit %}
+        <button type="submit" class="btn-primary btn-sm">Copy Fee Structures</button>
+        {% endif %}
+      </form>
+    </span>
+    {% endif %}
+
+    {% if selected_term %}
+    <span style="margin-left:auto;">
+      <form method="POST" action="{% url 'finance:auto_generate_invoices' %}" style="display:inline;">
+        {% csrf_token %}
+        <input type="hidden" name="term_id" value="{{ selected_term.pk }}">
+        {% has_perm user "finance.add_invoice" as can_generate %}
+        {% if can_generate %}
+        <button type="submit" class="btn-auto-gen">Auto-generate Invoices</button>
+        {% endif %}
+      </form>
+    </span>
+    {% endif %}
+  </div>
+
+  <!--  Missing classes notification  -->
+  {% if unconfigured_classes %}
+  <div class="missing-classes">
+    <span class="mc-label">Classes without fee structures:</span>
+    {% for cls in unconfigured_classes %}
+    <span class="mc-badge">{{ cls }}</span>
+    {% endfor %}
+    <span style="font-size:11px;color:var(--text-muted);margin-left:auto;">
+      Save a card below to create each structure.
+    </span>
+  </div>
+  {% endif %}
+</div>
+
+<!--  Department Tabs  -->
+<div class="fs-section">
+  <div class="dept-tabs" role="tablist">
+    {% for dept in departments %}
+    <button class="dept-tab {% if forloop.first %}active{% endif %}"
+            data-dept="{{ dept.department }}"
+            onclick="switchDept('{{ dept.department }}')"
+            role="tab"
+            aria-selected="{% if forloop.first %}true{% else %}false{% endif %}">
+      {{ dept.department_label }}
+      <span class="tab-count">{{ dept.cards|length }}</span>
+    </button>
+    {% endfor %}
+  </div>
+
+  <!--  Department Panels  -->
+  {% for dept in departments %}
+  <div class="dept-panel {% if forloop.first %}active{% endif %}"
+       id="panel-{{ dept.department }}"
+       role="tabpanel">
+    <div class="class-cards">
+      {% for card in dept.cards %}
+      <div class="class-card" id="card-{{ dept.department }}-{{ card.class_name|slugify }}">
+        <form method="POST" action="{% url 'finance:fee_structure_setup' %}" class="fs-form">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="save_class">
+          <input type="hidden" name="term_id" value="{{ selected_term.pk }}">
+          <input type="hidden" name="class_name" value="{{ card.class_name }}">
+
+          <div class="class-card-header">
+            <h4>{{ card.class_name }}</h4>
+            <span class="class-status {% if card.fs.pk %}configured{% else %}unconfigured{% endif %}">
+              {% if card.fs.pk %}Configured{% else %}New{% endif %}
+            </span>
+          </div>
+
+          <div class="class-card-body">
+            <!-- Tuition Fee -->
+            <div class="fs-field-row">
+              <span class="fs-field-label">Tuition Fee</span>
+              <div class="fs-field-input">
+                <span class="fs-currency-symbol">TZS</span>
+                {% with tuition=card.tuition_items|first %}
+                <input type="number" name="item_amount[]"
+                       value="{{ tuition.amount|floatformat:0|default:'0' }}"
+                       min="0" step="1000" required>
+                <input type="hidden" name="item_description[]" value="Tuition Fee">
+                <input type="hidden" name="item_category[]" value="tuition">
+                {% endwith %}
+              </div>
+            </div>
+
+            <!-- Activity Fees -->
+            {% for act in card.activity_items %}
+            <div class="activity-sub-row">
+              <span class="activity-label">{{ act.description }}</span>
+              <div class="fs-field-input">
+                <span class="fs-currency-symbol">TZS</span>
+                <input type="number" name="item_amount[]" value="{{ act.amount|floatformat:0 }}" min="0" step="500">
+                <input type="hidden" name="item_description[]" value="{{ act.description }}">
+                <input type="hidden" name="item_category[]" value="activity">
+              </div>
+            </div>
+            {% endfor %}
+
+            <!-- Add Activity Fee row (blank template) -->
+            <div class="activity-sub-row" style="opacity:.6;">
+              <span class="activity-label">
+                <input type="text" name="item_description[]" placeholder="Activity name (e.g. Sports & Arts)"
+                       style="border:none;background:transparent;font-size:11.5px;color:var(--text-secondary);width:160px;padding:2px 0;border-bottom:1px dashed var(--border);">
+              </span>
+              <div class="fs-field-input">
+                <span class="fs-currency-symbol">TZS</span>
+                <input type="number" name="item_amount[]" value="0" min="0" step="500"
+                       placeholder="0" style="width:80px;">
+                <input type="hidden" name="item_category[]" value="activity">
+              </div>
+            </div>
+
+            <!-- Late Pickup Charge -->
+            <div class="fs-field-row">
+              <span class="fs-field-label"> Late Pickup <span class="fs-label-hint">per instance</span></span>
+              <div class="fs-field-input">
+                <span class="fs-currency-symbol">TZS</span>
+                <input type="number" name="late_pickup_charge"
+                       value="{{ card.fs.late_pickup_charge|floatformat:0|default:'0' }}"
+                       min="0" step="1000">
+              </div>
+            </div>
+
+            <!-- Sibling Discount -->
+            <div class="fs-field-row">
+              <span class="fs-field-label">Sibling Discount</span>
+              <div class="fs-field-input sibling-toggle">
+                <select name="sibling_discount_mode">
+                  <option value="percentage" {% if card.fs.sibling_discount_mode == 'percentage' %}selected{% endif %}>%</option>
+                  <option value="fixed" {% if card.fs.sibling_discount_mode == 'fixed' %}selected{% endif %}>TZS</option>
+                </select>
+                <input type="number" name="sibling_discount_value"
+                       value="{{ card.fs.sibling_discount_value|floatformat:0|default:'0' }}"
+                       min="0" step="500" style="width:80px;">
+              </div>
+            </div>
+
+            <!-- Assessment Fee -->
+            <div class="fs-field-row">
+              <span class="fs-field-label">Assessment Fee <span class="fs-label-hint">Admissions</span></span>
+              <div class="fs-field-input">
+                <span class="fs-currency-symbol">TZS</span>
+                <input type="number" name="assessment_fee"
+                       value="{{ card.fs.assessment_fee|floatformat:0|default:'0' }}"
+                       min="0" step="500">
+              </div>
+            </div>
+          </div>
+
+          <div class="class-card-actions">
+            {% has_perm user "finance.change_feestructure" as can_edit %}
+            {% if can_edit %}
+            <button type="submit" class="btn-primary btn-sm">Save Fee Structure</button>
+            {% endif %}
+          </div>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% if not departments %}
+<div class="fs-section" style="padding:40px;text-align:center">
+  {% include '_partials/empty_state.html' with title='No classes found' desc='Create classes in Academics first before setting up fee structures.' icon='alert' icon_color='amber' %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  //  Department tab switching 
+  function switchDept(dept) {
+    document.querySelectorAll('.dept-tab').forEach(t => {
+      t.classList.remove('active');
+      t.setAttribute('aria-selected', 'false');
+    });
+    document.querySelectorAll('.dept-panel').forEach(p => p.classList.remove('active'));
+
+    const tab = document.querySelector(`.dept-tab[data-dept="${dept}"]`);
+    const panel = document.getElementById(`panel-${dept}`);
+    if (tab && panel) {
+      tab.classList.add('active');
+      tab.setAttribute('aria-selected', 'true');
+      panel.classList.add('active');
+    }
+  }
+
+  //  Term switcher 
+  function switchTerm(termId) {
+    window.location.href = `{% url 'finance:fee_structure_setup' %}?term=${termId}`;
+  }
+
+  //  Flash animation on save 
+  document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('saved')) {
+      const className = urlParams.get('class');
+      if (className) {
+        const card = document.getElementById(className);
+        if (card) card.classList.add('saved');
+      }
+    }
+
+    //  Auto-submit prevention on Enter (let the Save button handle it) 
+    document.querySelectorAll('.fs-form input').forEach(input => {
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          // Focus the save button instead of accidentally submitting
+          const btn = this.closest('.fs-form').querySelector('.btn-save-fs');
+          if (btn) btn.focus();
+        }
+      });
+    });
+
+    //  Save button feedback 
+    document.querySelectorAll('.fs-form').forEach(form => {
+      form.addEventListener('submit', function() {
+        const btn = this.querySelector('.btn-save-fs');
+        if (btn) {
+          btn.textContent = 'Saving...';
+          btn.classList.add('saving');
+          btn.disabled = true;
+        }
+      });
+    });
+  });
+</script>
+{% endblock %}

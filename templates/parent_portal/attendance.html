@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Parent Portal - Attendance{% endblock %}
+
+{% block content %}
+<div class="section-hdr">
+  <span class="section-title">Attendance History</span>
+  <span class="chip chip-blue">Monthly Record</span>
+</div>
+
+{% if children|length > 1 %}
+<div class="sub-nav" style="margin-bottom:16px">
+  {% for child in children %}
+  <a href="?student={{ child.id }}&year={{ year }}&month={{ month }}" class="sub-tab {% if selected_student and selected_student.id == child.id %}active{% endif %}">{{ child.get_full_name }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if selected_student %}
+<!-- Month Navigation -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:14px 18px">
+  <a href="?student={{ selected_student.id }}&year={{ prev_year }}&month={{ prev_month }}"
+     class="hf-btn hf-btn-secondary" style="padding:6px 14px;font-size:12px">&larr; Prev</a>
+  <strong style="font-size:15px">{{ month_name }} {{ year }}</strong>
+  <a href="?student={{ selected_student.id }}&year={{ next_year }}&month={{ next_month }}"
+     class="hf-btn hf-btn-secondary" style="padding:6px 14px;font-size:12px">Next &rarr;</a>
+</div>
+
+<!-- Stats Summary -->
+<div class="parent-att-grid">
+  <div class="parent-att-stat">
+    <div class="parent-att-val" style="color:#16a34a">{{ stats.present }}</div>
+    <div class="parent-att-lbl">Present</div>
+  </div>
+  <div class="parent-att-stat">
+    <div class="parent-att-val" style="color:#dc2626">{{ stats.absent }}</div>
+    <div class="parent-att-lbl">Absent</div>
+  </div>
+  <div class="parent-att-stat">
+    <div class="parent-att-val" style="color:#d97706">{{ stats.late }}</div>
+    <div class="parent-att-lbl">Late</div>
+  </div>
+  <div class="parent-att-stat">
+    <div class="parent-att-val" style="{% if stats.rate >= 90 %}color:#16a34a{% elif stats.rate >= 75 %}color:#d97706{% else %}color:#dc2626{% endif %}">{{ stats.rate }}%</div>
+    <div class="parent-att-lbl">Rate</div>
+  </div>
+</div>
+
+<!-- Calendar -->
+<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);background:var(--bg-page);border-bottom:1px solid var(--border)">
+    {% for day_name in day_names %}
+    <div class="cal-header" style="text-align:center;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">{{ day_name }}</div>
+    {% endfor %}
+  </div>
+
+  {% for week in month_days %}
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--border)">
+    {% for day in week %}
+    <div class="cal-cell" style="{% if day == 0 %}background:var(--bg-page){% endif %}">
+      {% if day != 0 %}
+      <div class="cal-day-num">{{ day }}</div>
+        {% for d, entry in attendance_map.items %}
+          {% if d == day %}
+          <div>
+            {% if "present" in entry.status|lower %}
+            <span style="display:block;text-align:center;padding:1px 4px;border-radius:4px;font-size:10px;font-weight:600;background:#dcfce7;color:#166534">P</span>
+            {% elif "absent" in entry.status|lower %}
+            <span style="display:block;text-align:center;padding:1px 4px;border-radius:4px;font-size:10px;font-weight:600;background:#fee2e2;color:#991b1b">A</span>
+            {% elif "late" in entry.status|lower %}
+            <span style="display:block;text-align:center;padding:1px 4px;border-radius:4px;font-size:10px;font-weight:600;background:#fef3c7;color:#92400e">L</span>
+            {% elif "excus" in entry.status|lower %}
+            <span style="display:block;text-align:center;padding:1px 4px;border-radius:4px;font-size:10px;font-weight:600;background:#dbeafe;color:#1e40af">E</span>
+            {% else %}
+            <span style="display:block;text-align:center;padding:1px 4px;border-radius:4px;font-size:10px;font-weight:600;background:#f3f4f6;color:#4b5563">{{ entry.status|truncatechars:1 }}</span>
+            {% endif %}
+            {% if entry.check_in_time %}
+            <div style="font-size:8px;color:var(--text-muted);text-align:center">{{ entry.check_in_time|time:"H:i" }}</div>
+            {% endif %}
+          </div>
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+
+  <!-- Legend -->
+  <div style="padding:10px 14px;background:var(--bg-page);border-top:1px solid var(--border);display:flex;gap:14px;font-size:11px;color:var(--text-muted);flex-wrap:wrap">
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#dcfce7;margin-right:4px;vertical-align:middle"></span> Present</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#fee2e2;margin-right:4px;vertical-align:middle"></span> Absent</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#fef3c7;margin-right:4px;vertical-align:middle"></span> Late</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#dbeafe;margin-right:4px;vertical-align:middle"></span> Excused</span>
+  </div>
+</div>
+
+{% else %}
+<div class="card" style="padding:40px;text-align:center">
+  <strong style="font-size:16px">No Children Found</strong>
+  <div style="font-size:13px;color:var(--text-muted);margin-top:6px">No students are linked to your parent account.</div>
+</div>
+{% endif %}
+
+<style>
+  .parent-att-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .parent-att-stat {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+  }
+  .parent-att-val { font-size: 20px; font-weight: 700; }
+  .parent-att-lbl { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+  .cal-cell { min-height: 48px; padding: 2px; border-right: 1px solid var(--border); }
+  .cal-day-num { font-size: 10px; font-weight: 500; color: var(--text-muted); margin-bottom: 2px; }
+  .cal-event-text { font-size: 9px; }
+  .cal-header { font-size: 9px; padding: 6px 2px; }
+
+  @media(min-width: 541px) {
+    .parent-att-grid { grid-template-columns: repeat(4, 1fr); }
+    .parent-att-stat { padding: 16px; }
+    .parent-att-val { font-size: 26px; }
+    .parent-att-lbl { font-size: 11px; }
+    .cal-cell { min-height: 72px; padding: 4px; }
+    .cal-day-num { font-size: 11px; }
+    .cal-event-text { font-size: 10px; }
+    .cal-header { font-size: 10px; padding: 8px 4px; }
+  }
+</style>
+{% endblock %}

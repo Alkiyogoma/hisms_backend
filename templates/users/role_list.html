@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+{% block title %}Role Management &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}User Management{% endblock %}
+
+{% block extra_head %}
+<style>
+  .role-card {
+    background: #fff;
+    border: 1px solid #E8EDF5;
+    border-radius: 12px;
+    padding: 20px;
+    transition: all 0.2s;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+  .role-card:hover {
+    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+    border-color: var(--hodari-blue, #2563EB);
+    transform: translateY(-2px);
+  }
+  .role-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .role-stats {
+    display: flex;
+    gap: 16px;
+    margin-top: 12px;
+  }
+  .role-stat {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #64748B;
+    font-weight: 500;
+  }
+  .role-stat svg {
+    width: 14px;
+    height: 14px;
+    opacity: 0.6;
+  }
+  .role-stat strong {
+    color: var(--text-primary, #1E293B);
+    font-weight: 700;
+  }
+  .dept-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 10px;
+  }
+  .dept-tag {
+    padding: 3px 10px;
+    border-radius: 99px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: #F1F5F9;
+    color: #475569;
+  }
+  .summary-bar {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .summary-item {
+    background: linear-gradient(135deg, #EEF4FF, #fff);
+    border: 1px solid #E8EDF5;
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    transition: all 0.2s;
+  }
+  .summary-item:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+    transform: translateY(-1px);
+  }
+  .summary-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .summary-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text-primary, #1E293B);
+    line-height: 1;
+    font-family: var(--font-mono, 'SF Mono', Monaco, Consolas, monospace);
+  }
+  .summary-label {
+    font-size: 11px;
+    color: #64748B;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .role-list-view {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .role-list-view .role-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 20px;
+  }
+  .role-list-view .role-card > div:first-child {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex: 1;
+    min-width: 0;
+  }
+  .role-list-view .role-card .role-stats {
+    margin-top: 0;
+    flex-shrink: 0;
+  }
+  .role-list-view .role-card .dept-tags {
+    margin-top: 0;
+    flex-shrink: 0;
+  }
+  .role-list-view .role-card .role-badge {
+    position: static;
+    flex-shrink: 0;
+  }
+  .view-toggle {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: #F1F5F9;
+    border-radius: 8px;
+    padding: 3px;
+  }
+  .view-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: #64748B;
+    transition: all 0.15s;
+  }
+  .view-toggle-btn.active {
+    background: #fff;
+    color: var(--hodari-blue, #2563EB);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .view-toggle-btn:hover:not(.active) {
+    color: #1E293B;
+  }
+  @media (max-width: 900px) {
+    .grid-3 { grid-template-columns: repeat(2, 1fr); }
+    .summary-bar { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 600px) {
+    .grid-3 { grid-template-columns: 1fr; }
+    .summary-bar { grid-template-columns: 1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "users/_top_tabs.html" %}
+
+<div style="max-width:1200px; margin:0 auto; padding:0 0 40px 0">
+  <!-- Summary Stats -->
+  <div class="summary-bar">
+    <div class="summary-item" style="background:linear-gradient(135deg,#7C3AED18,#fff)">
+      <div class="summary-icon" style="background:#7C3AED15">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div>
+        <div class="summary-value" style="color:#7C3AED">{{ system_count }}</div>
+        <div class="summary-label">System Roles</div>
+      </div>
+    </div>
+    <div class="summary-item" style="background:linear-gradient(135deg,#05966918,#fff)">
+      <div class="summary-icon" style="background:#05966915">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div>
+        <div class="summary-value" style="color:#059669">{{ total_users }}</div>
+        <div class="summary-label">Active Users</div>
+      </div>
+    </div>
+    <div class="summary-item" style="background:linear-gradient(135deg,#D9770618,#fff)">
+      <div class="summary-icon" style="background:#D9770615">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div>
+        <div class="summary-value" style="color:#B45309">RBAC</div>
+        <div class="summary-label">Access Control</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Roles Grid -->
+  <div id="roles-grid" class="role-list-view">
+    {% for role in roles %}
+    <a href="{% url 'users:role_detail' role=role.value %}" class="role-card" style="text-decoration:none; color:inherit">
+      <div style="display:flex; align-items:start; gap:16px">
+        <div class="role-icon" style="background:{{ role.icon_color }}15">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="{{ role.icon_color }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            {% if role.value == 'super_admin' %}
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            {% elif role.value == 'head_of_school' %}
+              <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+            {% elif role.value == 'teacher' %}
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            {% elif role.value == 'parent' %}
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            {% else %}
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+            {% endif %}
+          </svg>
+        </div>
+        <div style="flex:1; min-width:0">
+          <div style="font-size:15px; font-weight:700; color:var(--text-primary, #1E293B); margin-bottom:2px">
+            {{ role.label }}
+          </div>
+          <div style="font-size:12px; color:#64748B; line-height:1.5; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden">
+            {{ role.description }}
+          </div>
+        </div>
+      </div>
+
+      <div class="role-stats">
+        <div class="role-stat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          <strong>{{ role.user_count }}</strong> user{{ role.user_count|pluralize }}
+        </div>
+        <div class="role-stat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <strong>{{ role.permission_count }}</strong> perm{{ role.permission_count|pluralize }}
+        </div>
+      </div>
+
+      {% if role.departments %}
+      <div class="dept-tags">
+        {% for dept in role.departments %}
+        <span class="dept-tag">{{ dept }}</span>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="margin-top:10px; font-size:11px; color:#94A3B8; font-style:italic">
+        No department restriction
+      </div>
+      {% endif %}
+
+      <div class="role-badge" style="position:absolute; top:12px; right:12px; display:flex; align-items:center; gap:6px">
+        {% if role.is_system %}
+        <span style="padding:3px 8px; border-radius:6px; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; background:#FEF3C7; color:#92400E">
+          System
+        </span>
+        {% else %}
+        <span style="padding:3px 8px; border-radius:6px; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; background:#DBEAFE; color:#1E40AF">
+          Custom
+        </span>
+        {% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function setView(mode) {
+  var grid = document.getElementById('roles-grid');
+  var gridBtn = document.getElementById('grid-view-btn');
+  var listBtn = document.getElementById('list-view-btn');
+  if (mode === 'list') {
+    grid.classList.remove('grid-3');
+    grid.classList.add('role-list-view');
+    listBtn.classList.add('active');
+    gridBtn.classList.remove('active');
+  } else {
+    grid.classList.remove('role-list-view');
+    grid.classList.add('grid-3');
+    gridBtn.classList.add('active');
+    listBtn.classList.remove('active');
+  }
+  localStorage.setItem('roles-view', mode);
+}
+(function() {
+  var saved = localStorage.getItem('roles-view');
+  if (saved === 'grid') setView('grid');
+  else setView('list');
+})();
+</script>
+{% endblock %}

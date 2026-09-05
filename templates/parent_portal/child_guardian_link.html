@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Link Guardian — {{ student.first_name }}{% endblock %}
+{% block content %}
+<div class="page-hdr">
+  <div>
+    <h1>Link Guardian to {{ student.first_name }} {{ student.last_name }}</h1>
+    <p>Add an additional guardian or next of kin</p>
+  </div>
+  <a href="{% url 'parent_portal:guardian_list' student.id %}" class="hf-btn hf-btn-secondary">Back to Guardians</a>
+</div>
+
+{% if error %}
+<div class="card" style="padding:24px;color:#DC2626">{{ error }}</div>
+{% else %}
+
+<div class="card" style="padding:24px;max-width:640px">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+    <div style="width:40px;height:40px;border-radius:10px;background:#EEF4FF;display:flex;align-items:center;justify-content:center">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#023AA5" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    </div>
+    <div>
+      <h3 style="margin:0;font-size:15px;font-weight:700">Request a New Guardian</h3>
+      <p style="margin:0;font-size:13px;color:#64748B">Send a request to the school office to create and link a new guardian record.</p>
+    </div>
+  </div>
+
+  <form method="POST">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="request_guardian">
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Guardian Full Name</label>
+      <input type="text" name="guardian_name" class="form-input" placeholder="e.g. Jane Doe" required>
+    </div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Phone Number</label>
+      <input type="text" name="guardian_phone" class="form-input" placeholder="e.g. +255 767 000 000" required>
+    </div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Relationship to Student</label>
+      <select name="relationship" class="form-select">
+        {% for val, label in relationship_choices %}
+        <option value="{{ val }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group" style="margin-bottom:20px">
+      <label class="form-label">Additional Notes <span style="color:#94A3B8;font-weight:400">(optional)</span></label>
+      <textarea name="notes" class="form-input" rows="2" placeholder="Any extra details for the school office..."></textarea>
+    </div>
+    <button type="submit" class="hf-btn hf-btn-primary" style="width:100%;justify-content:center">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+      Send Request to School Office
+    </button>
+  </form>
+</div>
+
+{% endif %}
+{% endblock %}

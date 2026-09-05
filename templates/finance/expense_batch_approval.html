@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Batch Expense Approval &mdash; Finance &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Batch Expense Approval{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+<div class="section-hdr">
+  <span class="section-title">Review pending expenses</span>
+  <div style="display:flex;align-items:center;gap:8px">
+    <a href="{% url 'finance:expense_list' %}" class="btn btn-secondary btn-sm">&larr; All expenses</a>
+    <a href="{% url 'finance:dashboard' %}" class="btn btn-secondary btn-sm">&larr; Dashboard</a>
+  </div>
+</div>
+
+<!-- Summary cards -->
+<div class="metrics" style="grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:16px">
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FFF8ED,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Pending</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#B45309">{{ pending_total|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#B45309">{{ pending_count }} expense{{ pending_count|pluralize }} awaiting review</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Categories</span>
+    </div>
+    <div class="mc-val" style="color:#023AA5">{{ category_count }}</div>
+    <div class="mc-sub" style="color:#5A697D">Group{{ category_count|pluralize }}</div>
+  </div>
+</div>
+
+{% if pending_expenses %}
+{% has_perm user "finance.change_expense" as can_review %}
+{% if can_review %}
+<form method="post" id="batch-form">
+  {% csrf_token %}
+
+  <!-- Select all toolbar -->
+  <div class="card" style="margin-bottom:14px;padding:10px 16px">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <label class="hf2-check-label" style="margin:0">
+        <input type="checkbox" id="select-all" class="hf2-checkbox" onchange="document.querySelectorAll('.expense-check').forEach(c=>c.checked=this.checked)">
+        Select all
+      </label>
+      <span style="color:var(--text-muted);font-size:12px" id="selected-count">0 selected</span>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button type="submit" name="action" value="approve" class="btn btn-primary btn-sm" onclick="return confirm('Approve the selected expenses?')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polyline points="20 6 9 17 4 12"/></svg>
+          Approve selected
+        </button>
+        <button type="button" class="btn btn-danger btn-sm" onclick="document.getElementById('reject-section').style.display='block';this.style.display='none'">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          Reject selected
+        </button>
+      </div>
+    </div>
+    <div id="reject-section" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+      <label class="hf2-label" style="margin-bottom:4px">Rejection reason <span class="hf2-req">*</span></label>
+      <div style="display:flex;gap:8px">
+        <textarea name="rejection_reason" rows="2" class="hf2-textarea" placeholder="Reason for rejecting these expenses..." style="flex:1"></textarea>
+        <button type="submit" name="action" value="reject" class="btn btn-danger" onclick="return confirm('Reject the selected expenses? A reason is required.')">Reject</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Expenses grouped by category -->
+  {% for cat_code, cat_data in categories.items %}
+  <div class="card" style="margin-bottom:12px;padding:0;overflow:hidden">
+    <div style="padding:12px 16px;background:var(--bg-metric);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" class="hf2-checkbox category-check" onchange="document.querySelectorAll('.cat-{{ cat_code|slugify }}').forEach(c=>c.checked=this.checked)" style="margin:0">
+        <span style="font-weight:600;font-size:14px">{{ cat_data.label }}</span>
+      </div>
+      <span style="font-size:12px;font-family:var(--font-mono);color:var(--text-muted)">
+        {{ cat_data.count }} expense{{ cat_data.count|pluralize }} &middot; TZS {{ cat_data.total|floatformat:0 }}
+      </span>
+    </div>
+    {% for exp in cat_data.expenses %}
+    <div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;transition:background .1s" onmouseover="this.style.background='var(--bg-metric)'" onmouseout="this.style.background=''">
+      <input type="checkbox" name="expense_ids[]" value="{{ exp.pk }}" class="hf2-checkbox expense-check cat-{{ cat_code|slugify }}" style="margin:0;flex-shrink:0" onchange="updateCount()">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-weight:500;font-size:13px">{{ exp.description|truncatechars:50 }}</span>
+          <span style="font-family:var(--font-mono);font-size:13px;font-weight:700">TZS {{ exp.amount|floatformat:0 }}</span>
+        </div>
+        <div style="display:flex;gap:12px;font-size:11.5px;color:var(--text-muted);margin-top:2px">
+          <span>{{ exp.expense_date|date:"d M Y" }}</span>
+          {% if exp.vendor %}<span>Vendor: {{ exp.vendor }}</span>{% endif %}
+          <span>By: {{ exp.created_by.get_full_name|default:exp.created_by.username }}</span>
+          {% if exp.reference %}<span>Ref: {{ exp.reference }}</span>{% endif %}
+        </div>
+      </div>
+      <a href="{% url 'finance:expense_detail' exp.pk %}" class="section-link" style="font-size:11px;flex-shrink:0">View &rarr;</a>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</form>
+{% endif %}
+{% else %}
+<div style="text-align:center;padding:48px 24px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px">
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" style="margin-bottom:12px"><polyline points="20 6 9 17 4 12"/></svg>
+  <div style="font-size:16px;font-weight:600;color:var(--text-primary)">No pending expenses</div>
+  <div style="font-size:13px;color:var(--text-muted);margin-top:4px">All expenses have been reviewed. Great work!</div>
+  <a href="{% url 'finance:expense_list' %}" class="btn btn-secondary" style="margin-top:16px">View all expenses</a>
+</div>
+{% endif %}
+
+<!-- Recent actions -->
+{% if recent_actions %}
+<div class="card" style="margin-top:16px">
+  <div class="card-title">Recent approval activity</div>
+  {% for action in recent_actions %}
+  <div class="trow">
+    <div>
+      <div class="trow-name">
+        {{ action.description|truncatechars:50 }}
+        <span class="chip {% if action.status == 'approved' %}chip-green{% else %}chip-red{% endif %}" style="font-size:10px;margin-left:6px">
+          {{ action.get_status_display }}
+        </span>
+      </div>
+      <div class="trow-sub">
+        by {{ action.approved_by.get_full_name|default:action.approved_by.username }}
+        &middot; {{ action.approved_at|timesince }} ago
+      </div>
+    </div>
+    <span class="trow-right" style="font-family:var(--font-mono);font-weight:600">TZS {{ action.amount|floatformat:0 }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<script>
+function updateCount() {
+  var checked = document.querySelectorAll('.expense-check:checked').length;
+  document.getElementById('selected-count').textContent = checked + ' selected';
+}
+updateCount();
+</script>
+{% endblock %}

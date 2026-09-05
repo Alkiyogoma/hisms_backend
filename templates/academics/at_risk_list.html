@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}At-Risk Students &mdash; {{ brand.school_name }}{% endblock %}
+
+{% block topbar_greeting %}Academic Monitoring{% endblock %}
+{% block topbar_date %}{{ current_term.name }}{% endblock %}
+
+{% block extra_head %}
+{% include "includes/hodari_print_styles.html" %}
+<style>
+  .print-only { display: none; }
+  .grade-chip { padding: 4px 12px; border-radius: 99px; font-size: 11px; font-weight: 700; font-family: var(--font-mono); border: 1px solid transparent; }
+  .gc-d { background: #FEF2F2; color: #9B1C1C; border-color: #FECACA; }
+  .gc-e { background: #4A1515; color: #FFD0D0; border-color: #7B2020; }
+  
+  .h-table th { background: #F8FAFC; text-transform: uppercase; letter-spacing: 0.05em; font-size: 10px; color: #64748B; padding: 14px 16px; border-bottom: 2px solid #EDF2F7; }
+  .h-table td { padding: 14px 16px; border-bottom: 1px solid #F1F5F9; font-size: 13.5px; }
+  
+  .student-avatar { width: 36px; height: 36px; border-radius: 50%; background: #F0F4FB; color: var(--hodari-blue); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; border: 1px solid #DDE3EE; }
+
+  @media print {
+    .print-only { display: block !important; }
+    .print-hide, .sidebar, .topbar { display: none !important; }
+    body { background: #fff !important; }
+    .card { box-shadow: none !important; border: 1px solid #eee !important; margin: 0 !important; padding: 0 !important; }
+    .main { padding: 0 !important; }
+    .content { padding: 0 !important; }
+    .section-title { font-size: 18px !important; color: #000 !important; }
+    .h-table th { background: #eee !important; color: #000 !important; }
+    -webkit-print-color-adjust: exact;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "academics/_top_tabs_reports.html" %}
+<!-- Print-only branded header -->
+<div class="print-only doc-container" style="max-width:900px;margin:0 auto 20px;background:#fff;padding:24px 28px;border:1px solid #DDE3EE;border-radius:12px">
+  {% include "includes/hodari_print_header.html" %}
+  <div style="height:1px;background:var(--border);margin:16px 0"></div>
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <div style="font-family:var(--font-display);font-size:18pt;font-weight:bold;color:var(--hodari-blue);text-transform:uppercase">At-Risk Students</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">{{ current_term.name }} &middot; {{ at_risk_students|length }} student{{ at_risk_students|length|pluralize }}</div>
+    </div>
+    <div style="text-align:right;font-size:12px;color:var(--text-muted)">
+      <div style="font-weight:700;color:var(--hodari-blue)">Generated {% now "d M Y" %}</div>
+    </div>
+  </div>
+</div>
+<div class="section-hdr">
+  <span class="section-title">Critical & Flagged Students &middot; {{ current_term.name }}</span>
+  <div style="display:flex; gap:10px; align-items:center" class="print-hide">
+    <span class="chip chip-red" style="font-weight:700">{{ at_risk_students|length }} Action Required</span>
+    <button onclick="window.print()" class="hf-btn hf-btn-secondary" style="font-size:12px; padding:6px 14px">
+      <svg style="width:14px; height:14px; vertical-align:middle; margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z"/></svg>
+      Generate PDF List
+    </button>
+  </div>
+</div>
+
+<div class="card" style="padding:0; overflow:hidden; border-top: 4px solid var(--red);">
+  <table class="h-table">
+    <thead>
+      <tr>
+        <th style="width:60px"></th>
+        <th style="text-align:left">Student Full Name</th>
+        <th style="text-align:left">Class</th>
+        <th style="text-align:left">Adm. No</th>
+        <th style="text-align:center">Weighted Avg</th>
+        <th style="text-align:center">Rating</th>
+        <th style="text-align:right" class="print-hide">Intervention</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in at_risk_students %}
+      <tr class="hover-row" style="transition: background 0.2s">
+        <td style="padding-right:0">
+          <div class="student-avatar">
+            {{ s.first_name|slice:":1" }}{{ s.last_name|slice:":1" }}
+          </div>
+        </td>
+        <td>
+          <div style="font-weight: 700; color: var(--hodari-blue);">{{ s.get_full_name }}</div>
+          <div style="font-size:11px; color:#64748B; margin-top:2px">ID: #{{ s.id }}</div>
+        </td>
+        <td style="font-weight:500; color:#1A1A2E">{{ s.class_name }}</td>
+        <td style="font-family: var(--font-mono); font-size: 12px; color: #64748B">{{ s.admission_no }}</td>
+        <td style="text-align:center; font-weight: 800; color: var(--red); font-size:15px">{{ s.avg }}%</td>
+        <td style="text-align:center">
+          <span class="grade-chip {% if s.grade == 'D' %}gc-d{% else %}gc-e{% endif %}">
+            Grade {{ s.grade }}
+          </span>
+        </td>
+        <td style="text-align:right" class="print-hide">
+          <a href="{% url 'students:detail' s.pk %}" class="hf-btn hf-btn-secondary" style="padding:5px 12px; font-size:11px">Manage Profile</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7">{% include '_partials/empty_state.html' with title='No at-risk students' desc='All students are currently performing at Grade C or above.' icon='check' icon_color='green' %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="print-hide" style="margin-top:24px; background:#FEF2F2; border:1px solid #FECACA; border-radius:12px; padding:20px; display:flex; gap:16px; align-items:flex-start">
+    <div style="color:var(--red); margin-top:2px">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+    </div>
+    <div style="font-size:13px; color:#9B1C1C; line-height:1.6">
+        <strong>Intervention Guide:</strong> Students listed here have weighted scores below the 60% school threshold. 
+        <strong style="text-decoration:underline">Grade E</strong> students (below 50%) require immediate administrative intervention and parent-teacher conferences.
+        <strong style="text-decoration:underline">Grade D</strong> students (50-59%) should be monitored for academic trend improvement.
+    </div>
+</div>
+
+<style>
+  .hover-row:hover { background: #F8FAFC; }
+</style>
+{% endblock %}

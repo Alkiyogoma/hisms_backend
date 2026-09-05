@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+{% load hodari_forms static %}
+{% block title %}New Inquiry &mdash; {{ brand.school_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .accordion-section{display:none}
+  .tab-bar{display:flex;border-bottom:2px solid #E2E8F0;margin-bottom:0;padding:0;gap:0;flex-wrap:nowrap}
+  .tab-btn{padding:14px 22px;font-size:13px;font-weight:600;color:#64748B;background:transparent;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;justify-content:center;gap:8px;font-family:var(--font-ui);white-space:nowrap;flex:1;text-align:center}
+  .tab-btn:hover{color:var(--hodari-blue);background:rgba(2,58,165,0.04)}
+  .tab-btn.active{color:var(--hodari-blue);border-bottom-color:var(--hodari-blue);background:rgba(2,58,165,0.06)}
+  .tab-btn svg{width:17px;height:17px;flex-shrink:0}
+  .tab-content{display:none;padding:0}
+  .tab-content.active{display:block;animation:tabFadeIn 0.35s ease}
+  @keyframes tabFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  .parent-name-dropdown{display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:280px;overflow-y:auto}
+  .parent-name-dropdown.open{display:block}
+  .parent-name-item{padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .15s}
+  .parent-name-item:last-child{border-bottom:none}
+  .parent-name-item:hover,.parent-name-item.active{background:rgba(2,58,165,.05)}
+  .pni-name{font-size:13px;font-weight:600;color:var(--text-primary)}
+  .pni-detail{font-size:11.5px;color:var(--text-muted);margin-top:2px}
+  .pni-siblings{font-size:11px;color:var(--hodari-blue);margin-top:2px;font-style:italic}
+</style>
+{% endblock %}
+
+{% block topbar_greeting %}Admissions &middot; New Inquiry{% endblock %}
+{% block topbar_date %}{{ today_display }}{% endblock %}
+{% block topbar_badges %}
+  <a href="{% url 'admissions:actions_needed' %}" class="topbar-badge badge-blue" style="text-decoration:none">
+    <span class="badge-dot"></span>
+  </a>
+{% endblock %}
+
+{% block content %}
+  {% include "admissions/_top_tabs.html" %}
+
+  <div style="margin-top:20px;">
+    <form method="post" id="inquiry-form">
+      {% csrf_token %}
+      {{ form.inquiry_channel }}
+      {{ form.sibling_matched_parent }}
+      {{ form.sibling_link_decision }}
+      {% if form.previous_school_other %}<div style="display:none">{{ form.previous_school_other }}</div>{% endif %}
+
+      <div id="channel-required-banner" style="margin-bottom:14px;padding:14px 18px;border-radius:8px;background:rgba(2,58,165,.04);border:1px solid rgba(2,58,165,.12);display:flex;align-items:center;gap:10px;font-size:13px;color:#023AA5">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#023AA5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <span>Select how this inquiry was received before filling in any other fields.</span>
+      </div>
+
+      <div id="inquiry-grid" style="display:block; gap:24px; align-items: flex-start;">
+        <div class="form-container">
+
+          <div class="card" id="channel-card" style="margin-bottom:14px">
+            <div class="form-section-title">How did this inquiry come in?<span style="color:#DC2626;margin-left:2px">*</span></div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+              <div class="channel-pill" data-value="walk_in" onclick="selectChannel(this)">Walk-in</div>
+              <div class="channel-pill" data-value="phone_call" onclick="selectChannel(this)">Phone call</div>
+              <div class="channel-pill" data-value="website" onclick="selectChannel(this)">Website</div>
+              <div class="channel-pill" data-value="social" onclick="selectChannel(this)">Social media</div>
+            </div>
+            {% for err in form.inquiry_channel.errors %}<p class="hf2-error">{{ err }}</p>{% endfor %}
+          </div>
+
+          <div id="form-fields-wrapper" style="display:none">
+
+          <div class="card" style="padding:0;overflow:hidden">
+            <div class="tab-bar" role="tablist">
+              <button type="button" class="tab-btn active" data-tab="tab-child" role="tab" aria-selected="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                Child Information
+              </button>
+              <button type="button" class="tab-btn" data-tab="tab-parent" role="tab" aria-selected="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                Parent / Guardian
+              </button>
+              <button type="button" class="tab-btn" data-tab="tab-appointment" role="tab" aria-selected="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                Appointment
+              </button>
+            </div>
+
+            <!-- Tab 1: Child Information -->
+            <div id="tab-child" class="tab-content active" role="tabpanel" style="padding:28px 32px">
+              <div class="form-section">
+                <div class="form-section-title" style="font-size:15px;font-weight:700;border-bottom:2px solid #023AA5;padding-bottom:10px;margin-bottom:18px">
+                  <span style="display:inline-block;width:26px;height:26px;border-radius:6px;background:#023AA5;color:#fff;text-align:center;line-height:26px;font-size:12px;margin-right:8px">1</span>
+                  Child's Information
+                </div>
+                <div class="grid-3">
+                  {% field form.child_full_name placeholder="Name of the Child" %}
+                  {% field form.child_date_of_birth %}
+                  <div class="hf2-group">
+                    <label class="hf2-label">Gender<span class="hf2-req">*</span></label>
+                    <div style="display:flex;gap:12px;margin-top:6px">
+                      <div class="channel-pill gender-pill" data-value="Female" onclick="selectGender(this)">Female</div>
+                      <div class="channel-pill gender-pill" data-value="Male" onclick="selectGender(this)">Male</div>
+                    </div>
+                    <input type="hidden" name="x_gender" id="id_x_gender" value="">
+                  </div>
+                </div>
+                <div class="grid-2" style="margin-top:14px">
+                  {% field form.previous_school placeholder="Current School Attending" %}
+                  {% field form.applying_department %}
+                  {% field form.grade_applying_for %}
+                  <div class="hf2-group">
+                    <label class="hf2-label">Current Grade</label>
+                    <input type="text" name="x_current_grade" class="hf2-input" placeholder="e.g. Grade 2">
+                  </div>
+                </div>
+                <div id="capacity-indicator" style="display:none"></div>
+              </div>
+
+              <div style="margin-top:28px;display:flex;justify-content:flex-end">
+                <button type="button" class="btn-primary" onclick="switchTab('tab-parent')">
+                  Next: Parent / Guardian
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:4px"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Tab 2: Parent / Guardian Information -->
+            <div id="tab-parent" class="tab-content" role="tabpanel" style="padding:28px 32px">
+              <div class="form-section">
+                <div class="form-section-title" style="font-size:15px;font-weight:700;border-bottom:2px solid #023AA5;padding-bottom:10px;margin-bottom:18px">
+                  <span style="display:inline-block;width:26px;height:26px;border-radius:6px;background:#023AA5;color:#fff;text-align:center;line-height:26px;font-size:12px;margin-right:8px">2</span>
+                  Parent / Guardian Information
+                </div>
+                <div class="grid-2">
+                  <div style="position:relative">
+                    {% field form.parent_full_name placeholder="Full Name" span="full" %}
+                    <div id="parent-name-dropdown" class="parent-name-dropdown"></div>
+                  </div>
+                  {% field form.parent_relationship %}
+                  {% field form.parent_phone %}
+                  {% field form.parent_email %}
+                  {% field form.parent_invoice_name %}
+                </div>
+              </div>
+
+              <div style="margin-top:28px;display:flex;justify-content:space-between">
+                <button type="button" class="btn-secondary" onclick="switchTab('tab-child')">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+                  Back
+                </button>
+                <button type="button" class="btn-primary" onclick="switchTab('tab-appointment')">
+                  Next: Appointment
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:4px"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Tab 3: Appointment -->
+            <div id="tab-appointment" class="tab-content" role="tabpanel" style="padding:28px 32px">
+              <div class="form-section">
+                <div class="form-section-title" style="font-size:15px;font-weight:700;border-bottom:2px solid #023AA5;padding-bottom:10px;margin-bottom:18px">
+                  <span style="display:inline-block;width:26px;height:26px;border-radius:6px;background:#023AA5;color:#fff;text-align:center;line-height:26px;font-size:12px;margin-right:8px">3</span>
+                  Appointment
+                </div>
+                <p style="font-size:13px;color:#6B7280;margin:0 0 16px">Our Head of School reviews each inquiry personally. Pick a preferred date and time for the meeting.</p>
+                <div class="grid-2">
+                  {% field form.preferred_meeting_date %}
+                  {% field form.preferred_meeting_time %}
+                </div>
+                <div class="grid-2" style="margin-top:16px">
+                  <div>
+                    <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Target enrollment year</label>
+                    <select name="target_enrollment_year" style="width:100%;padding:10px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:14px">
+                      <option value="">Select year</option>
+                      {% for y in enrollment_years %}<option value="{{ y }}" {% if form.target_enrollment_year.value|stringformat:"s" == y|stringformat:"s" %}selected{% endif %}>{{ y }}</option>{% endfor %}
+                    </select>
+                  </div>
+                  <div>
+                    <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Target enrollment month</label>
+                    <select name="target_enrollment_month" style="width:100%;padding:10px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:14px">
+                      <option value="">Select month</option>
+                      <option value="1" {% if form.target_enrollment_month.value == 1 %}selected{% endif %}>January</option>
+                      <option value="2" {% if form.target_enrollment_month.value == 2 %}selected{% endif %}>February</option>
+                      <option value="3" {% if form.target_enrollment_month.value == 3 %}selected{% endif %}>March</option>
+                      <option value="4" {% if form.target_enrollment_month.value == 4 %}selected{% endif %}>April</option>
+                      <option value="5" {% if form.target_enrollment_month.value == 5 %}selected{% endif %}>May</option>
+                      <option value="6" {% if form.target_enrollment_month.value == 6 %}selected{% endif %}>June</option>
+                      <option value="7" {% if form.target_enrollment_month.value == 7 %}selected{% endif %}>July</option>
+                      <option value="8" {% if form.target_enrollment_month.value == 8 %}selected{% endif %}>August</option>
+                      <option value="9" {% if form.target_enrollment_month.value == 9 %}selected{% endif %}>September</option>
+                      <option value="10" {% if form.target_enrollment_month.value == 10 %}selected{% endif %}>October</option>
+                      <option value="11" {% if form.target_enrollment_month.value == 11 %}selected{% endif %}>November</option>
+                      <option value="12" {% if form.target_enrollment_month.value == 12 %}selected{% endif %}>December</option>
+                    </select>
+                  </div>
+                </div>
+                <div style="margin-top:16px">
+                  {% field form.notes placeholder="Anything else you would like us to know" rows="3" span="full" %}
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <a href="{% url 'admissions:pipeline' %}" class="btn-secondary">Cancel</a>
+                <div style="display:flex; gap:10px;">
+                  <button type="button" class="btn-secondary" onclick="switchTab('tab-parent')">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+                    Back
+                  </button>
+                  <button type="submit" name="action" value="save_only" class="btn-primary">Save Inquiry</button>
+                </div>
+              </div>
+            </div>
+           </div>
+          </div>
+        </div>
+
+        <!-- Right Column: Sibling panel -->
+        <div id="sidebar-wrapper" class="sidebar-container" style="display:none">
+          <div id="sibling-panel" class="card" style="display:none; border-left: 4px solid var(--hodari-gold); position: sticky; top: 82px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+              <div class="form-section-title" style="border:none !important; margin-bottom:0 !important; color:var(--amber) !important;">
+                Possible sibling match found
+              </div>
+              <button type="button" onclick="dismissSiblingPanel()" style="background:none;border:none;color:#8492A6;cursor:pointer;font-size:12px;padding:2px 6px;border-radius:4px;" title="Dismiss">
+                Dismiss &#10005;
+              </button>
+            </div>
+            <p style="font-size:12.5px; color:var(--text-secondary); margin:10px 0 14px;">
+              A parent with this phone number was found.
+            </p>
+            <div id="sibling-list"></div>
+            <div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--border);">
+              <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                <input type="checkbox" name="link_to_existing" id="link_to_existing" checked style="width:16px; height:16px;">
+                <span style="font-size:12.5px; font-weight:600; color:var(--hodari-blue);">Link to this family record</span>
+              </label>
+            </div>
+          </div>
+          <div id="no-match-panel" class="card" style="background:#f8fafc; border-style:dashed; display:none;">
+             <div class="form-section-title" style="border:none !important; margin-bottom:8px !important; opacity:0.6 !important;">No Match Yet</div>
+             <p style="font-size:12px; color:var(--text-muted);">Enter a parent phone number to check for existing family records.</p>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <script id="admission-grades-data" type="application/json">{{ admission_grades_json|safe }}</script>
+
+  <script>
+    function selectChannel(el) {
+      document.querySelectorAll('.channel-pill:not(.gender-pill)').forEach(function(p) { p.classList.remove('selected'); });
+      el.classList.add('selected');
+      var val = el.getAttribute('data-value');
+      var hiddenInput = document.getElementById('id_inquiry_channel');
+      if (hiddenInput) hiddenInput.value = val;
+      var fw = document.getElementById('form-fields-wrapper');
+      var cb = document.getElementById('channel-required-banner');
+      if (fw) { fw.style.display = 'block'; fw.style.animation = 'fadeIn 0.3s ease'; }
+      if (cb) cb.style.display = 'none';
+    }
+
+    function selectGender(el) {
+      document.querySelectorAll('.gender-pill').forEach(function(p) { p.classList.remove('selected'); });
+      el.classList.add('selected');
+      var val = el.getAttribute('data-value');
+      var hiddenInput = document.getElementById('id_x_gender');
+      if (hiddenInput) hiddenInput.value = val;
+    }
+
+    function switchTab(tabId) {
+      var btns = document.querySelectorAll('.tab-btn');
+      var contents = document.querySelectorAll('.tab-content');
+      btns.forEach(function(b) {
+        b.classList.remove('active');
+        b.setAttribute('aria-selected', 'false');
+      });
+      contents.forEach(function(c) { c.classList.remove('active'); });
+      var target = document.querySelector('[data-tab="' + tabId + '"]');
+      if (target) { target.classList.add('active'); target.setAttribute('aria-selected', 'true'); }
+      var panel = document.getElementById(tabId);
+      if (panel) { panel.classList.add('active'); }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      var tabBtns = document.querySelectorAll('.tab-btn');
+      tabBtns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          switchTab(this.getAttribute('data-tab'));
+        });
+      });
+    });
+
+    (function() {
+      var h = document.getElementById('id_inquiry_channel');
+      var init = h ? h.value : 'walk_in';
+      var pill = document.querySelector('.channel-pill[data-value="' + init + '"]');
+      if (pill) selectChannel(pill);
+    })();
+  </script>
+  <script src="{% static 'admissions/admissions-inquiry.js' %}?v=3"></script>
+{% endblock %}

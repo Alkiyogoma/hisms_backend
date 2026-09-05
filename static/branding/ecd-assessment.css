@@ -1,0 +1,21 @@
+/* Shared ECD Assessment Styles — imported by per-class templates */
+.domain-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:0.5px solid var(--border,#DDE3EE);gap:12px}
+.domain-row:last-child{border-bottom:none}
+.domain-label{font-size:13px;color:var(--text-primary,#1A1A2E);flex:1}
+.domain-grade-group{display:flex;gap:6px;flex-shrink:0}
+.comment-area{width:100%;padding:10px 12px;border:1px solid var(--border,#DDE3EE);border-radius:8px;font-size:13px;font-family:Roboto,sans-serif;color:var(--text-primary,#1A1A2E);resize:vertical;min-height:80px;outline:none}
+.comment-area:focus{border-color:var(--hodari-blue,#023AA5)}
+.char-count{font-size:13px;color:var(--text-muted,#8492A6);margin-top:4px;text-align:right}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:99px;font-size:13px;font-weight:600;border:1px solid transparent;white-space:nowrap}
+.chip-green{background:var(--green-bg,#E8F5EC);color:var(--green,#1B7B34);border-color:var(--green-bd,#B7DFBF)}
+.chip-grey{background:#F3F4F6;color:#4B5563;border-color:#D1D5DB}
+.chip-amber{background:var(--amber-bg,#FEF3C7);color:var(--amber,#92550A);border-color:var(--amber-bd,#FCD34D)}
+.student-item{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;cursor:pointer;border-left:3px solid transparent;border-bottom:0.5px solid var(--border,#DDE3EE);transition:all .1s}
+.student-item:hover{background:#F7F9FC}
+.student-item.active{border-left-color:var(--hodari-blue,#023AA5);background:var(--hodari-blue-pale,#F0F4FB)}
+.stab-link{padding:10px 16px;font-size:13px;font-weight:500;color:var(--text-muted,#8492A6);border-bottom:2px solid transparent;text-decoration:none;white-space:nowrap;display:inline-block}
+.stab-link.active{color:var(--hodari-blue,#023AA5);border-bottom-color:var(--hodari-blue,#023AA5);font-weight:600}
+.sec-hdr{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted,#8492A6);margin:14px 0 8px;padding-top:12px;border-top:1px solid var(--border,#DDE3EE)}
+.sec-hdr-first{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted,#8492A6);margin:0 0 8px}
+.pace-inp{width:100%;padding:5px 8px;border:1px solid var(--border,#DDE3EE);border-radius:6px;font-size:12.5px;font-family:Roboto,sans-serif;text-align:center;outline:none;background:#fff}
+.pace-inp:focus{border-color:var(--hodari-blue,#023AA5)}

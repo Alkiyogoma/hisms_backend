@@ -1,0 +1,1448 @@
+{% extends "base.html" %}
+{% load static %}
+{% load hodari_forms %}
+{% load role_tags %}
+{% block title %}Settings — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}System{% endblock %}
+
+{% block extra_head %}
+{% if active_tab == 'email_templates' %}
+<style>
+  .tpl-var-btn { display:inline-block;padding:3px 8px;margin:2px;font-size:11px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;cursor:pointer;color:#374151;font-weight:500;transition:all .15s; }
+  .tpl-var-btn:hover { background:#023AA5;color:#fff;border-color:#023AA5; }
+  #editEmailTpl_htmlRaw { border-radius:8px;border-color:#e5e7eb;resize:vertical;min-height:380px;line-height:1.6;tab-size:2;background:#fafbfc; }
+</style>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+{# ── Sub-nav tabs (consistent with academics, students, HR modules) ── #}
+<div class="sub-nav">
+    {% if not is_admin_officer and not is_head_of_school and not is_hod %}
+    <a href="?tab=system" class="sub-tab {% if active_tab == 'system' %}active{% endif %}">System Settings</a>
+    {% endif %}
+    {% has_perm request.user "academics.view_gradeclass" as can_view_classes %}
+    {% has_perm request.user "academics.add_gradeclass" as can_add_class %}
+    {% has_perm request.user "academics.change_gradeclass" as can_edit_class %}
+    {% has_perm request.user "academics.delete_gradeclass" as can_delete_class %}
+    {% if can_view_classes %}
+    <a href="?tab=classes" class="sub-tab {% if active_tab == 'classes' %}active{% endif %}">Classes <span class="sub-tab-count grey">{{ classes_count }}</span></a>
+    {% endif %}
+    <a href="?tab=messaging" class="sub-tab {% if active_tab == 'messaging' %}active{% endif %}">Email & WhatsApp</a>
+    <a href="?tab=academic_year" class="sub-tab {% if active_tab == 'academic_year' %}active{% endif %}">Academic Year & Terms</a>
+    <a href="?tab=media" class="sub-tab {% if active_tab == 'media' %}active{% endif %}">Media Settings</a>
+    <a href="?tab=dynamic_pages" class="sub-tab {% if active_tab == 'dynamic_pages' %}active{% endif %}">Dynamic Pages</a>
+    <a href="{% url 'core:bulk_import' %}" class="sub-tab">Bulk Import</a>
+    {% if not is_admin_officer and not is_head_of_school and not is_hod %}
+    <a href="?tab=induction_checklist" class="sub-tab {% if active_tab == 'induction_checklist' %}active{% endif %}">Induction Checklist <span class="sub-tab-count grey">{{ induction_items|length }}</span></a>
+    {% has_perm request.user "core.change_emailtemplate" as can_edit_email_templates %}
+    {% if can_edit_email_templates %}
+    <a href="?tab=email_templates" class="sub-tab {% if active_tab == 'email_templates' %}active{% endif %}">Email Templates</a>
+    {% endif %}
+    {% endif %}
+</div>
+
+{# ══════════════════════════════════════════════════════════════ #}
+{# SYSTEM SETTINGS TAB                                          #}
+{# ══════════════════════════════════════════════════════════════ #}
+{% if active_tab == 'system' %}
+
+    <form method="post" action="?tab=system">
+        {% csrf_token %}
+        <div class="card" style="margin-bottom:20px">
+            <div class="card-title">School Information</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    {% field form.school_name placeholder="e.g. {{ brand.school_name }}" %}
+                </div>
+                <div class="form-group">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                        {% field form.pass_mark label="Pass Mark (%)" %}
+                        {% field form.admission_fee %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px">
+            <div class="card-title">Attendance Thresholds</div>
+            <div class="form-grid">
+                {% field form.attendance_threshold_warn label="Warning (%)" hint="Students below this receive a warning notification." %}
+                {% field form.attendance_threshold_critical label="Critical (%)" hint="Students below this are flagged as critically absent." %}
+            </div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px">
+            <div class="card-title">SMS &amp; Notifications</div>
+            <div class="form-grid">
+                <div>
+                    <div class="form-group">
+                        <label class="form-label">SMS API Key</label>
+                        <div style="padding:9px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;color:var(--text-muted)">
+                            Configured via <code>CLOUDSERVICE_API_KEY</code> or <code>HODARI_SMS_API_KEY</code> environment variable.
+                        </div>
+                    </div>
+                    {% field form.sms_sender_id %}
+                </div>
+                <div>
+                    {% field form.send_absentee_sms %}
+                    {% field form.enable_online_inquiry %}
+                    {% field form.enable_auto_report_generation %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px">
+            <div class="card-title">Attendance PWA</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    {% field form.pwa_domain label="PWA Base URL" hint="Base URL for the Attendance PWA app." %}
+                </div>
+                <div class="form-group">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                        {% field form.pwa_version label="Version" hint="Increment to force PWA cache refresh." %}
+                        <div class="form-group">
+                            <label class="form-label">Preview</label>
+                            <div style="padding:9px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;color:var(--text-muted)">
+                                <a href="{{ form.pwa_domain.value|default:'https://hodari.elimcoregroup.com:8443' }}/attendance/pwa/" target="_blank" style="color:#023AA5">Open PWA &rarr;</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-primary">Save System Settings</button>
+        </div>
+    </form>
+
+{# ══════════════════════════════════════════════════════════════ #}
+{# MESSAGING TAB                                                 #}
+{# ══════════════════════════════════════════════════════════════ #}
+{% elif active_tab == 'messaging' %}
+
+    <form method="post" action="?tab=messaging">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save_messaging">
+
+        <div class="card" style="margin-bottom:20px">
+            <div class="card-title">Email (SMTP)</div>
+            <div class="form-grid">
+                <div>
+                    {% field form.email_backend hint="Use 'django.core.mail.backends.smtp.EmailBackend' for real email delivery." %}
+                    {% field form.email_host hint="SMTP server hostname (e.g. smtp.gmail.com)" %}
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                        {% field form.email_port label="Port" %}
+                        {% field form.email_use_tls %}
+                    </div>
+                </div>
+                <div>
+                    {% field form.email_host_user hint="SMTP username or email address" %}
+                    {% field form.email_host_password label="SMTP Password" %}
+                    {% field form.default_from_email %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px">
+            <div class="card-title">WhatsApp</div>
+            <div class="form-grid">
+                <div>
+                    <div class="form-group">
+                        <label class="form-label">WhatsApp API Key</label>
+                        <div style="padding:9px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;color:var(--text-muted)">
+                            Configured via environment variable (not stored in database).
+                        </div>
+                    </div>
+                    {% field form.whatsapp_sender_id %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px">
+            <div class="card-title">Admissions Contact Details</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">These appear in admission emails and SMS sent to parents (meeting confirmations, inquiry receipts, assessment logistics, etc.).</div>
+            <div class="form-grid">
+                <div>
+                    {% field form.admissions_phone hint="Phone number shown in emails and SMS to parents." %}
+                    {% field form.admissions_email hint="Reply-to address for all admission emails." %}
+                </div>
+                <div>
+                    {% field form.admissions_whatsapp hint="WhatsApp number for proof-of-payment submissions." %}
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-primary">Save Messaging Settings</button>
+        </div>
+    </form>
+
+{# ══════════════════════════════════════════════════════════════ #}
+{# CLASSES TAB                                                   #}
+{# ══════════════════════════════════════════════════════════════ #}
+{% elif active_tab == 'classes' and can_view_classes %}
+
+    <div class="card">
+        <div class="card-title-row">
+            <div class="card-title" style="margin:0">Grade Classes</div>
+            {% if can_add_class %}
+            <button type="button" class="btn-primary btn-sm" onclick="openModal('classModal')">+ Add Class</button>
+            {% endif %}
+        </div>
+        <div style="border-top:1px solid var(--border);margin-top:12px">
+            <table class="h-table">
+                <thead>
+                    <tr>
+                        <th>Class Name</th>
+                        <th>Department</th>
+                        <th>Capacity</th>
+                        <th style="text-align:right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for gc in classes %}
+                    <tr>
+                        <td style="font-weight:600">{{ gc.name }}</td>
+                        <td><span class="chip {% if gc.department == 'ECD' %}chip-amber{% elif gc.department == 'PRIMARY' %}chip-blue{% else %}chip-grey{% endif %}">{{ gc.get_department_display }}</span></td>
+                        <td>{{ gc.max_capacity }}</td>
+                        <td style="text-align:right;white-space:nowrap">
+                            {% if can_edit_class %}
+                            <button type="button" class="btn-secondary btn-sm" onclick="openEditClassModal('{{ gc.pk }}','{{ gc.name|escapejs }}','{{ gc.department }}','{{ gc.max_capacity }}')">Edit</button>
+                            {% endif %}
+                            {% if can_delete_class %}
+                            <button type="button" class="btn-secondary btn-sm" style="color:var(--red,#EF4444);margin-left:4px"
+                              onclick="confirmDeleteModal({title:'Delete Class?',body:'Are you sure you want to delete <strong>{{ gc.name }}</strong>?',detail:'This cannot be undone.',confirmText:'Delete Class',url:'?tab=classes',type:'danger',extraData:[{name:'action',value:'delete_class'},{name:'pk',value:'{{ gc.pk }}'}]})">Delete</button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with title='No classes yet' desc='Add the first class to get started.' icon='users' icon_color='blue' %}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {# ── Add Class Modal ── #}
+    <div id="classModal" class="settings-modal-overlay" >
+        <div class="settings-modal">
+            <div class="settings-modal-header">
+                <h3>Add New Class</h3>
+                <button type="button" class="settings-modal-close" onclick="closeModal('classModal')">&times;</button>
+            </div>
+            <form method="post" action="?tab=classes" style="padding:0">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_class">
+                <div class="settings-modal-body">
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">Class Name <span style="color:var(--red)">*</span></label>
+                        <input type="text" name="name" required class="hf-input" placeholder="e.g. Grade 1, Pre-K, ABC Class">
+                    </div>
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">Department <span style="color:var(--red)">*</span></label>
+                        <select name="department" class="hf-select" required>
+                            <option value="">Select Department</option>
+                            {% for value, label in departments %}
+                            <option value="{{ value }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">Max Capacity</label>
+                        <input type="number" name="max_capacity" value="25" min="1" required class="hf-input">
+                        <span class="form-help">Maximum number of students allowed.</span>
+                    </div>
+                </div>
+                <div class="settings-modal-footer">
+                    <button type="button" class="btn-secondary" onclick="closeModal('classModal')">Cancel</button>
+                    <button type="submit" class="btn-primary">Add Class</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {# ── Edit Class Modal ── #}
+    <div id="editClassModal" class="settings-modal-overlay" >
+        <div class="settings-modal">
+            <div class="settings-modal-header">
+                <h3>Edit Class</h3>
+                <button type="button" class="settings-modal-close" onclick="closeModal('editClassModal')">&times;</button>
+            </div>
+            <form method="post" action="?tab=classes" style="padding:0">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="edit_class">
+                <input type="hidden" name="pk" id="editClass_pk">
+                <div class="settings-modal-body">
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">Class Name <span style="color:var(--red)">*</span></label>
+                        <input type="text" name="name" id="editClass_name" required class="hf-input">
+                    </div>
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">Department <span style="color:var(--red)">*</span></label>
+                        <select name="department" id="editClass_dept" class="hf-select" required>
+                            <option value="">Select Department</option>
+                            {% for value, label in departments %}
+                            <option value="{{ value }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">Max Capacity</label>
+                        <input type="number" name="max_capacity" id="editClass_cap" min="1" required class="hf-input">
+                    </div>
+                </div>
+                <div class="settings-modal-footer">
+                    <button type="button" class="btn-secondary" onclick="closeModal('editClassModal')">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+{# ══════════════════════════════════════════════════════════════ #}
+{# ACADEMIC YEAR & TERMS TAB                                     #}
+{# ══════════════════════════════════════════════════════════════ #}
+{% elif active_tab == 'academic_year' %}
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+
+        {# ── Academic Years ── #}
+        <div class="card">
+            <div class="card-title-row">
+                <div class="card-title" style="margin:0">Academic Years</div>
+                <button type="button" class="btn-primary btn-sm" onclick="openModal('ayModal')">+ Add Year</button>
+            </div>
+            <div style="border-top:1px solid var(--border);margin-top:12px">
+                {% for ay in academic_years %}
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);{% if ay.is_current %}background:rgba(2,58,165,.04){% endif %}">
+                    <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;flex-wrap:wrap">
+                        <span style="font-weight:600;font-size:14px">{{ ay.name }}</span>
+                        {% if ay.is_current %}<span class="chip chip-blue" style="font-size:11px">Current</span>{% endif %}
+                        {% if ay.is_published %}<span class="chip chip-green" style="font-size:11px">Published</span>{% endif %}
+                        <span style="font-size:12px;color:var(--text-muted);white-space:nowrap">
+                            {% if ay.start_date and ay.end_date %}{{ ay.start_date|date:"d M Y" }} – {{ ay.end_date|date:"d M Y" }}{% else %}<span style="color:var(--hodari-gold,#D97706)">⚠ No dates</span>{% endif %}
+                        </span>
+                        <span style="font-size:12px;color:var(--text-muted);white-space:nowrap">{{ ay.terms.count }} term{{ ay.terms.count|pluralize }}</span>
+                    </div>
+                    <div style="display:flex;gap:4px">
+                        {% if ay.end_date and ay.end_date|date:'Y-m-d' < today_iso %}
+                            <span style="font-size:11px;color:var(--text-muted);padding:4px 8px;font-style:italic">Ended</span>
+                        {% else %}
+                            {% if perms.academics.change_academicyear %}
+                                {% if ay.is_published %}
+                                <button type="button" class="btn-secondary btn-sm"
+                                  onclick="confirmDeleteModal({title:'Unpublish Year?',body:'Unpublish <strong>{{ ay.name }}</strong>?',detail:'After unpublishing, Head of School / Admin can edit terms again.',confirmText:'Unpublish',url:'?tab=academic_year',type:'warning',extraData:[{name:'action',value:'unpublish_academic_year'},{name:'pk',value:'{{ ay.pk }}'}]})">Unpublish</button>
+                                {% else %}
+                                <button type="button" class="btn-secondary btn-sm" style="color:var(--green,#16A34A)"
+                                  onclick="confirmDeleteModal({title:'Publish Year?',body:'Publish <strong>{{ ay.name }}</strong>?',detail:'All terms must have start &amp; end dates. Publishing locks year dates/term count and term edits to Super Admin only.',confirmText:'Publish',url:'?tab=academic_year',type:'info',extraData:[{name:'action',value:'publish_academic_year'},{name:'pk',value:'{{ ay.pk }}'}]})">Publish</button>
+                                {% endif %}
+                            {% endif %}
+                            <button type="button" class="btn-secondary btn-sm" onclick="openEditAYModal('{{ ay.pk }}','{{ ay.name|escapejs }}','{{ ay.start_date|date:'Y-m-d'|default:'' }}','{{ ay.end_date|date:'Y-m-d'|default:'' }}',{{ ay.number_of_terms }},{% if ay.is_current %}true{% else %}false{% endif %})">Edit</button>
+                            <button type="button" class="btn-secondary btn-sm" style="color:var(--red,#EF4444)"
+                              onclick="confirmDeleteModal({title:'Delete Year?',body:'Are you sure you want to delete <strong>{{ ay.name }}</strong>?',detail:'Delete all terms first, then the year can be removed.',confirmText:'Delete Year',url:'?tab=academic_year',type:'danger',extraData:[{name:'action',value:'delete_academic_year'},{name:'pk',value:'{{ ay.pk }}'}]})">Delete</button>
+                        {% endif %}
+                    </div>
+                </div>
+                {% empty %}
+                <div style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with title='No academic years yet' desc='Click + Add Year to get started.' icon='calendar' icon_color='blue' %}</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {# ── Terms ── #}
+        <div class="card">
+            <div class="card-title-row">
+                <div class="card-title" style="margin:0">Terms</div>
+                <button type="button" class="btn-primary btn-sm" onclick="openModal('termModal')">+ Add Term</button>
+            </div>
+            <div style="border-top:1px solid var(--border);margin-top:12px">
+                {% for ay in academic_years %}
+                    {% if ay.terms.all %}
+                    <div style="padding:8px 16px 4px">
+                        <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">{{ ay.name }}</div>
+                    </div>
+                    {% for term in ay.terms.all %}
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-bottom:1px solid var(--border)">
+                        <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+                            <span style="font-weight:600;font-size:13px">{{ term.name }}</span>
+                            {% if term.is_locked %}<span class="chip chip-grey" style="font-size:10px">Locked</span>{% endif %}
+                            <span style="font-size:12px;color:var(--text-muted)">
+                                {% if term.start_date and term.end_date %}{{ term.start_date|date:"d M Y" }} – {{ term.end_date|date:"d M Y" }}{% else %}No dates{% endif %}
+                            </span>
+                            {% if term.midterm_exam_start_date or term.endterm_exam_start_date or term.quiz_start_date %}
+                            <span style="font-size:11px;color:var(--hodari-blue)">
+                                {% if term.quiz_start_date %}Q:{{ term.quiz_start_date|date:"d M" }}{% endif %}
+                                {% if term.midterm_exam_start_date %} MT:{{ term.midterm_exam_start_date|date:"d M" }}{% endif %}
+                                {% if term.endterm_exam_start_date %} ET:{{ term.endterm_exam_start_date|date:"d M" }}{% endif %}
+                            </span>
+                            {% endif %}
+                            {% if term.quiz_grade_marking_end_date %}
+                            <span style="font-size:11px;color:var(--green,#16A34A)">Q Mark:{{ term.quiz_grade_marking_end_date|date:"d M" }}</span>
+                            {% endif %}
+                            {% if term.midterm_grade_marking_end_date %}
+                            <span style="font-size:11px;color:var(--green,#16A34A)">MT Mark:{{ term.midterm_grade_marking_end_date|date:"d M" }}</span>
+                            {% endif %}
+                            {% if term.endterm_grade_marking_end_date %}
+                            <span style="font-size:11px;color:var(--green,#16A34A)">ET Mark:{{ term.endterm_grade_marking_end_date|date:"d M" }}</span>
+                            {% endif %}
+                        </div>
+                        <div style="display:flex;gap:4px">
+                            {% if term.end_date and term.end_date|date:'Y-m-d' < today_iso %}
+                                <span style="font-size:11px;color:var(--text-muted);padding:4px 8px;font-style:italic">Ended</span>
+                            {% else %}
+                            <button type="button" class="btn-secondary btn-sm" onclick="openEditTermModal('{{ term.pk }}','{{ term.name|escapejs }}','{{ term.start_date|date:'Y-m-d'|default:'' }}','{{ term.end_date|date:'Y-m-d'|default:'' }}','{{ term.grading_deadline|date:'Y-m-d'|default:'' }}','{{ term.midterm_exam_start_date|date:'Y-m-d'|default:'' }}','{{ term.midterm_exam_end_date|date:'Y-m-d'|default:'' }}','{{ term.endterm_exam_start_date|date:'Y-m-d'|default:'' }}','{{ term.endterm_exam_end_date|date:'Y-m-d'|default:'' }}','{{ term.quiz_start_date|date:'Y-m-d'|default:'' }}','{{ term.quiz_end_date|date:'Y-m-d'|default:'' }}',{{ term.quiz_grade_marking_days|default:5 }},{{ term.midterm_grade_marking_days|default:10 }},{{ term.endterm_grade_marking_days|default:10 }})">Edit</button>
+                            <button type="button" class="btn-secondary btn-sm" style="color:var(--red,#EF4444)"
+                              onclick="confirmDeleteModal({title:'Delete Term?',body:'Are you sure you want to delete <strong>{{ term.name }}</strong>?',detail:'This cannot be undone.',confirmText:'Delete Term',url:'?tab=academic_year',type:'danger',extraData:[{name:'action',value:'delete_term'},{name:'pk',value:'{{ term.pk }}'}]})">Delete</button>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+                {% empty %}
+                <div style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with title='No terms yet' desc='Create an academic year first, then add terms.' icon='calendar' icon_color='grey' %}</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    {% if current_term %}
+    <div style="margin-top:20px;padding:14px 18px;border-radius:8px;background:rgba(2,58,165,.04);border:1px solid rgba(2,58,165,.12);display:flex;align-items:center;gap:12px;font-size:13px">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#023AA5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <div>
+            <strong>Current Term:</strong> {{ current_term }}
+            {% if current_term.start_date and current_term.end_date %} &middot; {{ current_term.start_date|date:"d M Y" }} to {{ current_term.end_date|date:"d M Y" }}{% endif %}
+            &nbsp;({{ days_remaining }} day{{ days_remaining|pluralize }} remaining)
+        </div>
+    </div>
+    {% endif %}
+
+    {# ── Add Year Modal ── #}
+    <div id="ayModal" class="settings-modal-overlay" >
+        <div class="settings-modal">
+            <div class="settings-modal-header"><h3>Add Academic Year</h3><button type="button" class="settings-modal-close" onclick="closeModal('ayModal')">&times;</button></div>
+            <form method="post" action="?tab=academic_year" style="padding:0">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_academic_year">
+                <div class="settings-modal-body">
+                    <div class="form-group" style="margin:0"><label class="form-label">Year Name <span style="color:var(--red)">*</span></label><input type="text" name="name" required class="hf-input" placeholder="e.g. 2025/2026"></div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                        <div class="form-group" style="margin:0"><label class="form-label">Start Date <span style="color:var(--red)">*</span></label><input type="date" name="start_date" required class="hf-input"></div>
+                        <div class="form-group" style="margin:0"><label class="form-label">End Date <span style="color:var(--red)">*</span></label><input type="date" name="end_date" required class="hf-input"></div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                        <div class="form-group" style="margin:0"><label class="form-label"># Terms</label><input type="number" name="number_of_terms" value="3" min="1" max="6" class="hf-input"></div>
+                        <div class="form-group" style="margin:0;display:flex;align-items:flex-end"><label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary);cursor:pointer;padding-bottom:10px"><input type="checkbox" name="is_current" value="on" style="width:16px;height:16px"> Set as current academic year</label></div>
+                    </div>
+                </div>
+                <div class="settings-modal-footer"><button type="button" class="btn-secondary" onclick="closeModal('ayModal')">Cancel</button><button type="submit" class="btn-primary">Create Year</button></div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    var CURRENT_YEAR_NAME = "{{ current_year_name|escapejs }}";
+    (function() {
+        function hookIsCurrentConfirm(formEl) {
+            if (!formEl) return;
+            var cb = formEl.querySelector('input[name="is_current"]');
+            if (!cb) return;
+            formEl.addEventListener('submit', function(e) {
+                if (cb.checked && CURRENT_YEAR_NAME) {
+                    if (!confirm('"' + CURRENT_YEAR_NAME + '" is currently set as the active academic year. Setting this year as current will automatically unassign it. Continue?')) {
+                        e.preventDefault();
+                    }
+                }
+            });
+        }
+        var addForm = document.querySelector('#ayModal form');
+        hookIsCurrentConfirm(addForm);
+        var editForm = document.querySelector('#editAYModal form');
+        hookIsCurrentConfirm(editForm);
+    })();
+    </script>
+
+    {# ── Edit Year Modal ── #}
+    <div id="editAYModal" class="settings-modal-overlay" >
+        <div class="settings-modal">
+            <div class="settings-modal-header"><h3>Edit Academic Year</h3><button type="button" class="settings-modal-close" onclick="closeModal('editAYModal')">&times;</button></div>
+            <form method="post" action="?tab=academic_year" style="padding:0">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="edit_academic_year">
+                <input type="hidden" name="pk" id="editAY_pk">
+                <div class="settings-modal-body">
+                    <div class="form-group" style="margin:0"><label class="form-label">Year Name <span style="color:var(--red)">*</span></label><input type="text" name="name" id="editAY_name" required class="hf-input"></div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                        <div class="form-group" style="margin:0"><label class="form-label">Start Date</label><input type="date" name="start_date" id="editAY_start" class="hf-input"></div>
+                        <div class="form-group" style="margin:0"><label class="form-label">End Date</label><input type="date" name="end_date" id="editAY_end" class="hf-input"></div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                        <div class="form-group" style="margin:0"><label class="form-label"># Terms</label><input type="number" name="number_of_terms" id="editAY_terms" min="1" max="6" class="hf-input"></div>
+                        <div class="form-group" style="margin:0;display:flex;align-items:flex-end"><label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary);cursor:pointer;padding-bottom:10px"><input type="checkbox" name="is_current" id="editAY_current" value="on" style="width:16px;height:16px"> Set as current academic year</label></div>
+                    </div>
+                </div>
+                <div class="settings-modal-footer"><button type="button" class="btn-secondary" onclick="closeModal('editAYModal')">Cancel</button><button type="submit" class="btn-primary">Save Changes</button></div>
+            </form>
+        </div>
+    </div>
+
+    {# ── Add Term Modal ── #}
+    <div id="termModal" class="settings-modal-overlay" >
+        <div class="settings-modal">
+            <div class="settings-modal-header"><h3>Add Term</h3><button type="button" class="settings-modal-close" onclick="closeModal('termModal')">&times;</button></div>
+            <form method="post" action="?tab=academic_year" style="padding:0">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_term">
+                <div class="settings-modal-body">
+                    <div class="form-group" style="margin:0"><label class="form-label">Academic Year <span style="color:var(--red)">*</span></label>
+                        <select name="academic_year" class="hf-select" required><option value="">Select Year</option>{% for ay in academic_years %}<option value="{{ ay.pk }}">{{ ay.name }}</option>{% endfor %}</select>
+                    </div>
+                    <div class="form-group" style="margin:0"><label class="form-label">Term Name <span style="color:var(--red)">*</span></label><input type="text" name="term_name" required class="hf-input" placeholder="e.g. Term 1"></div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                        <div class="form-group" style="margin:0"><label class="form-label">Start Date <span style="color:var(--red)">*</span></label><input type="date" name="start_date" required class="hf-input"></div>
+                        <div class="form-group" style="margin:0"><label class="form-label">End Date <span style="color:var(--red)">*</span></label><input type="date" name="end_date" required class="hf-input"></div>
+                    </div>
+                    <div class="form-group" style="margin:0"><label class="form-label">Grading Deadline</label><input type="date" name="grading_deadline" class="hf-input"></div>
+                    <details style="margin-top:4px">
+                        <summary style="font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer">Quiz Dates (optional)</summary>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+                            <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Quiz Start</label><input type="date" name="quiz_start_date" class="hf-input"></div>
+                            <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Quiz End</label><input type="date" name="quiz_end_date" class="hf-input"></div>
+                        </div>
+                    </details>
+                    <details style="margin-top:4px">
+                        <summary style="font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer">Exam Dates (optional)</summary>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+                            <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Mid-Term Start</label><input type="date" name="midterm_exam_start_date" class="hf-input"></div>
+                            <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Mid-Term End</label><input type="date" name="midterm_exam_end_date" class="hf-input"></div>
+                            <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">End-Term Start</label><input type="date" name="endterm_exam_start_date" class="hf-input"></div>
+                            <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">End-Term End</label><input type="date" name="endterm_exam_end_date" class="hf-input"></div>
+                        </div>
+                    </details>
+                    <details style="margin-top:4px">
+                        <summary style="font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer">Grade Marking Window (optional)</summary>
+                        <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
+                            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;align-items:end">
+                                <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Quiz Marking Days</label><input type="number" name="quiz_grade_marking_days" value="5" min="1" max="60" class="hf-input"></div>
+                                <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Mid-Term Marking Days</label><input type="number" name="midterm_grade_marking_days" value="10" min="1" max="60" class="hf-input"></div>
+                                <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">End-Term Marking Days</label><input type="number" name="endterm_grade_marking_days" value="10" min="1" max="60" class="hf-input"></div>
+                            </div>
+                        </div>
+                        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Working days (excl. weekends) after each exam end date. Marking deadline auto-calculated.</div>
+                    </details>
+                </div>
+                <div class="settings-modal-footer"><button type="button" class="btn-secondary" onclick="closeModal('termModal')">Cancel</button><button type="submit" class="btn-primary">Add Term</button></div>
+            </form>
+        </div>
+    </div>
+
+    {# ── Edit Term Modal ── #}
+    <div id="editTermModal" class="settings-modal-overlay" >
+        <div class="settings-modal">
+            <div class="settings-modal-header"><h3>Edit Term</h3><button type="button" class="settings-modal-close" onclick="closeModal('editTermModal')">&times;</button></div>
+            <form method="post" action="?tab=academic_year" style="padding:0">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="edit_term">
+                <input type="hidden" name="pk" id="editTerm_pk">
+                <div class="settings-modal-body">
+                    <div class="form-group" style="margin:0"><label class="form-label">Start Date</label><input type="date" name="start_date" id="editTerm_start" class="hf-input"></div>
+                    <div class="form-group" style="margin:0"><label class="form-label">End Date</label><input type="date" name="end_date" id="editTerm_end" class="hf-input"></div>
+                    <div class="form-group" style="margin:0"><label class="form-label">Grading Deadline</label><input type="date" name="grading_deadline" id="editTerm_deadline" class="hf-input"></div>
+                    <details style="margin-top:4px">
+                        <summary style="font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer">Quiz Dates (optional)</summary>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+                            <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Quiz Start</label><input type="date" name="quiz_start_date" id="editTerm_quiz_start" class="hf-input"></div>
+                            <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Quiz End</label><input type="date" name="quiz_end_date" id="editTerm_quiz_end" class="hf-input"></div>
+                        </div>
+                    </details>
+                    <details style="margin-top:4px">
+                        <summary style="font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer">Exam Dates (optional)</summary>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+                            <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Mid-Term Start</label><input type="date" name="midterm_exam_start_date" id="editTerm_mt_start" class="hf-input"></div>
+                            <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Mid-Term End</label><input type="date" name="midterm_exam_end_date" id="editTerm_mt_end" class="hf-input"></div>
+                            <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">End-Term Start</label><input type="date" name="endterm_exam_start_date" id="editTerm_et_start" class="hf-input"></div>
+                            <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">End-Term End</label><input type="date" name="endterm_exam_end_date" id="editTerm_et_end" class="hf-input"></div>
+                        </div>
+                    </details>
+                    <details style="margin-top:4px">
+                        <summary style="font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer">Grade Marking Window (optional)</summary>
+                        <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
+                            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;align-items:end">
+                                <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Quiz Marking Days</label><input type="number" name="quiz_grade_marking_days" id="editTerm_gm_q_days" min="1" max="60" class="hf-input"></div>
+                                <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Mid-Term Marking Days</label><input type="number" name="midterm_grade_marking_days" id="editTerm_gm_mt_days" min="1" max="60" class="hf-input"></div>
+                                <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">End-Term Marking Days</label><input type="number" name="endterm_grade_marking_days" id="editTerm_gm_et_days" min="1" max="60" class="hf-input"></div>
+                            </div>
+                        </div>
+                        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Working days (excl. weekends) after each exam end date. Marking deadline auto-calculated.</div>
+                    </details>
+                </div>
+                <div class="settings-modal-footer"><button type="button" class="btn-secondary" onclick="closeModal('editTermModal')">Cancel</button><button type="submit" class="btn-primary">Save Changes</button></div>
+            </form>
+        </div>
+    </div>
+
+{# ══════════════════════════════════════════════════════════════ #}
+{# MEDIA SETTINGS TAB                                            #}
+{# ══════════════════════════════════════════════════════════════ #}
+{% elif active_tab == 'media' %}
+
+    <div class="card">
+        <div style="display:flex;align-items:center;gap:12px;padding:0 0 12px;border-bottom:1px solid var(--border)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <div>
+                <div style="font-weight:600;font-size:14px">Media Upload Configuration</div>
+                <div style="font-size:12px;color:var(--text-muted)">Configure allowed file types, size limits, and duplicate detection per upload area.</div>
+            </div>
+        </div>
+        <div style="border-top:1px solid var(--border);margin-top:12px">
+            <table class="h-table">
+                <thead>
+                    <tr><th>Area</th><th>Max Size</th><th>Total Limit</th><th>Max Files</th><th>Dup Check</th><th style="text-align:right">Actions</th></tr>
+                </thead>
+                <tbody>
+                    {% for ms in media_settings %}
+                    <tr style="{% if not ms.is_active %}opacity:.5{% endif %}">
+                        <td style="font-weight:600">{{ ms.get_area_display }}</td>
+                        <td>{{ ms.max_file_size_mb }} MB</td>
+                        <td>{{ ms.max_total_size_mb }} MB</td>
+                        <td>{{ ms.max_files }}</td>
+                        <td>{% if ms.duplicate_check %}<span class="chip chip-green" style="font-size:10px">On</span>{% else %}<span class="chip chip-grey" style="font-size:10px">Off</span>{% endif %}</td>
+                        <td style="text-align:right;white-space:nowrap">
+                            <button type="button" class="btn-secondary btn-sm" onclick="openEditMediaModal('{{ ms.area }}','{{ ms.allowed_extensions|escapejs }}','{{ ms.max_file_size_mb }}','{{ ms.max_total_size_mb }}','{{ ms.max_files }}',{% if ms.duplicate_check %}true{% else %}false{% endif %},{% if ms.is_active %}true{% else %}false{% endif %},'{{ ms.min_width }}','{{ ms.min_height }}')">Edit</button>
+                            <button type="button" class="btn-secondary btn-sm" style="color:var(--red,#EF4444);margin-left:4px"
+                              onclick="confirmDeleteModal({title:'Reset {{ ms.get_area_display }}?',body:'Are you sure you want to reset <strong>{{ ms.get_area_display }}</strong> upload settings to defaults?',detail:'This will overwrite your current configuration.',confirmText:'Reset',url:'?tab=media',type:'danger',extraData:[{name:'action',value:'reset_media_defaults'},{name:'area',value:'{{ ms.area }}'}]})">Reset</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {# ── Edit Media Modal ── #}
+    <div id="editMediaModal" class="settings-modal-overlay" >
+        <div class="settings-modal">
+            <div class="settings-modal-header"><h3 id="editMedia_title">Edit Upload Area</h3><button type="button" class="settings-modal-close" onclick="closeModal('editMediaModal')">&times;</button></div>
+            <form method="post" action="?tab=media" style="padding:0">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="save_media_setting">
+                <input type="hidden" name="area" id="editMedia_area">
+                <div class="settings-modal-body">
+                    <div class="form-group" style="margin:0"><label class="form-label">Allowed File Extensions</label><input type="text" name="allowed_extensions" id="editMedia_ext" class="hf-input"><span class="form-help">Comma-separated, without dots (e.g. pdf,docx,jpg)</span></div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                        <div class="form-group" style="margin:0"><label class="form-label">Max Single File (MB)</label><input type="number" name="max_file_size_mb" id="editMedia_size" min="1" max="100" class="hf-input"></div>
+                        <div class="form-group" style="margin:0"><label class="form-label">Max Total Size (MB)</label><input type="number" name="max_total_size_mb" id="editMedia_total" min="1" max="500" class="hf-input"></div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                        <div class="form-group" style="margin:0"><label class="form-label">Max Files Per Upload</label><input type="number" name="max_files" id="editMedia_files" min="1" max="20" class="hf-input"></div>
+                        <div class="form-group" style="margin:0">
+                            <label class="form-label">Duplicate Detection</label>
+                            <label style="display:flex;align-items:center;gap:8px;padding:10px 0;font-size:13px;cursor:pointer"><input type="checkbox" name="duplicate_check" id="editMedia_dup" value="on" style="width:16px;height:16px"> Reject duplicate files</label>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin:0">
+                        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" name="is_active" id="editMedia_active" value="on" style="width:16px;height:16px"> Active (enforce these limits)</label>
+                    </div>
+                </div>
+                <div class="settings-modal-footer"><button type="button" class="btn-secondary" onclick="closeModal('editMediaModal')">Cancel</button><button type="submit" class="btn-primary">Save Settings</button></div>
+            </form>
+        </div>
+    </div>
+
+{# ══════════════════════════════════════════════════════════════ #}
+{# DYNAMIC PAGES TAB                                             #}
+{# ══════════════════════════════════════════════════════════════ #}
+{% elif active_tab == 'dynamic_pages' %}
+
+    {# ── Login Page Visual Editor ── #}
+    <div class="card" style="margin-bottom:0;overflow:hidden">
+        <div style="padding:16px 20px 0;display:flex;align-items:center;justify-content:space-between">
+            <div>
+                <div style="font-weight:600;font-size:14px">Login Page Editor</div>
+                <div style="font-size:12px;color:var(--text-muted)">Click text to edit. Click images to replace. Drag text to reposition. Changes are previewed live.</div>
+            </div>
+            <button type="button" class="btn-primary btn-sm" onclick="document.getElementById('loginPreviewForm').submit()">Save Changes</button>
+        </div>
+
+        <form method="post" action="?tab=dynamic_pages" enctype="multipart/form-data" id="loginPreviewForm" style="margin:0">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="save_branding">
+            <input type="hidden" name="login_heading" id="hf_heading">
+            <input type="hidden" name="login_description" id="hf_description">
+            <input type="hidden" name="login_tagline" id="hf_tagline">
+            <input type="hidden" name="login_feature1" id="hf_feature1">
+            <input type="hidden" name="login_feature2" id="hf_feature2">
+            <input type="hidden" name="login_feature3" id="hf_feature3">
+            <input type="hidden" name="login_right_heading" id="hf_right_heading">
+            <input type="hidden" name="login_right_subtitle" id="hf_right_subtitle">
+            <input type="hidden" name="login_heading_top" id="hf_heading_top">
+            <input type="hidden" name="login_heading_left" id="hf_heading_left">
+            <input type="hidden" name="login_desc_top" id="hf_desc_top">
+            <input type="hidden" name="login_desc_left" id="hf_desc_left">
+            <input type="hidden" name="login_tagline_top" id="hf_tagline_top">
+            <input type="hidden" name="login_tagline_left" id="hf_tagline_left">
+            <input type="hidden" name="login_features_top" id="hf_features_top">
+            <input type="hidden" name="login_features_left" id="hf_features_left">
+            <input type="file" name="login_staff_hero_image" id="staffHeroFileInput" accept="image/*" style="display:none">
+            <input type="file" name="login_parent_hero_image" id="parentHeroFileInput" accept="image/*" style="display:none">
+            <input type="file" name="login_logo" id="logoFileInput" accept="image/*" style="display:none">
+            <input type="hidden" name="remove_staff_hero" id="removeStaffHero" value="">
+            <input type="hidden" name="remove_parent_hero" id="removeParentHero" value="">
+            <input type="hidden" name="remove_logo" id="removeLogo" value="">
+
+            <div id="loginPreviewWrap" style="margin:16px 20px 20px;border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;min-height:480px;background:#fff">
+
+                {# ── LEFT PANEL ── #}
+                <div id="prevLeft" style="flex:0 0 42%;position:relative;display:flex;flex-direction:column;justify-content:flex-end;padding:32px 28px;min-height:480px;cursor:default">
+
+                    <div id="prevHeroBg" style="position:absolute;inset:0;z-index:0">
+                        {% if brand.login_staff_hero_image %}
+                        <img id="prevStaffHeroImg" src="{{ brand.login_staff_hero_image.url }}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;transition:opacity .4s">
+                        {% else %}
+                        <img id="prevStaffHeroImg" src="{% static 'branding/hodari_school_logo.jpg' %}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;transition:opacity .4s">
+                        {% endif %}
+                        {% if brand.login_parent_hero_image %}
+                        <img id="prevParentHeroImg" src="{{ brand.login_parent_hero_image.url }}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;opacity:0;transition:opacity .4s">
+                        {% else %}
+                        <img id="prevParentHeroImg" src="{% static 'branding/hodari_school_logo.jpg' %}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;opacity:0;transition:opacity .4s">
+                        {% endif %}
+                    </div>
+                    <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.55) 70%,rgba(0,0,0,0.75) 100%);z-index:1"></div>
+
+                    {# Image upload & remove buttons #}
+                    <div id="imgControls" style="position:absolute;top:12px;right:12px;z-index:10;display:flex;gap:6px;opacity:0;transition:opacity .2s" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0">
+                        <div style="position:relative">
+                            <button type="button" onclick="document.getElementById('staffHeroFileInput').click()" style="background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;backdrop-filter:blur(4px)">Staff Image</button>
+                            <button type="button" onclick="removeImage('staff')" class="img-remove-btn" style="display:none;position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#EF4444;color:#fff;border:2px solid #fff;font-size:11px;cursor:pointer;line-height:14px;text-align:center;z-index:11" title="Remove">&times;</button>
+                        </div>
+                        <div style="position:relative">
+                            <button type="button" onclick="document.getElementById('parentHeroFileInput').click()" style="background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;backdrop-filter:blur(4px)">Parent Image</button>
+                            <button type="button" onclick="removeImage('parent')" class="img-remove-btn" style="display:none;position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#EF4444;color:#fff;border:2px solid #fff;font-size:11px;cursor:pointer;line-height:14px;text-align:center;z-index:11" title="Remove">&times;</button>
+                        </div>
+                        <div style="position:relative">
+                            <button type="button" onclick="document.getElementById('logoFileInput').click()" style="background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;backdrop-filter:blur(4px)">Logo</button>
+                        </div>
+                    </div>
+
+                    {# Logo — positionable #}
+                    <div id="dragLogo" style="position:absolute;z-index:3;left:32px;top:32px;cursor:grab">
+                        <div style="position:relative;display:inline-block">
+                            <img id="prevLeftLogo" src="{% if brand.login_logo %}{{ brand.login_logo.url }}{% endif %}" style="height:40px;width:auto;object-fit:contain;filter:brightness(0) invert(1);{% if not brand.login_logo %}display:none{% endif %}">
+                            <button type="button" onclick="removeImage('left_logo')" class="img-remove-btn" style="display:none;position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#EF4444;color:#fff;border:2px solid #fff;font-size:11px;cursor:pointer;line-height:14px;text-align:center;z-index:11" title="Remove">&times;</button>
+                            <div class="logo-overlay" onclick="event.stopPropagation();document.getElementById('logoFileInput').click()" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,.5);border-radius:6px;cursor:pointer;align-items:center;justify-content:center">
+                                <span style="color:#fff;font-size:10px;font-weight:600">Change</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {# Text block — draggable #}
+                    <div id="dragTextBlock" style="position:absolute;z-index:2;bottom:32px;left:28px;right:28px;cursor:grab">
+                        <div id="prevHeading" contenteditable="true" data-field="heading"
+                             style="font-family:'Plus Jakarta Sans',sans-serif;font-size:22px;font-weight:800;color:#fff;line-height:1.25;letter-spacing:-0.02em;outline:none;min-height:1.3em;white-space:pre-wrap;border-radius:4px;padding:2px 4px;margin:0 -4px;transition:background .15s"
+                             >{{ brand.login_heading }}</div>
+                        <div id="prevDescription" contenteditable="true" data-field="description"
+                             style="margin-top:12px;font-size:13px;color:rgba(255,255,255,.78);line-height:1.65;outline:none;min-height:1em;border-radius:4px;padding:2px 4px;margin-left:-4px;margin-right:-4px;transition:background .15s"
+                             >{{ brand.login_description }}</div>
+                        <div id="prevTagline" contenteditable="true" data-field="tagline"
+                             style="margin-top:14px;font-size:12px;font-style:italic;color:rgba(255,255,255,.55);outline:none;min-height:1em;border-radius:4px;padding:2px 4px;margin-left:-4px;margin-right:-4px;transition:background .15s"
+                             >{{ brand.login_tagline }}</div>
+                        <div style="margin-top:20px;display:flex;flex-direction:column;gap:6px">
+                            <div id="prevFeature1" contenteditable="true" data-field="feature1"
+                                 style="font-size:12px;color:rgba(255,255,255,.85);font-weight:500;outline:none;min-height:1em;border-radius:4px;padding:2px 4px;transition:background .15s"
+                                 >{{ brand.login_feature1 }}</div>
+                            <div id="prevFeature2" contenteditable="true" data-field="feature2"
+                                 style="font-size:12px;color:rgba(255,255,255,.85);font-weight:500;outline:none;min-height:1em;border-radius:4px;padding:2px 4px;transition:background .15s"
+                                 >{{ brand.login_feature2 }}</div>
+                            <div id="prevFeature3" contenteditable="true" data-field="feature3"
+                                 style="font-size:12px;color:rgba(255,255,255,.85);font-weight:500;outline:none;min-height:1em;border-radius:4px;padding:2px 4px;transition:background .15s"
+                                 >{{ brand.login_feature3 }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                {# ── RIGHT PANEL ── #}
+                <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:32px;background:#F8FAFC">
+                    <div style="width:100%;max-width:360px">
+                        <div id="rightLogoWrap" style="cursor:pointer;margin-bottom:24px;position:relative;display:inline-block" onclick="document.getElementById('logoFileInput').click()">
+                            <img id="prevRightLogo" src="{% if brand.login_logo %}{{ brand.login_logo.url }}{% endif %}" style="height:36px;width:auto;object-fit:contain;{% if not brand.login_logo %}display:none{% endif %}">
+                            <button type="button" onclick="event.stopPropagation();removeImage('right_logo')" class="img-remove-btn" style="display:none;position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#EF4444;color:#fff;border:2px solid #fff;font-size:11px;cursor:pointer;line-height:14px;text-align:center;z-index:11" title="Remove">&times;</button>
+                        </div>
+                        <div id="prevRightHeading" contenteditable="true" data-field="right_heading"
+                             style="font-family:'Plus Jakarta Sans',sans-serif;font-size:19px;font-weight:700;color:var(--text-primary);letter-spacing:-0.01em;outline:none;min-height:1em;border-radius:4px;padding:2px 4px;margin:0 -4px;transition:background .15s"
+                             >{{ brand.login_right_heading }}</div>
+                        <div id="prevRightSubtitle" contenteditable="true" data-field="right_subtitle"
+                             style="margin-top:4px;font-size:13px;color:var(--text-muted);outline:none;min-height:1em;border-radius:4px;padding:2px 4px;margin-left:-4px;margin-right:-4px;transition:background .15s"
+                             >{{ brand.login_right_subtitle }}</div>
+
+                        {# Staff/Parent Tabs #}
+                        <div id="roleTabBar" style="display:flex;background:#F0F4FA;border-radius:10px;padding:4px;margin-top:20px;margin-bottom:20px;cursor:pointer">
+                            <div id="tabStaff" onclick="switchTab('staff')" style="flex:1;padding:9px 14px;text-align:center;font-size:12.5px;font-weight:600;color:var(--blue);background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(2,58,165,.08);transition:all .2s">Staff</div>
+                            <div id="tabParent" onclick="switchTab('parent')" style="flex:1;padding:9px 14px;text-align:center;font-size:12.5px;font-weight:600;color:var(--text-muted);border-radius:8px;transition:all .2s">Parent</div>
+                        </div>
+
+                        {# Form fields (static preview) #}
+                        <div style="margin-bottom:14px">
+                            <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:5px">Email or Username</div>
+                            <div style="height:40px;border:1.5px solid var(--border);border-radius:10px;background:#fff;display:flex;align-items:center;padding:0 12px;font-size:13px;color:var(--text-muted)">you@school.com</div>
+                        </div>
+                        <div style="margin-bottom:20px">
+                            <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:5px">Password</div>
+                            <div style="height:40px;border:1.5px solid var(--border);border-radius:10px;background:#fff;display:flex;align-items:center;padding:0 12px;font-size:13px;color:var(--text-muted)">Enter your password</div>
+                        </div>
+                        <div id="signInBtn" style="height:44px;background:var(--blue,#023AA5);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:700;transition:background .2s">Sign in as Staff</div>
+                        <div style="text-align:center;margin-top:12px;font-size:12px"><span style="color:var(--blue,#023AA5);font-weight:500">Forgot password?</span></div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <script>
+    (function() {
+        var fieldMap = {
+            heading: 'hf_heading', description: 'hf_description', tagline: 'hf_tagline',
+            feature1: 'hf_feature1', feature2: 'hf_feature2', feature3: 'hf_feature3',
+            right_heading: 'hf_right_heading', right_subtitle: 'hf_right_subtitle'
+        };
+        var mappings = {
+            heading: 'prevHeading', description: 'prevDescription', tagline: 'prevTagline',
+            feature1: 'prevFeature1', feature2: 'prevFeature2', feature3: 'prevFeature3',
+            right_heading: 'prevRightHeading', right_subtitle: 'prevRightSubtitle'
+        };
+
+        function syncFields() {
+            Object.keys(fieldMap).forEach(function(key) {
+                var el = document.getElementById(mappings[key]);
+                if (el) document.getElementById(fieldMap[key]).value = el.innerText.trim();
+            });
+        }
+
+        document.querySelectorAll('#loginPreviewWrap [contenteditable]').forEach(function(el) {
+            el.addEventListener('input', syncFields);
+            el.addEventListener('blur', syncFields);
+            el.addEventListener('focus', function() {
+                if (this.innerText.trim() === '') this.innerHTML = '';
+            });
+            el.addEventListener('click', function(e) { e.stopPropagation(); });
+        });
+
+        document.getElementById('loginPreviewForm').addEventListener('submit', syncFields);
+
+        window.switchTab = function(role) {
+            var staffImg = document.getElementById('prevStaffHeroImg');
+            var parentImg = document.getElementById('prevParentHeroImg');
+            var tabStaff = document.getElementById('tabStaff');
+            var tabParent = document.getElementById('tabParent');
+            var signInBtn = document.getElementById('signInBtn');
+            if (role === 'staff') {
+                staffImg.style.opacity = '1';
+                parentImg.style.opacity = '0';
+                tabStaff.style.cssText = 'flex:1;padding:9px 14px;text-align:center;font-size:12.5px;font-weight:600;color:var(--blue);background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(2,58,165,.08);transition:all .2s';
+                tabParent.style.cssText = 'flex:1;padding:9px 14px;text-align:center;font-size:12.5px;font-weight:600;color:var(--text-muted);border-radius:8px;transition:all .2s';
+                signInBtn.textContent = 'Sign in as Staff';
+            } else {
+                staffImg.style.opacity = '0';
+                parentImg.style.opacity = '1';
+                tabParent.style.cssText = 'flex:1;padding:9px 14px;text-align:center;font-size:12.5px;font-weight:600;color:var(--blue);background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(2,58,165,.08);transition:all .2s';
+                tabStaff.style.cssText = 'flex:1;padding:9px 14px;text-align:center;font-size:12.5px;font-weight:600;color:var(--text-muted);border-radius:8px;transition:all .2s';
+                signInBtn.textContent = 'Sign in as Parent';
+            }
+        };
+
+        document.getElementById('staffHeroFileInput').addEventListener('change', function() {
+            document.getElementById('removeStaffHero').value = '';
+            document.getElementById('prevStaffHeroImg').style.display = 'block';
+            var file = this.files[0]; if (!file) return;
+            var reader = new FileReader();
+            reader.onload = function(e) { document.getElementById('prevStaffHeroImg').src = e.target.result; };
+            reader.readAsDataURL(file);
+        });
+        document.getElementById('parentHeroFileInput').addEventListener('change', function() {
+            document.getElementById('removeParentHero').value = '';
+            document.getElementById('prevParentHeroImg').style.display = 'block';
+            var file = this.files[0]; if (!file) return;
+            var reader = new FileReader();
+            reader.onload = function(e) { document.getElementById('prevParentHeroImg').src = e.target.result; };
+            reader.readAsDataURL(file);
+        });
+        document.getElementById('logoFileInput').addEventListener('change', function() {
+            document.getElementById('removeLogo').value = '';
+            document.getElementById('prevLeftLogo').style.display = 'block';
+            document.getElementById('prevRightLogo').style.display = 'block';
+            var file = this.files[0]; if (!file) return;
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('prevLeftLogo').src = e.target.result;
+                document.getElementById('prevRightLogo').src = e.target.result;
+                document.getElementById('prevLeftLogo').style.filter = 'brightness(0) invert(1)';
+            };
+            reader.readAsDataURL(file);
+        });
+
+        window.removeImage = function(type) {
+            if (type === 'staff') {
+                document.getElementById('removeStaffHero').value = '1';
+                document.getElementById('prevStaffHeroImg').style.display = 'none';
+            } else if (type === 'parent') {
+                document.getElementById('removeParentHero').value = '1';
+                document.getElementById('prevParentHeroImg').style.display = 'none';
+            } else if (type === 'left_logo') {
+                document.getElementById('removeLogo').value = '1';
+                document.getElementById('prevLeftLogo').style.display = 'none';
+            } else if (type === 'right_logo') {
+                document.getElementById('removeLogo').value = '1';
+                document.getElementById('prevRightLogo').style.display = 'none';
+            }
+        };
+
+        // ── Mouse drag with 5px dead zone ──
+        function setupDrag(el, useBottom) {
+            var dragging = false, startX, startY, origLeft, origPos;
+            el.addEventListener('mousedown', function(e) {
+                if (e.target.closest('[contenteditable]') || e.target.closest('button') || e.target.closest('.img-remove-btn') || e.target.closest('.logo-overlay')) return;
+                startX = e.clientX; startY = e.clientY;
+                origLeft = parseInt(el.style.left) || 0;
+                origPos = useBottom ? (parseInt(el.style.bottom) || 0) : (parseInt(el.style.top) || 0);
+                dragging = false;
+                e.preventDefault();
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            });
+            function onMove(e) {
+                var dx = e.clientX - startX, dy = e.clientY - startY;
+                if (!dragging && Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+                dragging = true;
+                el.style.cursor = 'grabbing';
+                el.style.left = Math.max(0, origLeft + dx) + 'px';
+                if (useBottom) el.style.bottom = Math.max(0, origPos - dy) + 'px';
+                else el.style.top = Math.max(0, origPos + dy) + 'px';
+            }
+            function onUp() {
+                dragging = false;
+                el.style.cursor = 'grab';
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            }
+        }
+        setupDrag(document.getElementById('dragLogo'), false);
+        setupDrag(document.getElementById('dragTextBlock'), true);
+
+        var leftPanel = document.getElementById('prevLeft');
+        var imgControls = document.getElementById('imgControls');
+        leftPanel.addEventListener('mouseenter', function() { imgControls.style.opacity = '1'; });
+        leftPanel.addEventListener('mouseleave', function(e) {
+            if (!e.relatedTarget || !leftPanel.contains(e.relatedTarget)) imgControls.style.opacity = '0';
+        });
+
+        // Show remove buttons on image hover
+        document.querySelectorAll('#loginPreviewWrap .img-remove-btn').forEach(function(btn) {
+            var container = btn.parentElement;
+            container.addEventListener('mouseenter', function() { btn.style.display = 'block'; });
+            container.addEventListener('mouseleave', function() { btn.style.display = 'none'; });
+        });
+
+        // Logo hover — show overlay
+        var dragLogo = document.getElementById('dragLogo');
+        var logoOverlay = dragLogo.querySelector('.logo-overlay');
+        var logoHoverTimeout;
+        dragLogo.addEventListener('mouseenter', function() {
+            clearTimeout(logoHoverTimeout);
+            logoOverlay.style.display = 'flex';
+        });
+        dragLogo.addEventListener('mouseleave', function() {
+            logoHoverTimeout = setTimeout(function() {
+                logoOverlay.style.display = 'none';
+            }, 150);
+        });
+
+        syncFields();
+    })();
+    </script>
+
+{# ══════════════════════════════════════════════════════════════ #}
+{# INDUCTION CHECKLIST TAB                                       #}
+{# ══════════════════════════════════════════════════════════════ #}
+{% elif active_tab == 'induction_checklist' %}
+
+    <div class="card">
+        <div class="card-title-row">
+            <div class="card-title" style="margin:0">Induction Checklist Items</div>
+            <button type="button" class="btn-primary btn-sm" onclick="openModal('checklistModal')">+ Add Item</button>
+        </div>
+        <div style="border-top:1px solid var(--border);margin-top:12px">
+            <table class="h-table">
+                <thead>
+                    <tr><th style="width:40px"></th><th>Item Name</th><th>Step</th><th>Description</th><th>Required</th><th style="text-align:right">Actions</th></tr>
+                </thead>
+                <tbody>
+                    {% for item in induction_items %}
+                    <tr>
+                        <td style="font-size:13px;color:var(--text-muted);text-align:center">{{ forloop.counter }}</td>
+                        <td style="font-weight:600">{{ item.item_name }}</td>
+                        <td><span class="chip chip-blue" style="font-size:11px">Step {{ item.step }}</span></td>
+                        <td style="font-size:12px;color:var(--text-secondary);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ item.description|truncatewords:12|default:"N/A" }}</td>
+                        <td>{% if item.is_required %}<span class="chip chip-green" style="font-size:10px">Required</span>{% else %}<span class="chip chip-grey" style="font-size:10px">Optional</span>{% endif %}</td>
+                        <td style="text-align:right;white-space:nowrap">
+                            <button type="button" class="btn-secondary btn-sm" onclick="openEditChecklistModal('{{ item.pk }}','{{ item.item_name|escapejs }}','{{ item.description|escapejs }}','{{ item.step }}',{% if item.is_required %}true{% else %}false{% endif %},'{{ item.order }}')">Edit</button>
+                            <button type="button" class="btn-secondary btn-sm" style="color:var(--red,#EF4444);margin-left:4px"
+                              onclick="confirmDeleteModal({title:'Delete Item?',body:'Are you sure you want to delete <strong>{{ item.item_name }}</strong>?',detail:'This affects all staff induction records.',confirmText:'Delete Item',url:'?tab=induction_checklist',type:'danger',extraData:[{name:'action',value:'delete_item'},{name:'pk',value:'{{ item.pk }}'}]})">Delete</button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with title='No induction checklist items yet' desc='Add the first item to get started.' icon='doc' icon_color='blue' %}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {# ── Add Item Modal ── #}
+    <div id="checklistModal" class="settings-modal-overlay" >
+        <div class="settings-modal">
+            <div class="settings-modal-header"><h3>Add Checklist Item</h3><button type="button" class="settings-modal-close" onclick="closeModal('checklistModal')">&times;</button></div>
+            <form method="post" action="?tab=induction_checklist" style="padding:0">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_item">
+                <div class="settings-modal-body">
+                    <div class="form-group" style="margin:0"><label class="form-label">Onboarding Step <span style="color:var(--red)">*</span></label>
+                        <select name="step" class="hf-select" required><option value="">Select Step</option>{% for num, label in onboarding_step_choices %}<option value="{{ num }}">{{ label }}</option>{% endfor %}</select>
+                        <span class="form-help">Which onboarding step this item belongs to.</span>
+                    </div>
+                    <div class="form-group" style="margin:0"><label class="form-label">Item Name <span style="color:var(--red)">*</span></label><input type="text" name="item_name" required class="hf-input" placeholder="e.g. School Tour, IT Access Setup"></div>
+                    <div class="form-group" style="margin:0"><label class="form-label">Description</label><textarea name="description" class="hf-input" rows="3" placeholder="Brief description..."></textarea></div>
+                    <div class="form-group" style="margin:0"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" name="is_required" value="on" checked style="width:16px;height:16px"> Required item</label></div>
+                    <div class="form-group" style="margin:0"><label class="form-label">Display Order</label><input type="number" name="order" value="0" min="0" class="hf-input"><span class="form-help">Lower numbers appear first within the same step.</span></div>
+                </div>
+                <div class="settings-modal-footer"><button type="button" class="btn-secondary" onclick="closeModal('checklistModal')">Cancel</button><button type="submit" class="btn-primary">Add Item</button></div>
+            </form>
+        </div>
+    </div>
+
+    {# ── Edit Item Modal ── #}
+    <div id="editChecklistModal" class="settings-modal-overlay" >
+        <div class="settings-modal">
+            <div class="settings-modal-header"><h3>Edit Checklist Item</h3><button type="button" class="settings-modal-close" onclick="closeModal('editChecklistModal')">&times;</button></div>
+            <form method="post" action="?tab=induction_checklist" style="padding:0">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="edit_item">
+                <input type="hidden" name="pk" id="editCL_pk">
+                <div class="settings-modal-body">
+                    <div class="form-group" style="margin:0"><label class="form-label">Onboarding Step <span style="color:var(--red)">*</span></label>
+                        <select name="step" id="editCL_step" class="hf-select" required><option value="">Select Step</option>{% for num, label in onboarding_step_choices %}<option value="{{ num }}">{{ label }}</option>{% endfor %}</select>
+                    </div>
+                    <div class="form-group" style="margin:0"><label class="form-label">Item Name <span style="color:var(--red)">*</span></label><input type="text" name="item_name" id="editCL_name" required class="hf-input"></div>
+                    <div class="form-group" style="margin:0"><label class="form-label">Description</label><textarea name="description" id="editCL_desc" class="hf-input" rows="3"></textarea></div>
+                    <div class="form-group" style="margin:0"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" name="is_required" id="editCL_req" value="on" style="width:16px;height:16px"> Required item</label></div>
+                    <div class="form-group" style="margin:0"><label class="form-label">Display Order</label><input type="number" name="order" id="editCL_order" min="0" class="hf-input"></div>
+                </div>
+                <div class="settings-modal-footer"><button type="button" class="btn-secondary" onclick="closeModal('editChecklistModal')">Cancel</button><button type="submit" class="btn-primary">Save Changes</button></div>
+            </form>
+        </div>
+    </div>
+
+{# ══════════════════════════════════════════════════════════════ #}
+{# EMAIL TEMPLATES TAB                                           #}
+{# ══════════════════════════════════════════════════════════════ #}
+{% elif active_tab == 'email_templates' %}
+
+    <div class="card" style="margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:12px;padding:0 0 12px;border-bottom:1px solid var(--border)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            <div>
+                <div style="font-weight:600;font-size:14px">Email Templates</div>
+                <div style="font-size:12px;color:var(--text-muted)">Customize the subject and body of all system emails. Use {{ variable }} syntax for dynamic content.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title-row">
+            <div class="card-title" style="margin:0">All Email Templates</div>
+        </div>
+        <div style="border-top:1px solid var(--border);margin-top:12px">
+            <table class="h-table">
+                <thead>
+                    <tr><th>Template</th><th>Subject</th><th>HTML</th><th>Plain Text</th><th>Status</th><th style="text-align:right">Actions</th></tr>
+                </thead>
+                <tbody>
+                    {% for tpl in email_templates %}
+                    <tr>
+                        <td style="font-weight:600">{{ tpl.name }}</td>
+                        <td style="font-size:12px;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ tpl.subject|truncatewords:8|default:"--" }}</td>
+                        <td>{% if tpl.html_body %}<span class="chip chip-green" style="font-size:10px">Set</span>{% else %}<span class="chip chip-grey" style="font-size:10px">None</span>{% endif %}</td>
+                        <td>{% if tpl.plain_body %}<span class="chip chip-green" style="font-size:10px">Set</span>{% else %}<span class="chip chip-grey" style="font-size:10px">None</span>{% endif %}</td>
+                        <td>{% if tpl.is_enabled %}<span class="chip chip-green" style="font-size:10px">Enabled</span>{% else %}<span class="chip chip-amber" style="font-size:10px">Disabled</span>{% endif %}</td>
+                        <td style="text-align:right;white-space:nowrap">
+                            {% if can_edit_email_templates %}
+                            <button type="button" class="btn-secondary btn-sm" onclick="openEditEmailTplModal('{{ tpl.pk }}','{{ tpl.template_type|escapejs }}','{{ tpl.name|escapejs }}')">Edit</button>
+                            {% if not tpl.is_default %}
+                            <button type="button" class="btn-secondary btn-sm" style="color:var(--red,#EF4444);margin-left:4px"
+                              onclick="confirmDeleteModal({title:'Reset Template?',body:'Are you sure you want to reset <strong>{{ tpl.name }}</strong> to its default content?',detail:'This will overwrite your current changes.',confirmText:'Reset',url:'?tab=email_templates',type:'danger',extraData:[{name:'action',value:'reset_email_template'},{name:'template_type',value:'{{ tpl.template_type }}'}]})">Reset</button>
+                            {% endif %}
+                            {% else %}
+                            <span style="font-size:12px;color:var(--text-muted)">View only</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with title='No email templates yet' desc='Templates will be seeded automatically on first visit.' icon='mail' icon_color='blue' %}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {# ── Edit Email Template Modal ── #}
+    <div id="editEmailTplModal" class="settings-modal-overlay" >
+        <div class="settings-modal" style="max-width:900px">
+            <div class="settings-modal-header"><h3 id="editEmailTpl_title">Edit Email Template</h3><button type="button" class="settings-modal-close" onclick="closeModal('editEmailTplModal')">&times;</button></div>
+            <form method="post" action="?tab=email_templates" id="editEmailTplForm" style="padding:0">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="save_email_template">
+                <input type="hidden" name="template_type" id="editEmailTpl_type">
+                <textarea name="html_body" id="editEmailTpl_html" style="display:none"></textarea>
+                <div class="settings-modal-body">
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">Template Name</label>
+                        <input type="text" name="name" id="editEmailTpl_name" required class="hf-input">
+                    </div>
+                    <div class="form-group" style="margin:0">
+                        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" name="is_enabled" id="editEmailTpl_enabled" value="on" style="width:16px;height:16px"> Enabled (send this email)</label>
+                    </div>
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">Subject Line</label>
+                        <input type="text" name="subject" id="editEmailTpl_subject" class="hf-input" placeholder="e.g. Your {{ school_name }} Account">
+                        <span class="form-help">Supports Django template syntax. Available variables depend on template type.</span>
+                    </div>
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">HTML Body</label>
+                        <div id="editEmailTpl_vars" style="font-size:12px;color:var(--text-muted);padding:6px 10px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px 8px 0 0;border-bottom:none;display:flex;align-items:center;gap:12px">
+                            <span><strong>Insert variable:</strong> <span id="editEmailTpl_vars_list"></span></span>
+                            <span style="flex:1"></span>
+                            <button type="button" id="updatePreviewBtn" onclick="updatePreviewFromHtml()" style="display:none;padding:3px 10px;border:1px solid #023AA5;border-radius:6px;cursor:pointer;font-weight:600;background:#fff;color:#023AA5;font-size:11px;margin-right:8px">Update Preview</button>
+                            <span id="emailEditorModeToggle" style="display:inline-flex;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;font-size:11px">
+                                <button type="button" id="modeVisualBtn" onclick="switchEmailEditorMode('visual')" style="padding:3px 10px;border:none;cursor:pointer;font-weight:600;background:#023AA5;color:#fff">Visual</button>
+                                <button type="button" id="modeHtmlBtn" onclick="switchEmailEditorMode('html')" style="padding:3px 10px;border:none;cursor:pointer;font-weight:600;background:#f3f4f6;color:#374151;border-left:1px solid #e5e7eb">HTML</button>
+                            </span>
+                        </div>
+                        <iframe id="emailPreviewFrame" style="width:100%;min-height:380px;border:1px solid #e5e7eb;border-radius:0 0 8px 8px;background:#f0f2f5"></iframe>
+                        <textarea id="editEmailTpl_htmlRaw" class="hf-input" rows="14" style="font-family:'SF Mono',Monaco,Consolas,monospace;font-size:12px;display:none;border-radius:0 0 8px 8px" placeholder="Paste or write raw HTML here..."></textarea>
+                        <span class="form-help" style="margin-top:6px">Visual mode: live preview of the email as recipients will see it. HTML mode: edit the raw source directly. Supports &#123;&#123; variable &#125;&#125; and &#123;&#37; ... &#37;&#125; Django template syntax.</span>
+                    </div>
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">Plain Text Body</label>
+                        <textarea name="plain_body" id="editEmailTpl_plain" class="hf-input" rows="6" style="font-family:monospace;font-size:12px" placeholder="Plain text fallback..."></textarea>
+                        <span class="form-help">Required fallback for email clients that don't render HTML.</span>
+                    </div>
+                </div>
+                <div class="settings-modal-footer"><button type="button" class="btn-secondary" onclick="closeModal('editEmailTplModal')">Cancel</button><button type="submit" class="btn-primary">Save Template</button></div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    var EMAIL_TPL_VARS = {
+        'activation': ['school_name', 'user.first_name', 'user.username', 'temp_password', 'login_url', 'site_url', 'static_url'],
+        'password_reset': ['school_name', 'user.get_full_name', 'user.username', 'reset_url', 'expiry_hours', 'site_url', 'static_url'],
+        'onboarding_complete': ['school_name', 'staff.first_name', 'staff.full_name', 'staff.employee_id', 'staff.department', 'staff.job_title', 'staff.employment_start_date', 'login_url'],
+        'parent_portal': ['school_name', 'guardian_name', 'username', 'temp_password', 'login_url', 'site_url', 'static_url'],
+        'admission_inquiry': ['school_name', 'parent_name', 'child_name', 'ref_number'],
+        'admission_meeting': ['school_name', 'parent_name', 'child_name', 'meeting_date', 'meeting_time', 'ref'],
+        'admission_denied': ['school_name', 'parent_name', 'child_full_name', 'admissions_email'],
+        'fee_invoice': ['school_name', 'guardian_name', 'student_name', 'invoice_number', 'currency', 'amount_due', 'due_date'],
+        'fee_reminder': ['school_name', 'guardian_name', 'student_name', 'currency', 'balance', 'due_date'],
+        'checkin_notification': ['school_name', 'guardian_name', 'student_name', 'checkin_time'],
+        'checkout_notification': ['school_name', 'guardian_name', 'student_name', 'checkout_time'],
+        'otp_code': ['school_name', 'otp_code', 'expiry_minutes'],
+        'broadcast': ['subject', 'message']
+    };
+    var OPEN_VAR = '{' + '{';
+    var CLOSE_VAR = '}' + '}';
+    var currentEmailMode = 'visual';
+    var lastHtmlContent = '';
+
+    function renderEmailPreview(html) {
+        var frame = document.getElementById('emailPreviewFrame');
+        var doc = frame.contentDocument || frame.contentWindow.document;
+        doc.open();
+        doc.write(html || '<html><body style="font-family:sans-serif;color:#999;padding:40px;text-align:center">No content yet. Switch to HTML mode to add content.</body></html>');
+        doc.close();
+        setTimeout(function() {
+            try { frame.style.height = Math.max(380, doc.body.scrollHeight + 20) + 'px'; } catch(e) {}
+        }, 100);
+    }
+
+    function updatePreviewFromHtml() {
+        lastHtmlContent = document.getElementById('editEmailTpl_htmlRaw').value;
+        renderEmailPreview(lastHtmlContent);
+    }
+
+    function switchEmailEditorMode(mode) {
+        currentEmailMode = mode;
+        var frame = document.getElementById('emailPreviewFrame');
+        var rawArea = document.getElementById('editEmailTpl_htmlRaw');
+        var visBtn = document.getElementById('modeVisualBtn');
+        var htmlBtn = document.getElementById('modeHtmlBtn');
+        var previewBtn = document.getElementById('updatePreviewBtn');
+        if (mode === 'visual') {
+            lastHtmlContent = rawArea.value;
+            rawArea.style.display = 'none';
+            frame.style.display = '';
+            previewBtn.style.display = 'none';
+            htmlBtn.style.background = '#f3f4f6';
+            htmlBtn.style.color = '#374151';
+            visBtn.style.background = '#023AA5';
+            visBtn.style.color = '#fff';
+            renderEmailPreview(rawArea.value);
+        } else {
+            if (frame.style.display !== 'none') {
+                rawArea.value = lastHtmlContent;
+            }
+            frame.style.display = 'none';
+            rawArea.style.display = '';
+            previewBtn.style.display = '';
+            visBtn.style.background = '#f3f4f6';
+            visBtn.style.color = '#374151';
+            htmlBtn.style.background = '#023AA5';
+            htmlBtn.style.color = '#fff';
+            rawArea.focus();
+        }
+    }
+
+    function openEditEmailTplModal(pk, type, name) {
+        document.getElementById('editEmailTpl_type').value = type;
+        document.getElementById('editEmailTpl_title').textContent = 'Edit ' + name;
+        document.getElementById('editEmailTpl_name').value = name;
+
+        currentEmailMode = 'visual';
+        document.getElementById('emailPreviewFrame').style.display = '';
+        document.getElementById('editEmailTpl_htmlRaw').style.display = 'none';
+        document.getElementById('updatePreviewBtn').style.display = 'none';
+        document.getElementById('modeVisualBtn').style.background = '#023AA5';
+        document.getElementById('modeVisualBtn').style.color = '#fff';
+        document.getElementById('modeHtmlBtn').style.background = '#f3f4f6';
+        document.getElementById('modeHtmlBtn').style.color = '#374151';
+
+        var vars = EMAIL_TPL_VARS[type] || [];
+        var varsHtml = vars.map(function(v){
+            var tag = OPEN_VAR + ' ' + v + ' ' + CLOSE_VAR;
+            return '<span class="tpl-var-btn" onclick="insertVariable(\'' + tag + '\')" title="Insert ' + tag + '">' + tag + '</span>';
+        }).join(' ');
+        document.getElementById('editEmailTpl_vars_list').innerHTML = varsHtml;
+
+        fetch('?tab=email_templates&action=get_template&template_type=' + type)
+            .then(function(r){ return r.json(); })
+            .then(function(data) {
+                document.getElementById('editEmailTpl_subject').value = data.subject || '';
+                document.getElementById('editEmailTpl_plain').value = data.plain_body || '';
+                document.getElementById('editEmailTpl_enabled').checked = data.is_enabled;
+                var raw = data.html_body || '';
+                lastHtmlContent = raw;
+                document.getElementById('editEmailTpl_htmlRaw').value = raw;
+                renderEmailPreview(raw);
+            });
+
+        document.getElementById('editEmailTplForm').onsubmit = function() {
+            document.getElementById('editEmailTpl_html').value = currentEmailMode === 'html'
+                ? document.getElementById('editEmailTpl_htmlRaw').value
+                : lastHtmlContent;
+        };
+
+        openModal('editEmailTplModal');
+    }
+
+    function insertVariable(varText) {
+        if (currentEmailMode === 'html') {
+            var raw = document.getElementById('editEmailTpl_htmlRaw');
+            var pos = raw.selectionStart || raw.value.length;
+            raw.value = raw.value.slice(0, pos) + varText + raw.value.slice(pos);
+            raw.selectionStart = raw.selectionEnd = pos + varText.length;
+            raw.focus();
+            lastHtmlContent = raw.value;
+        }
+    }
+    </script>
+
+{% endif %}
+
+<script>
+function previewImage(dropZoneId, file, imgId) {
+    if (!file || !file.type.startsWith('image/')) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        var img = document.getElementById(imgId);
+        img.src = e.target.result;
+        img.style.display = 'block';
+        var dz = document.getElementById(dropZoneId);
+        var placeholder = dz.querySelector('#heroPlaceholder, #logoPlaceholder');
+        if (placeholder) placeholder.style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+}
+</script>
+
+{# ══════════════════════════════════════════════════════════════ #}
+{# SHARED MODAL CSS & JS                                         #}
+{# ══════════════════════════════════════════════════════════════ #}
+<style>
+@keyframes modalSlideIn { from { transform: translateY(16px) scale(0.97); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+.settings-modal-overlay { position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.45);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;opacity:0;visibility:hidden;pointer-events:none;transition:opacity 0.2s,visibility 0.2s; }
+.settings-modal-overlay.is-open { opacity:1;visibility:visible;pointer-events:auto; }
+.settings-modal { background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.2);max-width:520px;width:92%;max-height:85vh;display:flex;flex-direction:column;animation:modalSlideIn 0.25s cubic-bezier(0.16,1,0.3,1);overflow:hidden; }
+.settings-modal-header { display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border);flex-shrink:0; }
+.settings-modal-header h3 { font-size:16px;font-weight:700;color:var(--text-primary);margin:0; }
+.settings-modal-close { border:none;background:none;font-size:22px;color:var(--text-muted);cursor:pointer;padding:0 4px;line-height:1; }
+.settings-modal-close:hover { color:var(--text-primary); }
+.settings-modal-body { padding:20px 24px;display:flex;flex-direction:column;gap:16px;overflow-y:auto;flex:1;min-height:0; }
+.settings-modal form { display:flex;flex-direction:column;flex:1;min-height:0; }
+.settings-modal-footer { display:flex;justify-content:flex-end;gap:8px;padding:16px 24px;border-top:1px solid var(--border);flex-shrink:0; }
+</style>
+<script>
+function openModal(id) { document.getElementById(id).classList.add('is-open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('is-open'); }
+function openEditClassModal(pk, name, dept, cap) {
+    document.getElementById('editClass_pk').value = pk;
+    document.getElementById('editClass_name').value = name;
+    document.getElementById('editClass_dept').value = dept;
+    document.getElementById('editClass_cap').value = cap;
+    openModal('editClassModal');
+}
+function setDateInput(id, val) {
+    var el = document.getElementById(id);
+    if (!el || !val) return;
+    el.value = val;
+}
+function openEditAYModal(pk, name, start, end, terms, isCurrent) {
+    var html = '<div class="settings-modal-overlay is-open" id="editAYOverlay">' +
+        '<div class="settings-modal">' +
+        '<div class="settings-modal-header"><h3>Edit Academic Year</h3><button type="button" class="settings-modal-close" onclick="this.closest(\'.settings-modal-overlay\').remove()">&times;</button></div>' +
+        '<form method="post" action="?tab=academic_year" style="padding:0">' +
+        '<input type="hidden" name="csrfmiddlewaretoken" value="' + document.querySelector('input[name=csrfmiddlewaretoken]').value + '">' +
+        '<input type="hidden" name="action" value="edit_academic_year">' +
+        '<input type="hidden" name="pk" value="' + pk + '">' +
+        '<div class="settings-modal-body">' +
+        '<div class="form-group" style="margin:0"><label class="form-label">Year Name <span style="color:var(--red)">*</span></label><input type="text" name="name" value="' + name.replace(/"/g, '&quot;') + '" required class="hf-input"></div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+        '<div class="form-group" style="margin:0"><label class="form-label">Start Date</label><input type="date" name="start_date" value="' + (start || '') + '" class="hf-input"></div>' +
+        '<div class="form-group" style="margin:0"><label class="form-label">End Date</label><input type="date" name="end_date" value="' + (end || '') + '" class="hf-input"></div>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+        '<div class="form-group" style="margin:0"><label class="form-label"># Terms</label><input type="number" name="number_of_terms" value="' + terms + '" min="1" max="6" class="hf-input"></div>' +
+        '<div class="form-group" style="margin:0;display:flex;align-items:flex-end"><label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary);cursor:pointer;padding-bottom:10px"><input type="checkbox" name="is_current" value="on" style="width:16px;height:16px"' + (isCurrent ? ' checked' : '') + '> Set as current academic year</label></div>' +
+        '</div></div>' +
+        '<div class="settings-modal-footer"><button type="button" class="btn-secondary" onclick="this.closest(\'.settings-modal-overlay\').remove()">Cancel</button><button type="submit" class="btn-primary">Save Changes</button></div>' +
+        '</form></div></div>';
+    document.body.insertAdjacentHTML('beforeend', html);
+    var overlay = document.getElementById('editAYOverlay');
+    var form = overlay.querySelector('form');
+    var cb = form.querySelector('input[name="is_current"]');
+    form.addEventListener('submit', function(e) {
+        if (cb.checked && !isCurrent && typeof CURRENT_YEAR_NAME !== 'undefined' && CURRENT_YEAR_NAME) {
+            if (!confirm('"' + CURRENT_YEAR_NAME + '" is currently set as the active academic year. Setting this year as current will automatically unassign it. Continue?')) {
+                e.preventDefault();
+            }
+        }
+    });
+}
+function openEditTermModal(pk, name, start, end, deadline, mtStart, mtEnd, etStart, etEnd, quizStart, quizEnd, gmQDays, gmMtDays, gmEtDays) {
+    var html = '<div class="settings-modal-overlay is-open" id="editTermOverlay">' +
+        '<div class="settings-modal">' +
+        '<div class="settings-modal-header"><h3>Edit Term</h3><button type="button" class="settings-modal-close" onclick="this.closest(\'.settings-modal-overlay\').remove()">&times;</button></div>' +
+        '<form method="post" action="?tab=academic_year" style="padding:0">' +
+        '<input type="hidden" name="csrfmiddlewaretoken" value="' + document.querySelector('input[name=csrfmiddlewaretoken]').value + '">' +
+        '<input type="hidden" name="action" value="edit_term">' +
+        '<input type="hidden" name="pk" value="' + pk + '">' +
+        '<div class="settings-modal-body">' +
+        '<div class="form-group" style="margin:0"><label class="form-label">Term Name</label><input type="text" name="term_name" value="' + name.replace(/"/g, '&quot;') + '" required class="hf-input"></div>' +
+        '<div class="form-group" style="margin:0"><label class="form-label">Start Date</label><input type="date" name="start_date" value="' + (start || '') + '" class="hf-input"></div>' +
+        '<div class="form-group" style="margin:0"><label class="form-label">End Date</label><input type="date" name="end_date" value="' + (end || '') + '" class="hf-input"></div>' +
+        '<div class="form-group" style="margin:0"><label class="form-label">Grading Deadline</label><input type="date" name="grading_deadline" value="' + (deadline || '') + '" class="hf-input"></div>' +
+        '<details style="margin-top:4px"><summary style="font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer">Quiz Dates (optional)</summary>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">' +
+        '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Quiz Start</label><input type="date" name="quiz_start_date" value="' + (quizStart || '') + '" class="hf-input"></div>' +
+        '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Quiz End</label><input type="date" name="quiz_end_date" value="' + (quizEnd || '') + '" class="hf-input"></div>' +
+        '</div></details>' +
+        '<details style="margin-top:4px"><summary style="font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer">Exam Dates (optional)</summary>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">' +
+        '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Mid-Term Start</label><input type="date" name="midterm_exam_start_date" value="' + (mtStart || '') + '" class="hf-input"></div>' +
+        '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Mid-Term End</label><input type="date" name="midterm_exam_end_date" value="' + (mtEnd || '') + '" class="hf-input"></div>' +
+        '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">End-Term Start</label><input type="date" name="endterm_exam_start_date" value="' + (etStart || '') + '" class="hf-input"></div>' +
+        '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">End-Term End</label><input type="date" name="endterm_exam_end_date" value="' + (etEnd || '') + '" class="hf-input"></div>' +
+        '</div></details>' +
+        '<details style="margin-top:4px"><summary style="font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer">Grade Marking Window (optional)</summary>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px;align-items:end">' +
+        '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Quiz Marking Days</label><input type="number" name="quiz_grade_marking_days" value="' + (gmQDays || 5) + '" min="1" max="60" class="hf-input"></div>' +
+        '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Mid-Term Marking Days</label><input type="number" name="midterm_grade_marking_days" value="' + (gmMtDays || 10) + '" min="1" max="60" class="hf-input"></div>' +
+        '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">End-Term Marking Days</label><input type="number" name="endterm_grade_marking_days" value="' + (gmEtDays || 10) + '" min="1" max="60" class="hf-input"></div>' +
+        '</div><div style="font-size:11px;color:var(--text-muted);margin-top:4px">Working days (excl. weekends) after each exam end date. Marking deadline auto-calculated.</div></details>' +
+        '</div>' +
+        '<div class="settings-modal-footer"><button type="button" class="btn-secondary" onclick="this.closest(\'.settings-modal-overlay\').remove()">Cancel</button><button type="submit" class="btn-primary">Save Changes</button></div>' +
+        '</form></div></div>';
+    document.body.insertAdjacentHTML('beforeend', html);
+}
+function openEditMediaModal(area, ext, size, total, files, dup, active, w, h) {
+    document.getElementById('editMedia_area').value = area;
+    document.getElementById('editMedia_title').textContent = 'Edit ' + area.replace(/_/g, ' ').replace(/\b\w/g, function(l){ return l.toUpperCase(); });
+    document.getElementById('editMedia_ext').value = ext;
+    document.getElementById('editMedia_size').value = size;
+    document.getElementById('editMedia_total').value = total;
+    document.getElementById('editMedia_files').value = files;
+    document.getElementById('editMedia_dup').checked = dup;
+    document.getElementById('editMedia_active').checked = active;
+    openModal('editMediaModal');
+}
+function openEditChecklistModal(pk, name, desc, step, req, order) {
+    document.getElementById('editCL_pk').value = pk;
+    document.getElementById('editCL_name').value = name;
+    document.getElementById('editCL_desc').value = desc;
+    document.getElementById('editCL_step').value = step;
+    document.getElementById('editCL_req').checked = req;
+    document.getElementById('editCL_order').value = order;
+    openModal('editChecklistModal');
+}
+document.querySelectorAll('.settings-modal-overlay').forEach(function(el) {
+    el.addEventListener('click', function(e) { if (e.target === el) el.classList.remove('is-open'); });
+});
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') document.querySelectorAll('.settings-modal-overlay').forEach(function(el) { el.classList.remove('is-open'); });
+});
+
+function confirmDeleteModal(opts) {
+    var modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.45);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center';
+    modal.innerHTML = '<div style="background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.2);max-width:420px;width:92%;overflow:hidden;animation:modalSlideIn 0.25s cubic-bezier(0.16,1,0.3,1)">' +
+        '<div style="padding:20px 24px;border-bottom:1px solid #E5E7EB;display:flex;align-items:center;justify-content:space-between">' +
+        '<h3 style="margin:0;font-size:16px;font-weight:700">' + opts.title + '</h3>' +
+        '<button type="button" onclick="this.closest(\'.settings-modal-overlay,.confirm-modal\').remove()" style="border:none;background:none;font-size:22px;color:#8492A6;cursor:pointer">&times;</button></div>' +
+        '<div style="padding:20px 24px">' +
+        '<p style="margin:0 0 8px;font-size:13px;color:#374151">' + opts.body + '</p>' +
+        (opts.detail ? '<p style="margin:0;font-size:12px;color:#6B7280;font-style:italic">' + opts.detail + '</p>' : '') +
+        '</div>' +
+        '<div style="display:flex;justify-content:flex-end;gap:8px;padding:16px 24px;border-top:1px solid #E5E7EB">' +
+        '<button type="button" class="btn-secondary" onclick="this.closest(\'.settings-modal-overlay,.confirm-modal\').remove()">Cancel</button>' +
+        '<button type="button" class="btn-' + (opts.type === 'danger' ? 'danger' : 'primary') + '" id="confirmModalSubmit">' + opts.confirmText + '</button>' +
+        '</div></div>';
+    modal.className = 'confirm-modal';
+    document.body.appendChild(modal);
+    modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+    document.getElementById('confirmModalSubmit').addEventListener('click', function() {
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = opts.url || window.location.href;
+        var csrf = document.querySelector('input[name=csrfmiddlewaretoken]');
+        if (csrf) { var f = csrf.cloneNode(true); form.appendChild(f); }
+        (opts.extraData || []).forEach(function(d) {
+            var inp = document.createElement('input');
+            inp.type = 'hidden';
+            inp.name = d.name;
+            inp.value = d.value;
+            form.appendChild(inp);
+        });
+        document.body.appendChild(form);
+        form.submit();
+    });
+}
+</script>
+{% endblock %}

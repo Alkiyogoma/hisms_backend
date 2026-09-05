@@ -1,0 +1,96 @@
+{% if is_checkbox %}
+<div class="hf2-group hf2-check-group{% if span == 'full' %} hf2-span-full{% endif %}">
+  <label class="hf2-check-label">
+    {{ rendered }}
+    <span>{{ label }}</span>
+  </label>
+  {% if help_text %}<p class="hf2-hint">{{ help_text }}</p>{% endif %}
+  {% for err in errors %}<p class="hf2-error">{{ err }}</p>{% endfor %}
+</div>
+{% elif is_checkbox_select %}
+<div class="hf2-group{% if span == 'full' %} hf2-span-full{% endif %}">
+  <label class="hf2-label">{{ label }}{% if field.field.required %}<span class="hf2-req">*</span>{% endif %}</label>
+  <div class="hf2-checkbox-grid">
+    {{ rendered }}
+  </div>
+  {% if help_text %}<p class="hf2-hint">{{ help_text }}</p>{% endif %}
+  {% for err in errors %}<p class="hf2-error">{{ err }}</p>{% endfor %}
+</div>
+{% elif is_file %}
+<div class="hf2-group{% if span == 'full' %} hf2-span-full{% endif %}">
+  <label class="hf2-label{% if errors %} hf2-label-err{% endif %}">{{ label }}{% if field.field.required %}<span class="hf2-req">*</span>{% endif %}</label>
+  <div style="display:flex; align-items:center; gap:20px; margin-top:8px;">
+     <!-- Round Placeholder / Preview -->
+     <div id="preview-container-{{ field.id_for_label }}" 
+          style="width:72px; height:72px; border-radius:50%; background:#F8FAFC; border:2px dashed #CBD5E1; display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative; transition: all 0.2s;"
+          onclick="this.nextElementSibling.querySelector('input').click()"
+          onmouseover="this.style.borderColor='var(--hodari-blue)'; this.style.background='#F0F4FB'"
+          onmouseout="this.style.borderColor='#CBD5E1'; this.style.background='#F8FAFC'">
+        
+        <div id="initials-{{ field.id_for_label }}" style="font-size:24px; font-weight:800; color:#94A3B8; letter-spacing:-0.02em">H</div>
+        <img id="img-preview-{{ field.id_for_label }}" style="width:100%; height:100%; border-radius:50%; object-fit:cover; display:none; position:absolute; inset:0; border:2px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,0.1)">
+     </div>
+
+     <div style="display:none">{{ rendered }}</div>
+     
+     <div style="font-size:12px; color:#64748B; font-weight:500">
+        <div id="file-status-{{ field.id_for_label }}">Click to upload student photo</div>
+     </div>
+  </div>
+  {% for err in errors %}<p class="hf2-error">{{ err }}</p>{% endfor %}
+  
+  <script>
+    (function() {
+      const input = document.getElementById('{{ field.id_for_label }}');
+      const nameInput = document.getElementById('id_child_full_name') || document.getElementById('id_first_name');
+      const initialsDiv = document.getElementById('initials-{{ field.id_for_label }}');
+      const previewImg = document.getElementById('img-preview-{{ field.id_for_label }}');
+      const statusDiv = document.getElementById('file-status-{{ field.id_for_label }}');
+
+      function updateInitials() {
+          if (nameInput && nameInput.value.trim() && !previewImg.src.includes('blob')) {
+              const val = nameInput.value.trim();
+              const parts = val.split(' ').filter(p => p.length > 0);
+              let initials = 'H';
+              if (parts.length >= 2) {
+                  initials = (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+              } else if (parts.length === 1) {
+                  initials = parts[0].substring(0, 2).toUpperCase();
+              }
+              initialsDiv.innerText = initials;
+          } else if (!previewImg.style.display || previewImg.style.display === 'none') {
+              initialsDiv.innerText = 'H';
+          }
+      }
+
+      if (nameInput) {
+          nameInput.addEventListener('input', updateInitials);
+          updateInitials();
+      }
+
+      if (input) {
+        input.addEventListener('change', function() {
+          if (this.files && this.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewImg.src = e.target.result;
+                previewImg.style.display = 'block';
+                initialsDiv.style.display = 'none';
+                statusDiv.innerText = 'Photo selected: ' + input.files[0].name;
+                statusDiv.style.color = '#10B981';
+            }
+            reader.readAsDataURL(this.files[0]);
+          }
+        });
+      }
+    })();
+  </script>
+</div>
+{% else %}
+<div class="hf2-group{% if span == 'full' %} hf2-span-full{% endif %}">
+  <label class="hf2-label{% if errors %} hf2-label-err{% endif %}">{{ label }}{% if field.field.required %}<span class="hf2-req">*</span>{% endif %}</label>
+  {{ rendered }}
+  {% if help_text %}<p class="hf2-hint">{{ help_text }}</p>{% endif %}
+  {% for err in errors %}<p class="hf2-error">{{ err }}</p>{% endfor %}
+</div>
+{% endif %}

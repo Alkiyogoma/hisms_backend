@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+{% load static role_tags %}
+
+{% block title %}Incident #{{ incident.id }} — {{ brand.school_name }}{% endblock %}
+
+{% block extra_head %}
+{% include "includes/hodari_print_styles.html" %}
+<style>
+  .form-section-title { font-size: 14px; font-weight: 800; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+  .form-section-title::before { content: ''; width: 4px; height: 18px; background: var(--hodari-blue); border-radius: 2px; }
+  .form-header { border-bottom: 2px solid var(--hodari-blue); padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-start; }
+  .form-title { font-family: var(--font-display, 'Merriweather', serif); font-size: 24px; color: var(--hodari-blue); font-weight: 800; margin: 0; }
+  .form-subtitle { color: var(--text-muted); font-size: 13px; margin-top: 4px; font-weight: 600; }
+  .incident-box { background: #F8FAFC; border: 1px solid var(--border); border-radius: 12px; padding: 24px; font-size: 15px; line-height: 1.6; color: var(--text-primary); white-space: pre-wrap; margin-bottom: 20px; }
+  .tag { background: white; border: 1px solid var(--border); padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+  .status-btn-group { display: flex; gap: 12px; margin-top: 8px; }
+  .status-btn { 
+    flex: 1; text-align: center; padding: 12px 10px; border-radius: 10px; 
+    border: 1px solid var(--border); background: #fff; cursor: pointer; 
+    font-size: 13px; font-weight: 700; color: var(--text-secondary);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .status-btn:hover { background: #F8FAFC; border-color: #CBD5E1; color: var(--text-primary); }
+  .status-radio:checked + .btn-pending { background: #64748B; color: #fff; border-color: #64748B; box-shadow: 0 4px 12px rgba(100, 116, 139, 0.2); }
+  .status-radio:checked + .btn-progress { background: var(--hodari-blue); color: #fff; border-color: var(--hodari-blue); box-shadow: 0 4px 12px rgba(2, 58, 165, 0.25); }
+  .status-radio:checked + .btn-resolved { background: #10B981; color: #fff; border-color: #10B981; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25); }
+  .status-radio:checked + .btn-dismissed { background: #6B7280; color: #fff; border-color: #6B7280; box-shadow: 0 4px 12px rgba(107, 114, 128, 0.2); }
+  .status-btn-group.locked .status-btn { pointer-events: none; opacity: 0.55; cursor: not-allowed; }
+  .locked-banner { background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 10px; padding: 14px 18px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; color: #166534; font-size: 13px; font-weight: 600; }
+  @media print {
+    .no-print-area { display: none !important; }
+    .print-only { display: block !important; }
+    .sig-line { border-bottom: 1.5px solid #000; height: 40px; margin-bottom: 4px; }
+    body { background: #fff !important; }
+    .card { border: none !important; box-shadow: none !important; padding: 0 !important; }
+  }
+</style>
+{% endblock %}
+
+{% block topbar_greeting %}Discipline Incident #{{ incident.id }}{% endblock %}
+{% block topbar_date %}{{ incident.created_at|date:"l, d F Y" }}{% endblock %}
+
+{% block content %}
+{% include "discipline/_top_tabs.html" %}
+<div style="max-width:800px;margin:0 auto">
+  <div class="no-print-area" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <a href="{% url 'discipline:list' %}" class="back-link" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#64748B;text-decoration:none">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      Back to Incidents
+    </a>
+    <button onclick="window.print()" style="padding:8px 18px;border-radius:8px;border:1.5px solid var(--hodari-blue);background:#fff;color:var(--hodari-blue);font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>
+      Print / Download
+    </button>
+  </div>
+
+  <!-- Printable Document Container -->
+  <div class="doc-container">
+    <div class="doc-body" style="padding-top:32px">
+      <!-- Form Header — matching welfare detail style -->
+      {% with student=incident.student %}
+      {% include "includes/hodari_print_header.html" %}
+      {% endwith %}
+      <div style="height:1px;background:var(--border);margin:20px 0"></div>
+
+      <!-- Student & Reporter Info -->
+      <table class="doc-table">
+        <tr>
+          <th style="width:33%">Student</th>
+          <th style="width:33%">Class</th>
+          <th style="width:34%">Admission No.</th>
+        </tr>
+        <tr>
+          <td style="font-weight:600;color:var(--hodari-blue)">{{ incident.student.first_name }} {{ incident.student.last_name }}</td>
+          <td>{{ incident.student.class_name }}</td>
+          <td>{{ incident.student.admission_no }}</td>
+        </tr>
+      </table>
+
+      <table class="doc-table">
+        <tr>
+          <th style="width:50%">Reported By</th>
+          <th style="width:50%">Date of Incident</th>
+        </tr>
+        <tr>
+          <td>{% if incident.reported_by.staff_profile %}{{ incident.reported_by.staff_profile.full_name }}{% else %}{{ incident.reported_by.get_full_name|default:incident.reported_by.username }}{% endif %}</td>
+          <td>{% if incident.incident_date %}{{ incident.incident_date|date:"d M Y" }}{% else %}{{ incident.created_at|date:"d M Y" }}{% endif %}</td>
+        </tr>
+      </table>
+
+      <table class="doc-table">
+        <tr>
+          <th style="width:33%">Location</th>
+          <th style="width:33%">Severity</th>
+          <th style="width:34%">Previous Incidents</th>
+        </tr>
+        <tr>
+          <td>{{ incident.location|default:"Not specified" }}</td>
+          <td><span class="chip {% if incident.severity == 'critical' %}chip-red{% elif incident.severity == 'high' %}chip-amber{% else %}chip-blue{% endif %}">{{ incident.get_severity_display }}</span></td>
+          <td>{{ incident.previous_incidents|yesno:"Yes,No" }}</td>
+        </tr>
+      </table>
+
+      <!-- Incident Classification -->
+      {% if incident.incident_level_1 or incident.incident_level_2 or incident.incident_level_3 or incident.incident_level_4 %}
+      <div style="margin-bottom:20px">
+        <div class="form-section-title">Incident Classification</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          {% if incident.incident_level_1 %}
+          <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+            <div style="background:#16a34a;color:white;padding:8px 12px;font-size:12px;font-weight:700">LEVEL 1 - MINOR</div>
+            <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
+              {% for item in incident.incident_level_1 %}
+                <div style="font-size:12px; display:flex; gap:8px; align-items:center;">
+                  <div style="width:14px;height:14px;border:1px solid #cbd5e1;border-radius:3px;display:flex;align-items:center;justify-content:center;background:#16a34a;-webkit-print-color-adjust: exact;print-color-adjust: exact;">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+                  </div>
+                  <span>{{ item }}</span>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+          
+          {% if incident.incident_level_2 %}
+          <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+            <div style="background:#2563eb;color:white;padding:8px 12px;font-size:12px;font-weight:700">LEVEL 2 - MODERATE</div>
+            <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
+              {% for item in incident.incident_level_2 %}
+                <div style="font-size:12px; display:flex; gap:8px; align-items:center;">
+                  <div style="width:14px;height:14px;border:1px solid #cbd5e1;border-radius:3px;display:flex;align-items:center;justify-content:center;background:#2563eb;-webkit-print-color-adjust: exact;print-color-adjust: exact;">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+                  </div>
+                  <span>{{ item }}</span>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+          
+          {% if incident.incident_level_3 %}
+          <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+            <div style="background:#d97706;color:white;padding:8px 12px;font-size:12px;font-weight:700">LEVEL 3 - SERIOUS</div>
+            <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
+              {% for item in incident.incident_level_3 %}
+                <div style="font-size:12px; display:flex; gap:8px; align-items:center;">
+                  <div style="width:14px;height:14px;border:1px solid #cbd5e1;border-radius:3px;display:flex;align-items:center;justify-content:center;background:#d97706;-webkit-print-color-adjust: exact;print-color-adjust: exact;">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+                  </div>
+                  <span>{{ item }}</span>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+          
+          {% if incident.incident_level_4 %}
+          <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+            <div style="background:#dc2626;color:white;padding:8px 12px;font-size:12px;font-weight:700">LEVEL 4 - SEVERE</div>
+            <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
+              {% for item in incident.incident_level_4 %}
+                <div style="font-size:12px; display:flex; gap:8px; align-items:center;">
+                  <div style="width:14px;height:14px;border:1px solid #cbd5e1;border-radius:3px;display:flex;align-items:center;justify-content:center;background:#dc2626;-webkit-print-color-adjust: exact;print-color-adjust: exact;">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+                  </div>
+                  <span>{{ item }}</span>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Summary -->
+      <div style="margin-bottom:20px">
+        <div class="form-section-title">Incident Summary</div>
+        <div class="incident-box">{{ incident.summary }}</div>
+      </div>
+
+      <!-- Actions Taken -->
+      {% if incident.actions_taken_detailed or incident.action_taken %}
+      <div style="margin-bottom:20px">
+        <div class="form-section-title">Actions Taken</div>
+        {% if incident.actions_taken_detailed %}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+          {% for item in incident.actions_taken_detailed %}
+            <div style="font-size:12px; display:flex; gap:8px; align-items:center;">
+              <div style="width:14px;height:14px;border:1px solid #cbd5e1;border-radius:3px;display:flex;align-items:center;justify-content:center;background:#0f172a;-webkit-print-color-adjust: exact;print-color-adjust: exact;">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+              </div>
+              <span>{{ item }}</span>
+            </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if incident.action_taken %}
+          <div style="font-size:13px;color:var(--text-secondary);background:#F1F5F9;padding:12px;border-radius:8px;border-left:3px solid var(--hodari-blue)">
+            <strong>Additional Notes:</strong> {{ incident.action_taken }}
+          </div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <!-- Parent Contact & Follow-up -->
+      {% if incident.incident_date or incident.parent_contacted %}
+      <div style="margin-bottom:20px">
+        <div class="form-section-title">Parent Contact & Follow-up</div>
+        <table class="doc-table">
+          <tr>
+            <th style="width:33%">Date of Incident</th>
+            <th style="width:33%">Parent Contacted</th>
+            <th style="width:34%">Follow-up</th>
+          </tr>
+          <tr>
+            <td>{{ incident.incident_date|date:"F d, Y"|default:incident.created_at|date:"F d, Y" }}</td>
+            <td>{{ incident.parent_contacted|yesno:"Yes,No" }}{% if incident.parent_contact_datetime %} on {{ incident.parent_contact_datetime|date:"d M Y, H:i" }}{% endif %}</td>
+            <td>{{ incident.follow_up_required|yesno:"Required,Not required" }}{% if incident.follow_up_date %} (Due {{ incident.follow_up_date|date:"d M Y" }}){% endif %}</td>
+          </tr>
+        </table>
+      </div>
+      {% endif %}
+
+      <!-- Escalation -->
+      {% if incident.escalated %}
+      <div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#92400E;margin-bottom:20px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 8v13H6V8"/><path d="M4 8h16"/><path d="M12 12v5"/><path d="M12 4v3"/><path d="M8 4h8"/></svg>
+        This incident has been escalated for HOD review.
+      </div>
+      {% endif %}
+
+      <!-- HOD Review -->
+      {% if incident.reviewed_by %}
+      <div style="margin-bottom:20px">
+        <div class="form-section-title">HOD Review</div>
+        <div style="background:#F0F9F4;border:1px solid #BBF7D0;border-radius:10px;padding:16px">
+          <div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:4px">Reviewed by {{ incident.reviewed_by.get_full_name|default:incident.reviewed_by.username }}</div>
+          <div style="font-size:11px;color:#64748B;margin-bottom:8px">{{ incident.reviewed_at|date:"d M Y, H:i" }}</div>
+          {% if incident.hod_notes %}
+            <div style="font-size:13px;color:#334155;line-height:1.5;white-space:pre-wrap">{{ incident.hod_notes }}</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Parent/Guardian Digital Confirmation -->
+      <div style="margin-bottom:20px">
+        <div class="form-section-title">Parent/Guardian Confirmation</div>
+        <div style="border:2px dashed var(--border);border-radius:12px;padding:24px;background:#FAFBFC">
+          {% if incident.parent_confirmed %}
+            <div style="display:flex;align-items:center;gap:16px;color:#166534">
+              <div style="width:48px;height:48px;border-radius:50%;background:#DCFCE7;display:flex;align-items:center;justify-content:center">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+              </div>
+              <div>
+                <div style="font-weight:800;font-size:16px">CONFIRMED BY PARENT</div>
+                <div style="font-size:13px;opacity:0.8">Date: {{ incident.parent_confirmation_date|date:"F d, Y @ H:i" }}</div>
+              </div>
+            </div>
+          {% else %}
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:40px">
+              <div>
+                <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">I acknowledge receipt of this notification and have discussed the matter with the learner.</p>
+                <div class="sig-line"></div>
+                <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-top:8px">Parent/Guardian Signature</div>
+              </div>
+              <div>
+                <div class="sig-line"></div>
+                <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-top:8px">Date of Acknowledgment</div>
+              </div>
+            </div>
+            {% has_perm user "discipline.change_disciplineincident" as can_parent_confirm %}
+            {% if can_parent_confirm %}
+            <div style="margin-top:24px;border-top:1px solid var(--border);padding-top:20px">
+              <form method="post" action="{% url 'discipline:parent_confirm' incident.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn-primary" style="width:100%;padding:14px;font-size:14px;cursor:pointer">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px"><path d="M9 12l2 2 4-4"/><rect x="3" y="8" width="18" height="12" rx="2"/></svg>
+                  Digitally Confirm Receipt
+                </button>
+              </form>
+            </div>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Signatures -->
+      <div class="signatures">
+        <div>
+          <div class="sig-line"></div>
+          <div class="sig-label">Reported By<br><span style="font-weight:400;font-size:11px;color:var(--text-muted)">{{ incident.reported_by.get_full_name|default:incident.reported_by.username }}</span></div>
+        </div>
+        <div>
+          <div class="sig-line"></div>
+          <div class="sig-label">Parent/Guardian Signature<br><span style="font-weight:400;font-size:11px;color:var(--text-muted)">I acknowledge receipt of this report</span></div>
+        </div>
+        <div>
+          <div class="sig-line"></div>
+          <div class="sig-label">Head of Department<br><span style="font-weight:400;font-size:11px;color:var(--text-muted)">{{ incident.reviewed_by.get_full_name|default:"________________" }}</span></div>
+        </div>
+        <div>
+          <div class="sig-line"></div>
+          <div class="sig-label">Date</div>
+        </div>
+      </div>
+
+      <div class="doc-footer">
+        This is a computer-generated disciplinary report from {{ brand.school_name|default:"the school" }}. Report #DISC-{{ incident.id }}.
+      </div>
+    </div>
+  </div>
+
+  <!-- HOD Review Form (screen only, below the printable document) -->
+  <div class="no-print-area" style="margin-top:20px">
+    {% if can_review %}
+    <div style="background:#fff;border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:20px">
+      <div style="padding:16px 24px;border-bottom:1px solid var(--border);background:#F8FAFC">
+        <div style="font-size:11px;font-weight:800;color:#64748B;text-transform:uppercase;letter-spacing:.05em">HOD Review</div>
+      </div>
+      <div style="padding:20px 24px">
+        {% if incident.reviewed_by and not is_incident_locked %}
+        <div style="margin-bottom:16px;padding:14px 18px;background:#F0F9F4;border:1px solid #B7DFBF;border-radius:10px">
+          <div style="font-size:11px;font-weight:700;color:#1B7B34;margin-bottom:4px">Reviewed by {{ incident.reviewed_by.get_full_name|default:incident.reviewed_by.username }}</div>
+          <div style="font-size:12px;color:#64748B;margin-bottom:8px">{{ incident.reviewed_at|date:"d M Y, H:i" }}</div>
+          {% if incident.hod_notes %}
+            <div style="font-size:13px;color:#334155;line-height:1.5;white-space:pre-wrap">{{ incident.hod_notes }}</div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {% if is_incident_locked %}
+        <div class="locked-banner">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          This incident is {{ incident.get_status_display|lower }}. Status changes are locked. You may add comments only.
+        </div>
+        <div style="margin-bottom:16px;">
+          <label class="form-label">Current Status</label>
+          <div class="status-btn-group locked">
+            <input type="radio" class="status-radio" checked style="display:none">
+            <label class="status-btn {% if incident.status == 'resolved' %}btn-resolved{% else %}btn-dismissed{% endif %}">{{ incident.get_status_display }}</label>
+          </div>
+        </div>
+        {% if incident.hod_notes %}
+        <div style="margin-bottom:16px;">
+          <label class="form-label">Review History</label>
+          <div class="incident-box" style="font-size:13px;background:#fff;">{{ incident.hod_notes }}</div>
+        </div>
+        {% endif %}
+        <form method="post" action="{% url 'discipline:review' incident.pk %}">
+          {% csrf_token %}
+          <div class="form-group">
+            <label class="form-label" for="id_comment">New Comment</label>
+            <textarea name="comment" rows="3" class="form-input" id="id_comment" placeholder="Add a follow-up note or comment..." required></textarea>
+          </div>
+          <button type="submit" class="hf-btn hf-btn-primary" style="padding:8px 20px;font-size:12.5px;border:none;cursor:pointer;margin-top:12px">Add Comment</button>
+        </form>
+        {% else %}
+        <form method="post" action="{% url 'discipline:review' incident.pk %}">
+          {% csrf_token %}
+          <div>
+            <label class="hf2-label">Update Status</label>
+            <div class="status-btn-group">
+              <input type="radio" name="status" value="under_investigation" id="status_investigate" class="status-radio" {% if incident.status == 'under_investigation' %}checked{% endif %} style="display:none">
+              <label for="status_investigate" class="status-btn btn-progress">Under Investigation</label>
+
+              <input type="radio" name="status" value="resolved" id="status_resolved" class="status-radio" {% if incident.status == 'resolved' %}checked{% endif %} style="display:none">
+              <label for="status_resolved" class="status-btn btn-resolved">Resolved</label>
+
+              <input type="radio" name="status" value="dismissed" id="status_dismissed" class="status-radio" {% if incident.status == 'dismissed' %}checked{% endif %} style="display:none">
+              <label for="status_dismissed" class="status-btn btn-dismissed">Dismissed</label>
+            </div>
+          </div>
+          <div class="form-group" style="margin-top:16px">
+            <label class="form-label" for="id_hod_notes">Review Notes</label>
+            <textarea name="hod_notes" rows="3" class="form-input" id="id_hod_notes" placeholder="Add HOD notes, follow-up actions, or resolution details...">{{ incident.hod_notes|default:"" }}</textarea>
+          </div>
+          <button type="submit" class="hf-btn hf-btn-primary" style="padding:8px 20px;font-size:12.5px;border:none;cursor:pointer;margin-top:12px">Save Review</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

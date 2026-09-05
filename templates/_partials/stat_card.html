@@ -1,0 +1,22 @@
+{% comment %}── Canonical Stat Card ──
+   Usage: {% include '_partials/stat_card.html' with label='Total Billed' value='0' badge='TZS' sub='Current term' variant='blue' %}
+
+   Parameters:
+     label   — uppercase label text (required)
+     value   — the stat number (required)
+     unit    — optional unit suffix (e.g. '%', 'hrs')
+     badge   — optional corner badge text (e.g. 'TZS', 'pending')
+     sub     — optional subtitle line below the number
+     variant — color variant: blue (default), green, amber, red, grey
+     link    — optional URL to navigate on click
+{% endcomment %}
+{% with v=variant|default:'blue' %}
+<div class="metric-compact" style="background:linear-gradient(135deg,{% if v == 'green' %}#EEF9F0{% elif v == 'amber' %}#FFF8ED{% elif v == 'red' %}#FFF0F0{% elif v == 'grey' %}#F9FAFB{% else %}#EEF4FF{% endif %},#fff)"{% if link %} onclick="location.href='{{ link }}'"{% endif %}>
+  <div class="mc-lbl-row">
+    <span class="mc-lbl">{{ label }}</span>
+    {% if badge %}<span class="mc-currency">{{ badge }}</span>{% endif %}
+  </div>
+  <div class="mc-val" style="color:{% if v == 'green' %}#059669{% elif v == 'amber' %}#B45309{% elif v == 'red' %}#DC2626{% elif v == 'grey' %}#6B7280{% else %}#023AA5{% endif %}">{{ value }}{% if unit %}<span class="mc-currency" style="margin-left:4px;vertical-align:middle">{{ unit }}</span>{% endif %}</div>
+  {% if sub %}<div class="mc-sub" style="color:{% if v == 'green' %}#059669{% elif v == 'amber' %}#B45309{% elif v == 'red' %}#DC2626{% elif v == 'grey' %}#6B7280{% else %}#5A697D{% endif %}">{{ sub }}</div>{% endif %}
+</div>
+{% endwith %}

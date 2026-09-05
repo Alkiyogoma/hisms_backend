@@ -1,0 +1,21 @@
+{% load role_tags %}
+<div class="sub-nav">
+  {% if perms.admissions.view_applicant %}
+  <a href="{% url 'admissions:pipeline' %}" class="sub-tab {% if admissions_tab == 'pipeline' %}active{% endif %}">Pipeline</a>
+  {% endif %}
+  {% if perms.admissions.view_applicant %}
+  <a href="{% if applicant %}{% url 'admissions:detail' applicant.id %}{% else %}#{% endif %}" class="sub-tab {% if admissions_tab == 'applicant' %}active{% endif %}">Applicant</a>
+  {% endif %}
+  {% if perms.admissions.view_applicant %}
+  <a href="{% url 'admissions:assessments' %}" class="sub-tab {% if admissions_tab == 'assessments' %}active{% endif %}">Assessments <span class="sub-tab-count amber">{{ assessment_count|default:"0" }}</span></a>
+  {% endif %}
+  {% if perms.admissions.add_applicant and user.role != 'head_of_school' %}
+  <a href="{% url 'admissions:new_inquiry' %}" class="sub-tab {% if admissions_tab == 'new_inquiry' %}active{% endif %}">New inquiry</a>
+  {% endif %}
+  {% if perms.admissions.view_applicant %}
+  <a href="{% url 'admissions:actions_needed' %}" class="sub-tab {% if admissions_tab == 'actions' %}active{% endif %}">Action Center <span class="sub-tab-count blue">{{ critical_action_count|default:"0" }}</span></a>
+  {% endif %}
+  {% if perms.admissions.view_applicant %}
+  <a href="{% url 'admissions:waitlist' %}" class="sub-tab {% if admissions_tab == 'waitlist' %}active{% endif %}">Waitlist <span class="sub-tab-count grey">{{ waitlist_count|default:"0" }}</span></a>
+  {% endif %}
+</div>

@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}{{ budget.get_category_display }} Budget &mdash; Finance &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Budget detail{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+<div class="section-hdr">
+  <span class="section-title">{{ budget.get_category_display }} &middot; TZS {{ allocated|floatformat:0 }}</span>
+  <div style="display:flex;align-items:center;gap:8px">
+    <a href="{% url 'finance:budget_list' %}" class="btn btn-secondary btn-sm">&larr; All budgets</a>
+    <a href="{% url 'finance:budget_vs_actual' %}{% if budget.term_id %}?term={{ budget.term_id }}{% endif %}" class="btn btn-secondary btn-sm">Budget vs Actual</a>
+    {% has_perm user "finance.change_budget" as can_finance %}
+    {% if can_finance and not budget.is_frozen %}
+    <a href="{% url 'finance:budget_edit' budget.pk %}" class="btn btn-primary btn-sm">Edit budget</a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Summary metric cards -->
+<div class="metrics" style="grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px">
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Allocated</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#023AA5">{{ allocated|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#5A697D">{{ budget.term.name }}</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,{% if is_over_budget %}#FFF0F0{% else %}#EEF9F0{% endif %},#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Spent</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:{% if is_over_budget %}#DC2626{% else %}#059669{% endif %}">{{ actual|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#5A697D">{{ expense_count }} transaction{{ expense_count|pluralize }}</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,{% if is_over_budget %}#FFF0F0{% elif is_low_buffer %}#FFF8ED{% else %}#EEF9F0{% endif %},#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Remaining</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:{% if is_over_budget %}#DC2626{% elif is_low_buffer %}#B45309{% else %}#059669{% endif %}">{{ remaining|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:{% if is_over_budget %}#DC2626{% else %}#059669{% endif %}">
+      {% if is_over_budget %}Over budget{% else %}Budget buffer{% endif %}
+    </div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,{% if utilization >= 90 %}#FFF0F0{% elif utilization >= 75 %}#FFF8ED{% else %}#EEF9F0{% endif %},#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Utilization</span>
+      <span class="mc-currency">%</span>
+    </div>
+    <div class="mc-val" style="color:{% if utilization >= 90 %}#DC2626{% elif utilization >= 75 %}#B45309{% else %}#059669{% endif %}">{{ utilization }}</div>
+    <div class="mc-sub" style="color:#5A697D">of budget used</div>
+  </div>
+</div>
+
+<!-- Utilization bar -->
+<div class="card" style="margin-bottom:16px">
+  <div class="card-title-row">
+    <span class="card-title" style="margin-bottom:0">Budget utilization</span>
+    {% if budget.notes %}
+    <span style="font-size:12px;color:var(--text-muted);max-width:300px;text-align:right">{{ budget.notes|truncatechars:60 }}</span>
+    {% endif %}
+  </div>
+  <div style="margin-top:12px">
+    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
+      <span style="color:var(--text-secondary)">TZS {{ actual|floatformat:0 }} spent</span>
+      <span style="font-weight:600;font-family:var(--font-mono)">{{ utilization }}%</span>
+    </div>
+    <div style="height:14px;background:#EDF1F7;border-radius:99px;overflow:hidden;position:relative">
+      <div style="height:100%;border-radius:99px;width:{{ utilization }}%;background:{% if utilization >= 90 %}linear-gradient(90deg,#DC2626,#EF4444){% elif utilization >= 75 %}linear-gradient(90deg,#E0A800,#F59E0B){% else %}linear-gradient(90deg,var(--green),#34D399){% endif %};transition:width .8s ease"></div>
+      {% if utilization > 0 %}
+      <span style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.3)">
+        TZS {{ actual|floatformat:0 }} / TZS {{ allocated|floatformat:0 }}
+      </span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Projection warning -->
+{% if projected_total and projected_overrun %}
+<div class="card" style="margin-bottom:16px;border-left:3px solid #DC2626;background:#FFF5F5">
+  <div style="display:flex;align-items:flex-start;gap:10px">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <div>
+      <div style="font-weight:600;font-size:14px;color:#DC2626">Budget overrun projected</div>
+      <div style="font-size:12.5px;color:var(--text-secondary);margin-top:2px">
+        {{ pct_elapsed }}% of the term has elapsed, but {{ utilization }}% of the budget is already used.
+        At the current rate, spending is projected to reach TZS {{ projected_total|floatformat:0 }} by term end &middot;
+        <strong>TZS {{ projected_overrun_amount|floatformat:0 }} over budget</strong>.
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="grid-2">
+  <!-- Monthly breakdown -->
+  <div class="card">
+    <div class="card-title">Monthly spending breakdown</div>
+    {% if monthly_breakdown %}
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="text-align:left;background:var(--bg-metric);border-bottom:1px solid var(--border)">
+          <th style="padding:8px 12px;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase">Month</th>
+          <th style="padding:8px 12px;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;text-align:right">Amount</th>
+          <th style="padding:8px 12px;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;text-align:right">% of budget</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in monthly_breakdown %}
+        <tr style="border-bottom:1px solid var(--border);font-size:13px">
+          <td style="padding:8px 12px;font-weight:500">{{ m.month|date:"F Y" }}</td>
+          <td style="padding:8px 12px;text-align:right;font-family:var(--font-mono);font-weight:600">TZS {{ m.total|floatformat:0 }}</td>
+          <td style="padding:8px 12px;text-align:right">
+            <span class="chip {% if allocated > 0 and m.total|divisibleby:allocated > 0.25 %}chip-red{% else %}chip-grey{% endif %}">
+              {% if allocated > 0 %}{% widthratio m.total allocated 100 %}%{% else %}0%{% endif %}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    {% include '_partials/empty_state.html' with title='No spending yet' desc='Expenses will appear here once recorded.' icon='doc' icon_color='grey' %}
+    {% endif %}
+  </div>
+
+  <!-- Related budgets -->
+  <div class="card">
+    <div class="card-title">Other budgets in {{ budget.term.name }}</div>
+    {% if related_budgets %}
+    {% for rb in related_budgets %}
+    {% with spent=rb.spent_amount remaining=rb.remaining_amount util=rb.utilization_pct %}
+    <a href="{% url 'finance:budget_detail' rb.pk %}" style="text-decoration:none;display:block;margin-bottom:8px">
+      <div class="card" style="padding:10px 14px;margin:0;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 1px 4px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <span style="font-size:13px;font-weight:600;color:var(--hodari-blue)">{{ rb.get_category_display }}</span>
+            <span style="font-size:11px;color:var(--text-muted);margin-left:8px">{{ util }}% used</span>
+          </div>
+          <span style="font-size:12px;font-family:var(--font-mono)">
+            TZS {{ remaining|floatformat:0 }}
+            <span style="color:var(--text-muted)">remaining</span>
+          </span>
+        </div>
+        <div style="height:5px;background:#EDF1F7;border-radius:99px;margin-top:6px;overflow:hidden">
+          <div style="height:100%;border-radius:99px;width:{{ util }}%;background:{% if util >= 90 %}#DC2626{% elif util >= 75 %}#E0A800{% else %}var(--green){% endif %}"></div>
+        </div>
+      </div>
+    </a>
+    {% endwith %}
+    {% endfor %}
+    {% else %}
+    <div style="padding:20px;text-align:center">
+      {% include '_partials/empty_state.html' with title='No other budgets' desc='No other budgets have been created for this term.' icon='inbox' icon_color='grey' %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Expense breakdown -->
+<div class="card" style="margin-top:16px">
+  <div class="card-title-row">
+    <span class="card-title" style="margin-bottom:0">Expenses against {{ budget.get_category_display }}</span>
+    <span style="font-size:12px;color:var(--text-muted)">{{ expense_count }} expense{{ expense_count|pluralize }}</span>
+  </div>
+  {% if budget_expenses %}
+  <table style="width:100%;border-collapse:collapse">
+    <thead>
+      <tr style="text-align:left;background:var(--bg-metric);border-bottom:1px solid var(--border)">
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase">Date</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase">Description</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase">Vendor</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;text-align:right">Amount</th>
+        <th style="padding:10px 14px"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for exp in budget_expenses %}
+      <tr style="border-bottom:1px solid var(--border);font-size:13px;transition:background .1s" onmouseover="this.style.background='var(--bg-metric)'" onmouseout="this.style.background=''">
+        <td style="padding:10px 14px;color:var(--text-muted);font-size:12px">{{ exp.expense_date|date:"d M Y" }}</td>
+        <td style="padding:10px 14px;font-weight:500">{{ exp.description|truncatechars:45 }}</td>
+        <td style="padding:10px 14px;color:var(--text-secondary)">{{ exp.vendor|default:"N/A" }}</td>
+        <td style="padding:10px 14px;text-align:right;font-weight:700;font-family:var(--font-mono)">TZS {{ exp.amount|floatformat:0 }}</td>
+        <td style="padding:10px 14px;text-align:right">
+          <a href="{% url 'finance:expense_detail' exp.pk %}" class="section-link" style="font-size:12px">View &rarr;</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  {% include '_partials/empty_state.html' with title='No approved expenses' desc='No expenses have been recorded against this budget category yet.' icon='inbox' icon_color='grey' %}
+  {% endif %}
+</div>
+{% endblock %}

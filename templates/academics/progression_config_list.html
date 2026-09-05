@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}Progression Settings - {{ brand.school_name }}{% endblock %}
+{% block content %}
+{% include "academics/_top_tabs.html" %}
+<div class="section-hdr">
+    <div style="display:flex;align-items:center;gap:12px">
+        <span class="section-title">Progression Settings</span>
+        <span class="chip chip-blue">Year-End Promotion</span>
+    </div>
+    <a href="#" class="hf-btn hf-btn-primary" onclick="document.getElementById('createForm').style.display='block'">+ New Configuration</a>
+</div>
+
+<div id="createForm" class="card" style="display:none;margin-bottom:24px">
+    <div class="card-title">Create Progression Configuration</div>
+    <form method="post" style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end">
+        {% csrf_token %}
+        <div style="flex:1;min-width:180px">
+            <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:4px">From Academic Year</label>
+            <select name="academic_year_from" required style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px">
+                <option value="">— Select —</option>
+                {% for y in years %}
+                <option value="{{ y.pk }}">{{ y.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div style="flex:1;min-width:180px">
+            <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:4px">To Academic Year</label>
+            <select name="academic_year_to" required style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px">
+                <option value="">— Select —</option>
+                {% for y in years %}
+                <option value="{{ y.pk }}">{{ y.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div style="flex:1;min-width:140px">
+            <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:4px">Min Average</label>
+            <input type="number" name="minimum_average" value="50" min="0" max="100" step="0.1" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px">
+        </div>
+        <div style="flex:1;min-width:140px">
+            <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:4px">Min Attendance %</label>
+            <input type="number" name="minimum_attendance" value="80" min="0" max="100" step="0.1" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px">
+        </div>
+        <div style="flex:1;min-width:140px">
+            <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:4px">Retention Threshold</label>
+            <input type="number" name="retention_threshold" value="50" min="0" max="100" step="0.1" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px">
+        </div>
+        <div>
+            <button type="submit" class="hf-btn hf-btn-primary">Create Config</button>
+            <button type="button" class="hf-btn hf-btn-secondary" onclick="document.getElementById('createForm').style.display='none'">Cancel</button>
+        </div>
+    </form>
+</div>
+
+{% if unreachable_warnings %}
+<div style="margin-bottom:24px">
+    <div class="card" style="border-left:4px solid #dc2626">
+        <div class="card-title" style="color:#dc2626">⚠ Unreachable Cases</div>
+        {% for w in unreachable_warnings %}
+        <p style="margin:4px 0;font-size:13px">
+            <strong>{{ w.department_label }}</strong> department has no assigned HOD.
+            <strong>{{ w.count }}</strong> case{{ w.count|pluralize }} awaiting HOD review.
+        </p>
+        {% endfor %}
+        <p style="margin:8px 0 0;font-size:12px;color:var(--text-muted)">
+            Assign a HOD user to each department so cases can proceed through the review workflow.
+        </p>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-title">Configuration History</div>
+    {% if configs %}
+    <div class="trow" style="background:var(--bg-page);border-radius:8px;margin-bottom:12px;font-weight:700;color:var(--text-secondary);font-size:11px;text-transform:uppercase;letter-spacing:0.05em">
+        <div style="flex:2">Cycle</div>
+        <div style="flex:1;text-align:center">Min Avg</div>
+        <div style="flex:1;text-align:center">Min Att</div>
+        <div style="flex:1;text-align:center">Cases</div>
+        <div style="flex:1;text-align:center">Status</div>
+        <div style="flex:1;text-align:center">Created By</div>
+        <div style="flex:1;text-align:center">Actions</div>
+    </div>
+    {% for c in configs %}
+    {% with case_count=c.cases.count %}
+    <div class="trow">
+        <div style="flex:2">
+            <div class="trow-name">{{ c.academic_year_from }} → {{ c.academic_year_to }}</div>
+            <div class="trow-sub">{{ c.created_at|date:"M d, Y" }}</div>
+        </div>
+        <div style="flex:1;text-align:center;display:flex;align-items:center;justify-content:center">{{ c.minimum_average }}%</div>
+        <div style="flex:1;text-align:center;display:flex;align-items:center;justify-content:center">{{ c.minimum_attendance }}%</div>
+        <div style="flex:1;text-align:center;display:flex;align-items:center;justify-content:center">
+            {% if case_count > 0 %}
+            <span class="chip chip-blue">{{ case_count }} case{{ case_count|pluralize }}</span>
+            {% else %}
+            <span class="chip chip-grey">Not calculated</span>
+            {% endif %}
+        </div>
+        <div style="flex:1;text-align:center;display:flex;align-items:center;justify-content:center">
+            {% if c.recalc_status == "running" %}
+            <span class="chip" style="background:#fef3c7;color:#92400e">Running…</span>
+            {% elif c.recalc_status == "queued" %}
+            <span class="chip" style="background:#dbeafe;color:#1e40af">Queued</span>
+            {% elif c.recalc_status == "completed" %}
+            <span class="chip chip-green">{{ c.recalc_completed_count|default:case_count }} done</span>
+            {% elif c.recalc_status == "failed" %}
+            <span class="chip" style="background:#fee2e2;color:#991b1b">Failed</span>
+            {% else %}
+            <span class="chip chip-grey">—</span>
+            {% endif %}
+        </div>
+        <div style="flex:1;text-align:center;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text-secondary)">{{ c.created_by.get_full_name|default:c.created_by.username }}</div>
+        <div style="flex:1;text-align:center;display:flex;align-items:center;justify-content:center;gap:8px">
+            {% if case_count == 0 %}
+            <form method="post" action="{% url 'academics:progression_config_calculate' c.pk %}" style="display:inline">
+                {% csrf_token %}
+                <button class="btn-small" style="background:#dbeafe;color:#1e40af;border:none;cursor:pointer">Calculate</button>
+            </form>
+            {% endif %}
+            <button class="btn-small" onclick="editConfig({{ c.pk }}, {{ c.minimum_average }}, {{ c.minimum_attendance }}, {{ c.retention_threshold }})">Edit</button>
+            <button class="btn-small btn-danger" style="background:#fee2e2;color:#991b1b;border:none;cursor:pointer"
+              onclick="confirmDeleteModal({title:'Delete Configuration?',body:'Are you sure you want to delete this progression configuration?',detail:'This action cannot be undone.',confirmText:'Delete Configuration',url:'{% url 'academics:progression_config_delete' c.pk %}'})">Delete</button>
+        </div>
+    </div>
+    {% endwith %}
+    {% endfor %}
+    {% else %}
+    {% include '_partials/empty_state.html' with title='No progression configurations' desc='Create the first configuration to get started.' icon='doc' icon_color='blue' %}
+    <div style="text-align:center;margin-top:12px"><a href="#" onclick="document.getElementById('createForm').style.display='block'" class="btn-primary" style="display:inline-flex;align-items:center;gap:6px">Create First Configuration</a></div>
+    {% endif %}
+</div>
+
+<!-- Inline edit form (hidden) -->
+<div id="editForm" class="card" style="display:none;margin-bottom:24px">
+    <div class="card-title">Edit Configuration</div>
+    <form method="post" style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end">
+        {% csrf_token %}
+        <input type="hidden" name="edit_pk" id="editPk">
+        <div style="flex:1;min-width:140px">
+            <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:4px">Min Average</label>
+            <input type="number" name="minimum_average" id="editMinAvg" min="0" max="100" step="0.1" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px">
+        </div>
+        <div style="flex:1;min-width:140px">
+            <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:4px">Min Attendance %</label>
+            <input type="number" name="minimum_attendance" id="editMinAtt" min="0" max="100" step="0.1" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px">
+        </div>
+        <div style="flex:1;min-width:140px">
+            <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:4px">Retention Threshold</label>
+            <input type="number" name="retention_threshold" id="editRetThresh" min="0" max="100" step="0.1" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px">
+        </div>
+        <div>
+            <button type="submit" formaction="" class="hf-btn hf-btn-primary">Save Changes</button>
+            <button type="button" class="hf-btn hf-btn-secondary" onclick="document.getElementById('editForm').style.display='none'">Cancel</button>
+        </div>
+    </form>
+</div>
+
+<script>
+function editConfig(pk, minAvg, minAtt, retThresh) {
+    document.getElementById('editPk').value = pk;
+    document.getElementById('editMinAvg').value = minAvg;
+    document.getElementById('editMinAtt').value = minAtt;
+    document.getElementById('editRetThresh').value = retThresh;
+    var form = document.querySelector('#editForm form');
+    form.action = "{% url 'academics:progression_config_edit' 0 %}".replace('/0/', '/' + pk + '/');
+    document.getElementById('editForm').style.display = 'block';
+}
+</script>
+{% endblock %}

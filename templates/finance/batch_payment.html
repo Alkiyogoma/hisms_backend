@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Batch Payment &mdash; Finance{% endblock %}
+{% block topbar_greeting %}Batch Payment Recording{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+<div class="section-hdr">
+  <span class="section-title">Batch Payment Recording</span>
+  <div style="display:flex;gap:8px">
+    <a href="{% url 'finance:dashboard' %}" class="btn btn-secondary btn-sm">&larr; Dashboard</a>
+    <a href="{% url 'finance:payment_list' %}" class="btn btn-secondary btn-sm">Receipts</a>
+  </div>
+</div>
+
+<!-- Term & Class Selector -->
+<div class="card" style="margin-bottom:20px">
+  <div style="padding:16px 20px">
+    <form method="get" style="display:flex;gap:16px;align-items:end;flex-wrap:wrap">
+      <div>
+        <label class="field-label">Academic Term</label>
+        <select name="term" class="hf2-select" onchange="this.form.submit()" style="min-width:200px">
+          {% for t in terms %}
+          <option value="{{ t.id }}" {% if t.id == selected_term.id %}selected{% endif %}>{{ t.academic_year.name }} — {{ t.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="field-label">Class</label>
+        <select name="class" class="hf2-select" onchange="this.form.submit()" style="min-width:180px">
+          <option value="">Select class</option>
+          {% for cls in classes %}
+          <option value="{{ cls }}" {% if cls == selected_class %}selected{% endif %}>{{ cls }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if selected_term and selected_class %}
+  {% if student_payments %}
+  <div class="metrics" style="grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:20px">
+    <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
+      <div class="mc-lbl-row">
+        <span class="mc-lbl">Students Due</span>
+        <span class="mc-currency">count</span>
+      </div>
+      <div class="mc-val" style="color:#023AA5">{{ student_count }}</div>
+      <div class="mc-sub" style="color:#5A697D">In {{ selected_class }}</div>
+    </div>
+    <div class="metric-compact" style="background:linear-gradient(135deg,#FFF8ED,#fff)">
+      <div class="mc-lbl-row">
+        <span class="mc-lbl">Total Outstanding</span>
+        <span class="mc-currency">TZS</span>
+      </div>
+      <div class="mc-val" style="color:#B45309">{{ total_outstanding|floatformat:0 }}</div>
+      <div class="mc-sub" style="color:#B45309">{{ selected_term.name }}</div>
+    </div>
+  </div>
+
+  <div class="card" style="padding:0;overflow:hidden">
+    <form method="post" id="batchPaymentForm">
+      {% csrf_token %}
+      <input type="hidden" name="term_id" value="{{ selected_term.id }}">
+      <input type="hidden" name="class_name" value="{{ selected_class }}">
+
+      <!-- Default values bar -->
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;padding:14px 16px;border-bottom:1px solid var(--border);background:var(--hodari-blue-pale)">
+        <div>
+          <label class="field-label" style="font-size:10.5px">Payment Date</label>
+          <input type="date" name="payment_date" class="hf2-input" value="{{ today|date:'Y-m-d' }}" style="width:160px;height:34px;font-family:var(--font-mono)">
+        </div>
+        <div>
+          <label class="field-label" style="font-size:10.5px">Default Method</label>
+          <select name="default_method" class="hf2-select" style="height:34px" id="defaultMethod">
+            {% for code, label in payment_methods %}
+            <option value="{{ code }}" {% if code == 'cash' %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="field-label" style="font-size:10.5px">Default Reference</label>
+          <input type="text" name="default_reference" class="hf2-input" placeholder="e.g. bulk-receipt-001" style="width:180px;height:34px;font-family:var(--font-mono);font-size:12px">
+        </div>
+        <div>
+          <label class="field-label" style="font-size:10.5px">Default Notes</label>
+          <input type="text" name="default_notes" class="hf2-input" placeholder="Optional notes" style="width:200px;height:34px;font-size:12px">
+        </div>
+      </div>
+
+      <!-- Column headers -->
+      <div style="display:none" id="payAllRow"></div>
+
+      <!-- Student rows -->
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="text-align:left;background:var(--bg-metric);border-bottom:1px solid var(--border)">
+              <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;width:28px">
+                <input type="checkbox" id="selectAll" checked onchange="document.querySelectorAll('.student-select').forEach(c=>c.checked=this.checked)">
+              </th>
+              <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Student</th>
+              <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Invoice</th>
+              <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;text-align:right">Due (TZS)</th>
+              <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;text-align:right">Paid (TZS)</th>
+              <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;text-align:right">Balance (TZS)</th>
+              <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;text-align:right">Amount (TZS)</th>
+              <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Method</th>
+              <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Reference</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for sp in student_payments %}
+            <tr style="border-bottom:1px solid var(--border);font-size:13px;transition:background .1s" onmouseover="this.style.background='var(--hodari-blue-pale)'" onmouseout="this.style.background=''">
+              <td style="padding:8px 14px">
+                <input type="checkbox" class="student-select" checked>
+              </td>
+              <td style="padding:8px 14px">
+                <input type="hidden" name="invoice_id[]" value="{{ sp.invoice.id }}">
+                <div style="font-weight:600">{{ sp.student.get_full_name }}</div>
+                <div style="font-size:11px;color:var(--text-muted)">{{ sp.student.admission_no }}</div>
+              </td>
+              <td style="padding:8px 14px">
+                <div style="font-family:var(--font-mono);font-size:12px">{{ sp.invoice.invoice_number|default:sp.invoice.id }}</div>
+              </td>
+              <td style="padding:8px 14px;text-align:right;font-family:var(--font-mono);font-weight:600">{{ sp.total_due|floatformat:0 }}</td>
+              <td style="padding:8px 14px;text-align:right;font-family:var(--font-mono);color:var(--green)">{{ sp.total_paid|floatformat:0 }}</td>
+              <td style="padding:8px 14px;text-align:right;font-family:var(--font-mono);font-weight:700;color:var(--red)">{{ sp.balance|floatformat:0 }}</td>
+              <td style="padding:8px 14px;text-align:right">
+                <input type="number" name="amount[]" class="hf2-input pay-amount" step="0.01" min="0" max="{{ sp.balance }}" placeholder="0" style="width:120px;height:32px;text-align:right;font-family:var(--font-mono);font-size:13px" data-balance="{{ sp.balance }}">
+              </td>
+              <td style="padding:8px 14px">
+                <select name="method[]" class="hf2-select row-method" style="width:130px;height:32px;font-size:12px">
+                  <option value="">Default</option>
+                  {% for code, label in payment_methods %}
+                  <option value="{{ code }}">{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td style="padding:8px 14px">
+                <input type="text" name="reference[]" class="hf2-input row-reference" placeholder="(optional)" style="width:120px;height:32px;font-family:var(--font-mono);font-size:11px">
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Actions bar -->
+      <div style="display:flex;gap:12px;justify-content:space-between;align-items:center;padding:14px 16px;border-top:1px solid var(--border);background:var(--bg-metric)">
+        <div style="display:flex;gap:8px;align-items:center">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="fillAllBalances()">Pay All Balances</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="clearAllAmounts()">Clear All</button>
+          <span style="font-size:12px;color:var(--text-muted)" id="selectedCount">All selected</span>
+        </div>
+        <div>
+          {% has_perm user "finance.add_payment" as can_batch %}
+          {% if can_batch %}
+          <button type="submit" class="btn btn-primary" id="submitBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:middle"><polyline points="20 6 9 17 4 12"/></svg>
+            Record Payments
+          </button>
+          {% endif %}
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    // Select-all toggle
+    document.getElementById('selectAll').addEventListener('change', function() {
+      updateSelectedCount();
+    });
+
+    document.querySelectorAll('.student-select').forEach(cb => {
+      cb.addEventListener('change', updateSelectedCount);
+    });
+
+    function updateSelectedCount() {
+      const checked = document.querySelectorAll('.student-select:checked').length;
+      const total = document.querySelectorAll('.student-select').length;
+      const el = document.getElementById('selectedCount');
+      if (checked === total) el.textContent = 'All selected';
+      else el.textContent = checked + ' of ' + total + ' selected';
+
+      // Enable/disable rows based on checkbox
+      document.querySelectorAll('.student-select').forEach((cb, i) => {
+        const row = cb.closest('tr');
+        const inputs = row.querySelectorAll('input.pay-amount, select.row-method, input.row-reference');
+        inputs.forEach(inp => inp.disabled = !cb.checked);
+      });
+    }
+
+    // Pay All Balances
+    function fillAllBalances() {
+      document.querySelectorAll('.pay-amount').forEach(inp => {
+        if (!inp.closest('tr').querySelector('.student-select').checked) return;
+        inp.value = inp.dataset.balance;
+      });
+    }
+
+    function clearAllAmounts() {
+      document.querySelectorAll('.pay-amount').forEach(inp => {
+        inp.value = '';
+      });
+    }
+
+    // Update default method to all rows with empty method
+    document.getElementById('defaultMethod').addEventListener('change', function() {
+      document.querySelectorAll('.row-method').forEach(sel => {
+        if (!sel.value) sel.value = this.value;
+      });
+    });
+
+    // Init disabled state
+    updateSelectedCount();
+  </script>
+  {% else %}
+  <!-- No students to show -->
+  <div class="card" style="text-align:center;padding:48px 24px">
+    <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+    </svg>
+    <div style="font-size:15px;font-weight:600;color:var(--text-primary);margin-top:8px">No outstanding invoices</div>
+    <div style="font-size:13px;color:var(--text-muted);margin-top:4px">All invoices for {{ selected_class }} in {{ selected_term.name }} are fully paid or no students found.</div>
+  </div>
+  {% endif %}
+{% elif selected_term and not selected_class %}
+<div class="card" style="text-align:center;padding:48px 24px">
+  <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5">
+    <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
+  </svg>
+  <div style="font-size:15px;font-weight:600;color:var(--text-primary);margin-top:8px">Select a class</div>
+  <div style="font-size:13px;color:var(--text-muted);margin-top:4px">Choose a class above to see students with outstanding invoices.</div>
+</div>
+{% endif %}
+{% endblock %}

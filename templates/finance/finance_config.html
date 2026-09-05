@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Finance Configuration &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Finance Configuration{% endblock %}
+{% block topbar_date %}{% now "d F Y" %}{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:13px">
+  <a href="{% url 'finance:dashboard' %}" style="color:var(--hodari-blue);text-decoration:none;font-weight:500">Dashboard</a>
+  <span style="color:var(--text-muted)">&rarr;</span>
+  <span style="color:var(--text-secondary);font-weight:500">Configuration</span>
+</div>
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:8px">
+  <div>
+    <h1 style="font-family:var(--font-display);font-size:20px;font-weight:700;color:var(--text-primary);margin:0">Finance Configuration</h1>
+    <p style="font-size:13px;color:var(--text-muted);margin:4px 0 0 0">System-wide defaults for invoices, payments, and notifications</p>
+  </div>
+</div>
+
+{% has_perm user "finance.change_financeconfig" as can_edit %}
+{% if can_edit %}
+<form method="post">
+  {% csrf_token %}
+
+  <!-- Invoice Defaults -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title" style="margin-bottom:16px">Invoice Defaults</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Invoice Number Prefix</label>
+        <input type="text" name="invoice_prefix" value="{{ config.invoice_prefix }}" class="hf2-input" style="width:100%" placeholder="INV">
+        <div style="font-size:10.5px;color:var(--text-muted);margin-top:3px">Prefix for auto-generated invoice numbers</div>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Default Due Days</label>
+        <input type="number" name="invoice_due_days" value="{{ config.invoice_due_days }}" min="1" max="365" class="hf2-input" style="width:100%">
+        <div style="font-size:10.5px;color:var(--text-muted);margin-top:3px">Days from invoice date until payment is due</div>
+      </div>
+    </div>
+    <div style="margin-top:16px">
+      <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Default Invoice Terms &amp; Conditions</label>
+      <textarea name="invoice_terms" class="hf2-input" style="width:100%;min-height:80px;resize:vertical" placeholder="Terms and conditions shown on invoices...">{{ config.invoice_terms|default:'' }}</textarea>
+    </div>
+  </div>
+
+  <!-- Payment Defaults -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title" style="margin-bottom:16px">Payment Defaults</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Default Payment Method</label>
+        <select name="default_payment_method" class="hf2-select" style="width:100%">
+          {% for code, label in payment_methods %}
+          <option value="{{ code }}" {% if config.default_payment_method == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">School Currency</label>
+        <input type="text" name="school_currency" value="{{ config.school_currency }}" class="hf2-input" style="width:100%" placeholder="TZS">
+      </div>
+    </div>
+  </div>
+
+  <!-- Reminder & Late Fee Defaults -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title" style="margin-bottom:16px">Reminders &amp; Late Fees</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Reminder Grace Days</label>
+        <input type="number" name="reminder_grace_days" value="{{ config.reminder_grace_days }}" min="0" max="90" class="hf2-input" style="width:100%">
+        <div style="font-size:10.5px;color:var(--text-muted);margin-top:3px">Days after due date before reminders start</div>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Late Fee (%)</label>
+        <input type="number" name="late_fee_percentage" value="{{ config.late_fee_percentage|floatformat:2 }}" step="0.01" min="0" max="100" class="hf2-input" style="width:100%">
+        <div style="font-size:10.5px;color:var(--text-muted);margin-top:3px">Percentage of outstanding charged as late fee</div>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Late Fee Max Days</label>
+        <input type="number" name="late_fee_max_days" value="{{ config.late_fee_max_days }}" min="1" max="365" class="hf2-input" style="width:100%">
+        <div style="font-size:10.5px;color:var(--text-muted);margin-top:3px">Maximum days to apply late fee</div>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">&nbsp;</label>
+        <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" name="auto_reminder_enabled" {% if config.auto_reminder_enabled %}checked{% endif %}>
+          <span style="font-size:13px">Enable auto-reminders</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notifications -->
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-title" style="margin-bottom:16px">Notifications</div>
+    <div>
+      <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Finance Officer Email</label>
+      <input type="email" name="finance_officer_email" value="{{ config.finance_officer_email|default:'' }}" class="hf2-input" style="width:100%;max-width:400px" placeholder="finance@school.ac.tz">
+      <div style="font-size:10.5px;color:var(--text-muted);margin-top:3px">Email for finance-related notifications and alerts</div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:8px">
+    <button type="submit" class="btn btn-primary btn-sm">Save Configuration</button>
+    <a href="{% url 'finance:dashboard' %}" class="btn btn-secondary btn-sm">Cancel</a>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

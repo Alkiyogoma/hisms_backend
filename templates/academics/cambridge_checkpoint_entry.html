@@ -1,0 +1,502 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Cambridge Checkpoint — {{ brand.school_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+.class-tabs-container {
+    background: #fff;
+    border-bottom: 1px solid #E2E8F0;
+    margin: 0 -28px 24px -28px;
+    padding: 0 28px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+.class-tabs-container::-webkit-scrollbar { display: none; }
+.class-tab {
+    padding: 16px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #64748B;
+    text-decoration: none;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+.class-tab:hover { color: #023AA5; background: #F8FAFC; }
+.class-tab.active { color: #023AA5; border-bottom-color: #023AA5; }
+
+.checkpoint-grid {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 24px;
+    align-items: start;
+}
+
+.student-sidebar {
+    background: #fff;
+    border: 1px solid #E2E8F0;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    position: sticky;
+    top: 80px;
+    align-self: start;
+}
+
+.sidebar-header {
+    padding: 20px;
+    background: #F8FAFC;
+    border-bottom: 1px solid #E2E8F0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.student-list {
+    max-height: calc(100vh - 180px);
+    overflow-y: auto;
+}
+
+.student-card {
+    padding: 16px 20px;
+    border-bottom: 1px solid #F1F5F9;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.student-card:hover { background: #F8FAFC; }
+.student-card.active {
+    background: #F0F7FF;
+    border-left: 4px solid #023AA5;
+    padding-left: 16px;
+}
+
+.progress-bar-container {
+    background: #fff;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 16px 24px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+.subject-section {
+    background: #fff;
+    border: 1px solid #E2E8F0;
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.subject-header {
+    font-size: 14px;
+    font-weight: 700;
+    color: #023AA5;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.score-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+.score-box {
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.score-box input {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid #E2E8F0;
+    border-radius: 10px;
+    font-size: 18px;
+    font-weight: 700;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 8px;
+    box-sizing: border-box;
+}
+.score-box input:focus {
+    border-color: #023AA5;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(2, 58, 165, 0.1);
+}
+.score-box input.error { border-color: #EF4444; background: #FEF2F2; }
+
+.status-chip {
+    padding: 4px 10px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+.status-pending { background: #F1F5F9; color: #64748B; }
+.status-saved { background: #E0F2FE; color: #0369A1; }
+
+.nav-bar {
+    background: #fff;
+    border: 1px solid #E2E8F0;
+    border-radius: 16px;
+    padding: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.info-banner {
+    background: #EFF6FF;
+    border: 1px solid #BFCFE9;
+    border-radius: 12px;
+    padding: 12px 20px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 13px;
+}
+.info-banner .info-text strong { color: #023AA5; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "academics/_top_tabs_progress.html" %}
+
+<div class="class-tabs-container">
+    {% for cls in eligible_classes %}
+    <a href="?class_name={{ cls }}" class="class-tab {% if selected_class == cls %}active{% endif %}">{{ cls }}</a>
+    {% endfor %}
+</div>
+
+{% if selected_class and students_data %}
+<div class="info-banner">
+    <div style="font-size:16px;flex-shrink:0"><i class="fas fa-book"></i></div>
+    <div class="info-text">
+        <strong>Cambridge Checkpoint</strong> &mdash; Scores are recorded on a <strong>1.0–6.0 scale</strong>. 
+        Subjects: English, Mathematics, Science.
+    </div>
+</div>
+
+<div class="progress-bar-container">
+    <div style="flex:1">
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px">
+            <span style="font-size:13px;font-weight:600;color:#64748B">Checkpoint Progress &middot; {{ selected_class }}</span>
+            <span id="progress-text" style="font-size:13px;font-weight:700;color:#023AA5">0 of {{ students_data|length }} students complete</span>
+        </div>
+        <div style="height:10px;background:#F1F5F9;border-radius:5px;overflow:hidden">
+            <div id="progress-fill" style="width:0%;height:100%;background:#023AA5;transition:width 0.5s ease"></div>
+        </div>
+    </div>
+    <div style="display:flex;gap:12px;align-items:center">
+        <div style="text-align:right">
+            <div style="font-size:11px;color:#64748B;font-weight:700;text-transform:uppercase">Academic Year</div>
+            <div style="font-size:14px;font-weight:700;color:#1E293B">{{ academic_year.name|default:"N/A" }}</div>
+        </div>
+    </div>
+</div>
+
+<form method="post" id="checkpoint-form">
+    {% csrf_token %}
+    <input type="hidden" name="class_name" value="{{ selected_class }}">
+
+    <div class="checkpoint-grid">
+        <!-- Sidebar -->
+        <div class="student-sidebar">
+            <div class="sidebar-header">
+                <span style="font-size:12px;font-weight:700;color:#64748B;text-transform:uppercase">Students</span>
+                <span id="student-count" class="status-chip status-pending">{{ students_data|length }}</span>
+            </div>
+            <div id="student-list" class="student-list">
+                {% for item in students_data %}
+                {% with s=item.student %}
+                <div class="student-card {% if forloop.first %}active{% endif %}"
+                     data-id="{{ s.id }}"
+                     onclick="selectStudent({{ s.id }})"
+                     id="card-{{ s.id }}">
+                    <div style="width:40px;height:40px;background:#023AA5;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px">
+                        {{ s.first_name|first }}{{ s.last_name|first }}
+                    </div>
+                    <div style="flex:1">
+                        <div style="font-size:14px;font-weight:700;color:#1E293B">{{ s.get_full_name }}</div>
+                        <div style="font-size:11px;color:#64748B">{{ s.admission_no }}</div>
+                    </div>
+                    <span class="status-chip {% if item.scores.English or item.scores.Mathematics or item.scores.Science %}status-saved{% else %}status-pending{% endif %}" id="st-{{ s.id }}">
+                        {% if item.scores.English or item.scores.Mathematics or item.scores.Science %}Saved{% else %}Pending{% endif %}
+                    </span>
+                </div>
+                {% endwith %}
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Main Panel -->
+        <div>
+            <div style="background:#fff;border:1px solid #E2E8F0;border-radius:16px;padding:24px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center">
+                <div>
+                    <h2 id="active-student-name" style="margin:0;font-size:26px;color:#1E293B">Select a student</h2>
+                    <div id="active-student-meta" style="color:#64748B;font-size:14px;margin-top:4px">{{ selected_class }} &middot; Cambridge Checkpoint</div>
+                </div>
+                <div style="background:#1E293B;border-radius:12px;padding:12px 24px;text-align:center;color:#fff;min-width:120px">
+                    <div style="font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;margin-bottom:2px">Scale</div>
+                    <div style="font-size:18px;font-weight:800;font-family:'JetBrains Mono'">1.0 – 6.0</div>
+                </div>
+            </div>
+
+            <div id="subjects-container">
+                <div class="subject-section">
+                    <div class="subject-header">
+                        <span>Checkpoint Scores</span>
+                    </div>
+                    <div class="score-grid">
+                        <div class="score-box">
+                            <div style="display:flex;justify-content:space-between;align-items:center">
+                                <span style="font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase">English</span>
+                            </div>
+                            <input type="number" step="0.1" min="1" max="6"
+                                   class="cp-input" data-subject="English"
+                                   placeholder="1.0" oninput="validateScore(this)">
+                        </div>
+                        <div class="score-box">
+                            <div style="display:flex;justify-content:space-between;align-items:center">
+                                <span style="font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase">Mathematics</span>
+                            </div>
+                            <input type="number" step="0.1" min="1" max="6"
+                                   class="cp-input" data-subject="Mathematics"
+                                   placeholder="1.0" oninput="validateScore(this)">
+                        </div>
+                        <div class="score-box">
+                            <div style="display:flex;justify-content:space-between;align-items:center">
+                                <span style="font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase">Science</span>
+                            </div>
+                            <input type="number" step="0.1" min="1" max="6"
+                                   class="cp-input" data-subject="Science"
+                                   placeholder="1.0" oninput="validateScore(this)">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="nav-bar">
+                <button type="button" onclick="movePrev()" class="btn" style="border:1px solid #E2E8F0;padding:12px 24px;font-weight:600;border-radius:10px">&larr; Previous Student</button>
+                <div style="display:flex;gap:12px">
+                    {% has_perm user "academics.add_cambridgecheckpointscore" as can_save %}
+                    {% if can_save %}
+                    <button type="button" onclick="saveAllScores()" class="hf-btn hf-btn-primary">Save Scores</button>
+                    <button type="button" onclick="saveAndNext()" class="hf-btn hf-btn-warning">Save &amp; Next &rarr;</button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% elif selected_class and not students_data %}
+<div style="background:#fff;border-radius:12px;padding:48px;text-align:center;border:1px solid #E2E8F0">
+    <div><i class="fas fa-users" style="font-size:48px;margin-bottom:12px"></i></div>
+    <h3 style="margin:0 0 8px">No Students Found</h3>
+    <p style="color:#64748B;font-size:14px">No students are enrolled in {{ selected_class }}.</p>
+</div>
+{% else %}
+<div style="background:#fff;border-radius:12px;padding:48px;text-align:center;border:1px solid #E2E8F0">
+    <div><i class="fas fa-chart-bar" style="font-size:48px;margin-bottom:12px"></i></div>
+    <h3 style="margin:0 0 8px">Select a Grade Level</h3>
+    <p style="color:#64748B;font-size:14px">Choose a grade from the tabs above to enter Cambridge Checkpoint scores.</p>
+</div>
+{% endif %}
+
+<script>
+const CLASS_NAME = "{{ selected_class }}";
+const CSRF = "{{ csrf_token }}";
+
+const STUDENTS = [
+    {% for item in students_data %}
+    {
+        id: {{ item.student.id }},
+        first_name: "{{ item.student.first_name|escapejs }}",
+        last_name: "{{ item.student.last_name|escapejs }}",
+        admission_no: "{{ item.student.admission_no|escapejs }}",
+        full_name: "{{ item.student.get_full_name|escapejs }}",
+        scores: {
+            English: {{ item.scores.English|default:"null" }},
+            Mathematics: {{ item.scores.Mathematics|default:"null" }},
+            Science: {{ item.scores.Science|default:"null" }}
+        }
+    },
+    {% endfor %}
+];
+
+let currentIdx = 0;
+
+function selectStudent(id) {
+    currentIdx = STUDENTS.findIndex(s => s.id === id);
+    renderStudent(currentIdx);
+}
+
+function renderStudent(idx) {
+    if (idx < 0 || idx >= STUDENTS.length) return;
+    const s = STUDENTS[idx];
+    if (!s) return;
+
+    document.querySelectorAll('.student-card').forEach(c => c.classList.remove('active'));
+    const card = document.getElementById("card-" + s.id);
+    if (card) card.classList.add('active');
+
+    document.getElementById("active-student-name").textContent = s.full_name;
+    document.getElementById("active-student-meta").textContent = s.admission_no + " \u00B7 {{ selected_class|escapejs }}";
+
+    document.querySelectorAll(".cp-input").forEach(inp => {
+        const subj = inp.getAttribute("data-subject");
+        const val = s.scores[subj];
+        inp.value = val !== null ? val : "";
+        inp.classList.remove('error');
+    });
+
+    updateProgress();
+}
+
+function updateProgress() {
+    const savedCount = STUDENTS.filter(s => {
+        return s.scores.English !== null || s.scores.Mathematics !== null || s.scores.Science !== null;
+    }).length;
+    const pct = STUDENTS.length ? (savedCount / STUDENTS.length) * 100 : 0;
+    document.getElementById("progress-text").textContent = savedCount + " of " + STUDENTS.length + " students complete";
+    document.getElementById("progress-fill").style.width = pct + "%";
+}
+
+function validateScore(input) {
+    const val = parseFloat(input.value);
+    if (input.value === '') {
+        input.classList.remove('error');
+        return;
+    }
+    if (isNaN(val) || val < 1 || val > 6) {
+        input.classList.add('error');
+    } else {
+        input.classList.remove('error');
+    }
+}
+
+function getCurrentScores() {
+    const s = STUDENTS[currentIdx];
+    if (!s) return null;
+    const scores = { English: null, Mathematics: null, Science: null };
+    let hasAny = false;
+    document.querySelectorAll(".cp-input").forEach(inp => {
+        const subj = inp.getAttribute("data-subject");
+        if (inp.value !== "") {
+            scores[subj] = inp.value;
+            hasAny = true;
+        }
+    });
+    return hasAny ? scores : null;
+}
+
+function getCurrentStudentId() {
+    const s = STUDENTS[currentIdx];
+    return s ? s.id : null;
+}
+
+function updateLocalScores() {
+    const s = STUDENTS[currentIdx];
+    if (!s) return;
+    document.querySelectorAll(".cp-input").forEach(inp => {
+        const subj = inp.getAttribute("data-subject");
+        if (inp.value !== "") {
+            s.scores[subj] = inp.value;
+        } else {
+            s.scores[subj] = null;
+        }
+    });
+    // Update status chip
+    const hasSaved = s.scores.English !== null || s.scores.Mathematics !== null || s.scores.Science !== null;
+    const chip = document.getElementById("st-" + s.id);
+    if (chip) {
+        chip.textContent = hasSaved ? "Saved" : "Pending";
+        chip.className = "status-chip " + (hasSaved ? "status-saved" : "status-pending");
+    }
+    updateProgress();
+}
+
+async function saveAllScores() {
+    const sid = getCurrentStudentId();
+    if (!sid) return;
+
+    // Build hidden inputs for the form submission
+    const form = document.getElementById("checkpoint-form");
+    // Remove old hidden inputs for this student
+    form.querySelectorAll("input.hidden-score").forEach(el => el.remove());
+
+    let hasAny = false;
+    document.querySelectorAll(".cp-input").forEach(inp => {
+        if (inp.value !== "" && inp.value !== null) {
+            const val = parseFloat(inp.value);
+            if (!isNaN(val) && val >= 0 && val <= 6) {
+                const h = document.createElement("input");
+                h.type = "hidden";
+                h.name = "score_" + sid + "_" + inp.getAttribute("data-subject");
+                h.value = inp.value;
+                h.className = "hidden-score";
+                form.appendChild(h);
+                hasAny = true;
+            }
+        }
+    });
+
+    if (!hasAny) {
+        showToast("No scores to save", "warning");
+        return;
+    }
+
+    const fd = new FormData(form);
+    const r = await fetch(window.location.pathname + "?class_name=" + encodeURIComponent(CLASS_NAME), {
+        method: "POST",
+        headers: { "X-CSRFToken": CSRF },
+        body: fd
+    });
+
+    if (r.ok) {
+        updateLocalScores();
+        showToast("Scores saved for " + STUDENTS[currentIdx].full_name, "success");
+    } else {
+        showToast("Failed to save scores", "error");
+    }
+}
+
+async function saveAndNext() {
+    await saveAllScores();
+    moveNext();
+}
+
+function movePrev() {
+    if (currentIdx > 0) renderStudent(currentIdx - 1);
+}
+
+function moveNext() {
+    if (currentIdx < STUDENTS.length - 1) renderStudent(currentIdx + 1);
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    if (STUDENTS.length > 0) renderStudent(0);
+});
+</script>
+{% endblock %}

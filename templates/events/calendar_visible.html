@@ -1,0 +1,1575 @@
+{% extends "base.html" %}
+{% load static %}
+{% load role_tags %}
+{% block title %}School Calendar — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Calendar & Events{% endblock %}
+
+{% block extra_head %}
+{% include "includes/hodari_print_styles.html" %}
+{% endblock %}
+{% block content %}
+<style>
+/* Calendar Styles */
+.calendar-container {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    overflow: hidden;
+    margin: 20px;
+}
+
+.calendar-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.calendar-nav {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+.calendar-nav button {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: white;
+    padding: 10px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    min-width: 40px;
+}
+
+.calendar-nav button:hover {
+    background: rgba(255,255,255,0.3);
+    transform: translateY(-1px);
+}
+
+.calendar-nav h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+    min-width: 200px;
+    text-align: center;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background: #e5e7eb;
+    border: 1px solid #e5e7eb;
+}
+
+.calendar-day-header {
+    background: #f9fafb;
+    padding: 16px 8px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 13px;
+    color: #6b7280;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.calendar-day {
+    background: white;
+    min-height: 100px;
+    padding: 8px;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.calendar-day:hover {
+    background: #f9fafb;
+    border-color: #e5e7eb;
+    transform: scale(1.02);
+    z-index: 1;
+}
+
+.calendar-day.other-month {
+    background: #f9fafb;
+    color: #9ca3af;
+}
+
+.calendar-day.today {
+    background: #eff6ff;
+    border: 2px solid #3b82f6;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+}
+
+.calendar-day-number {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 4px;
+}
+
+.calendar-day.other-month .calendar-day-number {
+    color: #9ca3af;
+}
+
+.calendar-day.today .calendar-day-number {
+    color: #3b82f6;
+    font-weight: 700;
+}
+
+/* Enhanced Event Indicators */
+.event-indicator {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    margin-top: 4px;
+}
+
+.event-badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.event-badge:hover {
+    transform: scale(1.05);
+    z-index: 2;
+}
+
+.event-badge.academic {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+}
+
+.event-badge.social {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+}
+
+.event-badge.holiday {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+}
+
+.event-badge.other {
+    background: linear-gradient(135deg, #6b7280, #4b5563);
+    color: white;
+}
+
+/* Event dots for multiple events */
+.event-dots {
+    display: flex;
+    gap: 3px;
+    margin-top: 4px;
+}
+
+.event-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.event-dot.academic { background: #3b82f6; }
+.event-dot.social { background: #10b981; }
+.event-dot.holiday { background: #ef4444; }
+.event-dot.other { background: #6b7280; }
+
+.event-list {
+    margin-top: 8px;
+    font-size: 11px;
+    line-height: 1.3;
+}
+
+.event-item {
+    background: #f3f4f6;
+    padding: 2px 4px;
+    border-radius: 3px;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.event-item:hover {
+    background: #e5e7eb;
+}
+
+.event-item.academic { background: #dbeafe; color: #1e40af; }
+.event-item.social { background: #d1fae5; color: #065f46; }
+.event-item.holiday { background: #fee2e2; color: #991b1b; }
+.event-item.other { background: #f3f4f6; color: #374151; }
+
+.view-toggle {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.view-toggle button {
+    padding: 8px 16px;
+    border: 1px solid rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.1);
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.view-toggle button.active {
+    background: rgba(255,255,255,0.3);
+    transform: translateY(-1px);
+}
+
+.view-toggle button:hover:not(.active) {
+    background: rgba(255,255,255,0.2);
+}
+
+.event-details-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    background: white;
+    border-radius: 12px;
+    padding: 32px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+    color: #1f2937;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    color: #6b7280;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.close-btn:hover {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.event-meta {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    color: #6b7280;
+    flex-wrap: wrap;
+}
+
+.event-description {
+    line-height: 1.6;
+    color: #374151;
+    margin-bottom: 16px;
+}
+
+.legend {
+    display: flex;
+    gap: 24px;
+    margin-top: 20px;
+    padding: 20px;
+    background: #f9fafb;
+    border-radius: 8px;
+    font-size: 13px;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.legend-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: white;
+}
+
+.legend-badge.academic {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.legend-badge.social {
+    background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.legend-badge.holiday {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.legend-badge.other {
+    background: linear-gradient(135deg, #6b7280, #4b5563);
+}
+
+.add-event-btn {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+}
+
+.add-event-btn:hover {
+    background: #2563eb;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2);
+}
+
+.chip {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.chip-blue { background: #dbeafe; color: #1e40af; }
+.chip-green { background: #d1fae5; color: #065f46; }
+.chip-red { background: #fee2e2; color: #991b1b; }
+.chip-grey { background: #f3f4f6; color: #374151; }
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .calendar-container {
+        margin: 10px;
+        border-radius: 8px;
+    }
+    
+    .calendar-header {
+        padding: 16px;
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .calendar-nav {
+        justify-content: space-between;
+    }
+    
+    .calendar-nav h2 {
+        font-size: 18px;
+        min-width: auto;
+        text-align: center;
+        margin: 8px 0;
+    }
+    
+    .calendar-day {
+        min-height: 80px;
+        padding: 6px;
+    }
+    
+    .calendar-day-number {
+        font-size: 12px;
+    }
+    
+    .event-badge {
+        font-size: 8px;
+        padding: 1px 4px;
+    }
+    
+    .event-item {
+        font-size: 10px;
+    }
+    
+    .modal-content {
+        padding: 20px;
+        margin: 20px;
+    }
+    
+    .legend {
+        gap: 12px;
+        padding: 12px;
+    }
+    
+    .view-toggle {
+        justify-content: center;
+        margin-top: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    .calendar-day {
+        min-height: 70px;
+        padding: 4px;
+    }
+    
+    .calendar-day-number {
+        font-size: 11px;
+    }
+    
+    .event-badge {
+        font-size: 7px;
+        padding: 1px 3px;
+    }
+    
+    .event-item {
+        font-size: 9px;
+    }
+    
+    .legend {
+        font-size: 11px;
+    }
+}
+
+/* Year View Styles */
+.year-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 24px;
+    padding: 24px;
+    background: #f8fafc;
+}
+
+.year-month-box {
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    padding: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.year-month-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 8px;
+    text-align: center;
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 6px;
+}
+
+.year-day-names {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    font-size: 10px;
+    font-weight: 700;
+    color: #94a3b8;
+    text-align: center;
+    margin-bottom: 4px;
+}
+
+.year-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+
+.year-day {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: #475569;
+    border-radius: 4px;
+    position: relative;
+}
+
+.year-day.has-event {
+    background: #f1f5f9;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.year-day.has-event::after {
+    content: '';
+    position: absolute;
+    bottom: 3px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #3b82f6;
+}
+
+.year-day.academic { background: #e0f2fe; color: #0369a1; }
+.year-day.social { background: #dcfce7; color: #15803d; }
+.year-day.holiday { background: #fee2e2; color: #b91c1c; }
+.year-day.other { background: #f1f5f9; color: #475569; }
+
+.year-day.academic::after { background: #0ea5e9; }
+.year-day.social::after { background: #22c55e; }
+.year-day.holiday::after { background: #ef4444; }
+
+.year-day.today {
+    box-shadow: inset 0 0 0 2px #3b82f6;
+    background: #fff;
+    color: #3b82f6;
+}
+
+.year-day:hover:not(.empty) {
+    background: #f1f5f9;
+    cursor: pointer;
+}
+
+.year-day.empty {
+    visibility: hidden;
+}
+
+  .print-only { display: none; }
+  .print-hide { }
+  @media print {
+    body { background: #fff !important; padding: 0 !important; }
+    .no-print, .print-hide, .event-details-modal { display: none !important; }
+    .print-only { display: block !important; }
+    .calendar-container { margin: 0 !important; box-shadow: none !important; border-radius: 0 !important; border: none !important; }
+    .calendar-header { background: #023AA5 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .calendar-nav button { display: none !important; }
+    .view-toggle { display: none !important; }
+    .legend { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .legend-badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .event-badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .event-item { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .doc-container { box-shadow: none; border-radius: 0; max-width: 100%; margin: 0; }
+    .add-event-btn { display: none !important; }
+  }
+</style>
+
+<!-- Print-only branded header -->
+<div class="print-only doc-container" style="max-width:900px;margin:0 auto 20px;background:#fff;padding:24px 28px;border:1px solid #DDE3EE;border-radius:12px">
+  {% include "includes/hodari_print_header.html" %}
+  <div style="height:1px;background:var(--border);margin:16px 0"></div>
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <div style="font-family:var(--font-display);font-size:18pt;font-weight:bold;color:var(--hodari-blue);text-transform:uppercase">School Calendar</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">{{ current_month|date:"F Y" }}</div>
+    </div>
+    <div style="text-align:right;font-size:12px;color:var(--text-muted)">
+      <div style="font-weight:700;color:var(--hodari-blue)">Generated {% now "d M Y" %}</div>
+    </div>
+  </div>
+</div>
+
+<!-- Print-only category color key -->
+<div class="print-only" style="max-width:900px;margin:0 auto 20px;background:#fff;padding:16px 28px;border:1px solid #DDE3EE;border-radius:12px">
+  <div style="font-size:11px;font-weight:800;color:#64748B;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Event Categories</div>
+  <div style="display:flex;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:6px">
+      <div style="width:12px;height:12px;border-radius:3px;background:#3b82f6;-webkit-print-color-adjust:exact;print-color-adjust:exact"></div>
+      <span style="font-size:12px;font-weight:600">Academic</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <div style="width:12px;height:12px;border-radius:3px;background:#10b981;-webkit-print-color-adjust:exact;print-color-adjust:exact"></div>
+      <span style="font-size:12px;font-weight:600">Social</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <div style="width:12px;height:12px;border-radius:3px;background:#ef4444;-webkit-print-color-adjust:exact;print-color-adjust:exact"></div>
+      <span style="font-size:12px;font-weight:600">Holiday</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <div style="width:12px;height:12px;border-radius:3px;background:#6b7280;-webkit-print-color-adjust:exact;print-color-adjust:exact"></div>
+      <span style="font-size:12px;font-weight:600">Other</span>
+    </div>
+  </div>
+</div>
+
+<!-- Print-only footer -->
+<div class="print-only" style="max-width:900px;margin:20px auto 0;padding:12px 28px;border-top:1px solid #DDE3EE;font-size:11px;color:#8492A6;text-align:center">
+  This is a computer-generated calendar from {{ brand.school_name|default:"the school" }}.
+</div>
+
+<div class="calendar-container">
+    <!-- Calendar Header -->
+    <div class="calendar-header">
+        <div class="calendar-nav">
+            <button onclick="changeMonth(-1)" title="Previous Month">‹</button>
+            <h2 id="current-month">{{ current_month|date:"F Y" }}</h2>
+            <button onclick="changeMonth(1)" title="Next Month">›</button>
+        </div>
+        
+        <div class="view-toggle">
+            <button onclick="setView('month')" title="Month View">Month</button>
+            <button onclick="setView('term')" title="Term View">Term</button>
+            <button class="active" onclick="setView('year')" title="Year View">Year</button>
+            <button onclick="setView('list')" title="List View">List</button>
+            {% has_perm user "events.view_calendarevent" as can_view_event %}
+            {% if can_view_event %}
+            <button onclick="window.print()" class="print-hide" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);color:white;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;display:inline-flex;align-items:center;gap:6px;transition:all 0.3s ease" title="Print Calendar">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>
+  Print
+</button>
+            {% endif %}
+            {% has_perm user "events.add_calendarevent" as can_add_event %}
+            {% if can_add_event %}
+            <button onclick="openAddEventModal()" class="add-event-btn" title="Add New Event">
+                <span>+</span> Add Event
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Calendar Grid -->
+    <div class="calendar-grid" id="calendar-grid">
+        <!-- Calendar content will be generated by JavaScript -->
+    </div>
+
+    <!-- Year View Container -->
+    <div id="year-view" class="year-grid" style="display: none;">
+        <!-- Year content will be generated by JavaScript -->
+    </div>
+
+    <!-- Term View Container -->
+    <div id="term-view" class="year-grid" style="display: none;">
+        <!-- Term content will be generated by JavaScript -->
+    </div>
+
+    <!-- Legend -->
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-badge academic">ACAD</div>
+            <span>Academic</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-badge social">SOC</div>
+            <span>Social</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-badge holiday">HOL</div>
+            <span>Holiday</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-badge other">OTH</div>
+            <span>Other</span>
+        </div>
+    </div>
+</div>
+
+<!-- Event Details Modal -->
+<div class="event-details-modal" id="event-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title" id="modal-title">Event Details</h3>
+            <button class="close-btn" onclick="closeModal()" title="Close">&times;</button>
+        </div>
+        <div id="modal-body"></div>
+    </div>
+</div>
+
+<!-- Add Event Modal -->
+<div class="event-details-modal" id="add-event-modal">
+    <div class="modal-content" style="max-width:600px">
+        <div class="modal-header">
+            <h3 class="modal-title">Add New Event</h3>
+            <button class="close-btn" onclick="closeAddEventModal()" title="Close">&times;</button>
+        </div>
+        <form id="add-event-form" method="post" style="display:flex;flex-direction:column;gap:16px">
+            <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+            <div class="hf2-form-group">
+                <label class="hf2-label">Event Title</label>
+                <input type="text" name="title" class="hf2-input" required placeholder="e.g. End of Term Concert">
+            </div>
+            <div class="hf2-form-group">
+                <label class="hf2-label">Category</label>
+                <select name="category" class="hf2-select">
+                    <option value="academic">Academic</option>
+                    <option value="social">Social</option>
+                    <option value="holiday">Holiday / Public Holiday</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                <div class="hf2-form-group">
+                    <label class="hf2-label">Start Date</label>
+                    <input type="date" name="start_date" class="hf2-input" required>
+                </div>
+                <div class="hf2-form-group">
+                    <label class="hf2-label">End Date (Optional)</label>
+                    <input type="date" name="end_date" class="hf2-input">
+                </div>
+            </div>
+            <div class="hf2-form-group">
+                <label class="hf2-label">Description</label>
+                <textarea name="description" class="hf2-textarea" rows="4" placeholder="Brief details about the event..."></textarea>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:12px;padding:16px;background:#F9FAFB;border-radius:8px">
+                <label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer">
+                    <input type="checkbox" name="is_public_holiday"> Mark as Public Holiday
+                </label>
+                <label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer">
+                    <input type="checkbox" name="notify_parents" checked> Notify Parents via Email
+                </label>
+                <label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer">
+                    <input type="checkbox" name="notify_staff" checked> Notify Staff via Dashboard
+                </label>
+                <label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer">
+                    <input type="checkbox" name="parent_acknowledgement_required"> Require Parent Acknowledgement
+                    <span style="font-size:12px;color:var(--text-muted)">Parents must acknowledge this event when viewing the calendar</span>
+                </label>
+            </div>
+            <div id="add-event-error" style="color:#DC2626;font-size:13px;display:none"></div>
+            <div style="display:flex;gap:12px;margin-top:4px">
+                <button type="submit" class="hf-btn hf-btn-primary" id="add-event-submit" style="flex:1;justify-content:center">Create Event</button>
+                <button type="button" onclick="closeAddEventModal()" class="hf-btn hf-btn-secondary">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- List View (hidden by default) -->
+<div id="list-view" style="display: none;">
+    <div class="card">
+        <div class="card-title-row">
+            <div class="card-title">Event List</div>
+        </div>
+        <div style="margin-top:20px; border-top:1px solid var(--border)">
+            <table style="width:100%; border-collapse:collapse">
+                <thead>
+                    <tr style="text-align:left; border-bottom:2px solid #F3F4F6">
+                        <th style="padding:12px 8px; font-size:12px; color:var(--text-muted); font-weight:600">Date</th>
+                        <th style="padding:12px 8px; font-size:12px; color:var(--text-muted); font-weight:600">Event</th>
+                        <th style="padding:12px 8px; font-size:12px; color:var(--text-muted); font-weight:600">Category</th>
+                        <th style="padding:12px 8px; font-size:12px; color:var(--text-muted); font-weight:600">Details</th>
+                    </tr>
+                </thead>
+                <tbody id="event-list-tbody">
+                    <!-- Events will be populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script type="application/json" id="events-data">
+{{ events_json|safe }}
+</script>
+<script type="application/json" id="term-data">
+{{ term_json|safe }}
+</script>
+<script type="application/json" id="all-terms-json">
+{{ all_terms_json|safe }}
+</script>
+<script type="application/json" id="acknowledged-ids">
+{{ user_acknowledged_ids_json|safe }}
+</script>
+
+<script>
+var eventsData = JSON.parse(document.getElementById('events-data').textContent || '[]');
+var termData = JSON.parse(document.getElementById('term-data').textContent || 'null');
+var allTermsData = JSON.parse(document.getElementById('all-terms-json').textContent || '[]');
+window.acknowledgedIds = JSON.parse(document.getElementById('acknowledged-ids').textContent || '[]');
+var currentMonthData = '{{ current_month|date:"Y-m-d" }}';
+
+// Initialize calendar
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        window.events = eventsData;
+        window.allTerms = allTermsData;
+        window.currentDate = new Date(currentMonthData);
+        
+        // Find current term index
+        window.currentTermIndex = -1;
+        if (termData) {
+            window.currentTermIndex = window.allTerms.findIndex(t => t.id === termData.id);
+        }
+        if (window.currentTermIndex === -1 && window.allTerms.length > 0) {
+            window.currentTermIndex = window.allTerms.length - 1; // Default to latest
+        }
+
+        setView('year');
+    } catch (e) {
+        console.error("Calendar initialization failed:", e);
+        setView('month');
+    }
+});
+
+function renderCalendar() {
+    if (window.currentView === 'month') {
+        renderMonthView();
+    } else if (window.currentView === 'term') {
+        renderTermView();
+    } else if (window.currentView === 'year') {
+        renderYearView();
+    } else {
+        renderListView();
+    }
+}
+
+// Helper to get YYYY-MM-DD in local time
+function formatDateLocal(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function renderMonthView() {
+    const year = window.currentDate.getFullYear();
+    const month = window.currentDate.getMonth();
+    
+    // Update month display
+    document.getElementById('current-month').textContent = 
+        new Date(year, month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    
+    // Clear existing calendar
+    const grid = document.getElementById('calendar-grid');
+    grid.innerHTML = '';
+    
+    // Add day headers
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    dayNames.forEach(dayName => {
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'calendar-day-header';
+        headerDiv.textContent = dayName;
+        grid.appendChild(headerDiv);
+    });
+    
+    // Get first day of month and number of days
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysInPrevMonth = new Date(year, month, 0).getDate();
+    
+    // Previous month days
+    for (let i = firstDay - 1; i >= 0; i--) {
+        const day = daysInPrevMonth - i;
+        const dayElement = createDayElement(day, true, new Date(year, month - 1, day));
+        grid.appendChild(dayElement);
+    }
+    
+    // Current month days
+    for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(year, month, day);
+        const dayElement = createDayElement(day, false, date);
+        grid.appendChild(dayElement);
+    }
+    
+    // Next month days to fill the grid
+    const totalCells = grid.children.length - 7; // Subtract headers
+    const remainingCells = 42 - totalCells; // 6 weeks * 7 days
+    
+    for (let day = 1; day <= remainingCells; day++) {
+        const dayElement = createDayElement(day, true, new Date(year, month + 1, day));
+        grid.appendChild(dayElement);
+    }
+}
+
+function renderYearView() {
+    const year = window.currentDate.getFullYear();
+    document.getElementById('current-month').textContent = year;
+    
+    const yearView = document.getElementById('year-view');
+    yearView.innerHTML = '';
+    
+    const monthNames = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    
+    monthNames.forEach((monthName, monthIndex) => {
+        const monthBox = document.createElement('div');
+        monthBox.className = 'year-month-box';
+        monthBox.innerHTML = `
+            <div class="year-month-title">${monthName}</div>
+            <div class="year-day-names">
+                <div>S</div><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div>
+            </div>
+            <div class="year-days" id="year-month-${monthIndex}"></div>
+        `;
+        yearView.appendChild(monthBox);
+        
+        const daysGrid = document.getElementById(`year-month-${monthIndex}`);
+        const firstDay = new Date(year, monthIndex, 1).getDay();
+        const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+        
+        // Empty cells for alignment
+        for (let i = 0; i < firstDay; i++) {
+            const empty = document.createElement('div');
+            empty.className = 'year-day empty';
+            daysGrid.appendChild(empty);
+        }
+        
+        // Month days
+        for (let day = 1; day <= daysInMonth; day++) {
+            const date = new Date(year, monthIndex, day);
+            const dateStr = formatDateLocal(date);
+            const dayEvents = window.events.filter(e => {
+                if (!e.end_date) return e.start_date === dateStr;
+                return dateStr >= e.start_date && dateStr <= e.end_date;
+            });
+            
+            const dayEl = document.createElement('div');
+            dayEl.className = 'year-day';
+            dayEl.textContent = day;
+            
+            if (date.toDateString() === new Date().toDateString()) {
+                dayEl.classList.add('today');
+            }
+            
+            if (dayEvents.length > 0) {
+                dayEl.classList.add('has-event');
+                const topCategory = dayEvents[0].category;
+                dayEl.classList.add(topCategory);
+                dayEl.title = dayEvents.map(e => e.title).join(', ');
+                dayEl.onclick = () => {
+                    showDayEvents(date, dayEvents);
+                };
+            } else {
+                dayEl.onclick = () => {
+                    setView('month');
+                    window.currentDate = new Date(year, monthIndex, 1);
+                    renderMonthView();
+                };
+            }
+            
+            daysGrid.appendChild(dayEl);
+        }
+    });
+}
+
+function renderTermView() {
+    const activeTerm = window.allTerms[window.currentTermIndex];
+    if (!activeTerm || !activeTerm.start_date || !activeTerm.end_date) {
+        document.getElementById('term-view').innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-muted); grid-column: 1/-1;">Term dates not set. Please contact admin.</div>';
+        return;
+    }
+
+    const startDate = new Date(parseInt(activeTerm.start_date.split('-')[0]), parseInt(activeTerm.start_date.split('-')[1]) - 1, parseInt(activeTerm.start_date.split('-')[2]));
+    const endDate = new Date(parseInt(activeTerm.end_date.split('-')[0]), parseInt(activeTerm.end_date.split('-')[1]) - 1, parseInt(activeTerm.end_date.split('-')[2]));
+    
+    document.getElementById('current-month').textContent = `${activeTerm.name} (${activeTerm.year_name})`;
+    
+    const termView = document.getElementById('term-view');
+    termView.innerHTML = '';
+    
+    const monthNames = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    
+    // Get all months between start and end date
+    let current = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const end = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+    
+    while (current <= end) {
+        const monthIndex = current.getMonth();
+        const year = current.getFullYear();
+        const monthName = monthNames[monthIndex];
+        
+        const monthBox = document.createElement('div');
+        monthBox.className = 'year-month-box';
+        monthBox.innerHTML = `
+            <div class="year-month-title">${monthName} ${year}</div>
+            <div class="year-day-names">
+                <div>S</div><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div>
+            </div>
+            <div class="year-days" id="term-month-${year}-${monthIndex}"></div>
+        `;
+        termView.appendChild(monthBox);
+        
+        const daysGrid = document.getElementById(`term-month-${year}-${monthIndex}`);
+        const firstDay = new Date(year, monthIndex, 1).getDay();
+        const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+        
+        for (let i = 0; i < firstDay; i++) {
+            const empty = document.createElement('div');
+            empty.className = 'year-day empty';
+            daysGrid.appendChild(empty);
+        }
+        
+        for (let day = 1; day <= daysInMonth; day++) {
+            const date = new Date(year, monthIndex, day);
+            const dateStr = formatDateLocal(date);
+            
+            // Only show days within the term range
+            if (dateStr < activeTerm.start_date || dateStr > activeTerm.end_date) {
+                const empty = document.createElement('div');
+                empty.className = 'year-day empty';
+                daysGrid.appendChild(empty);
+                continue;
+            }
+            const dayEvents = window.events.filter(e => {
+                if (!e.end_date) return e.start_date === dateStr;
+                return dateStr >= e.start_date && dateStr <= e.end_date;
+            });
+            
+            const dayEl = document.createElement('div');
+            dayEl.className = 'year-day';
+            dayEl.textContent = day;
+            
+            if (date.toDateString() === new Date().toDateString()) {
+                dayEl.classList.add('today');
+            }
+            
+            if (dayEvents.length > 0) {
+                dayEl.classList.add('has-event');
+                const topCategory = dayEvents[0].category;
+                dayEl.classList.add(topCategory);
+                dayEl.title = dayEvents.map(e => e.title).join(', ');
+                dayEl.onclick = () => {
+                    showDayEvents(date, dayEvents);
+                };
+            } else {
+                dayEl.onclick = () => {
+                    setView('month');
+                    window.currentDate = new Date(year, monthIndex, 1);
+                    renderMonthView();
+                };
+            }
+            daysGrid.appendChild(dayEl);
+        }
+        
+        current.setMonth(current.getMonth() + 1);
+    }
+}
+
+function createDayElement(day, isOtherMonth, date) {
+    const dayDiv = document.createElement('div');
+    dayDiv.className = 'calendar-day';
+    
+    if (isOtherMonth) {
+        dayDiv.classList.add('other-month');
+    }
+    
+    // Check if today
+    const today = new Date();
+    if (date.toDateString() === today.toDateString()) {
+        dayDiv.classList.add('today');
+    }
+    
+    // Day number
+    const dayNumber = document.createElement('div');
+    dayNumber.className = 'calendar-day-number';
+    dayNumber.textContent = day;
+    dayDiv.appendChild(dayNumber);
+    
+    // Add events for this date
+    const dateStr = formatDateLocal(date);
+    const dayEvents = window.events.filter(event => {
+        if (!event.end_date) return event.start_date === dateStr;
+        return dateStr >= event.start_date && dateStr <= event.end_date;
+    });
+    
+    if (dayEvents.length > 0) {
+        // Create event indicators
+        const eventIndicator = document.createElement('div');
+        eventIndicator.className = 'event-indicator';
+        
+        if (dayEvents.length === 1) {
+            // Single event - show badge
+            const event = dayEvents[0];
+            const badge = document.createElement('div');
+            badge.className = 'event-badge ' + event.category;
+            badge.textContent = getCategoryAbbreviation(event.category);
+            badge.title = event.title;
+            badge.onclick = function(e) {
+                e.stopPropagation();
+                showDayEvents(date, dayEvents);
+            };
+            eventIndicator.appendChild(badge);
+        } else if (dayEvents.length <= 3) {
+            // Multiple events - show multiple badges
+            dayEvents.slice(0, 3).forEach(event => {
+                const badge = document.createElement('div');
+                badge.className = 'event-badge ' + event.category;
+                badge.textContent = getCategoryAbbreviation(event.category);
+                badge.title = event.title;
+                badge.onclick = function(e) {
+                    e.stopPropagation();
+                    showDayEvents(date, dayEvents);
+                };
+                eventIndicator.appendChild(badge);
+            });
+        } else {
+            // Many events - show dots with count
+            const eventDots = document.createElement('div');
+            eventDots.className = 'event-dots';
+            
+            // Show first 2 event types as dots
+            const uniqueCategories = [...new Set(dayEvents.map(e => e.category))];
+            uniqueCategories.slice(0, 2).forEach(category => {
+                const dot = document.createElement('span');
+                dot.className = 'event-dot ' + category;
+                dot.title = `${dayEvents.filter(e => e.category === category).length} ${category} events`;
+                eventDots.appendChild(dot);
+            });
+            
+            eventIndicator.appendChild(eventDots);
+            
+            // Add count indicator
+            const countBadge = document.createElement('div');
+            countBadge.className = 'event-badge other';
+            countBadge.textContent = '+' + (dayEvents.length - 2);
+            countBadge.title = `${dayEvents.length} total events`;
+            countBadge.onclick = function(e) {
+                e.stopPropagation();
+                showDayEvents(date, dayEvents);
+            };
+            eventIndicator.appendChild(countBadge);
+        }
+        
+        dayDiv.appendChild(eventIndicator);
+        
+        // Add click handler to show events
+        dayDiv.style.cursor = 'pointer';
+        dayDiv.onclick = function() {
+            showDayEvents(date, dayEvents);
+        };
+    }
+    
+    return dayDiv;
+}
+
+function getCategoryAbbreviation(category) {
+    const abbreviations = {
+        'academic': 'ACAD',
+        'social': 'SOC',
+        'holiday': 'HOL',
+        'other': 'OTH'
+    };
+    return abbreviations[category] || 'OTH';
+}
+
+function renderListView() {
+    const tbody = document.getElementById('event-list-tbody');
+    tbody.innerHTML = '';
+    
+    // Sort events by date
+    const sortedEvents = [...window.events].sort((a, b) => 
+        new Date(a.start_date) - new Date(b.start_date)
+    );
+    
+    sortedEvents.forEach(event => {
+        const row = document.createElement('tr');
+        row.style.borderBottom = '1px solid #F3F4F6';
+        row.style.fontSize = '13px';
+        row.style.cursor = 'pointer';
+        row.onclick = () => showDayEvents(new Date(event.start_date), [event]);
+        
+        const startDate = new Date(event.start_date);
+        const endDate = event.end_date ? new Date(event.end_date) : null;
+        
+        row.innerHTML = `
+            <td style="padding:12px 8px; font-weight:600">
+                ${startDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                ${endDate && endDate.toDateString() !== startDate.toDateString() ? 
+                    '- ' + endDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
+            </td>
+            <td style="padding:12px 8px">
+                <div style="font-weight:600">${event.title}</div>
+                ${event.is_public_holiday ? 
+                    '<span class="chip chip-red" style="font-size:10px; padding:2px 6px">Holiday</span>' : ''}
+            </td>
+            <td style="padding:12px 8px">
+                <span class="chip ${getCategoryClass(event.category)}">
+                    ${event.category_display}
+                </span>
+            </td>
+            <td style="padding:12px 8px; color:var(--text-muted); max-width:300px">
+                ${event.description ? event.description.substring(0, 100) + (event.description.length > 100 ? '...' : '') : ''}
+            </td>
+        `;
+        
+        tbody.appendChild(row);
+    });
+    
+    if (sortedEvents.length === 0) {
+        const emptyRow = document.createElement('tr');
+        emptyRow.innerHTML = `
+            <td colspan="4" style="padding:32px; text-align:center; color:var(--text-muted)">
+                No events scheduled.
+            </td>
+        `;
+        tbody.appendChild(emptyRow);
+    }
+}
+
+function getCategoryClass(category) {
+    const classes = {
+        'academic': 'chip-blue',
+        'social': 'chip-green', 
+        'holiday': 'chip-red',
+        'other': 'chip-grey'
+    };
+    return classes[category] || 'chip-grey';
+}
+
+function changeMonth(direction) {
+    if (window.currentView === 'month') {
+        window.currentDate.setMonth(window.currentDate.getMonth() + direction);
+    } else if (window.currentView === 'year') {
+        window.currentDate.setFullYear(window.currentDate.getFullYear() + direction);
+    } else if (window.currentView === 'term') {
+        window.currentTermIndex += direction;
+        if (window.currentTermIndex < 0) window.currentTermIndex = 0;
+        if (window.currentTermIndex >= window.allTerms.length) window.currentTermIndex = window.allTerms.length - 1;
+    }
+    renderCalendar();
+}
+
+function setView(view) {
+    window.currentView = view;
+    
+    // Update button states
+    document.querySelectorAll('.view-toggle button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Find and activate the correct button
+    const buttons = document.querySelectorAll('.view-toggle button');
+    buttons.forEach(btn => {
+        if (btn.textContent.toLowerCase().includes(view)) {
+            btn.classList.add('active');
+        }
+    });
+    
+    // Show/hide views
+    const calendarGrid = document.querySelector('.calendar-grid');
+    const yearView = document.getElementById('year-view');
+    const termView = document.getElementById('term-view');
+    const listView = document.getElementById('list-view');
+    const legend = document.querySelector('.legend');
+    
+    if (view === 'month') {
+        calendarGrid.style.display = 'grid';
+        yearView.style.display = 'none';
+        termView.style.display = 'none';
+        listView.style.display = 'none';
+        legend.style.display = 'flex';
+        renderMonthView();
+    } else if (view === 'year') {
+        calendarGrid.style.display = 'none';
+        yearView.style.display = 'grid';
+        termView.style.display = 'none';
+        listView.style.display = 'none';
+        legend.style.display = 'flex';
+        renderYearView();
+    } else if (view === 'term') {
+        calendarGrid.style.display = 'none';
+        yearView.style.display = 'none';
+        termView.style.display = 'grid';
+        listView.style.display = 'none';
+        legend.style.display = 'flex';
+        renderTermView();
+    } else {
+        calendarGrid.style.display = 'none';
+        yearView.style.display = 'none';
+        termView.style.display = 'none';
+        listView.style.display = 'block';
+        legend.style.display = 'none';
+        renderListView();
+    }
+}
+
+function showDayEvents(date, dayEvents) {
+    const modal = document.getElementById('event-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    
+    modalTitle.textContent = date.toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    });
+    
+    let eventsHtml = '';
+    dayEvents.forEach(event => {
+        const startDate = new Date(event.start_date);
+        const endDate = event.end_date ? new Date(event.end_date) : null;
+        
+        eventsHtml += `
+            <div style="margin-bottom: 20px; padding: 20px; background: #f9fafb; border-radius: 8px; border-left: 4px solid ${getCategoryColor(event.category)};">
+                <h4 style="margin: 0 0 8px 0; color: #1f2937; font-size: 16px;">
+                    ${event.title}
+                    ${event.is_public_holiday ? '<span class="chip chip-red" style="font-size:10px; margin-left: 8px;">Holiday</span>' : ''}
+                    ${event.parent_acknowledgement_required ? '<span class="chip chip-yellow" style="font-size:10px; margin-left: 8px;">Requires Ack</span>' : ''}
+                </h4>
+                <div class="event-meta">
+                    <span>${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                    ${endDate && endDate.toDateString() !== startDate.toDateString() ? 
+                        '<span>→ ' + endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + '</span>' : ''}
+                    <span class="chip ${getCategoryClass(event.category)}" style="font-size: 11px;">
+                        ${event.category_display}
+                    </span>
+                    ${event.parent_acknowledgement_required ? '<span style="font-size:11px; color:var(--text-muted); margin-left:8px">' + (event.acknowledgement_count || 0) + ' acknowledged</span>' : ''}
+                </div>
+                ${event.description ? 
+                    '<div class="event-description" style="margin-top: 12px;">' + 
+                    event.description.replace(/\n/g, '<br>') + 
+                    '</div>' : ''}
+            </div>
+        `;
+    });
+    
+    modalBody.innerHTML = eventsHtml || '<p style="text-align: center; color: #6b7280; padding: 20px;">No events on this day.</p>';
+
+    // Add parent acknowledgement prompts for events that require it
+    {% has_perm user "events.add_eventacknowledgement" as can_ack_event %}
+    var canAckEvent = {{ can_ack_event|yesno:"true,false" }};
+    if (canAckEvent) {
+      var eventsWithAck = dayEvents.filter(function(e) { return e.parent_acknowledgement_required; });
+      if (eventsWithAck.length > 0) {
+        eventsWithAck.forEach(function(event) {
+          var alreadyAcknowledged = window.acknowledgedIds.indexOf(event.id) !== -1;
+          var ackDiv = document.createElement('div');
+          ackDiv.style.cssText = 'margin-bottom: 20px; padding: 20px; background: #FFFBEB; border-radius: 8px; border-left: 4px solid #F59E0B;';
+          if (alreadyAcknowledged) {
+            ackDiv.innerHTML = '<div style="display:flex; align-items:center; gap:10px">' +
+              '<span style="font-size:18px;">&#10003;</span>' +
+              '<div><strong>You acknowledged this event</strong>' +
+              '<br><span style="font-size:12px; color:var(--text-muted)">Parent acknowledgement recorded.</span></div></div>';
+          } else {
+            ackDiv.innerHTML = '<div style="margin-bottom:8px"><strong>Parent Acknowledgement Required</strong>' +
+              '<br><span style="font-size:12px; color:var(--text-muted)">Please confirm that you have read the event details.</span></div>' +
+              '<button class="btn-primary" style="font-size:13px; padding:8px 16px" ' +
+              'onclick="acknowledgeEvent(' + event.id + ', this)">Acknowledge Event</button>' +
+              '<span style="margin-left:10px; font-size:12px; color:var(--text-muted)" id="ack-status-' + event.id + '"></span>';
+          }
+          modalBody.appendChild(ackDiv);
+        });
+      }
+    }
+
+    // Add edit/delete buttons based on user permissions
+    {% has_perm user "events.change_calendarevent" as can_edit_event %}
+    {% has_perm user "events.delete_calendarevent" as can_delete_event %}
+    if ({{ can_edit_event|yesno:"true,false" }} || {{ can_delete_event|yesno:"true,false" }}) {
+      var actionBar = document.createElement('div');
+      actionBar.style.cssText = 'display:flex; gap:10px; margin-top:16px; border-top:1px solid #e5e7eb; padding-top:16px; justify-content:flex-end';
+      dayEvents.forEach(function(event) {
+        {% if can_edit_event %}
+        if ({{ can_edit_event|yesno:"true,false" }}) {
+          var editLink = document.createElement('a');
+          editLink.href = '/events/' + event.id + '/edit/';
+          editLink.textContent = 'Edit \u2018' + event.title + '\u2019';
+          editLink.style.cssText = 'font-size:12px; padding:6px 12px; border-radius:6px; background:var(--hodari-blue); color:#fff; text-decoration:none; font-weight:600';
+          actionBar.appendChild(editLink);
+        }
+        {% endif %}
+        {% if can_delete_event %}
+        if ({{ can_delete_event|yesno:"true,false" }}) {
+          var deleteLink = document.createElement('a');
+          deleteLink.href = '/events/' + event.id + '/delete/';
+          deleteLink.textContent = 'Delete';
+          deleteLink.style.cssText = 'font-size:12px; padding:6px 12px; border-radius:6px; background:#FEF2F2; color:#9B1C1C; text-decoration:none; font-weight:600; border:1px solid #FECACA';
+          actionBar.appendChild(deleteLink);
+        }
+        {% endif %}
+      });
+      if (actionBar.children.length > 0) {
+        modalBody.appendChild(actionBar);
+      }
+    }
+
+    modal.style.display = 'flex';
+}
+
+function getCategoryColor(category) {
+    const colors = {
+        'academic': '#3b82f6',
+        'social': '#10b981',
+        'holiday': '#ef4444',
+        'other': '#6b7280'
+    };
+    return colors[category] || '#6b7280';
+}
+
+function acknowledgeEvent(eventId, btn) {
+    var statusEl = document.getElementById('ack-status-' + eventId);
+    if (statusEl) statusEl.textContent = 'Sending...';
+    btn.disabled = true;
+
+    fetch('/events/' + eventId + '/acknowledge/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.acknowledged) {
+            btn.textContent = 'Acknowledged';
+            btn.style.background = '#D1FAE5';
+            btn.style.color = '#065F46';
+            btn.style.border = '1px solid #A7F3D0';
+            btn.disabled = true;
+            window.acknowledgedIds.push(eventId);
+            if (statusEl) statusEl.textContent = 'Parent acknowledgement recorded.';
+        } else {
+            if (statusEl) statusEl.textContent = 'Failed. Try again.';
+            btn.disabled = false;
+        }
+    })
+    .catch(function() {
+        if (statusEl) statusEl.textContent = 'Network error. Try again.';
+        btn.disabled = false;
+    });
+}
+
+function closeModal() {
+    document.getElementById('event-modal').style.display = 'none';
+}
+
+function openAddEventModal() {
+    document.getElementById('add-event-modal').style.display = 'flex';
+    document.getElementById('add-event-error').style.display = 'none';
+    // Pre-fill start date with selected date if available
+    var today = new Date().toISOString().split('T')[0];
+    var startDateInput = document.querySelector('#add-event-form [name="start_date"]');
+    if (startDateInput && !startDateInput.value) {
+        startDateInput.value = today;
+    }
+}
+
+function closeAddEventModal() {
+    document.getElementById('add-event-modal').style.display = 'none';
+    document.getElementById('add-event-form').reset();
+}
+
+document.getElementById('add-event-modal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeAddEventModal();
+    }
+});
+
+document.getElementById('add-event-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var form = this;
+    var submitBtn = document.getElementById('add-event-submit');
+    var errorEl = document.getElementById('add-event-error');
+    errorEl.style.display = 'none';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creating...';
+
+    var formData = new FormData(form);
+    fetch('/events/new/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+        },
+        body: formData
+    })
+    .then(function(r) {
+        if (r.ok) {
+            closeAddEventModal();
+            window.location.reload();
+            return;
+        }
+        return r.json().then(function(data) {
+            throw new Error(data.error || 'Validation failed. Please check the form fields.');
+        }, function() {
+            throw new Error('Failed to create event. Please try again.');
+        });
+    })
+    .then(function() {
+        // Success path handled above via reload
+    })
+    .catch(function(err) {
+        errorEl.textContent = err.message;
+        errorEl.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Create Event';
+    });
+});
+
+// Close modal when clicking outside or pressing Escape
+document.getElementById('event-modal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeModal();
+    }
+});
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeModal();
+    }
+});
+
+// Add keyboard navigation
+document.addEventListener('keydown', function(e) {
+    if (window.currentView === 'month') {
+        if (e.key === 'ArrowLeft') {
+            changeMonth(-1);
+        } else if (e.key === 'ArrowRight') {
+            changeMonth(1);
+        }
+    } else if (window.currentView === 'year') {
+        if (e.key === 'ArrowLeft') {
+            window.currentDate.setFullYear(window.currentDate.getFullYear() - 1);
+            renderYearView();
+        } else if (e.key === 'ArrowRight') {
+            window.currentDate.setFullYear(window.currentDate.getFullYear() + 1);
+            renderYearView();
+        }
+    }
+});
+</script>
+{% endblock %}

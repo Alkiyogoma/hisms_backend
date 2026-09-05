@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Account Statement &mdash; {{ student.first_name }} {{ student.last_name }}{% endblock %}
+{% block topbar_greeting %}Finance{% endblock %}
+{% block topbar_date %}{% now "d F Y" %}{% endblock %}
+{% block extra_head %}
+<style>
+  .print-statement-header { display: none; }
+  @media print {
+    .sidebar, .topbar, header, .sub-nav, .hf2-actions, .section-hdr,
+    .btn, .btn-primary, .btn-secondary, .hf-btn, .hf-btn-primary, .hf-btn-secondary,
+    form, .no-print, .no-print-area, .print-hide,
+    .card-title-row { display: none !important; }
+    .print-statement-header { display: block !important; }
+    .main { margin-left: 0 !important; }
+    .content { padding: 0 !important; }
+    .card { border: none !important; box-shadow: none !important; margin-bottom: 12px !important; }
+    body { background: #fff !important; }
+    table { font-size: 11px !important; width: 100% !important; }
+    th, td { padding: 6px 8px !important; }
+    .amount { text-align: right !important; }
+    .metric-compact { border: 1px solid #e2e8f0 !important; box-shadow: none !important; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+
+{# Print-only branded header #}
+<div class="print-statement-header" style="max-width:800px;margin:0 auto 20px;padding:20px 24px;border:1px solid #DDE3EE;border-radius:12px;background:#fff">
+  {% include "includes/hodari_print_header.html" %}
+  <div style="height:1px;background:var(--border);margin:12px 0"></div>
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <div style="font-family:var(--font-display);font-size:16pt;font-weight:bold;color:var(--hodari-blue);text-transform:uppercase">Account Statement</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">{{ student.first_name }} {{ student.last_name }} &middot; {{ student.class_name|default:"N/A" }}</div>
+    </div>
+    <div style="text-align:right;font-size:12px;color:var(--text-muted)">
+      <div style="font-weight:700;color:var(--hodari-blue)">Generated {% now "d M Y" %}</div>
+    </div>
+  </div>
+</div>
+
+<div class="section-hdr">
+  <span class="section-title">Account Statement</span>
+  <div style="display:flex;gap:8px;align-items:center">
+    <span style="font-size:13px;color:var(--text-secondary);font-weight:500">{{ student.first_name }} {{ student.last_name }} &middot; {{ student.class_name|default:"N/A" }}</span>
+    <a href="{% url 'finance:invoice_list' %}" class="btn btn-secondary btn-sm">&larr; Back</a>
+    <button onclick="window.print()" class="btn btn-primary btn-sm" style="margin-left:8px">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:4px"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z"/></svg>
+      Print
+    </button>
+  </div>
+</div>
+
+<!-- Summary Metrics -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Total Billed</span></div>
+    <div class="mc-val" style="color:#023AA5">TZS {{ total_billed|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#5A697D">All invoices</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF9F0,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Total Paid</span></div>
+    <div class="mc-val" style="color:#059669">TZS {{ total_paid|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#059669">{{ invoices|length }} invoice(s)</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,{% if balance > 0 %}#FFF8ED{% else %}#EEF9F0{% endif %},#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Current Balance</span></div>
+    <div class="mc-val" style="color:{% if balance > 0 %}#B45309{% else %}#059669{% endif %}">TZS {{ balance|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:{% if balance > 0 %}#B45309{% else %}#059669{% endif %}">{% if balance <= 0 %}Account in good standing{% else %}Outstanding balance{% endif %}</div>
+  </div>
+</div>
+
+<!-- Invoices Table -->
+<div class="card">
+  <div class="card-title">Invoice History</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Invoice #</th>
+        <th>Term</th>
+        <th>Issued</th>
+        <th>Due Date</th>
+        <th>Total Due</th>
+        <th>Paid</th>
+        <th>Balance</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in invoice_details %}
+      <tr onclick="location.href='{% url 'finance:invoice_detail' pk=item.invoice.pk %}'" style="cursor:pointer">
+        <td><strong>{{ item.invoice.invoice_number|default:item.invoice.pk }}</strong></td>
+        <td>{{ item.invoice.term.name|default:"N/A" }}</td>
+        <td>{{ item.invoice.created_at|date:"d M Y" }}</td>
+        <td>{{ item.invoice.due_date|date:"d M Y"|default:"N/A" }}</td>
+        <td class="amount">TZS {{ item.invoice.total_due|floatformat:0 }}</td>
+        <td class="amount amount-positive">TZS {{ item.paid|floatformat:0 }}</td>
+        <td class="amount {% if item.balance > 0 %}amount-negative{% else %}amount-positive{% endif %}">TZS {{ item.balance|floatformat:0 }}</td>
+        <td><span class="inv-status st-{{ item.invoice.status|lower }}">{{ item.invoice.get_status_display }}</span></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="8" style="text-align:center;padding:24px">
+        {% include '_partials/empty_state.html' with title='No invoices found' desc='No invoices have been created for this student yet.' icon='inbox' icon_color='grey' %}
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Payment History -->
+<div class="card">
+  <div class="card-title">Payment History</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Invoice</th>
+        <th>Method</th>
+        <th>Reference</th>
+        <th>Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for payment in payments %}
+      <tr>
+        <td>{{ payment.payment_date|date:"d M Y" }}</td>
+        <td>{{ payment.invoice.invoice_number|default:payment.invoice.pk }}</td>
+        <td>{{ payment.get_method_display }}</td>
+        <td>{{ payment.reference|default:"N/A" }}</td>
+        <td class="amount amount-positive">TZS {{ payment.amount|floatformat:0 }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" style="text-align:center;padding:24px">
+        {% include '_partials/empty_state.html' with title='No payments recorded' desc='Payment history will appear here once recorded.' icon='doc' icon_color='grey' %}
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

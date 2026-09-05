@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>500 — Server Error | {{ brand.school_name }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'branding/hodari.css' %}">
+  <style>
+    body { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg, #F8F9FC); font-family: 'Inter', sans-serif; margin: 0; }
+    .error-wrap { text-align: center; max-width: 480px; padding: 40px 24px; }
+    .error-code { font-size: 96px; font-weight: 700; color: #EF4444; line-height: 1; letter-spacing: -4px; margin: 0; }
+    .error-badge { display: inline-block; margin: 16px 0 8px; padding: 4px 14px; background: #FEF2F2; color: #EF4444; border-radius: 999px; font-size: 12px; font-weight: 600; letter-spacing: .05em; }
+    .error-title { font-size: 22px; font-weight: 700; color: var(--text, #1E293B); margin: 0 0 8px; }
+    .error-desc { font-size: 14px; color: var(--text-muted, #64748B); margin: 0 0 28px; line-height: 1.6; }
+    .error-logo { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 36px; }
+    .error-logo img { height: 38px; }
+    .error-logo-text { font-size: 15px; font-weight: 700; color: var(--primary, #4F46E5); letter-spacing: .04em; }
+    .btn-home { display: inline-flex; align-items: center; gap: 8px; background: #EF4444; color: #fff; padding: 10px 24px; border-radius: 12px; font-size: 14px; font-weight: 600; text-decoration: none; transition: opacity .15s; }
+    .btn-home:hover { opacity: .88; }
+    .btn-back { display: inline-flex; align-items: center; gap: 8px; background: transparent; color: var(--text-muted, #64748B); padding: 10px 20px; border-radius: 12px; font-size: 14px; font-weight: 500; text-decoration: none; border: 1px solid var(--border, #E2E8F0); margin-left: 8px; transition: background .15s; }
+    .btn-back:hover { background: var(--border, #E2E8F0); }
+    .alert-box { background: #FEF2F2; border: 1px solid #FECACA; border-radius: 10px; padding: 14px 16px; font-size: 13px; color: #991B1B; margin-bottom: 24px; }
+    .divider { border: none; border-top: 1px solid var(--border, #E2E8F0); margin: 32px 0; }
+    .tagline { font-size: 12px; color: var(--text-muted, #94A3B8); font-style: italic; }
+  </style>
+</head>
+<body>
+  <div class="error-wrap">
+    <div class="error-logo">
+      <img src="{% static 'branding/favicon.ico' %}" alt="{{ brand.school_name }}">
+      <span class="error-logo-text">{{ brand.school_name }}</span>
+    </div>
+
+    <div class="error-code">500</div>
+    <div class="error-badge">INTERNAL SERVER ERROR</div>
+    <h1 class="error-title">Something went wrong on our end</h1>
+    <p class="error-desc">
+      The server encountered an unexpected error and could not complete your request.<br>
+      This has been logged. Please try again in a moment.
+    </p>
+
+    <div class="alert-box" style="display:flex;align-items:center;gap:8px;justify-content:center;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+        <line x1="12" y1="9" x2="12" y2="13"></line>
+        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+      </svg>
+      If this persists, contact the system administrator at <strong>{{ brand.email }}</strong>
+    </div>
+
+    <div>
+      <a href="/" class="btn-home">
+        <svg width="14" height="14" viewBox="0 0 17 17" fill="none"><path d="M2 8.5L8.5 2 15 8.5M3.5 7V15h4V11h2v4h4V7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+        Go to Dashboard
+      </a>
+      <a href="javascript:history.back()" class="btn-back">Go Back</a>
+    </div>
+
+    <hr class="divider">
+    <p class="tagline">"The courage to stand out" — {{ brand.school_name }}</p>
+  </div>
+</body>
+</html>

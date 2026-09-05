@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Report Cards &mdash; {{ class_name|default:"All" }}{% endblock %}
+
+{% block topbar_greeting %}{{ class_name|default:"Reports" }} Reports{% endblock %}
+{% block topbar_date %}{{ current_term.academic_year.name }} - {{ current_term.name }}{% endblock %}
+
+{% block content %}
+{% include "academics/_top_tabs_reports.html" %}
+
+{% if signoff_blocked %}
+<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:14px 20px;margin:16px 0;display:flex;align-items:center;gap:12px">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+    <div>
+        <div style="font-size:13px;font-weight:700;color:#991B1B">Sign-off blocked</div>
+        <div style="font-size:12px;color:#DC2626;margin-top:2px">{{ signoff_block_reason }}. Reports cannot be published until this date is reached.</div>
+    </div>
+</div>
+{% endif %}
+
+<div class="section-hdr">
+  <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap">
+    <form method="GET" style="display:flex; align-items:center; gap:8px; margin:0">
+      <label style="font-size:12px; font-weight:600; color:var(--text-secondary)">Term:</label>
+      <select name="term_id" onchange="this.form.submit()" class="hf2-input" style="padding:6px 12px; font-size:13px; min-width:140px">
+        {% for t in all_terms %}
+          <option value="{{ t.id }}" {% if term_id == t.id %}selected{% endif %}>{{ t.name }} &middot; {{ t.academic_year.name }}</option>
+        {% endfor %}
+      </select>
+      <label style="font-size:12px; font-weight:600; color:var(--text-secondary)">Class:</label>
+      <select name="class_name" onchange="this.form.submit()" class="hf2-input" style="padding:6px 12px; font-size:13px; min-width:180px">
+        <option value="">-- Select Class --</option>
+        {% for c in available_classes %}
+          <option value="{{ c }}" {% if class_name == c %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    {% is_hod_like user as can_signoff %}
+    {% if has_pending and can_signoff and not signoff_blocked %}
+      <button type="button" class="hf-btn hf-btn-primary" style="font-size:12px; padding:6px 14px"
+        onclick="confirmDeleteModal({title:'Sign Off All?',body:'Sign off all pending reports for <strong>{{ class_name }}</strong>?',detail:'Reports will be published and become visible to parents immediately.',confirmText:'Sign Off All',url:'{% url 'academics:signoff_action' %}',type:'info',extraData:[{name:'class_name',value:'{{ class_name }}'},{name:'term_id',value:'{{ term.id }}'}]})">
+        Sign Off All Class
+      </button>
+    {% elif has_pending and can_signoff and signoff_blocked %}
+      <span class="hf-btn hf-btn-secondary" style="font-size:12px; padding:6px 14px; opacity:0.5; cursor:not-allowed" title="{{ signoff_block_reason }}">
+        Sign Off All Class
+      </span>
+    {% endif %}
+  </div>
+  {% is_hod_like user as can_signoff_nav %}
+  {% if not can_signoff_nav %}
+    <a href="/" class="hf-btn hf-btn-secondary" style="font-size:12px; padding:6px 12px">Back to Dashboard</a>
+  {% else %}
+    <a href="{% url 'academics:hos_signoff_list' %}" class="hf-btn hf-btn-secondary" style="font-size:12px; padding:6px 12px">Back to Overview</a>
+  {% endif %}
+</div>
+
+{% if class_error %}
+  <div class="card" style="padding:24px; text-align:center; color:var(--red); font-weight:600">{{ class_error }}</div>
+{% elif class_name %}
+<div class="card" style="padding:0; overflow:hidden; border-top: 3px solid var(--hodari-blue);">
+  <table class="h-table">
+    <thead>
+      <tr style="background: #F8FAFC">
+        <th style="padding-left:24px; width:140px">Admission No</th>
+        <th>Student Name</th>
+        <th style="text-align:center">Report Status</th>
+        <th style="text-align:right; padding-right:24px">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for report in reports %}
+        <tr class="hover-row">
+          <td style="padding-left:24px; font-family:var(--font-mono); font-size:12px; color:var(--text-secondary)">{{ report.student.admission_no }}</td>
+          <td style="font-weight:700; color:var(--hodari-blue); font-size:14px">{{ report.student.get_full_name }}</td>
+          <td style="text-align:center">
+            {% if report.status == 'published' %}
+              <div style="display:flex; flex-direction:column; align-items:center">
+                <span class="chip chip-green" style="font-weight:700">Published</span>
+                <span style="font-size:10px; color:var(--green); margin-top:2px">Visible to Parents</span>
+              </div>
+            {% elif report.status == 'pending_sign_off' %}
+              <div style="display:flex; flex-direction:column; align-items:center">
+                <span class="chip chip-amber" style="font-weight:700">Pending Sign-off</span>
+                <span style="font-size:10px; color:var(--amber); margin-top:2px">Awaiting HOS Action</span>
+              </div>
+            {% else %}
+              <div style="display:flex; flex-direction:column; align-items:center">
+                <span class="chip chip-grey">Draft</span>
+                <span style="font-size:10px; color:var(--text-muted); margin-top:2px">Not Submitted</span>
+              </div>
+            {% endif %}
+          </td>
+          <td style="text-align:right; padding-right:24px">
+            <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px;">
+                <a href="{% url 'academics:report_preview' report.pk %}" target="_blank" class="hf-btn hf-btn-secondary" style="font-size:11px; padding:5px 12px">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:4px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    Preview
+                </a>
+                
+                {% is_hod_like user as can_signoff %}
+                {% if report.status == 'pending_sign_off' and can_signoff and not signoff_blocked %}
+                    <button type="button" class="hf-btn hf-btn-primary" style="font-size:11px; padding:5px 12px; background:#10b981; border-color:#059669"
+                      onclick="confirmDeleteModal({title:'Sign Off Report?',body:'Sign off and publish the report for <strong>{{ report.student.get_full_name }}</strong>?',detail:'This report will become visible to parents immediately.',confirmText:'Sign Off',url:'{% url 'academics:signoff_action' %}',type:'info',extraData:[{name:'report_id',value:'{{ report.id }}'},{name:'action',value:'approve'}]})">
+                      Sign Off
+                    </button>
+
+                    <button type="button" class="hf-btn hf-btn-secondary" style="font-size:11px; padding:5px 12px; color:var(--red); border-color:var(--red)"
+                      onclick="confirmDeleteModal({title:'Return for Correction?',body:'Return the report for <strong>{{ report.student.get_full_name }}</strong> to the teacher for correction?',detail:'The report will be moved back to Draft status.',confirmText:'Return Report',url:'{% url 'academics:signoff_action' %}',type:'warning',extraData:[{name:'report_id',value:'{{ report.id }}'},{name:'action',value:'reject'}]})">
+                      Return
+                    </button>
+                {% elif report.status == 'pending_sign_off' and can_signoff and signoff_blocked %}
+                    <span class="hf-btn hf-btn-secondary" style="font-size:11px; padding:5px 12px; opacity:0.5; cursor:not-allowed" title="{{ signoff_block_reason }}">Sign Off</span>
+                {% endif %}
+            </div>
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="4">{% include '_partials/empty_state.html' with title='No report cards found' desc='Report cards will appear here once generated.' icon='doc' icon_color='grey' %}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card" style="padding:40px; text-align:center; color:var(--text-muted)">
+  Select a class above to view report cards.
+</div>
+{% endif %}
+
+<style>
+  .hover-row:hover { background: #F8FAFC; }
+</style>
+{% endblock %}

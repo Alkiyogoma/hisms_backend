@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Concessions &mdash; Finance &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Concessions{% endblock %}
+{% block topbar_date %}{{ today_display }}{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+<div class="section-hdr">
+  <span class="section-title">Fee concessions &amp; discounts</span>
+  {% has_perm user "finance.add_concession" as can_create %}
+  {% if can_create %}
+  <a href="{% url 'finance:concession_create' %}" class="btn btn-primary btn-sm">+ New Concession</a>
+  {% endif %}
+</div>
+
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
+  <a href="{% url 'finance:concession_list' %}"
+     style="padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;text-decoration:none;
+     {% if not request.GET.status %}background:#023AA5;color:#fff{% else %}background:#F3F4F6;color:var(--text-secondary){% endif %}">All</a>
+  {% for code, label in status_filters %}
+  <a href="{% url 'finance:concession_list' %}?status={{ code }}"
+     style="padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;text-decoration:none;
+     {% if request.GET.status == code %}background:#023AA5;color:#fff{% else %}background:#F3F4F6;color:var(--text-secondary){% endif %}">{{ label }}</a>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <div style="border-top:1px solid var(--border)">
+    {% for concession in concessions %}
+    <div class="trow">
+      <div style="flex:1">
+        <div class="trow-name">
+          {{ concession.student.first_name }} {{ concession.student.last_name }}
+          <span style="color:var(--text-muted);font-weight:500"> &middot; {{ concession.student.class_name }}</span>
+        </div>
+        <div class="trow-sub">
+          {{ concession.get_concession_type_display }} &middot;
+          {{ concession.get_discount_mode_display }}
+          {% if concession.discount_mode == 'percentage' %}{{ concession.discount_value|floatformat:1 }}%{% else %}TZS {{ concession.discount_value|floatformat:0 }}{% endif %}
+          &middot; {{ concession.term }}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        {% if concession.status == 'pending' %}
+        <span style="display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;background:#FFFBEB;color:#92400E;text-transform:uppercase">Pending</span>
+        {% elif concession.status == 'approved' %}
+        <span style="display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;background:#ECFDF5;color:#065F46;text-transform:uppercase">Approved</span>
+        {% elif concession.status == 'rejected' %}
+        <span style="display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;background:#FEF2F2;color:#9B1C1C;text-transform:uppercase">Rejected</span>
+        {% else %}
+        <span style="display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;background:#F3F4F6;color:#4B5563;text-transform:uppercase">{{ concession.get_status_display }}</span>
+        {% endif %}
+      </div>
+    </div>
+    {% empty %}
+    {% include '_partials/empty_state.html' with title='No concessions yet' desc='Create a fee concession or scholarship to apply a discount on a student invoice.' icon='doc' %}
+    {% endfor %}
+  </div>
+</div>
+
+{% if is_paginated %}
+<div style="display:flex;justify-content:center;gap:10px;margin-top:20px">
+  {% if page_obj.has_previous %}
+  <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" class="btn btn-secondary btn-sm">&larr; Prev</a>
+  {% endif %}
+  <span style="font-size:13px;color:var(--text-muted);align-self:center">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+  {% if page_obj.has_next %}
+  <a href="?page={{ page_obj.next_page_number }}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" class="btn btn-secondary btn-sm">Next &rarr;</a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

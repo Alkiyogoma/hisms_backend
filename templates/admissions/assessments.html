@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Assessments &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Admissions{% endblock %}
+{% block topbar_date %}{{ today_display }}{% endblock %}
+{% block topbar_badges %}
+  <a href="{% url 'admissions:actions_needed' %}" class="topbar-badge badge-red" style="background:#FEF2F2;color:#9B1C1C;border-color:#FECACA;text-decoration:none;cursor:pointer">
+    <span class="badge-dot"></span>{{ critical_action_count }} actions needed
+  </a>
+{% endblock %}
+{% block content %}
+  {% include "admissions/_top_tabs.html" %}
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">Assessment schedule</div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;margin-top:-6px">Upcoming and scheduled applicant assessments.</div>
+    <div style="border-top:1px solid var(--border)">
+      {% for applicant in items %}
+        <div class="trow">
+          <div style="flex:1;display:flex;gap:16px;align-items:center">
+            <div style="width:140px;flex-shrink:0">
+              <div class="trow-name" style="font-family:var(--font-mono);font-size:12.5px;color:var(--hodari-blue)">
+                {{ applicant.assessment.scheduled_date|date:"d M, Y" }}
+              </div>
+              <div class="trow-sub">{{ applicant.assessment.scheduled_time|time:"H:i" }}</div>
+            </div>
+            <div>
+              <div class="trow-name">{{ applicant.child_full_name }}</div>
+              <div class="trow-sub">{{ applicant.grade_applying_for }}</div>
+            </div>
+          </div>
+          <div class="trow-right">
+            {% if applicant.assessment.assessment_fee_confirmed_paid %}
+              <span class="chip chip-green">Paid &check;</span>
+            {% else %}
+              <span class="chip chip-amber">Pending</span>
+            {% endif %}
+            <a href="{% url 'admissions:detail' applicant.id %}" style="padding:5px 12px;background:#F3F4F6;border-radius:6px;font-size:11.5px;font-weight:600;color:var(--text-secondary);text-decoration:none;margin-left:8px;transition:background 0.1s">Open</a>
+          </div>
+        </div>
+      {% empty %}
+        {% include '_partials/empty_state.html' with title='No assessments scheduled yet' desc='Assessments will appear here once scheduled.' icon='calendar' icon_color='grey' %}
+      {% endfor %}
+    </div>
+  </div>
+{% endblock %}

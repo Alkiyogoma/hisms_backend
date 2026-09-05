@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Edit Payroll Entry — {{ brand.school_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  :root {
+    --hodari-blue: #023AA5; --hodari-blue-dark: #012880;
+    --hodari-blue-light: #E8EEF9;
+    --bg-page: #F2F5FA; --bg-card: #FFFFFF;
+    --text-primary: #1A1A2E; --text-secondary: #474747; --text-muted: #8492A6;
+    --border: #DDE3EE; --border-strong: #B8C4D8;
+    --green: #1B7B34; --green-bg: #E8F5EC;
+    --amber: #92550A; --amber-bg: #FEF3C7;
+    --blue-st-bg: #E8EEF9;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Roboto', sans-serif; background: var(--bg-page); color: var(--text-primary); }
+  .entry-form-page { padding: 24px 28px; max-width: 800px; margin: 0 auto; }
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin-bottom: 24px; }
+  .section-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); font-weight: 500; margin-bottom: 16px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; }
+  .hf2-input, .hf2-select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 14px; background: #fff; }
+  .hf2-input:focus, .hf2-select:focus { outline: none; border-color: var(--hodari-blue); box-shadow: 0 0 0 3px var(--hodari-blue-light); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  .btn-primary { background: var(--hodari-blue); color: #fff; border: none; padding: 10px 24px; border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; }
+  .btn-primary:hover { background: var(--hodari-blue-dark); }
+  .btn-secondary { background: #fff; color: var(--hodari-blue); border: 1px solid var(--border-strong); padding: 10px 24px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; text-decoration: none; display: inline-block; }
+  .actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "hr/_top_tabs.html" %}
+<div class="entry-form-page">
+  <h1 style="font-family:'Merriweather',serif;font-size:22px;font-weight:700;color:var(--text-primary);margin-bottom:4px;">Edit Payroll Entry</h1>
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:24px;">{{ form.instance.staff.full_name }} · {{ form.instance.payroll_run.period_name }}</p>
+
+  <form method="POST">
+    {% csrf_token %}
+    <div class="card">
+      <div class="section-label">Earnings</div>
+      <div class="form-row-3">
+        <div class="form-group"><label>Basic Pay</label><input type="number" name="basic_pay" class="hf2-input" value="{{ form.basic_pay.value|default:0 }}" step="0.01"></div>
+        <div class="form-group"><label>Housing Allowance</label><input type="number" name="housing_allowance" class="hf2-input" value="{{ form.housing_allowance.value|default:0 }}" step="0.01"></div>
+        <div class="form-group"><label>Transport Allowance</label><input type="number" name="transport_allowance" class="hf2-input" value="{{ form.transport_allowance.value|default:0 }}" step="0.01"></div>
+      </div>
+      <div class="form-row-3">
+        <div class="form-group"><label>Medical Allowance</label><input type="number" name="medical_allowance" class="hf2-input" value="{{ form.medical_allowance.value|default:0 }}" step="0.01"></div>
+        <div class="form-group"><label>Other Allowances</label><input type="number" name="other_allowances" class="hf2-input" value="{{ form.other_allowances.value|default:0 }}" step="0.01"></div>
+        <div class="form-group"><label>Overtime Pay</label><input type="number" name="overtime_pay" class="hf2-input" value="{{ form.overtime_pay.value|default:0 }}" step="0.01"></div>
+      </div>
+      <div class="form-group" style="max-width:250px;"><label>Bonus Pay</label><input type="number" name="bonus_pay" class="hf2-input" value="{{ form.bonus_pay.value|default:0 }}" step="0.01"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-label">Statutory Deductions</div>
+      <div class="form-row-3">
+        <div class="form-group"><label>PAYE Tax</label><input type="number" name="paye_tax" class="hf2-input" value="{{ form.paye_tax.value|default:0 }}" step="0.01"></div>
+        <div class="form-group"><label>NSSF (Employee)</label><input type="number" name="nssf_employee" class="hf2-input" value="{{ form.nssf_employee.value|default:0 }}" step="0.01"></div>
+        <div class="form-group"><label>NHIF Deduction</label><input type="number" name="nhif_deduction" class="hf2-input" value="{{ form.nhif_deduction.value|default:0 }}" step="0.01"></div>
+      </div>
+      <div class="form-row-3">
+        <div class="form-group"><label>HESLB Repayment</label><input type="number" name="hesb_deduction" class="hf2-input" value="{{ form.hesb_deduction.value|default:0 }}" step="0.01"></div>
+        <div class="form-group"><label>Other Deductions</label><input type="number" name="other_deductions" class="hf2-input" value="{{ form.other_deductions.value|default:0 }}" step="0.01"></div>
+        <div class="form-group"><label>Unpaid Leave Days</label><input type="number" name="unpaid_leave_days" class="hf2-input" value="{{ form.unpaid_leave_days.value|default:0 }}"></div>
+      </div>
+      <div class="form-group"><label>Leave Deduction</label><input type="number" name="leave_deduction" class="hf2-input" value="{{ form.leave_deduction.value|default:0 }}" step="0.01" style="max-width:250px;"></div>
+      <div class="form-group"><label>Deduction Notes</label><textarea name="deduction_notes" class="hf2-input" rows="2">{{ form.deduction_notes.value|default:'' }}</textarea></div>
+    </div>
+
+    <div class="actions">
+      <a href="{% url 'hr:payroll_detail' form.instance.payroll_run.pk %}" class="btn-secondary">Cancel</a>
+      <button type="submit" class="btn-primary">Save Entry</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Action Center — {{ brand.school_name }}{% endblock %}
+
+{% block topbar_greeting %}Admissions Action Center{% endblock %}
+
+{% block topbar_badges %}
+  <div class="topbar-badge badge-red" style="background:#FEF2F2;color:#9B1C1C;border-color:#FECACA">
+    <span class="badge-dot"></span>{{ action_count }} actions needed
+  </div>
+{% endblock %}
+
+{% block content %}
+{% include "admissions/_top_tabs.html" %}
+
+<div class="page-hdr">
+    <h1 style="font-family:Merriweather,serif; font-size:24px; color:#1A1A2E">Critical Blocking Actions</h1>
+    <p>These applicants are currently stuck and require administrative or leadership action to proceed.</p>
+</div>
+
+<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap:20px; margin-top:20px">
+    {% for action in actions %}
+        <div class="card" style="border-left: 4px solid {% if action.severity == 'high' %}#DC2626{% else %}#F59E0B{% endif %}; padding:20px">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start">
+                <div>
+                    <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:#8492A6; margin-bottom:4px">
+                        {{ action.type|upper }} &middot; {{ action.applicant.grade_applying_for }}
+                    </div>
+                    <h3 style="font-size:17px; font-weight:700; color:#1A1A2E; margin-bottom:8px">{{ action.title }}</h3>
+                </div>
+                <span class="k-flag {% if action.severity == 'high' %}kf-red{% else %}kf-amber{% endif %}">
+                    {% if action.severity == 'high' %}CRITICAL{% else %}REQUIRED{% endif %}
+                </span>
+            </div>
+            
+            <div style="display:flex; align-items:center; gap:12px; margin:12px 0; padding:10px; background:#F7F9FC; border-radius:8px">
+                <div style="width:32px; height:32px; border-radius:50%; background:#023AA5; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px">
+                    {{ action.applicant.child_full_name|slice:":1"|upper }}
+                </div>
+                <div>
+                    <div style="font-size:13.5px; font-weight:600; color:#1A1A2E">{{ action.applicant.child_full_name }}</div>
+                    <div style="font-size:11px; color:#8492A6">Applied {{ action.applicant.created_at|date:"d M Y" }}</div>
+                </div>
+            </div>
+
+            <p style="font-size:13px; color:#474747; line-height:1.5; margin-bottom:16px">
+                {{ action.description }}
+            </p>
+
+            <div style="display:flex; gap:10px">
+                <a href="{{ action.link }}" class="btn-primary" style="flex:1; text-align:center; padding:8px; font-size:12.5px; text-decoration:none">
+                    Resolve Action &rarr;
+                </a>
+            </div>
+        </div>
+    {% empty %}
+        {% include '_partials/empty_state.html' with title='No blocking actions!' desc='Your admissions pipeline is running smoothly.' icon='check' icon_color='green' %}
+    {% endfor %}
+</div>
+{% endblock %}

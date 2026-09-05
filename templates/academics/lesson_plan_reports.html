@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}Lesson Plan Reports &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Lesson Plan Reports{% endblock %}
+{% block extra_head %}
+<style>
+  .report-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; }
+  .report-kpi { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:24px; }
+  .kpi-card { background:#fff; border:1px solid #E2E8F0; border-radius:14px; padding:20px; text-align:center; }
+  .kpi-card .num { font-size:32px; font-weight:800; }
+  .kpi-card .lbl { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-top:4px; }
+  .kpi-card .sub { font-size:11px; color:#94A3B8; margin-top:2px; }
+  .rank-badge { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; font-size:11px; font-weight:800; }
+  .rank-1 { background:#FEF3C7; color:#92400E; }
+  .rank-2 { background:#F1F5F9; color:#475569; }
+  .rank-3 { background:#FFF7ED; color:#9A3412; }
+  .bar-inline { display:flex; align-items:center; gap:8px; }
+  .bar-track { flex:1; height:8px; background:#F1F5F9; border-radius:4px; overflow:hidden; }
+  .bar-fill { height:100%; border-radius:4px; transition:width 0.4s ease; }
+</style>
+{% endblock %}
+{% block content %}
+{% include "academics/_lesson_plan_tabs.html" %}
+
+{% if total_plans %}
+<!-- KPI Cards -->
+<div class="report-kpi">
+  <div class="kpi-card">
+    <div class="num" style="color:#023AA5">{{ total_plans }}</div>
+    <div class="lbl" style="color:#023AA5">Total Plans</div>
+    <div class="sub">This term</div>
+  </div>
+  <div class="kpi-card">
+    <div class="num" style="color:#059669">{{ approved_plans }}</div>
+    <div class="lbl" style="color:#059669">Approved</div>
+    <div class="sub">{{ approval_rate }}% approval rate</div>
+  </div>
+  <div class="kpi-card">
+    <div class="num" style="color:#DC2626">{{ pending_rejected }}</div>
+    <div class="lbl" style="color:#DC2626">Pending / Rejected</div>
+    <div class="sub">{{ teacher_stats|length }} teachers</div>
+  </div>
+</div>
+
+<!-- Teacher Performance -->
+{% if teacher_stats %}
+<div class="card" style="margin-bottom:20px">
+  <div class="card-title">Teacher Performance</div>
+  <table class="h-table">
+    <thead>
+      <tr><th style="width:40px">#</th><th>Teacher</th><th>Total</th><th>Approved</th><th>Submitted</th><th>Missing</th><th>Approval Rate</th></tr>
+    </thead>
+    <tbody>
+    {% for t in teacher_stats %}
+      <tr>
+        <td>
+          {% if forloop.counter == 1 %}<span class="rank-badge rank-1">{{ forloop.counter }}</span>
+          {% elif forloop.counter == 2 %}<span class="rank-badge rank-2">{{ forloop.counter }}</span>
+          {% elif forloop.counter == 3 %}<span class="rank-badge rank-3">{{ forloop.counter }}</span>
+          {% else %}<span style="font-size:12px; color:#94A3B8; font-weight:600">{{ forloop.counter }}</span>
+          {% endif %}
+        </td>
+        <td style="font-weight:600">{{ t.teacher__first_name }} {{ t.teacher__last_name|default:t.teacher__username }}</td>
+        <td>{{ t.total }}</td>
+        <td style="color:#059669; font-weight:700">{{ t.approved }}</td>
+        <td>{{ t.submitted }}</td>
+        <td style="color:#DC2626; font-weight:700">{{ t.missing }}</td>
+        <td>
+          <div class="bar-inline">
+            {% widthratio t.approved t.total 100 as rate %}
+            <div class="bar-track">
+              <div class="bar-fill" style="width:{{ rate }}%; background:{% if rate >= 75 %}#059669{% elif rate >= 50 %}#B45309{% else %}#DC2626{% endif %}"></div>
+            </div>
+            <span style="font-size:12px; font-weight:700; min-width:36px; text-align:right">{{ rate }}%</span>
+          </div>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if ts_total_pages > 1 %}
+  <div style="display:flex;justify-content:center;align-items:center;gap:6px;padding-top:12px;border-top:1px solid var(--border)">
+    {% if ts_has_prev %}<a href="?ts_page={{ ts_page|add:'-1' }}" style="padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;background:#F1F5F9;color:#475569;text-decoration:none">&larr;</a>{% endif %}
+    <span style="font-size:11px;color:#64748B;font-weight:600">Page {{ ts_page }}/{{ ts_total_pages }}</span>
+    {% if ts_has_next %}<a href="?ts_page={{ ts_page|add:'1' }}" style="padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;background:#F1F5F9;color:#475569;text-decoration:none">&rarr;</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- Subject Coverage -->
+{% if subject_stats %}
+<div class="card" style="margin-bottom:20px">
+  <div class="card-title">Coverage by Subject</div>
+  <table class="h-table">
+    <thead>
+      <tr><th>Subject</th><th>Total Plans</th><th>Approved</th><th>Submitted</th><th>Missing</th><th>Coverage</th></tr>
+    </thead>
+    <tbody>
+    {% for s in subject_stats %}
+      <tr>
+        <td style="font-weight:600">{{ s.subject_name }}</td>
+        <td>{{ s.total }}</td>
+        <td style="color:#059669; font-weight:700">{{ s.approved }}</td>
+        <td>{{ s.submitted }}</td>
+        <td style="color:#DC2626; font-weight:700">{{ s.missing }}</td>
+        <td>
+          <div class="bar-inline">
+            {% widthratio s.approved s.total 100 as rate %}
+            <div class="bar-track">
+              <div class="bar-fill" style="width:{{ rate }}%; background:{% if rate >= 75 %}#059669{% elif rate >= 50 %}#B45309{% else %}#DC2626{% endif %}"></div>
+            </div>
+            <span style="font-size:12px; font-weight:700; min-width:36px; text-align:right">{{ rate }}%</span>
+          </div>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if ss_total_pages > 1 %}
+  <div style="display:flex;justify-content:center;align-items:center;gap:6px;padding-top:12px;border-top:1px solid var(--border)">
+    {% if ss_has_prev %}<a href="?ss_page={{ ss_page|add:'-1' }}" style="padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;background:#F1F5F9;color:#475569;text-decoration:none">&larr;</a>{% endif %}
+    <span style="font-size:11px;color:#64748B;font-weight:600">Page {{ ss_page }}/{{ ss_total_pages }}</span>
+    {% if ss_has_next %}<a href="?ss_page={{ ss_page|add:'1' }}" style="padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;background:#F1F5F9;color:#475569;text-decoration:none">&rarr;</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- Class Coverage -->
+{% if class_stats %}
+<div class="card" style="margin-bottom:20px">
+  <div class="card-title">Coverage by Class</div>
+  <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(200px,1fr)); gap:12px; padding:4px 0">
+    {% for c in class_stats %}
+    {% widthratio c.approved c.total 100 as rate %}
+    <div style="background:#F8FAFC; border-radius:12px; padding:16px; border:1px solid #E2E8F0">
+      <div style="font-size:14px; font-weight:700; color:var(--hodari-blue); margin-bottom:4px">{{ c.class_name }}</div>
+      <div style="display:flex; align-items:baseline; gap:6px">
+        <span style="font-size:22px; font-weight:800; color:{% if rate >= 75 %}#059669{% elif rate >= 50 %}#B45309{% else %}#DC2626{% endif %}">{{ rate }}%</span>
+        <span style="font-size:11px; color:#94A3B8; font-weight:600">{{ c.approved }}/{{ c.total }}</span>
+      </div>
+      <div class="bar-track" style="margin-top:8px">
+        <div class="bar-fill" style="width:{{ rate }}%; background:{% if rate >= 75 %}#059669{% elif rate >= 50 %}#B45309{% else %}#DC2626{% endif %}"></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Weekly Trend Chart -->
+{% if weekly_trend %}
+<div class="card">
+  <div class="card-title">Weekly Approved Trend</div>
+  <div style="display:flex; align-items:flex-end; gap:6px; height:120px; padding:16px 0">
+    {% for w in weekly_trend %}
+    <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:4px">
+      <span style="font-size:10px; font-weight:700; color:var(--hodari-blue)">{{ w.count }}</span>
+      <div style="width:100%; background:linear-gradient(180deg, var(--hodari-blue), #0252C7); border-radius:3px 3px 0 0; height:{{ w.count }}0px; min-height:4px"></div>
+      <span style="font-size:8px; color:#94A3B8; font-weight:600">{{ w.week|date:"d/m" }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% else %}
+<div style="text-align:center; padding:60px; background:#fff; border-radius:16px; border:1px solid #E2E8F0">
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5" style="margin-bottom:16px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+  <h3 style="margin:0 0 8px; font-size:16px; color:#1E293B; font-weight:700">No report data</h3>
+  <p style="margin:0; font-size:13px; color:#64748B">Reports will appear once lesson plans are submitted this term.</p>
+</div>
+{% endif %}
+{% endblock %}

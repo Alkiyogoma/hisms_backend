@@ -1,0 +1,26 @@
+{% load static %}
+<div class="header">
+    <div class="header-left">
+        <img src="{% static 'branding/hodari_school_logo.jpg' %}" alt="Hodari Christian School" class="school-logo">
+        <div class="school-info">
+            <div class="school-name">HODARI CHRISTIAN SCHOOL</div>
+            <div class="school-details">
+                P.O BOX 1114 Dar es Salaam, Kawe Beach<br>
+                Cell : 0767016 940<br>
+                Email : hello@hodari.ac.tz<br>
+                Website : www.hodari.ac.tz
+            </div>
+        </div>
+    </div>
+    {% if student and student.photo %}
+        <img src="{{ student.photo.url }}" alt="Student" class="student-photo">
+    {% elif student and student.image %}
+        <img src="{{ student.image.url }}" alt="Student" class="student-photo">
+    {% elif student %}
+        <div class="student-photo" style="display: flex; align-items: center; justify-content: center; border: 1px solid #ccc; color: #aaa; font-family: Arial;">No Photo</div>
+    {% else %}
+        <!-- No student object provided (e.g. general calendar or timetable) -->
+        <div class="student-photo-placeholder" style="width: 100px; height: 120px;"></div>
+    {% endif %}
+</div>
+<div class="header-separator"></div>

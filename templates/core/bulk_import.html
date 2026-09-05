@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Bulk Import — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}System{% endblock %}
+
+{% block content %}
+<div class="sub-nav">
+  {% if not is_admin_officer and not is_head_of_school and not is_hod %}
+  <a href="{% url 'core:school_settings' %}?tab=system" class="sub-tab">System Settings</a>
+  {% endif %}
+  {% has_perm request.user "academics.view_gradeclass" as can_view_classes %}
+  {% if can_view_classes %}
+  <a href="{% url 'core:school_settings' %}?tab=classes" class="sub-tab">Classes <span class="sub-tab-count grey">{{ classes_count }}</span></a>
+  {% endif %}
+  <a href="{% url 'core:school_settings' %}?tab=messaging" class="sub-tab">Email & WhatsApp</a>
+  <a href="{% url 'core:school_settings' %}?tab=academic_year" class="sub-tab">Academic Year & Terms</a>
+  <a href="{% url 'core:school_settings' %}?tab=media" class="sub-tab">Media Settings</a>
+  <a href="{% url 'core:school_settings' %}?tab=dynamic_pages" class="sub-tab">Dynamic Pages</a>
+  <a href="{% url 'core:bulk_import' %}" class="sub-tab active">Bulk Import</a>
+  {% if not is_admin_officer and not is_head_of_school and not is_hod %}
+  <a href="{% url 'core:school_settings' %}?tab=induction_checklist" class="sub-tab">Induction Checklist</a>
+  {% has_perm request.user "core.change_emailtemplate" as can_edit_email_templates %}
+  {% if can_edit_email_templates %}
+  <a href="{% url 'core:school_settings' %}?tab=email_templates" class="sub-tab">Email Templates</a>
+  {% endif %}
+  {% endif %}
+</div>
+
+{# Messages rendered by base.html — no duplicate block needed #}
+
+{# ── Tab switcher ── #}
+<div class="card" style="margin-bottom:20px">
+  <div style="display:flex;gap:0;border-bottom:1px solid var(--border)">
+    <a href="?type=students" style="padding:12px 20px;font-size:13px;font-weight:600;color:{% if import_type == 'students' %}var(--hodari-blue);border-bottom:2px solid var(--hodari-blue){% else %}var(--text-muted){% endif %};text-decoration:none;transition:color .15s">Students</a>
+    <a href="?type=staff" style="padding:12px 20px;font-size:13px;font-weight:600;color:{% if import_type == 'staff' %}var(--hodari-blue);border-bottom:2px solid var(--hodari-blue){% else %}var(--text-muted){% endif %};text-decoration:none;transition:color .15s">Staff</a>
+  </div>
+
+  <div style="padding:24px">
+    {# ── Step 1: Download template ── #}
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+      <div style="width:32px;height:32px;border-radius:8px;background:var(--hodari-blue-light);color:var(--hodari-blue);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0">1</div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:700;color:var(--text-dark)">Download Template</div>
+        <div style="font-size:12px;color:var(--text-muted)">Get the CSV template with correct column headers</div>
+      </div>
+      <a href="{% url 'core:bulk_import_template' %}?type={{ import_type }}" class="hf-btn hf-btn-secondary" style="text-decoration:none">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        Download {{ import_type|title }} Template
+      </a>
+    </div>
+
+    {# ── Step 2: Upload filled CSV ── #}
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="width:32px;height:32px;border-radius:8px;background:var(--hodari-blue-light);color:var(--hodari-blue);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0">2</div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:700;color:var(--text-dark)">Upload Completed CSV</div>
+        <div style="font-size:12px;color:var(--text-muted)">Upload your filled template for preview and validation</div>
+      </div>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data" action="{% url 'core:bulk_import_upload' %}?type={{ import_type }}" style="margin-top:14px;margin-left:44px">
+      {% csrf_token %}
+      <div style="display:flex;gap:10px;align-items:center">
+        <label class="hf-btn hf-btn-secondary" style="cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:6px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+          <span id="file-label">Choose CSV file</span>
+          <input type="file" name="csv_file" accept=".csv" required style="display:none" onchange="document.getElementById('file-label').textContent=this.files[0].name">
+        </label>
+        <button type="submit" class="hf-btn hf-btn-primary">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+          Upload & Preview
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Preview Table ── #}
+{% if preview_rows %}
+<div class="card">
+  <div class="card-title-row" style="margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="card-title" style="margin:0">Preview</div>
+      <span style="background:var(--hodari-blue-light);color:var(--hodari-blue);padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700">{{ preview_rows|length }} row{{ preview_rows|length|pluralize }}</span>
+      {% if error_count %}
+      <span style="background:#FEF2F2;color:#991B1B;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700">{{ error_count }} error{{ error_count|pluralize }}</span>
+      {% endif %}
+      {% if duplicate_count %}
+      <span style="background:#FFF7ED;color:#9A3412;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700">{{ duplicate_count }} duplicate{{ duplicate_count|pluralize }}</span>
+      {% endif %}
+    </div>
+    <div style="display:flex;gap:8px">
+      <a href="{% url 'core:bulk_import' %}?type={{ import_type }}" class="hf-btn hf-btn-secondary" style="text-decoration:none;font-size:12px">Cancel</a>
+      {% if valid_count > 0 %}
+      <form method="POST" action="{% url 'core:bulk_import_confirm' %}?type={{ import_type }}" style="display:inline">
+        {% csrf_token %}
+        <button type="submit" class="hf-btn hf-btn-primary" style="font-size:12px">
+          Import {{ valid_count }} Valid Row{{ valid_count|pluralize }}
+        </button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:separate;border-spacing:0;font-size:12px">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);border-bottom:2px solid var(--border);font-weight:700;background:var(--bg-page)">#</th>
+          <th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);border-bottom:2px solid var(--border);font-weight:700;background:var(--bg-page)">Status</th>
+          {% for header in csv_headers %}
+          <th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);border-bottom:2px solid var(--border);font-weight:700;background:var(--bg-page)">{{ header }}</th>
+          {% endfor %}
+          <th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);border-bottom:2px solid var(--border);font-weight:700;background:var(--bg-page)">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in preview_rows %}
+        <tr style="{% if row.errors %}background:#FEF2F2{% elif row.is_duplicate %}background:#FFF7ED{% else %}background:#fff{% endif %}">
+          <td style="padding:10px 12px;border-bottom:1px solid var(--border);color:var(--text-muted);font-weight:600">{{ forloop.counter }}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid var(--border)">
+            {% if row.errors %}
+              <span style="padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;background:#FEF2F2;color:#991B1B">Error</span>
+            {% elif row.is_duplicate %}
+              <span style="padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;background:#FFF7ED;color:#9A3412">Duplicate</span>
+            {% else %}
+              <span style="padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;background:#DCFCE7;color:#166534">Valid</span>
+            {% endif %}
+          </td>
+          {% for cell in row.cells %}
+          <td style="padding:10px 12px;border-bottom:1px solid var(--border);max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-dark)">{{ cell|default:"—" }}</td>
+          {% endfor %}
+          <td style="padding:10px 12px;border-bottom:1px solid var(--border)">
+            {% if row.errors %}
+              <span style="font-size:11px;color:#991B1B">{{ row.errors|join:", " }}</span>
+            {% elif row.is_duplicate %}
+              <div style="display:flex;gap:6px">
+                <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;color:var(--text-muted)">
+                  <input type="checkbox" name="skip_{{ forloop.counter0 }}" value="1" checked style="accent-color:var(--green)"> Skip
+                </label>
+                <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;color:var(--hodari-blue)">
+                  <input type="checkbox" name="update_{{ forloop.counter0 }}" value="1" style="accent-color:var(--hodari-blue)"> Update
+                </label>
+              </div>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{# ── Empty State ── #}
+{% if not preview_rows %}
+<div class="card" style="padding:48px 24px;text-align:center">
+  <div style="width:64px;height:64px;border-radius:16px;background:var(--hodari-blue-light);display:inline-flex;align-items:center;justify-content:center;margin-bottom:16px">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--hodari-blue)" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+  </div>
+  <div style="font-size:16px;font-weight:700;color:var(--text-dark);margin-bottom:6px">Bulk Import {{ import_type|title }}</div>
+  <div style="font-size:13px;color:var(--text-muted);max-width:400px;margin:0 auto">
+    Download the template, fill in your data, then upload it here for preview and import.
+  </div>
+</div>
+{% endif %}
+
+{# Recent Imports #}
+{% if recent_imports %}
+<div class="card" style="margin-top:20px">
+  <div class="card-title" style="font-size:13px;margin-bottom:12px">Recent Imports</div>
+  <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:separate;border-spacing:0;font-size:12px">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);border-bottom:2px solid var(--border);font-weight:700">Date</th>
+          <th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);border-bottom:2px solid var(--border);font-weight:700">Type</th>
+          <th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);border-bottom:2px solid var(--border);font-weight:700">Imported</th>
+          <th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);border-bottom:2px solid var(--border);font-weight:700">Skipped</th>
+          <th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);border-bottom:2px solid var(--border);font-weight:700">Errors</th>
+          <th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);border-bottom:2px solid var(--border);font-weight:700">Actor</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for imp in recent_imports %}
+        <tr>
+          <td style="padding:10px 12px;border-bottom:1px solid var(--border)">{{ imp.created_at|date:"d M Y H:i" }}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid var(--border)"><span style="padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;background:var(--hodari-blue-light);color:var(--hodari-blue)">{{ imp.import_type|title }}</span></td>
+          <td style="padding:10px 12px;border-bottom:1px solid var(--border);font-weight:600;color:#166534">{{ imp.imported_count }}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid var(--border);color:#9A3412">{{ imp.skipped_count }}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid var(--border);color:#991B1B">{{ imp.error_count }}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid var(--border);color:var(--text-muted)">{{ imp.actor.get_full_name|default:imp.actor.username }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

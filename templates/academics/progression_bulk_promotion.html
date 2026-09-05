@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}Bulk Promotion Execution - {{ brand.school_name }}{% endblock %}
+{% block content %}
+{% include "academics/_top_tabs.html" %}
+
+<div class="section-hdr">
+    <div style="display:flex;align-items:center;gap:12px">
+        <span class="section-title">Bulk Promotion Execution</span>
+        <span class="chip chip-blue">Phase Four</span>
+    </div>
+</div>
+
+<form method="get" style="display:flex;gap:16px;align-items:center;margin-bottom:20px">
+    <select name="config_id" style="padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:250px">
+        <option value="">— Choose Progression Cycle —</option>
+        {% for c in configs %}
+        <option value="{{ c.pk }}" {% if selected_config_id|stringformat:"s" == c.pk|stringformat:"s" %}selected{% endif %}>
+            {{ c.academic_year_from }} → {{ c.academic_year_to }}
+        </option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="hf-btn hf-btn-primary">Load Finalized Cases</button>
+</form>
+
+{% if config %}
+<div class="card" style="margin-bottom:20px">
+    <div class="card-title">Summary — {{ config.academic_year_from }} → {{ config.academic_year_to }}</div>
+    <div style="display:flex;gap:24px;padding:12px 0">
+        <div style="flex:1;text-align:center;padding:16px;background:#dbeafe;border-radius:8px">
+            <div style="font-size:28px;font-weight:700;color:#1e40af">{{ promote_cases.count }}</div>
+            <div style="font-size:12px;color:#1e40af;font-weight:600">To Promote</div>
+        </div>
+        <div style="flex:1;text-align:center;padding:16px;background:#fef3c7;border-radius:8px">
+            <div style="font-size:28px;font-weight:700;color:#92400e">{{ retain_cases.count }}</div>
+            <div style="font-size:12px;color:#92400e;font-weight:600">To Retain</div>
+        </div>
+        <div style="flex:1;text-align:center;padding:16px;background:#d1fae5;border-radius:8px">
+            <div style="font-size:28px;font-weight:700;color:#065f46">{{ graduate_cases.count }}</div>
+            <div style="font-size:12px;color:#065f46;font-weight:600">To Graduate</div>
+        </div>
+        <div style="flex:1;text-align:center;padding:16px;background:#f3f4f6;border-radius:8px">
+            <div style="font-size:28px;font-weight:700;color:#374151">{{ promote_cases.count|add:retain_cases.count|add:graduate_cases.count }}</div>
+            <div style="font-size:12px;color:#374151;font-weight:600">Total Finalized</div>
+        </div>
+    </div>
+</div>
+
+{% if not promote_cases and not retain_cases and not graduate_cases %}
+<div class="card">
+    <div style="padding:40px;text-align:center;color:var(--text-muted)">
+        <p>No finalized cases for this cycle. All cases must be reviewed and decided by HOS first.</p>
+    </div>
+</div>
+{% else %}
+<div class="card" style="margin-bottom:20px">
+    <div class="card-title">Students to Promote</div>
+    {% if promote_cases %}
+    <div style="display:flex;flex-wrap:wrap;gap:6px">
+        {% for case in promote_cases %}
+        <span class="chip chip-green">{{ case.student.get_full_name }} ({{ case.student.class_name }})</span>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="padding:12px 0;color:var(--text-muted);font-size:13px">No students to promote.</div>
+    {% endif %}
+</div>
+
+<div class="card" style="margin-bottom:20px">
+    <div class="card-title">Students to Retain</div>
+    {% if retain_cases %}
+    <div style="display:flex;flex-wrap:wrap;gap:6px">
+        {% for case in retain_cases %}
+        <span class="chip chip-grey">{{ case.student.get_full_name }} ({{ case.student.class_name }})</span>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="padding:12px 0;color:var(--text-muted);font-size:13px">No students to retain.</div>
+    {% endif %}
+</div>
+
+<div class="card" style="margin-bottom:20px">
+    <div class="card-title">Students to Graduate</div>
+    {% if graduate_cases %}
+    <div style="display:flex;flex-wrap:wrap;gap:6px">
+        {% for case in graduate_cases %}
+        <span class="chip chip-blue">{{ case.student.get_full_name }} ({{ case.student.class_name }})</span>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="padding:12px 0;color:var(--text-muted);font-size:13px">No students to graduate.</div>
+    {% endif %}
+</div>
+
+{% if resume_run %}
+<div class="card" style="margin-bottom:20px;border-left:4px solid {% if failed_students %}#dc2626{% else %}#059669{% endif %}">
+    <div class="card-title">
+        Resume — Run from {{ resume_run.created_at|date:"M d, Y H:i" }}
+        <span class="chip {% if resume_run.status == 'paused' %}chip-yellow{% elif resume_run.status == 'interrupted' %}chip-grey{% else %}chip-blue{% endif %}" style="margin-left:8px">{{ resume_run.get_status_display }}</span>
+    </div>
+
+    {% if successful_students %}
+    <div style="margin-bottom:16px">
+        <div style="font-size:13px;font-weight:600;color:#059669;margin-bottom:8px">✓ Successfully Promoted ({{ successful_students|length }})</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+            {% for case in successful_students %}
+            <span class="chip chip-green">{{ case.student.get_full_name }} ({{ case.student.class_name }})</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if failed_students %}
+    <div style="margin-bottom:16px">
+        <div style="font-size:13px;font-weight:600;color:#dc2626;margin-bottom:8px">✗ Failed ({{ failed_students|length }})</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+            {% for entry in failed_students %}
+            <span class="chip chip-red" title="{{ entry.reason }}">{{ entry.case.student.get_full_name }} — {{ entry.reason|truncatechars:60 }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if not_attempted_students %}
+    <div style="margin-bottom:16px">
+        <div style="font-size:13px;font-weight:600;color:#6b7280;margin-bottom:8px">○ Not Yet Attempted ({{ not_attempted_students|length }})</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+            {% for case in not_attempted_students %}
+            <span class="chip chip-grey">{{ case.student.get_full_name }} ({{ case.student.class_name }})</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="post" action="{% url 'academics:progression_execute_promotion' config.pk %}" style="display:inline">
+        {% csrf_token %}
+        <button type="submit" class="hf-btn hf-btn-primary">
+            Retry Failed &amp; Process Remaining
+        </button>
+    </form>
+</div>
+{% endif %}
+
+<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+            <strong>Execute Promotion</strong>
+            <p style="margin:4px 0 0;font-size:12px;color:var(--text-muted)">
+                This will permanently update student records and create enrollment history entries.
+                This action cannot be undone.
+            </p>
+        </div>
+        <button type="button" class="hf-btn hf-btn-success"
+          onclick="confirmDeleteModal({title:'Execute Promotion?',body:'Are you sure you want to <strong>execute this promotion run</strong>?',detail:'This will permanently update student records and create enrollment history entries. This action cannot be undone.',confirmText:'Execute Promotion',url:'{% url 'academics:progression_execute_promotion' config.pk %}',type:'warning'})">
+          Execute Promotion Run
+        </button>
+    </div>
+</div>
+{% endif %}
+
+{% if runs %}
+<div class="card" style="margin-top:24px">
+    <div class="card-title">Previous Promotion Runs</div>
+    <div class="trow" style="background:var(--bg-page);border-radius:8px;margin-bottom:12px;font-weight:700;color:var(--text-secondary);font-size:11px;text-transform:uppercase;letter-spacing:0.05em">
+        <div style="flex:1">Date</div>
+        <div style="flex:1;text-align:center">Status</div>
+        <div style="flex:1;text-align:center">Promoted</div>
+        <div style="flex:1;text-align:center">Retained</div>
+        <div style="flex:1;text-align:center">Graduated</div>
+        <div style="flex:1;text-align:center">By</div>
+    </div>
+    {% for run in runs %}
+    <div class="trow">
+        <div style="flex:1">{{ run.started_at|date:"M d, Y H:i" }}</div>
+        <div style="flex:1;text-align:center;display:flex;align-items:center;justify-content:center">
+            <span class="chip {% if run.status == 'completed' %}chip-green{% elif run.status == 'in_progress' %}chip-yellow{% elif run.status == 'interrupted' %}chip-grey{% else %}chip-blue{% endif %}">
+                {{ run.get_status_display }}
+            </span>
+        </div>
+        <div style="flex:1;text-align:center;display:flex;align-items:center;justify-content:center">{{ run.promoted_count }}</div>
+        <div style="flex:1;text-align:center;display:flex;align-items:center;justify-content:center">{{ run.retained_count }}</div>
+        <div style="flex:1;text-align:center;display:flex;align-items:center;justify-content:center">{{ run.graduated_count }}</div>
+        <div style="flex:1;text-align:center;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text-secondary)">{{ run.executed_by.get_full_name|default:run.executed_by.username }}</div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

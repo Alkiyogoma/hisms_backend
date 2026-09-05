@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}PTC - Compliance Dashboard{% endblock %}
+
+{% block topbar_greeting %}
+<h1 class="topbar-title">PTC Compliance Dashboard</h1>
+{% endblock %}
+
+{% block content %}
+{% include "ptc/_top_tabs.html" %}
+<div style="max-width:1000px;margin:0 auto">
+  <div style="margin-bottom:20px">
+    <h2 style="font-size:20px;font-weight:700;color:var(--text-primary);margin:0">PTC Compliance Dashboard</h2>
+    <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 0">
+      {% if ptc_window %}PTC Date: {{ ptc_window.ptc_date }} ({{ ptc_window.get_term_slot_display }}) - {{ academic_year.name }}{% endif %}
+      <br><em style="font-size:11px">Read-only view. This dashboard shows teacher completion status for PTC data entry.</em>
+    </p>
+  </div>
+
+  {% if not ptc_window %}
+  <div style="padding:16px 20px;margin-bottom:16px">
+    {% include '_partials/empty_state.html' with icon='alert' icon_color='amber' title='No PTC window configured' desc='Compliance data will appear once a PTC window is set up.' %}
+  </div>
+  {% endif %}
+
+  {% if ptc_window %}
+  <!-- Section 1: PTC Subject Comments -->
+  <div style="background:#fff;border:1px solid var(--border);border-radius:12px;margin-bottom:16px;overflow:hidden">
+    <div style="padding:12px 20px;background:var(--hodari-blue);color:#fff;font-size:14px;font-weight:700">
+      PTC Subject Comments - Completion by Teacher
+    </div>
+    {% if comment_compliance %}
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="border-bottom:2px solid var(--border)">
+          <th style="padding:10px 16px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Teacher</th>
+          <th style="padding:10px 16px;text-align:center;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Total Students</th>
+          <th style="padding:10px 16px;text-align:center;font-size:11px;text-transform:uppercase;color:#1B7B34">Completed</th>
+          <th style="padding:10px 16px;text-align:center;font-size:11px;text-transform:uppercase;color:#9B1C1C">Incomplete</th>
+          <th style="padding:10px 16px;text-align:center;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in comment_compliance %}
+        <tr style="border-bottom:1px solid #F0F4FB">
+          <td style="padding:10px 16px;font-weight:600">{{ row.teacher.get_full_name }}</td>
+          <td style="padding:10px 16px;text-align:center">{{ row.total_students }}</td>
+          <td style="padding:10px 16px;text-align:center;color:#1B7B34;font-weight:700">{{ row.completed }}</td>
+          <td style="padding:10px 16px;text-align:center;color:{% if row.incomplete > 0 %}#9B1C1C{% else %}#1B7B34{% endif %};font-weight:700">{{ row.incomplete }}</td>
+          <td style="padding:10px 16px;text-align:center">
+            {% if row.incomplete == 0 %}
+            <span style="padding:2px 10px;border-radius:99px;font-size:11px;font-weight:700;background:#E8F5EC;color:#1B7B34">Complete</span>
+            {% else %}
+            <span style="padding:2px 10px;border-radius:99px;font-size:11px;font-weight:700;background:#FEF2F2;color:#9B1C1C">Pending</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="padding:20px">
+      {% include '_partials/empty_state.html' with icon='doc' icon_color='grey' title='No comment data available' desc='Comment compliance data will appear here.' %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Section 2: Enrichment Grades -->
+  <div style="background:#fff;border:1px solid var(--border);border-radius:12px;margin-bottom:16px;overflow:hidden">
+    <div style="padding:12px 20px;background:var(--hodari-blue);color:#fff;font-size:14px;font-weight:700">
+      Enrichment Grades - Completion by Specialist Teacher
+    </div>
+    {% if enrichment_compliance %}
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="border-bottom:2px solid var(--border)">
+          <th style="padding:10px 16px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Teacher</th>
+          <th style="padding:10px 16px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Subject</th>
+          <th style="padding:10px 16px;text-align:center;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Total</th>
+          <th style="padding:10px 16px;text-align:center;font-size:11px;text-transform:uppercase;color:#1B7B34">Completed</th>
+          <th style="padding:10px 16px;text-align:center;font-size:11px;text-transform:uppercase;color:#9B1C1C">Incomplete</th>
+          <th style="padding:10px 16px;text-align:center;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in enrichment_compliance %}
+        <tr style="border-bottom:1px solid #F0F4FB">
+          <td style="padding:10px 16px;font-weight:600">{{ row.teacher.get_full_name }}</td>
+          <td style="padding:10px 16px">{{ row.subject }}</td>
+          <td style="padding:10px 16px;text-align:center">{{ row.total_students }}</td>
+          <td style="padding:10px 16px;text-align:center;color:#1B7B34;font-weight:700">{{ row.completed }}</td>
+          <td style="padding:10px 16px;text-align:center;color:{% if row.incomplete > 0 %}#9B1C1C{% else %}#1B7B34{% endif %};font-weight:700">{{ row.incomplete }}</td>
+          <td style="padding:10px 16px;text-align:center">
+            {% if row.incomplete == 0 %}
+            <span style="padding:2px 10px;border-radius:99px;font-size:11px;font-weight:700;background:#E8F5EC;color:#1B7B34">Complete</span>
+            {% else %}
+            <span style="padding:2px 10px;border-radius:99px;font-size:11px;font-weight:700;background:#FEF2F2;color:#9B1C1C">Pending</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="padding:20px">
+      {% include '_partials/empty_state.html' with icon='doc' icon_color='grey' title='No enrichment grade data available' desc='Enrichment compliance data will appear here.' %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Section 3: Learner Attributes -->
+  <div style="background:#fff;border:1px solid var(--border);border-radius:12px;margin-bottom:16px;overflow:hidden">
+    <div style="padding:12px 20px;background:var(--hodari-blue);color:#fff;font-size:14px;font-weight:700">
+      Learner Attributes - Completion by Class Teacher
+    </div>
+    {% if attribute_compliance %}
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="border-bottom:2px solid var(--border)">
+          <th style="padding:10px 16px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Teacher</th>
+          <th style="padding:10px 16px;text-align:center;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Total Students</th>
+          <th style="padding:10px 16px;text-align:center;font-size:11px;text-transform:uppercase;color:#1B7B34">Completed</th>
+          <th style="padding:10px 16px;text-align:center;font-size:11px;text-transform:uppercase;color:#9B1C1C">Incomplete</th>
+          <th style="padding:10px 16px;text-align:center;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in attribute_compliance %}
+        <tr style="border-bottom:1px solid #F0F4FB">
+          <td style="padding:10px 16px;font-weight:600">{{ row.teacher.get_full_name }}</td>
+          <td style="padding:10px 16px;text-align:center">{{ row.total_students }}</td>
+          <td style="padding:10px 16px;text-align:center;color:#1B7B34;font-weight:700">{{ row.completed }}</td>
+          <td style="padding:10px 16px;text-align:center;color:{% if row.incomplete > 0 %}#9B1C1C{% else %}#1B7B34{% endif %};font-weight:700">{{ row.incomplete }}</td>
+          <td style="padding:10px 16px;text-align:center">
+            {% if row.incomplete == 0 %}
+            <span style="padding:2px 10px;border-radius:99px;font-size:11px;font-weight:700;background:#E8F5EC;color:#1B7B34">Complete</span>
+            {% else %}
+            <span style="padding:2px 10px;border-radius:99px;font-size:11px;font-weight:700;background:#FEF2F2;color:#9B1C1C">Pending</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="padding:20px">
+      {% include '_partials/empty_state.html' with icon='doc' icon_color='grey' title='No attribute data available' desc='Attribute compliance data will appear here.' %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

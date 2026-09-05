@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Rooms & Venues — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Academic{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start">
+
+  {#  Room list  #}
+  <div class="card">
+    <div class="card-title-row">
+      <div class="card-title" style="margin:0">Rooms & Venues</div>
+      <span style="font-size:12px;color:var(--text-muted)">{{ rooms|length }} venue{{ rooms|length|pluralize }}</span>
+    </div>
+    <div style="border-top:1px solid var(--border);margin-top:12px">
+      {% if messages %}
+        {% for msg in messages %}
+        <div class="msg-toast {% if msg.tags %}msg-{{ msg.tags }}{% endif %}" style="margin-bottom:12px">{{ msg }}</div>
+        {% endfor %}
+      {% endif %}
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="border-bottom:1px solid #F3F4F6">
+            <th style="padding:10px 8px;font-size:11px;color:var(--text-muted);font-weight:600;text-align:left;text-transform:uppercase">Name</th>
+            <th style="padding:10px 8px;font-size:11px;color:var(--text-muted);font-weight:600;text-align:left;text-transform:uppercase">Building</th>
+            <th style="padding:10px 8px;font-size:11px;color:var(--text-muted);font-weight:600;text-align:center;text-transform:uppercase">Capacity</th>
+            <th style="padding:10px 8px;font-size:11px;color:var(--text-muted);font-weight:600;text-align:center;text-transform:uppercase">Status</th>
+            <th style="padding:10px 8px;font-size:11px;color:var(--text-muted);font-weight:600;text-align:right;text-transform:uppercase">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for room in rooms %}
+          <tr style="border-bottom:1px solid #F3F4F6;font-size:13px">
+            <td style="padding:10px 8px;font-weight:600">{{ room.name }}</td>
+            <td style="padding:10px 8px;color:var(--text-muted)">{{ room.building|default:"N/A" }}</td>
+            <td style="padding:10px 8px;text-align:center;color:var(--text-muted)">{{ room.capacity|default:"N/A" }}</td>
+            <td style="padding:10px 8px;text-align:center">
+              <span class="chip {% if room.is_active %}chip-green{% else %}chip-grey{% endif %}">
+                {% if room.is_active %}Active{% else %}Inactive{% endif %}
+              </span>
+            </td>
+            <td style="padding:10px 8px;text-align:right;white-space:nowrap">
+              <a href="{% url 'academics:room_edit' room.pk %}" class="hf-btn hf-btn-secondary hf-btn-sm">Edit</a>
+              <button type="button" class="hf-btn hf-btn-danger hf-btn-sm"
+                    onclick="confirmDeleteModal({title:'Delete Room?',body:'Are you sure you want to delete <strong>{{ room.name }}</strong>?',detail:'This room will be permanently removed. This action cannot be undone.',confirmText:'Delete Room',url:'{% url 'academics:room_delete' room.pk %}'})">Delete</button>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5">{% include '_partials/empty_state.html' with title='No rooms yet' desc='Add the first room using the form below.' icon='doc' icon_color='blue' %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {#  Add / Edit form  #}
+  <div class="card">
+    <div class="card-title" style="margin-bottom:16px">{% if edit_room %}Edit Room{% else %}Add New Room{% endif %}</div>
+    <form method="post" action="{% if edit_room %}{% url 'academics:room_edit' edit_room.pk %}{% else %}{% url 'academics:rooms' %}{% endif %}">
+      {% csrf_token %}
+      <div style="display:flex;flex-direction:column;gap:14px">
+
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Room Name *</label>
+          <input type="text" name="name" value="{{ edit_room.name|default:'' }}" required
+                 class="hf-input" placeholder="e.g. Science Lab 1">
+        </div>
+
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Building / Block</label>
+          <input type="text" name="building" value="{{ edit_room.building|default:'' }}"
+                 class="hf-input" placeholder="e.g. Main Block">
+        </div>
+
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Capacity (seats)</label>
+          <input type="number" name="capacity" value="{{ edit_room.capacity|default:'' }}" min="1"
+                 class="hf-input" placeholder="e.g. 30">
+        </div>
+
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Status</label>
+          <select name="is_active" class="hf-select">
+            <option value="1" {% if not edit_room or edit_room.is_active %}selected{% endif %}>Active</option>
+            <option value="0" {% if edit_room and not edit_room.is_active %}selected{% endif %}>Inactive</option>
+          </select>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <button type="submit" class="hf-btn hf-btn-primary hf-btn-full">
+            {% if edit_room %}Save Changes{% else %}Add Room{% endif %}
+          </button>
+          {% if edit_room %}
+          <a href="{% url 'academics:rooms' %}" class="hf-btn hf-btn-secondary hf-btn-full">Cancel</a>
+          {% endif %}
+        </div>
+      </div>
+    </form>
+  </div>
+
+</div>
+{% endblock %}

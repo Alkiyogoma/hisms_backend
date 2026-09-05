@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Super Admin - {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Good {% if hour < 12 %}morning{% elif hour < 17 %}afternoon{% else %}evening{% endif %}, {{ user.get_full_name|default:user.username }}{% endblock %}
+{% block topbar_date %}{{ today_display }} - {{ term_label }}{% endblock %}
+{% block topbar_badges %}
+  <div class="topbar-badge badge-amber"><span class="badge-dot"></span>Super Admin</div>
+{% endblock %}
+{% block content %}
+<div class="section-hdr">
+  <span class="section-title">System administration</span>
+  <span class="chip chip-amber">Super Admin</span>
+</div>
+
+<div class="metrics" style="grid-template-columns:repeat(3,1fr);gap:14px">
+  {% include '_partials/stat_card.html' with label='Login success rate' value=uptime unit='%' sub='Last 30 days' variant='green' %}
+  {% include '_partials/stat_card.html' with label='Active incidents' value=incidents sub='Operational' variant='amber' %}
+  {% include '_partials/stat_card.html' with label='Pending audit items' value=pending_audit sub='Review queue' variant='blue' %}
+</div>
+
+<div class="card" style="margin-bottom:16px;background:#FFFDF5;border-color:#FDE68A">
+  <div class="card-title" style="display:flex;align-items:center;gap:8px">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--hodari-gold-dark)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+    View As (Read-Only)
+  </div>
+  <p style="font-size:12px;color:var(--text-muted);margin:0 0 14px">Select a user to see their dashboard exactly as they see it. Write operations are disabled while viewing as another user.</p>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">
+  {% for row in view_as_users %}
+    <form method="post" action="{% url 'users:impersonate_start' row.id %}" style="margin:0">{% csrf_token %}
+      <button type="submit" style="width:100%;text-align:left;border:1px solid var(--border);border-radius:8px;padding:10px 14px;cursor:pointer;background:var(--bg-card);font-family:var(--font-ui);transition:border-color .15s,box-shadow .15s"
+        onmouseover="this.style.borderColor='var(--hodari-blue-mid)';this.style.boxShadow='0 1px 4px rgba(2,58,165,.1)'"
+        onmouseout="this.style.borderColor='';this.style.boxShadow=''">
+        <div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:2px">{{ row.name }}</div>
+        <div style="font-size:11px;color:var(--text-muted)">{{ row.role_label }}</div>
+      </button>
+    </form>
+  {% empty %}
+    {% include '_partials/empty_state.html' with icon='users' title='No staff accounts yet' desc='Create your first staff account to get started.' action_url='/accounts/create/' action_text='+ New Staff Member' %}
+  {% endfor %}
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-title">Recent audit activity</div>
+    {% for log in recent_audit %}
+    <div class="trow">
+      <div>
+        <div class="trow-name">{{ log.action_type }}</div>
+        <div class="trow-sub">{{ log.model_name }} {% if log.object_id %}#{{ log.object_id }}{% endif %} - {{ log.created_at|date:"d M Y H:i" }}</div>
+      </div>
+      <span class="trow-right" style="font-size:11px;color:var(--text-muted)">{% if log.actor %}{{ log.actor.username }}{% else %}system{% endif %}</span>
+    </div>
+    {% empty %}
+      {% include '_partials/empty_state.html' with icon='doc' icon_color='grey' title='No audit entries yet' desc='System activity will be logged here.' %}
+    {% endfor %}
+    <div style="margin-top:8px"><a href="{% url 'audit:logs' %}" class="section-link" style="font-size:12px">View full audit log</a></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Quick admin actions</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      {% has_perm user "core.view_schoolsettings" as can_settings %}
+      {% if can_settings %}
+      <a href="{% url 'core:school_settings' %}" style="background:var(--card-bg);border:1px solid var(--border);color:var(--text-primary);border-radius:7px;padding:10px 14px;font-size:13px;text-decoration:none;font-family:var(--font-ui);max-width:280px;flex:1 1 calc(50% - 6px)">
+        <div style="font-weight:600">System settings & permissions</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Thresholds, notifications, API keys</div>
+      </a>
+      {% endif %}
+      {% for item in action_queue %}
+        {% if item.label != "System settings & permissions" %}
+        <a href="{{ item.url }}" style="background:var(--card-bg);border:1px solid var(--border);color:var(--text-primary);border-radius:7px;padding:10px 14px;font-size:13px;text-decoration:none;font-family:var(--font-ui);max-width:280px;flex:1 1 calc(50% - 6px)">
+          <div style="font-weight:600">{{ item.label }}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">{{ item.sub }}</div>
+        </a>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

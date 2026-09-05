@@ -1,0 +1,75 @@
+{% if messages %}
+  {% for message in messages %}
+    <div class="msg-toast {% if message.tags == 'error' %}msg-error{% else %}msg-success{% endif %}" style="margin-bottom:12px">
+      {{ message }}
+    </div>
+  {% endfor %}
+{% endif %}
+<form
+  method="post"
+  action="{% url 'admissions:transition' applicant.id %}"
+  style="display:flex;flex-direction:column;gap:12px"
+  hx-post="{% url 'admissions:transition' applicant.id %}"
+  hx-target="this"
+  hx-swap="outerHTML"
+>
+  {% csrf_token %}
+  <div class="hf2-group">
+    <label class="hf2-label">Current Stage</label>
+    <div style="margin-top:4px">
+      <span class="chip chip-blue">{{ applicant.get_status_display }}</span>
+    </div>
+  </div>
+
+  <div class="hf2-group">
+    <label class="hf2-label">Change to</label>
+    {% if status_choices %}
+      <select name="to_status" class="hf2-select" style="margin-top:4px">
+        {% for value, label in status_choices %}
+          <option value="{{ value }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    {% else %}
+      <div class="hf2-hint" style="margin-top:4px">
+        No next transitions available for your role at this stage.
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="hf2-group" id="conditions-group" style="display:none">
+    <label class="hf2-label">Conditions for Admission</label>
+    <textarea name="conditions" class="hf2-textarea" style="margin-top:4px" placeholder="Specify the conditions for conditional admission..."></textarea>
+  </div>
+
+  <div class="hf2-group">
+    <label class="hf2-label">Reason (optional)</label>
+    <textarea name="reason" class="hf2-textarea" style="margin-top:4px" placeholder="Optional internal note for this step transition..."></textarea>
+  </div>
+
+  {% if status_choices %}
+    <button type="submit" class="btn-primary btn-full" style="margin-top:8px;position:relative">
+      <span class="htmx-indicator" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="animation:btn-spin 1s linear infinite"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
+      </span>
+      <span class="hx-hide-on-request">Move to next step</span>
+    </button>
+  {% endif %}
+</form>
+
+<style>
+  .htmx-request .hx-hide-on-request { visibility: hidden; }
+</style>
+
+<script>
+(function() {
+  const sel = document.querySelector('select[name="to_status"]');
+  const cg = document.getElementById('conditions-group');
+  if (sel && cg) {
+    function toggleConditions() {
+      cg.style.display = sel.value === 'conditional' ? 'flex' : 'none';
+    }
+    sel.addEventListener('change', toggleConditions);
+    toggleConditions();
+  }
+})();
+</script>

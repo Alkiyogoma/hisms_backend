@@ -1,0 +1,75 @@
+{% load humanize %}
+<!-- Task Detail Fragment (HTMX) -->
+<div style="max-width:480px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <h3 style="font-size:15px;font-weight:700;color:var(--text-primary);margin:0">{{ task.title }}</h3>
+    {% if task.is_overdue %}
+      <span class="chip chip-red">Overdue</span>
+    {% elif task.status == 'in_progress' %}
+      <span class="chip chip-amber">In Progress</span>
+    {% else %}
+      <span class="chip chip-blue">{{ task.get_status_display }}</span>
+    {% endif %}
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;color:var(--text-muted);margin-bottom:14px">
+    <div><span class="hf-label">Priority</span><div style="font-weight:600;color:var(--text-primary);margin-top:1px">{{ task.get_priority_display }}</div></div>
+    <div><span class="hf-label">Due</span><div style="font-weight:600;color:var(--text-primary);margin-top:1px">{{ task.due_date|date:"d M Y, H:i" }}</div></div>
+    {% if task.assigned_to %}
+    <div><span class="hf-label">Assigned to</span><div style="font-weight:600;color:var(--text-primary);margin-top:1px">{{ task.assigned_to.get_full_name|default:task.assigned_to.username }}</div></div>
+    {% endif %}
+    {% if task.created_by %}
+    <div><span class="hf-label">Created by</span><div style="font-weight:600;color:var(--text-primary);margin-top:1px">{{ task.created_by.get_full_name|default:task.created_by.username }}</div></div>
+    {% endif %}
+  </div>
+
+  {% if task.description %}
+  <div style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;line-height:1.6">{{ task.description }}</div>
+  {% endif %}
+
+  {% if task.status != 'completed' and task.task_type != 'assessment_report' %}
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+    {% for action in task.actions_available %}
+      {% if action == 'mark_complete' or action == 'approve' or action == 'sign_off' or action == 'submit' %}
+      <form method="post" action="{% url 'tasks:take_action' task.pk %}" style="display:inline">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="{{ action }}">
+        <button type="submit" class="hf-btn" style="background:var(--hodari-blue);color:#fff;padding:6px 14px;font-size:12px">{{ action|title }}</button>
+      </form>
+      {% endif %}
+    {% endfor %}
+    <form method="post" action="{% url 'tasks:mark_complete' task.pk %}" style="display:inline">
+      {% csrf_token %}
+      <button type="submit" class="hf-btn" style="background:var(--green-bg);color:var(--green);border-color:var(--green-bd);padding:6px 14px;font-size:12px">Complete</button>
+    </form>
+  </div>
+  {% endif %}
+
+  {% if task.task_type == 'assessment_report' and task.status != 'completed' %}
+  <div id="assessment-report-form" style="margin-bottom:14px"
+    hx-get="{% url 'tasks:assessment_report_submit' task.pk %}"
+    hx-trigger="load"
+    hx-swap="outerHTML">
+    <div style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px">Loading assessment form...</div>
+  </div>
+  {% elif task.task_type == 'assessment_report' and task.status == 'completed' %}
+  <div style="padding:14px 16px;background:var(--green-bg);border:1px solid var(--green-bd);border-radius:10px;margin-bottom:14px">
+    <div style="font-size:13px;font-weight:600;color:var(--green)">Assessment report submitted.</div>
+  </div>
+  {% elif task.metadata.module_url %}
+  <a href="{{ task.metadata.module_url }}" class="hf-btn" style="display:inline-block;margin-bottom:14px;text-decoration:none;padding:6px 14px;font-size:12px">Go to source &rarr;</a>
+  {% endif %}
+
+  {% if history %}
+  <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
+    <div class="hf-label" style="margin-bottom:8px">History</div>
+    {% for h in history %}
+    <div style="font-size:12px;color:var(--text-secondary);padding:6px 0;border-bottom:1px solid var(--border)">
+      <strong>{{ h.get_action_display }}</strong> by {{ h.changed_by.get_full_name|default:"System" }}
+      <span style="color:var(--text-muted)"> &middot; {{ h.created_at|date:"d M, H:i" }}</span>
+      {% if h.comment %}<div style="color:var(--text-muted);font-style:italic;margin-top:2px">{{ h.comment }}</div>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>

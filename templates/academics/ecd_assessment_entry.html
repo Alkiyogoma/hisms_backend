@@ -1,0 +1,491 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% load static %}
+
+{% block title %}{{ page_title|default:brand.school_name }} — ECD Reports{% endblock %}
+
+{% block extra_head %}
+<style>
+.class-tabs-container{background:#fff;border-bottom:1px solid #E2E8F0;margin:0 -28px 24px -28px;padding:0 28px;display:flex;align-items:center;gap:8px;overflow-x:auto;scrollbar-width:none;position:sticky;top:108px;z-index:39}
+.class-tabs-container::-webkit-scrollbar{display:none}
+.class-tab{padding:16px 24px;font-size:14px;font-weight:600;color:#64748B;text-decoration:none;border-bottom:3px solid transparent;transition:all .2s ease;white-space:nowrap}
+.class-tab:hover{color:#023AA5;background:#F8FAFC}
+.class-tab.active{color:#023AA5;border-bottom-color:#023AA5}
+  /*  ECD ASSESSMENT STYLES  */
+  .ecd-grade-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 44px; height: 44px; border-radius: 8px; font-size: 14px; font-weight: 700;
+    cursor: pointer; border: 2px solid transparent; transition: all .15s;
+    background: #fff; border-color: #DDE3EE; color: var(--text-muted);
+  }
+  
+  .ecd-grade-btn.g-4 { background: #E8F5EC; color: #1B7B34; border-color: #B7DFBF; }
+  .ecd-grade-btn.g-3 { background: #E8EEF9; color: #023AA5; border-color: #BFCFE9; }
+  .ecd-grade-btn.g-2 { background: #FEF3C7; color: #92550A; border-color: #FCD34D; }
+  .ecd-grade-btn.g-1 { background: #FEF2F2; color: #9B1C1C; border-color: #FECACA; }
+
+  .ecd-grade-btn.selected-4 { background: #1B7B34 !important; color: #fff !important; border-color: #1B7B34 !important; }
+  .ecd-grade-btn.selected-3 { background: #023AA5 !important; color: #fff !important; border-color: #023AA5 !important; }
+  .ecd-grade-btn.selected-2 { background: #D97706 !important; color: #fff !important; border-color: #D97706 !important; }
+  .ecd-grade-btn.selected-1 { background: #9B1C1C !important; color: #fff !important; border-color: #9B1C1C !important; }
+
+  .domain-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 0.5px solid #DDE3EE; gap: 12px; }
+  .domain-row:last-child { border-bottom: none; }
+  .domain-label { font-size: 13px; color: #1A1A2E; flex: 1; }
+  .domain-grade-group { display: flex; gap: 6px; flex-shrink: 0; }
+
+  .pace-row { display: grid; grid-template-columns: 80px 70px 110px 80px 80px 80px; gap: 8px; align-items: center; padding: 7px 0; border-bottom: 0.5px solid #DDE3EE; font-size: 12.5px; }
+  .pace-row.pace-hdr { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #8492A6; border-bottom: 1px solid #DDE3EE; }
+  .pace-inp { width: 100%; padding: 5px 8px; border: 1px solid #DDE3EE; border-radius: 6px; font-size: 13px; font-family: 'Roboto', sans-serif; text-align: center; outline: none; }
+  .pace-inp:focus { border-color: #023AA5; }
+
+  .stab { padding: 10px 16px; font-size: 13px; font-weight: 500; color: #8492A6; border-bottom: 2px solid transparent; text-decoration: none; white-space: nowrap; transition: all .2s; }
+  .stab.active { color: #023AA5; border-bottom-color: #023AA5; font-weight: 600; }
+  
+  .comment-area { width: 100%; padding: 10px 12px; border: 1px solid #DDE3EE; border-radius: 8px; font-size: 13px; font-family: 'Roboto', sans-serif; color: #1A1A2E; resize: vertical; min-height: 80px; outline: none; }
+  .comment-area:focus { border-color: #023AA5; }
+  .char-count { font-size: 11px; color: #8492A6; margin-top: 4px; text-align: right; }
+
+  .student-list-item { display: flex; align-items: center; justify-content: space-between; padding: 9px 14px; cursor: pointer; border-left: 3px solid transparent; border-bottom: 0.5px solid #DDE3EE; }
+  .student-list-item.active { border-left-color: #023AA5; background: #F0F4FB; font-weight: 600; }
+  
+  .pace-status-badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 5px; text-align: center; }
+  .psb-complete { background: #E8F5EC; color: #1B7B34; }
+  .psb-progress { background: #FEF3C7; color: #92550A; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "academics/_top_tabs_progress.html" %}
+<!-- Tabs for Class Selection -->
+<div class="class-tabs-container">
+  {% for cls in ecd_classes %}
+    <a href="?class_name={{ cls.name }}" class="class-tab {% if ecd_class_name == cls.name %}active{% endif %}">{{ cls.name }}</a>
+  {% endfor %}
+
+</div>
+
+<!-- Header / Status Banner -->
+<div style="background:#1A1A2E;border-radius:8px;padding:10px 16px;margin-bottom:14px;font-size:12.5px;display:flex;align-items:center;gap:10px">
+  <strong style="color:#FBBC05">{{ ecd_class_label }} — {% if ecd_template_type == 'abc' %}A.C.E. Curriculum{% else %}Early Years Foundation Stage{% endif %}</strong>
+  <span style="color:rgba(251,188,5,.4)">|</span>
+  <span style="color:rgba(255,255,255,.7);font-size:12px">
+    {% if ecd_template_type == 'abc' %}
+      Record Supervisor score (S%) per PACE. M% = Moderator score (optional). STK = sticker sequence number.
+    {% else %}
+      Grade competencies: 4 (Outstanding), 3 (Good), 2 (Satisfactory), 1 (Not Yet).
+    {% endif %}
+  </span>
+</div>
+
+<!-- Global Progress Bar -->
+<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+  <div style="flex:1;background:#EDF1F7;height:8px;border-radius:99px;overflow:hidden">
+    <div id="global-progress-bar" style="width:0%;height:100%;background:#FBBC05;border-radius:99px;transition:width .4s"></div>
+  </div>
+  <span id="global-progress-text" style="font-size:12px;color:#8492A6;white-space:nowrap;font-weight:500">0 of 0 students complete</span>
+  <button onclick="submitAllToHOD()" style="padding:7px 14px;background:#1B7B34;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">Submit all to HOD</button>
+</div>
+
+<!-- Main Grid -->
+<div style="display:grid;grid-template-columns:220px 1fr;gap:16px;align-items:start">
+  <!-- Student Sidebar -->
+  <div class="card" style="padding:12px 0">
+    <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8492A6;padding:0 14px 8px" id="student-list-count">Students (0)</div>
+    <div id="students-list-container">
+      <!-- Loaded via JS -->
+    </div>
+  </div>
+
+  <!-- Entry Form Area -->
+  <div>
+    <div class="card" style="margin-bottom:14px">
+      <!-- Student Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#1A1A2E" id="active-student-name">Select a student</div>
+          <div style="font-size:12px;color:#8492A6;margin-top:2px">{{ ecd_class_label }} &middot; School Year {% if current_term %}{{ current_term.academic_year.name }}{% else %}--{% endif %}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="display:flex;gap:8px">
+            <button onclick="moveToPreviousStudent()" style="padding:6px 12px;background:#fff;color:#8492A6;border:1px solid #DDE3EE;border-radius:7px;font-size:12px;cursor:pointer">Prev</button>
+            <button onclick="moveToNextStudent()" style="padding:6px 12px;background:#023AA5;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">Next</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Assessment Content (Dynamic) -->
+      <div id="assessment-container">
+        {% if ecd_template_type == 'abc' %}
+          <!-- PACE PROGRESS TABLE (ABC ONLY) -->
+          <div style="font-size:13px;font-weight:700;color:#1A1A2E;margin-bottom:12px">PACE Progress by Subject</div>
+          <div id="abc-pace-content">
+            <!-- Subjects and PACEs loaded here -->
+          </div>
+          
+          <div style="padding-top:14px;border-top:2px solid #DDE3EE;margin-bottom:16px">
+            <div style="font-size:13px;font-weight:700;color:#023AA5;margin-bottom:10px">Scripture</div>
+            <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px" id="abc-scripture-grid">
+              {% for q in "1234"|make_list %}
+              <div style="background:#F7F9FC;border-radius:8px;padding:10px">
+                <div style="font-size:10px;font-weight:700;color:#8492A6;margin-bottom:4px">Term {{ q }}</div>
+                <input type="text" class="pace-inp abc-scripture-input" data-quarter="{{ q }}" placeholder="e.g. Psalms 100:1-4">
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div style="padding-top:14px;border-top:2px solid #DDE3EE;margin-bottom:16px">
+            <div style="font-size:13px;font-weight:700;color:#023AA5;margin-bottom:10px">General Assignments</div>
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px" id="abc-assignments-grid">
+              {% for q in "1234"|make_list %}
+              <div style="background:#F7F9FC;border-radius:8px;padding:10px">
+                <div style="font-size:10px;font-weight:700;color:#8492A6;margin-bottom:6px">Term {{ q }}</div>
+                <input class="pace-inp abc-assignment-name" data-quarter="{{ q }}" placeholder="Assignment item" style="margin-bottom:4px">
+                <input class="pace-inp abc-assignment-score" data-quarter="{{ q }}" placeholder="Score %" type="number">
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div style="padding-top:14px;border-top:2px solid #DDE3EE;margin-bottom:16px">
+            <div style="font-size:13px;font-weight:700;color:#023AA5;margin-bottom:10px">Reading Programme</div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px" id="abc-reading-grid">
+              {% for q in "1234"|make_list %}
+              <div style="background:#F7F9FC;border-radius:8px;padding:10px">
+                <div style="font-size:10px;font-weight:700;color:#8492A6;margin-bottom:6px">Term {{ q }}</div>
+                <input class="pace-inp abc-reading-wpm" data-quarter="{{ q }}" placeholder="w.p.m." style="margin-bottom:3px">
+                <input class="pace-inp abc-reading-pct" data-quarter="{{ q }}" placeholder="%" style="margin-bottom:3px">
+                <input class="pace-inp abc-reading-comp" data-quarter="{{ q }}" placeholder="comp score">
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+        {% else %}
+          <!-- QUALITATIVE GRID (Pre-K, KG, Pre-School) -->
+          {% has_perm user "academics.add_ecdevaluation" as can_grade %}
+          {% for section_title, items in domain_groups %}
+            <div class="report-domain-hdr" style="font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8492A6;margin:16px 0 8px;padding-top:14px;border-top:1px solid #DDE3EE">
+              {{ section_title }}
+            </div>
+            {% for domain in items %}
+              <div class="domain-row">
+                <div class="domain-label">{{ domain }}</div>
+                {% if can_grade %}
+                <div class="domain-grade-group" data-domain="{{ domain }}">
+                  <div class="ecd-grade-btn g-4" onclick="selectGrade(this, '4')">4</div>
+                  <div class="ecd-grade-btn g-3" onclick="selectGrade(this, '3')">3</div>
+                  <div class="ecd-grade-btn g-2" onclick="selectGrade(this, '2')">2</div>
+                  <div class="ecd-grade-btn g-1" onclick="selectGrade(this, '1')">1</div>
+                </div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          {% endfor %}
+        {% endif %}
+
+        <!-- Teacher Comment Section -->
+        <div style="font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#8492A6;margin:14px 0 8px;padding-top:12px;border-top:1px solid #DDE3EE">
+          Class Teacher&#x2019;s Comment <span style="color:#DC2626">*</span>
+        </div>
+        <textarea id="teacher-comment" class="comment-area" onkeyup="checkComment()" placeholder="Required (minimum 50 characters)"></textarea>
+        <div id="char-count" class="char-count">0 / 50 minimum</div>
+      </div>
+
+      <!-- Actions Footer -->
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:20px;padding-top:14px;border-top:1px solid #DDE3EE">
+        <div style="font-size:12px;color:#8492A6">All fields required before submission. Save draft at any time.</div>
+        <div style="display:flex;gap:8px">
+          <button onclick="saveDraft()" style="padding:8px 16px;background:#fff;color:#474747;border:1px solid #DDE3EE;border-radius:8px;font-size:13px;cursor:pointer">Save draft</button>
+          <button onclick="saveAndNext()" style="padding:8px 16px;background:#023AA5;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Save &amp; next student</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // State
+  let students = [];
+  let currentStudent = null;
+  let reportCardId = null;
+  const tplType = "{{ ecd_template_type }}";
+  const className = "{{ ecd_class_name }}";
+  const API_BASE = "/academics/api/ecd/";
+
+  // ABC Subject mapping for PACEs
+  const ABC_SUBJECTS = [
+    { name: "Math", code: "MATH 5-8", paces: ["M05", "M06", "M07", "M08"] },
+    { name: "English", code: "ENG 5-8", paces: ["E05", "E06", "E07", "E08"] },
+    { name: "Word Building", code: "WB 5-8", paces: ["W05", "W06", "W07", "W08"] },
+    { name: "Science", code: "SCI 5-8", paces: ["S05", "S06", "S07", "S08"] },
+    { name: "Social Studies", code: "SS 5-8", paces: ["SS05", "SS06", "SS07", "SS08"] }
+  ];
+
+  document.addEventListener('DOMContentLoaded', () => {
+    initABCLayout();
+    loadStudents();
+  });
+
+  function initABCLayout() {
+    if (tplType !== 'abc') return;
+    const container = document.getElementById('abc-pace-content');
+    if (!container) return;
+    
+    let html = '';
+    ABC_SUBJECTS.forEach(sub => {
+      html += `
+        <div style="margin-bottom:18px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-size:13px;font-weight:700;color:#023AA5">${sub.name} (${sub.code})</div>
+            <div style="font-size:11px;color:#8492A6" id="pace-complete-${sub.name}">Completed: <strong style="color:#1B7B34">0/4 PACEs</strong></div>
+          </div>
+          <div class="pace-row pace-hdr"><span>PACE</span><span>STK</span><span>Status</span><span>S%</span><span>M%</span><span>Date</span></div>
+          ${sub.paces.map(p => `
+            <div class="pace-row pace-data-row" data-subject="${sub.name}" data-pace="${p}">
+              <span style="font-weight:600;color:#1A1A2E">${p}</span>
+              <input class="pace-inp pace-stk" placeholder="--">
+              <select class="pace-inp pace-status" style="font-size:11px; padding: 4px;">
+                <option value="in_progress">In progress</option>
+                <option value="complete">Complete</option>
+              </select>
+              <input class="pace-inp pace-s-score" placeholder="--">
+              <input class="pace-inp pace-m-score" placeholder="--">
+              <input class="pace-inp pace-date" placeholder="--">
+            </div>
+          `).join('')}
+        </div>
+      `;
+    });
+    container.innerHTML = html;
+  }
+
+  async function loadStudents() {
+    const res = await fetch(`${API_BASE}students/?class_name=${encodeURIComponent(className)}`);
+    const data = await res.json();
+    students = data.students || [];
+    updateSidebar();
+    if (students.length > 0) switchStudent(students[0].id);
+    updateGlobalProgress();
+  }
+
+  function updateSidebar() {
+    const container = document.getElementById('students-list-container');
+    const countEl = document.getElementById('student-list-count');
+    countEl.textContent = `Students (${students.length})`;
+    
+    container.innerHTML = students.map(s => `
+      <div class="student-list-item ${currentStudent && currentStudent.id === s.id ? 'active' : ''}" onclick="switchStudent(${s.id})">
+        <div style="font-size:12.5px;color:#1A1A2E">${s.first_name} ${s.last_name}</div>
+        <span class="chip chip-grey" style="font-size:10px" id="side-status-${s.id}">Pending</span>
+      </div>
+    `).join('');
+  }
+
+  async function switchStudent(id) {
+    currentStudent = students.find(s => s.id === id);
+    updateSidebar();
+    document.getElementById('active-student-name').textContent = `${currentStudent.first_name} ${currentStudent.last_name}`;
+    
+    // Clear inputs
+    clearInputs();
+    
+    // Fetch evaluation data
+    const res = await fetch(`${API_BASE}evaluation/${id}/`);
+    const data = await res.json();
+    reportCardId = data.report_card_id;
+    
+    // Fill qualitative data
+    if (tplType !== 'abc') {
+      Object.keys(data.evaluations || {}).forEach(domain => {
+        const rating = data.evaluations[domain];
+        const group = document.querySelector(`.domain-grade-group[data-domain="${domain}"]`);
+        if (group) {
+          const btn = Array.from(group.querySelectorAll('.ecd-grade-btn')).find(b => b.textContent.trim() === rating);
+          if (btn) btn.classList.add('selected-' + rating);
+        }
+      });
+    } else {
+      // Fill ABC PACE data
+      (data.abc_pace_progress || []).forEach(p => {
+        const row = document.querySelector(`.pace-data-row[data-subject="${p.subject}"][data-pace="${p.pace_no}"]`);
+        if (row) {
+          row.querySelector('.pace-stk').value = p.sticker_no || '';
+          row.querySelector('.pace-status').value = p.status || 'in_progress';
+          row.querySelector('.pace-s-score').value = p.supervisor_score || '';
+          row.querySelector('.pace-m-score').value = p.moderator_score || '';
+          row.querySelector('.pace-date').value = p.date_completed || '';
+        }
+      });
+      // Fill Scripture
+      Object.keys(data.abc_scripture || {}).forEach(q => {
+        const inp = document.querySelector(`.abc-scripture-input[data-quarter="${q}"]`);
+        if (inp) inp.value = data.abc_scripture[q];
+      });
+      // Fill Assignments
+      Object.keys(data.abc_assignments || {}).forEach(q => {
+        const rd = data.abc_assignments[q];
+        const nameInp = document.querySelector(`.abc-assignment-name[data-quarter="${q}"]`);
+        const scoreInp = document.querySelector(`.abc-assignment-score[data-quarter="${q}"]`);
+        if (nameInp) nameInp.value = rd.item_name;
+        if (scoreInp) scoreInp.value = rd.score;
+      });
+      // Fill Reading
+      Object.keys(data.abc_reading || {}).forEach(q => {
+        const rd = data.abc_reading[q];
+        const wpmInp = document.querySelector(`.abc-reading-wpm[data-quarter="${q}"]`);
+        const pctInp = document.querySelector(`.abc-reading-pct[data-quarter="${q}"]`);
+        const compInp = document.querySelector(`.abc-reading-comp[data-quarter="${q}"]`);
+        if (wpmInp) wpmInp.value = rd.wpm || '';
+        if (pctInp) pctInp.value = rd.percentage || '';
+        if (compInp) compInp.value = rd.comprehension_score || '';
+      });
+      
+      updateABCCounts();
+    }
+    
+    document.getElementById('teacher-comment').value = data.teacher_comments || '';
+    checkComment();
+    
+    // Update student status badge in sidebar
+    const statusEl = document.getElementById(`side-status-${id}`);
+    if (statusEl) {
+      if (data.status === 'draft') {
+        statusEl.textContent = 'Draft';
+        statusEl.className = 'chip chip-amber';
+      } else {
+        statusEl.textContent = 'Done';
+        statusEl.className = 'chip chip-green';
+      }
+    }
+  }
+
+  function clearInputs() {
+    document.querySelectorAll('.selected-1, .selected-2, .selected-3, .selected-4').forEach(el => {
+      el.classList.remove('selected-1', 'selected-2', 'selected-3', 'selected-4');
+    });
+    document.querySelectorAll('.pace-inp, .comment-area').forEach(el => el.value = '');
+    if (tplType === 'abc') {
+      document.querySelectorAll('.pace-status').forEach(el => el.value = 'in_progress');
+    }
+  }
+
+  function selectGrade(el, grade) {
+    const group = el.parentElement;
+    group.querySelectorAll('.ecd-grade-btn').forEach(b => b.classList.remove('selected-1', 'selected-2', 'selected-3', 'selected-4'));
+    el.classList.add('selected-' + grade);
+    saveDraft();
+  }
+
+  function updateABCCounts() {
+    ABC_SUBJECTS.forEach(sub => {
+      const rows = document.querySelectorAll(`.pace-data-row[data-subject="${sub.name}"]`);
+      let complete = 0;
+      rows.forEach(r => { if (r.querySelector('.pace-status').value === 'complete') complete++; });
+      const countEl = document.getElementById(`pace-complete-${sub.name}`);
+      if (countEl) countEl.innerHTML = `Completed: <strong style="color:#1B7B34">${complete}/4 PACEs</strong>`;
+    });
+  }
+
+  function checkComment() {
+    const ta = document.getElementById('teacher-comment');
+    const cnt = document.getElementById('char-count');
+    const len = ta.value.length;
+    cnt.textContent = `${len} / 50 minimum`;
+    cnt.style.color = len >= 50 ? '#1B7B34' : '#9B1C1C';
+  }
+
+  async function saveDraft() {
+    if (!currentStudent) return;
+    const payload = {
+      teacher_comments: document.getElementById('teacher-comment').value,
+      evaluations: {},
+      abc_pace_progress: [],
+      abc_scripture: {},
+      abc_assignments: {},
+      abc_reading: {}
+    };
+    
+    if (tplType !== 'abc') {
+      document.querySelectorAll('.domain-grade-group').forEach(group => {
+        const domain = group.dataset.domain;
+        const selected = group.querySelector('.selected-1, .selected-2, .selected-3, .selected-4');
+        if (selected) payload.evaluations[domain] = selected.textContent.trim();
+      });
+    } else {
+      document.querySelectorAll('.pace-data-row').forEach(row => {
+        payload.abc_pace_progress.push({
+          subject: row.dataset.subject,
+          pace_no: row.dataset.pace,
+          sticker_no: row.querySelector('.pace-stk').value,
+          status: row.querySelector('.pace-status').value,
+          supervisor_score: row.querySelector('.pace-s-score').value || null,
+          moderator_score: row.querySelector('.pace-m-score').value || null,
+          date_completed: row.querySelector('.pace-date').value
+        });
+      });
+      document.querySelectorAll('.abc-scripture-input').forEach(inp => {
+        if (inp.value) payload.abc_scripture[inp.dataset.quarter] = inp.value;
+      });
+      document.querySelectorAll('.abc-assignment-name').forEach(inp => {
+        const q = inp.dataset.quarter;
+        const score = document.querySelector(`.abc-assignment-score[data-quarter="${q}"]`).value;
+        if (inp.value || score) payload.abc_assignments[q] = { item_name: inp.value, score: score || null };
+      });
+      document.querySelectorAll('.abc-reading-wpm').forEach(inp => {
+        const q = inp.dataset.quarter;
+        const pct = document.querySelector(`.abc-reading-pct[data-quarter="${q}"]`).value;
+        const comp = document.querySelector(`.abc-reading-comp[data-quarter="${q}"]`).value;
+        if (inp.value || pct || comp) payload.abc_reading[q] = { wpm: inp.value || null, percentage: pct || null, comprehension_score: comp || null };
+      });
+    }
+    
+    const res = await fetch(`${API_BASE}evaluation/${currentStudent.id}/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+      body: JSON.stringify(payload)
+    });
+    
+    if (res.ok) {
+      if (typeof showToast === 'function') showToast("Draft saved successfully", "success");
+      updateGlobalProgress();
+      if (tplType === 'abc') updateABCCounts();
+    }
+  }
+
+  async function saveAndNext() {
+    await saveDraft();
+    moveToNextStudent();
+  }
+
+  function moveToNextStudent() {
+    const idx = students.findIndex(s => s.id === currentStudent.id);
+    if (idx < students.length - 1) switchStudent(students[idx + 1].id);
+  }
+
+  function moveToPreviousStudent() {
+    const idx = students.findIndex(s => s.id === currentStudent.id);
+    if (idx > 0) switchStudent(students[idx - 1].id);
+  }
+
+  async function updateGlobalProgress() {
+    const res = await fetch(`${API_BASE}progress/?class_name=${encodeURIComponent(className)}`);
+    const data = await res.json();
+    const p = data.progress;
+    document.getElementById('global-progress-bar').style.width = `${p.percentage}%`;
+    document.getElementById('global-progress-text').textContent = `${p.completed} of ${p.total} students complete`;
+  }
+
+  async function submitAllToHOD() {
+    if (!confirm("Are you sure you want to submit all evaluations for this class to HOD?")) return;
+    for (const s of students) {
+       await fetch(`${API_BASE}submit/${s.id}/`, {
+         method: 'POST',
+         headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+       });
+    }
+    window.location.reload();
+  }
+</script>
+{% endblock %}

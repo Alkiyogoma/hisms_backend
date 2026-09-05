@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff ID Card</title>
+    <style>
+        :root {
+            --hodari-blue: #023AA5;
+            --hodari-blue-dark: #012A7A;
+            --border: #f1f5f9;
+            --card-shadow: 0 10px 40px -10px rgba(30, 58, 138, 0.15);
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #f8fafc;
+            margin: 0;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .id-card-container {
+            background: #fff;
+            width: 380px;
+            min-height: 560px;
+            border-radius: 32px;
+            box-shadow: var(--card-shadow);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(255,255,255,0.8);
+        }
+        .header-section {
+            height: 160px;
+            background: linear-gradient(135deg, var(--hodari-blue) 0%, var(--hodari-blue-dark) 100%);
+            padding: 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .school-name {
+            font-size: 14px;
+            font-weight: 800;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin: 0;
+        }
+        .school-tagline {
+            font-size: 10px;
+            color: rgba(255,255,255,0.7);
+            margin-top: 4px;
+        }
+        .content-section {
+            flex: 1;
+            padding: 36px 32px 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        .photo-section {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: #eef2ff;
+            border: 4px solid var(--hodari-blue);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+            overflow: hidden;
+            font-size: 34px;
+            font-weight: 800;
+            color: var(--hodari-blue);
+        }
+        .staff-name {
+            font-size: 20px;
+            font-weight: 800;
+            color: #0f172a;
+            margin: 0;
+        }
+        .staff-role {
+            font-size: 13px;
+            font-weight: 600;
+            color: #64748b;
+            margin: 4px 0 0;
+        }
+        .staff-detail {
+            font-size: 11.5px;
+            color: #94a3b8;
+            margin-top: 12px;
+            line-height: 1.8;
+        }
+        .id-number-display {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            color: #0f172a;
+            margin: 20px 0 0;
+            text-align: center;
+        }
+        .id-label {
+            font-size: 10px;
+            font-weight: 700;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            margin-top: 4px;
+        }
+        .footer-section {
+            padding: 20px 32px;
+            background: #f8fafc;
+            border-top: 1px solid #f1f5f9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .contact-info {
+            font-size: 10px;
+            color: #94a3b8;
+            line-height: 1.5;
+        }
+        .print-controls {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 100;
+        }
+        .btn-print {
+            background: var(--hodari-blue);
+            color: #fff;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 16px;
+            font-weight: 700;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(30, 58, 138, 0.2);
+        }
+        @media print {
+            body { background: #fff; padding: 0; }
+            .print-controls { display: none; }
+            .id-card-container {
+                box-shadow: none;
+                border: 1px solid #e2e8f0;
+                margin: 40px auto;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="print-controls">
+        <button class="btn-print" onclick="window.print()">
+            Print ID Card
+        </button>
+    </div>
+
+    <div class="id-card-container">
+        <div class="header-section">
+            <div>
+                <h1 class="school-name">{{ brand.school_name }}</h1>
+                <div class="school-tagline">{{ brand.tagline|default:"Staff Identification" }}</div>
+            </div>
+        </div>
+
+        <div class="content-section">
+            <div class="photo-section">
+                {% if staff.user.initials %}{{ staff.user.initials }}{% else %}{{ staff.full_name|truncatechars:2 }}{% endif %}
+            </div>
+            <p class="staff-name">{{ staff.full_name }}</p>
+            <p class="staff-role">{{ staff.job_title }}</p>
+            <div class="staff-detail">
+                {{ staff.get_department_display }}<br>
+                {% if staff.contact_phone %}{{ staff.contact_phone }}<br>{% endif %}
+                {% if staff.contact_email %}{{ staff.contact_email }}{% endif %}
+            </div>
+            <p class="id-number-display">{{ staff.employee_id|default:"&mdash;" }}</p>
+            <p class="id-label">Staff ID Number</p>
+        </div>
+
+        <div class="footer-section">
+            <div class="contact-info">
+                {{ brand.website|default:"" }}<br>
+                {{ brand.address|truncatechars:40 }}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

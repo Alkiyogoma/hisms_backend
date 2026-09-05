@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Term Report &mdash; {{ student.get_full_name }}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Merriweather:wght@700&family=Roboto+Mono:wght@400;500&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --hodari-blue: #023AA5;
+      --hodari-blue-mid: #1A56C4;
+      --hodari-gold: #FBBC05;
+      --hodari-charcoal: #474747;
+      --text-primary: #1A1A2E;
+      --text-secondary: #474747;
+      --text-muted: #8492A6;
+      --border: #DDE3EE;
+      --font-ui: 'Roboto', sans-serif;
+      --font-display: 'Merriweather', serif;
+      --rating-E: #1B7B34;
+      --rating-E-bg: #E8F5EC;
+      --rating-G: #023AA5;
+      --rating-G-bg: #E8EEF9;
+      --rating-S: #92550A;
+      --rating-S-bg: #FEF3C7;
+      --rating-N: #9B1C1C;
+      --rating-N-bg: #FEF2F2;
+    }
+
+    body { font-family: var(--font-ui); background: #F2F5FA; color: var(--text-primary); line-height: 1.5; padding: 20px; }
+
+    .no-print { max-width: 720px; margin: 0 auto 20px; text-align: right; background: #fff; padding: 12px 20px; border-radius: 10px; border: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 12px; }
+    .btn { padding: 8px 16px; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; border: none; }
+    .btn-primary { background: var(--hodari-blue); color: #fff; }
+    .btn-outline { background: #fff; color: var(--hodari-blue); border: 1.5px solid var(--hodari-blue); }
+    .btn-green { background: #1B7B34; color: #fff; }
+
+    .report-container { max-width: 720px; margin: 0 auto; background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border-radius: 12px; overflow: hidden; }
+
+    /* Header */
+    .report-header { background: linear-gradient(135deg, #023AA5 0%, #1A56C4 100%); color: #fff; padding: 28px 32px; }
+    .logo-row { display: flex; align-items: flex-start; justify-content: space-between; }
+    .school-info { display: flex; align-items: center; gap: 16px; }
+    .school-name { font-size: 20px; font-weight: 700; letter-spacing: .02em; font-family: var(--font-display); }
+    .school-details { font-size: 12px; opacity: .85; line-height: 1.6; }
+    .report-title-badge { display: inline-block; background: rgba(251,188,5,.2); border: 1px solid rgba(251,188,5,.4); padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 700; color: #FBBC05; letter-spacing: .04em; margin-top: 14px; }
+    .term-meta { text-align: right; font-size: 12px; opacity: .85; line-height: 1.6; }
+
+    /* Student Info Bar */
+    .student-bar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; padding: 16px 32px; background: #f8fafc; border-bottom: 1px solid var(--border); }
+    .student-bar .field label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; display: block; margin-bottom: 2px; }
+    .student-bar .field value { font-size: 14px; font-weight: 600; color: var(--text-primary); display: block; }
+
+    /* Rating Key */
+    .key-banner { background: #F7F9FC; border-bottom: 1px solid var(--border); padding: 10px 32px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .key-label { font-size: 10.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+    .key-item { padding: 4px 12px; border-radius: 99px; font-size: 11px; font-weight: 600; border: 1px solid; }
+    .ki-E { background: var(--rating-E-bg); color: var(--rating-E); border-color: #B7DFBF; }
+    .ki-G { background: var(--rating-G-bg); color: var(--rating-G); border-color: #BFCFE9; }
+    .ki-S { background: var(--rating-S-bg); color: var(--rating-S); border-color: #FCD34D; }
+    .ki-N { background: var(--rating-N-bg); color: var(--rating-N); border-color: #FECACA; }
+
+    /* Report Body */
+    .report-body { padding: 24px 32px; }
+
+    .section-title { font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 14px; padding-bottom: 8px; border-bottom: 2px solid var(--hodari-blue); }
+
+    /* Domain Section */
+    .domain-section { margin-bottom: 20px; }
+    .domain-section:last-child { margin-bottom: 0; }
+    .domain-header { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--hodari-blue); margin-bottom: 8px; padding: 8px 12px; background: #f0f4fb; border-radius: 6px; border-left: 3px solid var(--hodari-blue); }
+
+    /* Competency Row */
+    .competency-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 0.5px solid #F0F4FB; font-size: 13px; }
+    .competency-row:last-child { border-bottom: none; }
+    .competency-name { flex: 1; color: var(--text-secondary); }
+    .competency-rating { width: 60px; text-align: center; }
+    .rating-pill { display: inline-block; font-size: 12px; font-weight: 700; padding: 4px 14px; border-radius: 99px; min-width: 38px; text-align: center; }
+    .rating-pill.rating-E { background: var(--rating-E-bg); color: var(--rating-E); }
+    .rating-pill.rating-G { background: var(--rating-G-bg); color: var(--rating-G); }
+    .rating-pill.rating-S { background: var(--rating-S-bg); color: var(--rating-S); }
+    .rating-pill.rating-N { background: var(--rating-N-bg); color: var(--rating-N); }
+    .rating-pill.rating-empty { background: #f5f5f5; color: #ccc; }
+
+    /* Summary Cards */
+    .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0; padding-top: 16px; border-top: 2px solid var(--border); }
+    .summary-card { background: #F7F9FC; border-radius: 10px; padding: 14px; }
+    .summary-card .label { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; }
+    .summary-card .value { font-size: 22px; font-weight: 700; color: var(--hodari-blue); font-family: 'Roboto Mono', monospace; }
+    .summary-card .value.remarks { font-size: 16px; color: #1B7B34; font-family: var(--font-ui); }
+
+    /* Attendance */
+    .attendance-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 20px 0; }
+    .att-card { border-radius: 10px; padding: 14px; text-align: center; }
+    .att-present { background: #E8F5EC; color: #1B7B34; }
+    .att-absent { background: #FEF2F2; color: #9B1C1C; }
+    .att-late { background: #FEF3C7; color: #92550A; }
+    .att-val { font-size: 22px; font-weight: 700; font-family: 'Roboto Mono', monospace; }
+    .att-lbl { font-size: 10px; font-weight: 600; text-transform: uppercase; margin-top: 2px; }
+
+    /* Comment Box */
+    .comment-section { margin: 20px 0; }
+    .comment-box { background: #F7F9FC; border-left: 4px solid var(--hodari-gold); border-radius: 0 8px 8px 0; padding: 16px 20px; font-size: 13px; font-style: italic; color: var(--text-secondary); line-height: 1.7; }
+
+    /* ABC Tables */
+    .abc-table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 12px; }
+    .abc-table th { background: #f0f4fb; text-align: left; padding: 10px 12px; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); border: 1px solid var(--border); font-weight: 700; }
+    .abc-table td { padding: 8px 12px; border: 1px solid var(--border); }
+    .abc-table tr:nth-child(even) td { background: #fafbfd; }
+    .status-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+    .status-complete { background: #E8F5EC; color: #1B7B34; }
+    .status-in_progress { background: #FEF3C7; color: #92550A; }
+
+    /* Signatures */
+    .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: end; margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border); page-break-inside: avoid; }
+    .sig-line { border-bottom: 1.5px solid var(--hodari-charcoal); height: 40px; min-height: 40px; position: relative; }
+    .sig-label { font-size: 12px; font-weight: 600; color: var(--hodari-charcoal); margin-top: 8px; line-height: 1.3; }
+    .sig-stamp { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%) rotate(-5deg); border: 2.5px solid var(--hodari-blue); color: var(--hodari-blue); font-weight: 900; padding: 4px 10px; font-size: 14px; text-transform: uppercase; border-radius: 4px; opacity: 0.8; white-space: nowrap; }
+
+    /* Footer */
+    .footer { margin-top: 30px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; align-items: flex-start; }
+
+    /* Page Break Helper */
+    .page-break-before { page-break-before: always; }
+    .no-break { page-break-inside: avoid; }
+
+    /* Print Styles */
+    @page {
+      size: A4;
+      margin: 15mm;
+    }
+    @media print {
+      body { background: #fff; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .no-print { display: none; }
+      .report-container { box-shadow: none; border-radius: 0; max-width: 100%; border: none; }
+      .domain-section { page-break-inside: avoid; }
+      .signatures { page-break-inside: avoid; }
+      .abc-table { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+{% load static role_tags %}
+
+  <div class="no-print">
+    {% is_hod_like user as can_signoff_ecd %}
+    {% if can_signoff_ecd %}
+      {% if report.status == 'pending_sign_off' or report.status == 'draft' %}
+        <form method="POST" action="{% url 'academics:signoff_action' %}" style="margin:0">
+            {% csrf_token %}
+            <input type="hidden" name="report_id" value="{{ report.id }}">
+            <button type="submit" class="btn btn-green">Approve & Sign Off</button>
+        </form>
+      {% endif %}
+    {% endif %}
+    {% if perms.academics.view_reportcard %}
+      <button onclick="window.print()" class="btn btn-primary" style="margin-left:8px">Print</button>
+    {% endif %}
+    {% if not can_signoff_ecd %}
+      <a href="{% url 'academics:parent_reports' %}" class="btn btn-outline" style="margin-left:8px">Back</a>
+    {% else %}
+      <button onclick="window.history.go(-2)" class="btn btn-outline" style="margin-left:8px">Back</button>
+    {% endif %}
+  </div>
+
+  <div class="report-container">
+    {% include "includes/hodari_print_header.html" %}
+
+    <!-- Report Title Row -->
+    <div style="padding:16px 32px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)">
+      <div style="font-weight:700;color:var(--hodari-blue);font-size:14px">
+        {% if report.ecd_template_type == "pre_k" %}PRE-KINDERGARTEN{% elif report.ecd_template_type == "kindergarten" %}KINDERGARTEN{% elif report.ecd_template_type == "pre_school" %}PRE-SCHOOL{% elif report.ecd_template_type == "abc" %}ABC CLASS{% else %}{{ report.ecd_template_type|upper }}{% endif %} PROGRESS REPORT
+      </div>
+      <div style="text-align:right;font-size:12px;color:var(--text-muted)">
+        Academic Year: {{ report.term.academic_year.name }}<br>
+        Term: {{ report.term.name }}<br>
+        Date: {% now "d F Y" %}
+      </div>
+    </div>
+
+    <!-- Student Info Bar -->
+    <div class="student-bar">
+      <div class="field">
+        <label>Student Name</label>
+        <value>{{ student.get_full_name }}</value>
+      </div>
+      <div class="field">
+        <label>Class</label>
+        <value>{{ student.class_name }}</value>
+      </div>
+      <div class="field">
+        <label>Class Teacher</label>
+        <value>{{ report.generated_by.get_full_name|default:report.generated_by.username }}</value>
+      </div>
+    </div>
+
+    <!-- Rating Key -->
+    <div class="key-banner">
+      <span class="key-label">Key:</span>
+      <span class="key-item ki-E">E &middot; Excellent</span>
+      <span class="key-item ki-G">G &middot; Good</span>
+      <span class="key-item ki-S">S &middot; Satisfactory</span>
+      <span class="key-item ki-N">N &middot; Not Yet</span>
+    </div>
+
+    <div class="report-body">
+      <div class="section-title">Academic Progress</div>
+
+      {% if ecd.template_type == 'abc' %}
+        <!-- ==================== ABC CLASS SECTION ==================== -->
+
+        <!-- PACE Progress -->
+        <div class="domain-section no-break">
+          <div class="domain-header">PACE Progress Tracker</div>
+          <table class="abc-table">
+            <thead>
+              <tr>
+                <th>Subject</th>
+                <th>PACE No.</th>
+                <th>Sticker</th>
+                <th>Status</th>
+                <th style="text-align:center">Sup. Score</th>
+                <th style="text-align:center">Mod. Score</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for pace in ecd.abc_pace_progress %}
+                <tr>
+                  <td style="font-weight:700">{{ pace.subject }}</td>
+                  <td>{{ pace.pace_no }}</td>
+                  <td>{{ pace.sticker_no|default:"-" }}</td>
+                  <td>
+                    <span class="status-badge {% if pace.status == 'complete' %}status-complete{% else %}status-in_progress{% endif %}">
+                      {{ pace.status|title }}
+                    </span>
+                  </td>
+                  <td style="text-align:center;font-weight:700;color:var(--hodari-blue)">{{ pace.supervisor_score|default:"-" }}</td>
+                  <td style="text-align:center;color:var(--text-muted)">{{ pace.moderator_score|default:"-" }}</td>
+                  <td style="color:var(--text-muted)">{{ pace.date_completed|default:"-" }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:16px">No PACE records</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Scripture & Reading -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px" class="no-break">
+          <div class="domain-section">
+            <div class="domain-header">Scripture &amp; Reading</div>
+            <div class="competency-row"><span class="competency-name">Scripture Memorisation (T1)</span><span class="competency-rating" style="font-weight:600">{{ ecd.abc_scripture.1|default:"-" }}</span></div>
+            <div class="competency-row"><span class="competency-name">Scripture Memorisation (T2)</span><span class="competency-rating" style="font-weight:600">{{ ecd.abc_scripture.2|default:"-" }}</span></div>
+            <div class="competency-row"><span class="competency-name">Scripture Memorisation (T3)</span><span class="competency-rating" style="font-weight:600">{{ ecd.abc_scripture.3|default:"-" }}</span></div>
+            <div class="competency-row"><span class="competency-name">Reading WPM (T3)</span><span class="competency-rating" style="font-weight:600">{{ ecd.abc_reading.3.wpm|default:"-" }}</span></div>
+            <div class="competency-row"><span class="competency-name">Reading % (T3)</span><span class="competency-rating" style="font-weight:600">{{ ecd.abc_reading.3.percentage|default:"-" }}%</span></div>
+            <div class="competency-row"><span class="competency-name">Comprehension (T3)</span><span class="competency-rating" style="font-weight:600">{{ ecd.abc_reading.3.comprehension_score|default:"-" }}%</span></div>
+          </div>
+          <div class="domain-section">
+            <div class="domain-header">General Assignments</div>
+            <div class="competency-row"><span class="competency-name">Assignment (T1)</span><span class="competency-rating" style="font-weight:600">{{ ecd.abc_assignments.1.score|default:"-" }}%</span></div>
+            <div class="competency-row"><span class="competency-name">Assignment (T2)</span><span class="competency-rating" style="font-weight:600">{{ ecd.abc_assignments.2.score|default:"-" }}%</span></div>
+            <div class="competency-row"><span class="competency-name">Assignment (T3)</span><span class="competency-rating" style="font-weight:600">{{ ecd.abc_assignments.3.score|default:"-" }}%</span></div>
+          </div>
+        </div>
+
+        <!-- Term 3 Internal Exam -->
+        {% if ecd.abc_internal_exams %}
+        <div class="domain-section no-break" style="margin-top:16px">
+          <div class="domain-header">Term 3 Internal Exam</div>
+          {% for exam in ecd.abc_internal_exams %}
+          <div class="competency-row">
+            <span class="competency-name">{{ exam.subject }}</span>
+            <span class="competency-rating"><span class="rating-pill rating-{{ exam.rating }}">{{ exam.rating }}</span></span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- ABC Character Domains -->
+        {% for group in ecd.domain_groups %}
+          <div class="domain-section no-break">
+            <div class="domain-header">{{ group.section }}</div>
+            {% for item in group.items %}
+              <div class="competency-row">
+                <span class="competency-name">{{ item.domain }}</span>
+                <span class="competency-rating">
+                  {% if item.rating %}
+                    <span class="rating-pill rating-{{ item.rating }}">{{ item.rating }}</span>
+                  {% else %}
+                    <span class="rating-pill rating-empty">-</span>
+                  {% endif %}
+                </span>
+              </div>
+            {% endfor %}
+          </div>
+        {% endfor %}
+
+      {% else %}
+        <!-- ==================== PRE-K / KG / PRE-SCHOOL SECTION ==================== -->
+        {% for group in ecd.domain_groups %}
+          <div class="domain-section no-break">
+            <div class="domain-header">{{ group.section }}</div>
+            {% for item in group.items %}
+              <div class="competency-row">
+                <span class="competency-name">{{ item.domain }}</span>
+                <span class="competency-rating">
+                  {% if item.rating %}
+                    <span class="rating-pill rating-{{ item.rating }}">{{ item.rating }}</span>
+                  {% else %}
+                    <span class="rating-pill rating-empty">-</span>
+                  {% endif %}
+                </span>
+              </div>
+            {% endfor %}
+          </div>
+        {% endfor %}
+      {% endif %}
+
+      <!-- Average & Remarks -->
+      {% if ecd.avg_score is not None %}
+      <div class="summary-grid">
+        <div class="summary-card">
+          <div class="label">Average Points</div>
+          <div class="value">{{ ecd.avg_score }}</div>
+        </div>
+        <div class="summary-card">
+          <div class="label">Overall Remarks</div>
+          <div class="value remarks">{{ ecd.remarks_label }}</div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Attendance -->
+      <div class="section-title" style="margin-top:20px">Attendance</div>
+      <div class="attendance-row">
+        <div class="att-card att-present">
+          <div class="att-val">{{ attendance.present }}</div>
+          <div class="att-lbl">Days Present</div>
+        </div>
+        <div class="att-card att-absent">
+          <div class="att-val">{{ attendance.absent }}</div>
+          <div class="att-lbl">Days Absent</div>
+        </div>
+        <div class="att-card att-late">
+          <div class="att-val">{{ attendance.late }}</div>
+          <div class="att-lbl">Days Late</div>
+        </div>
+      </div>
+
+      <!-- Teacher Comment -->
+      {% if ecd.teacher_comments %}
+        <div class="comment-section">
+          <div class="section-title">Class Teacher's Comment</div>
+          <div class="comment-box">
+            {{ ecd.teacher_comments }}
+          </div>
+        </div>
+      {% endif %}
+
+      <!-- Signatures -->
+      <div class="signatures">
+        <div>
+          <div class="sig-line">
+            {% if report.generated_by %}
+              <div style="font-size: 12px; color: var(--text-primary); font-weight: 600; text-align: center; padding-top: 4px;">{{ report.generated_by.get_full_name|default:report.generated_by.username }}</div>
+            {% endif %}
+          </div>
+          <div class="sig-label">Class Teacher Signature</div>
+        </div>
+        <div>
+          <div class="sig-line">
+            {% if report.signed_off_by %}
+              <div class="sig-stamp">OFFICIALLY SIGNED</div>
+              <div style="font-size: 11px; color: var(--text-muted); text-align: center; padding-top: 4px;">{{ report.signed_off_by.get_full_name|default:report.signed_off_by.username }}</div>
+            {% endif %}
+          </div>
+          <div class="sig-label">Head of School Signature</div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="footer">
+        <div style="flex:1">
+          <div style="font-weight:600; color:var(--hodari-charcoal)">School Re-opens: {{ report.term.next_term_start|default:"To be announced" }}</div>
+          <div style="margin-top:4px">&copy; {% now "Y" %} {{ brand.school_name }} &bull; Confidential Student Record</div>
+        </div>
+        <div style="text-align:right">
+          <div>{{ brand.phone }} &nbsp;|&nbsp; {{ brand.email }}</div>
+          <div>{{ brand.address }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

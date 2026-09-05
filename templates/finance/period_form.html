@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}{% if is_edit %}Edit{% else %}New{% endif %} Finance Period &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}{% if is_edit %}Edit Period{% else %}New Period{% endif %}{% endblock %}
+{% block topbar_date %}{% now "d F Y" %}{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:13px">
+  <a href="{% url 'finance:dashboard' %}" style="color:var(--hodari-blue);text-decoration:none;font-weight:500">Dashboard</a>
+  <span style="color:var(--text-muted)">&rarr;</span>
+  <a href="{% url 'finance:period_list' %}" style="color:var(--hodari-blue);text-decoration:none;font-weight:500">Periods</a>
+  <span style="color:var(--text-muted)">&rarr;</span>
+  <span style="color:var(--text-secondary);font-weight:500">{% if is_edit %}Edit{% else %}New{% endif %}</span>
+</div>
+
+<div class="card" style="max-width:600px">
+  <div class="card-title-row">
+    <span class="card-title" style="margin-bottom:0">
+      {% if is_edit %}Edit Period{% else %}Create New Finance Period{% endif %}
+    </span>
+  </div>
+
+  {% has_perm user "finance.add_financeperiod" as can_create %}
+  {% has_perm user "finance.change_financeperiod" as can_edit %}
+  {% if is_edit and can_edit or not is_edit and can_create %}
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="hf2-toolbar" style="flex-direction:column;align-items:stretch;gap:16px;padding:0;background:none;border:none">
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Period Name *</label>
+        <input type="text" name="name" value="{{ period.name|default:'' }}" required
+               class="hf2-input" style="width:100%" placeholder="e.g. Term 1 2026, January 2026">
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Start Date</label>
+          <input type="date" name="start_date" value="{{ period.start_date|date:'Y-m-d'|default:'' }}"
+                 class="hf2-input hf2-date" style="width:100%">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">End Date</label>
+          <input type="date" name="end_date" value="{{ period.end_date|date:'Y-m-d'|default:'' }}"
+                 class="hf2-input hf2-date" style="width:100%">
+        </div>
+      </div>
+
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Notes</label>
+        <textarea name="notes" class="hf2-input" style="width:100%;min-height:80px;resize:vertical" placeholder="Optional notes about this period...">{{ period.notes|default:'' }}</textarea>
+      </div>
+
+      {% if is_edit and period.is_reconciled %}
+      <div style="padding:10px 14px;background:#FFF3CD;border-radius:6px;font-size:12px;color:#856404">
+        This period is reconciled — only notes can be edited.
+      </div>
+      {% endif %}
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:20px">
+      <button type="submit" class="btn btn-primary btn-sm">
+        {% if is_edit %}Save Changes{% else %}Create Period{% endif %}
+      </button>
+      <a href="{% url 'finance:period_list' %}" class="btn btn-secondary btn-sm">Cancel</a>
+    </div>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

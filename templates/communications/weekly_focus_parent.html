@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Weekly Focus — {{ brand.school_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Weekly Focus</h1>
+    <p class="page-subtitle">{{ today_date }}</p>
+  </div>
+</div>
+
+{% if entries %}
+  <div style="display:flex;flex-direction:column;gap:12px">
+    {% for entry in entries %}
+      <div class="card" style="padding:20px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+          <div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;flex-wrap:wrap">
+              <span class="badge badge-blue">{{ entry.class_name }}</span>
+              <span style="font-size:12px;color:var(--text-muted)">Week {{ entry.week_number }} &middot; {{ entry.academic_year }}</span>
+              <span class="badge badge-green">Published</span>
+            </div>
+            <h3 style="margin:0;font-size:15px;color:var(--text-primary)">{{ entry.theme }}</h3>
+            <p style="margin:6px 0 0;font-size:13px;color:var(--text-muted)">By {{ entry.teacher.get_full_name|default:entry.teacher.username }}</p>
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);text-align:right">
+            {% if entry.published_at %}Published {{ entry.published_at|date:"d M Y H:i" }}{% endif %}
+          </div>
+        </div>
+
+        <div style="margin-top:14px;font-size:13px;color:var(--text-secondary);border-top:1px solid var(--border);padding-top:12px">
+          <p style="font-weight:600;margin-bottom:4px;color:var(--text-primary)">Planned Activities</p>
+          <div>{{ entry.planned_activities|linebreaksbr }}</div>
+          {% if entry.items_to_bring %}
+            <p style="font-weight:600;margin:12px 0 4px;color:var(--text-primary)">Items to Bring / Prepare</p>
+            <div>{{ entry.items_to_bring|linebreaksbr }}</div>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  {% include '_partials/empty_state.html' with title='No published weekly focus entries' desc='No weekly focus entries for your child\'s class yet.' icon='inbox' icon_color='grey' %}
+{% endif %}
+{% endblock %}

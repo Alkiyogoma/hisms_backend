@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+{% load static hodari_forms role_tags %}
+
+{% block title %}ECD HOD Dashboard — {{ brand.school_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .metrics-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ev-widget { background: #F7F9FC; border: 1px solid #DDE3EE; border-radius: 10px; padding: 14px; margin-top: 14px; }
+  .ev-title { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #8492A6; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
+  .ev-link { font-size: 12px; color: #023AA5; font-weight: 500; cursor: pointer; text-transform: none; letter-spacing: 0; text-decoration: none; }
+  .ev-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 0.5px solid #DDE3EE; }
+  .ev-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .ev-date { flex-shrink: 0; width: 44px; text-align: center; background: #fff; border: 1px solid #DDE3EE; border-radius: 7px; padding: 5px 3px; }
+  .ev-day { font-size: 17px; font-weight: 700; color: #023AA5; font-family: monospace; line-height: 1; }
+  .ev-mon { font-size: 9px; color: #8492A6; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; margin-top: 1px; }
+  .ev-body { flex: 1; min-width: 0; }
+  .ev-name { font-size: 12.5px; font-weight: 600; color: #1A1A2E; line-height: 1.3; }
+  .ev-meta { font-size: 11px; color: #8492A6; margin-top: 2px; }
+  .ev-badge { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 99px; font-size: 10px; font-weight: 700; margin-top: 5px; border: 1px solid transparent; }
+  .ev-today { background: #E8F5EC; color: #1B7B34; border-color: #B7DFBF; }
+  .ev-soon { background: #FEF3C7; color: #92550A; border-color: #FCD34D; }
+  .ev-normal { background: #E8EEF9; color: #023AA5; border-color: #BFCFE9; }
+
+
+  
+  .exp-meets { background: #E8F5EC; color: #1B7B34; border: 1px solid #B7DFBF; display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+  .exp-towards { background: #FEF3C7; color: #92550A; border: 1px solid #FCD34D; display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+  .exp-not { background: #FEF2F2; color: #9B1C1C; border: 1px solid #FECACA; display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+  
+  .queue-item { display: flex; align-items: flex-start; gap: 11px; padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid transparent; }
+  .qi-red { background: var(--red-bg); border-left-color: #DC2626; }
+  .qi-amber { background: var(--amber-bg); border-left-color: #D97706; }
+  .qi-btn { font-size: 11.5px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border-strong); background: #fff; color: var(--text-secondary); cursor: pointer; flex-shrink: 0; margin-top: 1px; font-weight: 500; }
+  .qi-label { font-size: 13px; font-weight: 600; color: var(--text-primary); line-height: 1.3; }
+  .qi-sub { font-size: 11.5px; color: var(--text-muted); margin-top: 3px; }
+  .qi-body { flex: 1; }
+</style>
+{% endblock %}
+
+{% block topbar_greeting %}Good {% if hour < 12 %}morning{% elif hour < 17 %}afternoon{% else %}evening{% endif %}, {{ user.get_full_name|default:user.username }}{% endblock %}
+{% block topbar_date %}{{ today_display }} &middot; ECD Department{% endblock %}
+
+{% block topbar_badges %}
+  <div class="topbar-badge badge-amber"><span class="badge-dot"></span>{{ welfare_to_review_count }} welfare entries</div>
+{% endblock %}
+
+{% block content %}
+<div id="dashboard-content" hx-target="this" hx-swap="innerHTML" hx-trigger="every 60s">
+  
+  <!-- Section Header -->
+  <div class="section-hdr">
+    <span class="section-title">ECD dept &middot; today</span>
+    <a href="{% url 'students:list' %}?department=ECD" class="section-link">View all children &rarr;</a>
+  </div>
+
+  <!-- Primary Metrics -->
+  <div class="metrics metrics-3">
+    <a href="{% url 'welfare:list' %}" class="metric-compact" style="background:linear-gradient(135deg,#FFF8ED,#fff);text-decoration:none;color:inherit">
+      <div class="mc-lbl-row"><span class="mc-lbl">Welfare entries to review</span></div>
+      <div class="mc-val" style="color:#B45309">{{ welfare_to_review_count }}</div>
+      <div class="mc-sub" style="color:#B45309">Submitted by ECD teachers today</div>
+    </a>
+    <a href="{% url 'welfare:list' %}?severity=high" class="metric-compact" style="background:linear-gradient(135deg,#FFF0F0,#fff);text-decoration:none;color:inherit">
+      <div class="mc-lbl-row"><span class="mc-lbl">Children flagged</span></div>
+      <div class="mc-val" style="color:#DC2626">{{ flagged_count }}</div>
+      <div class="mc-sub" style="color:#DC2626">Open welfare concerns</div>
+    </a>
+    <a href="{% url 'welfare:hod_dashboard' %}" class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff);text-decoration:none;color:inherit">
+      <div class="mc-lbl-row"><span class="mc-lbl">Parent comms needed</span></div>
+      <div class="mc-val" style="color:#023AA5">{{ comms_needed_count }}</div>
+      <div class="mc-sub" style="color:#5A697D">Families to contact today</div>
+    </a>
+  </div>
+
+  <!-- Staff Presence Card -->
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title-row">
+      <a href="{% url 'attendance:staff' %}" class="card-title" style="margin-bottom:0;text-decoration:none;color:inherit">ECD staff in school today &nearr;</a>
+      {% if staff_absent_count > 0 %}
+        <span class="chip chip-red">{{ staff_absent_count }} absent with classes</span>
+      {% else %}
+        <span class="chip chip-green">All present</span>
+      {% endif %}
+    </div>
+    
+    {% for staff in staff_attendance %}
+      <div class="trow">
+        <div>
+          <div class="trow-name">{{ staff.name }}</div>
+          <div class="trow-sub">{{ staff.role }}{% if staff.check_in %} · checked in {{ staff.check_in }}{% elif staff.is_teacher %} · {% if staff.has_classes_today %}has classes today{% else %}no classes today{% endif %}{% endif %}</div>
+        </div>
+        <span class="trow-right">
+          <span class="chip {% if staff.status == 'Present' %}chip-green{% else %}chip-amber{% endif %}">
+            {{ staff.status }}
+          </span>
+        </span>
+      </div>
+    {% endfor %}
+  </div>
+
+  {% if hos_review_queue %}
+  <div class="card" style="margin-bottom:14px;border-left:4px solid #1A56C4">
+    <div class="card-title-row">
+      <span class="card-title" style="margin-bottom:0">Applicants awaiting your HOS review</span>
+      <span class="chip chip-blue">{{ hos_review_count }} pending</span>
+    </div>
+    {% for item in hos_review_queue %}
+    <a href="{% url 'admissions:detail' item.applicant.pk %}" class="trow" style="text-decoration:none;color:inherit;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-left:3px solid #1A56C4;margin-left:12px">
+      <div>
+        <div class="trow-name">{{ item.applicant.child_full_name }} &middot; {{ item.applicant.grade_applying_for }}</div>
+        <div class="trow-sub">Assessment result: {{ item.result_display }}{% if item.teacher_comments %} &middot; {{ item.teacher_comments|truncatewords:12 }}{% endif %}</div>
+      </div>
+      <span class="trow-right" style="display:flex;gap:6px;align-items:center">
+        <a href="{% url 'admissions:detail' item.applicant.pk %}" style="font-size:11px;color:var(--text-muted);text-decoration:none;white-space:nowrap">Detail &rarr;</a>
+        {% has_perm user "admissions.submit_hos_review" as can_forward %}
+        {% if can_forward %}
+        <button type="button" style="padding:4px 10px;font-size:11px;font-weight:600;border:1px solid #BBF7D0;border-radius:6px;background:#DCFCE7;color:#166534;cursor:pointer;white-space:nowrap"
+          onclick="confirmDeleteModal({title:'Forward to HOS?',body:'Forward <strong>{{ item.applicant.child_full_name }}</strong> to HOS for decision?',detail:'The applicant will be moved to the HOS review queue.',confirmText:'Forward to HOS',url:'{% url 'admissions:hos_review_submit' item.applicant.pk %}',type:'info',extraData:[{name:'hod_comments',value:'Reviewed and recommended.'}]})">
+          Forward to HOS
+        </button>
+        {% endif %}
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if admission_actions %}
+  <div class="card" style="margin-bottom:14px;border-left:4px solid var(--hodari-gold)">
+    <div class="card-title-row">
+      <span class="card-title" style="margin-bottom:0">ECD Admissions requiring your attention</span>
+      <a href="{% url 'admissions:pipeline' %}" class="section-link" style="margin-left:auto">View all &rarr;</a>
+    </div>
+    {% for action in admission_actions %}
+      <div class="trow">
+        <div>
+          <div class="trow-name">{{ action.applicant.child_full_name|default:action.description }}</div>
+          <div class="trow-sub">{{ action.applicant.grade_applying_for|default:"N/A" }} &middot; {{ action.type|title }} &middot; {{ action.description }}</div>
+        </div>
+        <span class="trow-right">
+          <span class="chip {% if action.severity == 'high' %}chip-red{% else %}chip-amber{% endif %}">{{ action.severity|title }}</span>
+        </span>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="grid-2">
+    <!-- Welfare Reviews -->
+    <div class="card">
+      <div class="card-title-row">
+        <a href="{% url 'welfare:list' %}" class="card-title" style="margin-bottom:0;text-decoration:none;color:inherit">Welfare entries to review &nearr;</a>
+        <span class="chip chip-amber">{{ welfare_to_review_count }} pending</span>
+      </div>
+      {% for obs in welfare_review_list %}
+        <a href="{% url 'welfare:detail' obs.pk %}" class="trow" style="text-decoration:none; color:inherit; display:flex">
+          <div style="flex:1">
+            <div class="trow-name">{{ obs.student.get_full_name }} &middot; {{ obs.student.class_name }}</div>
+            <div class="trow-sub">{{ obs.observation_text|truncatechars:80 }} &middot; {{ obs.submitted_by.last_name }} &middot; Today</div>
+          </div>
+          <span class="trow-right">
+            <span class="chip {% if obs.severity == 'critical' or obs.severity == 'high' %}chip-red{% else %}chip-amber{% endif %}">
+              {{ obs.get_severity_display|split:' — '|first }}
+            </span>
+          </span>
+        </a>
+      {% empty %}
+        <div class="trow"><div class="trow-name t-muted">No welfare entries pending.</div></div>
+      {% endfor %}
+    </div>
+
+    <!-- Attendance -->
+    <div class="card">
+      <a href="{% url 'attendance:today' %}" class="card-title" style="text-decoration:none;color:inherit;display:block">ECD attendance today &nearr;</a>
+      {% for item in class_attendance %}
+        <div class="trow">
+          <div>
+            <div class="trow-name">{{ item.name }}</div>
+            {% if item.pct < 85 %}<span class="chip chip-amber" style="font-size:10px">&#9679; Attention</span>{% endif %}
+          </div>
+          <span class="trow-right">
+            <span class="status-dot dot-{{ item.status }}"></span>
+            <span class="trow-val t-{{ item.status }}">{{ item.pct }}%</span>
+          </span>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title-row">
+      <a href="{% url 'academics:analytics' %}" class="card-title" style="margin-bottom:0;text-decoration:none;color:inherit">Progression expectation status &nearr;</a>
+      <span class="chip chip-red">{{ progression.not_meet }} Does Not Meet</span>
+    </div>
+    
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:10px 0 14px">
+      <a href="{% url 'academics:analytics' %}" style="background:#E8F5EC;border:1px solid #B7DFBF;border-radius:8px;padding:12px;text-align:center;text-decoration:none;display:block">
+        <div style="font-size:22px;font-weight:700;color:#1B7B34;font-family:monospace">{{ progression.meets }}</div>
+        <div style="font-size:10.5px;color:#1B7B34;font-weight:600;margin-top:2px">Meets expectation</div>
+      </a>
+      <a href="{% url 'academics:analytics' %}" style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:12px;text-align:center;text-decoration:none;display:block">
+        <div style="font-size:22px;font-weight:700;color:#92550A;font-family:monospace">{{ progression.towards }}</div>
+        <div style="font-size:10.5px;color:#92550A;font-weight:600;margin-top:2px">Working towards</div>
+      </a>
+      <a href="{% url 'academics:analytics' %}" style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:12px;text-align:center;text-decoration:none;display:block">
+        <div style="font-size:22px;font-weight:700;color:#9B1C1C;font-family:monospace">{{ progression.not_meet }}</div>
+        <div style="font-size:10.5px;color:#9B1C1C;font-weight:600;margin-top:2px">Does not meet</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <!-- Follow-up -->
+    <div class="card">
+      <a href="{% url 'welfare:list' %}" class="card-title" style="text-decoration:none;color:inherit;display:block">Children flagged for follow-up &nearr;</a>
+      {% for obs in flagged_children %}
+      <div class="trow">
+        <div>
+          <div class="trow-name">{{ obs.student.first_name }} {{ obs.student.last_name|first }}.</div>
+          <div class="trow-sub">{{ obs.student.class_name }} &middot; {{ obs.get_concern_type_display }}</div>
+        </div>
+        <span class="trow-right">
+          <span class="chip {% if obs.severity == 'critical' %}chip-red{% elif obs.severity == 'high' %}chip-red{% elif obs.severity == 'medium' %}chip-amber{% else %}chip-green{% endif %}">
+            {{ obs.get_severity_display|truncatechars:8 }}
+          </span>
+        </span>
+      </div>
+      {% empty %}
+      <div style="padding:24px;text-align:center;color:#94A3B8;font-size:13px">No children currently flagged</div>
+      {% endfor %}
+    </div>
+
+    <!-- Comms -->
+    <div class="card">
+      <a href="{% url 'welfare:hod_dashboard' %}" class="card-title" style="text-decoration:none;color:inherit;display:block">Parent communications needed &nearr;</a>
+      {% for obs in parent_comms_needed %}
+      <div class="queue-item qi-red">
+        <div class="qi-body">
+          <div class="qi-label">{{ obs.student.first_name }} {{ obs.student.last_name|first }}.'s parents &middot; {{ obs.get_concern_type_display|lower }}</div>
+          <div class="qi-sub">{% if obs.parent_contacted %}Contacted {{ obs.parent_contact_datetime|date:"d M" }}{% else %}Contact before end of school day{% endif %}</div>
+        </div>
+        <a href="tel:" class="qi-btn" style="text-decoration:none">Call now</a>
+      </div>
+      {% empty %}
+      <div style="padding:24px;text-align:center;color:#94A3B8;font-size:13px">No parent communications needed</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

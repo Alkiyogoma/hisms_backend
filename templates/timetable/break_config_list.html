@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}ECD Break Times — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}ECD Break Time Configuration{% endblock %}
+
+{% block content %}
+{% has_perm user "timetable.add_ecdbreakconfig" as can_add %}
+{% has_perm user "timetable.change_ecdbreakconfig" as can_change %}
+<div class="card-title-row">
+  <div class="card-title">Break &amp; Nap Schedules (ECD Classes)</div>
+  {% if can_add %}
+  <a href="{% url 'timetable:break_config_create' %}" class="btn-primary">+ New Config</a>
+  {% endif %}
+</div>
+
+<div class="card" style="padding:0; overflow:hidden; margin-top:20px">
+  {% if break_configs %}
+  <table class="h-table">
+    <thead>
+      <tr>
+        <th>Class</th>
+        <th>Snack Break</th>
+        <th>Lunch Break</th>
+        <th>Nap Time</th>
+        <th style="width:100px">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for cfg in break_configs %}
+      <tr>
+        <td style="font-weight:700; color:var(--hodari-blue)">{{ cfg.class_name }}</td>
+        <td>{{ cfg.snack_break_start|time:"H:i" }} &ndash; {{ cfg.snack_break_end|time:"H:i" }}</td>
+        <td>{{ cfg.lunch_break_start|time:"H:i" }} &ndash; {{ cfg.lunch_break_end|time:"H:i" }}</td>
+        <td>
+          {% if cfg.nap_time_start %}
+            {{ cfg.nap_time_start|time:"H:i" }} &ndash; {{ cfg.nap_time_end|time:"H:i" }}
+          {% else %}
+            <span style="color:var(--text-muted)">Not set</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if can_change %}
+          <a href="{% url 'timetable:break_config_edit' pk=cfg.pk %}" class="hf-btn hf-btn-secondary" style="font-size:11px; padding:4px 10px">Edit</a>
+          {% else %}
+          <span style="font-size:11px;color:var(--text-secondary)">Read only</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="padding:40px; text-align:center">
+    {% if can_add %}
+    {% url 'timetable:break_config_create' as create_url %}
+    {% include '_partials/empty_state.html' with title='No break configurations yet' desc='Configure ECD class break times so they display on the timetable.' icon='calendar' icon_color='grey' action_url=create_url action_text='+ Add First Config' action_btn='true' %}
+    {% else %}
+    <p style="color:var(--text-secondary)">No break configurations yet.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<div style="margin-top:16px; background:var(--blue-st-bg); border:1px solid var(--blue-st-bd); padding:12px 20px; border-radius:10px; display:flex; align-items:center; gap:12px">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+  <div style="font-size:12.5px; color:var(--hodari-blue)">
+    ECD break and nap times are shown on the timetable grid and used to avoid scheduling lessons during break periods.
+  </div>
+</div>
+{% endblock %}

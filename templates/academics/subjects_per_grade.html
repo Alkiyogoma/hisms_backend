@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Subjects per Grade &mdash; {{ brand.school_name }}{% endblock %}
+
+{% block content %}
+{% include "academics/_top_tabs.html" %}
+<div class="section-hdr">
+  <span class="section-title">Subjects per Grade</span>
+  <a href="{% url 'academics:subjects' %}" class="hf-btn hf-btn-secondary hf-btn-sm">Subject-Centric View</a>
+</div>
+
+<div class="card">
+  <table style="width:100%;border-collapse:collapse">
+    <thead>
+      <tr style="border-bottom:2px solid var(--border)">
+        <th style="padding:10px 8px;font-size:11px;color:var(--text-muted);font-weight:600;text-align:left;text-transform:uppercase">Grade</th>
+        <th style="padding:10px 8px;font-size:11px;color:var(--text-muted);font-weight:600;text-align:left;text-transform:uppercase">Department</th>
+        <th style="padding:10px 8px;font-size:11px;color:var(--text-muted);font-weight:600;text-align:left;text-transform:uppercase">Configured Subjects</th>
+        <th style="padding:10px 8px;font-size:11px;color:var(--text-muted);font-weight:600;text-align:center;text-transform:uppercase">Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in grade_data %}
+      <tr style="border-bottom:1px solid #F3F4F6;font-size:13px">
+        <td style="padding:10px 8px;font-weight:600">{{ item.grade.name }}</td>
+        <td style="padding:10px 8px">
+          <span class="chip {% if item.grade.department == 'ECD' %}chip-amber{% elif item.grade.department == 'PRIMARY' %}chip-blue{% else %}chip-grey{% endif %}">
+            {{ item.grade.get_department_display }}
+          </span>
+        </td>
+        <td style="padding:10px 8px">
+          <div style="display:flex;flex-wrap:wrap;gap:4px">
+            {% for s in item.subjects %}
+              <span class="chip chip-blue" style="font-size:11px;{% if not s.is_active %}opacity:.55;text-decoration:line-through{% endif %}" title="{% if not s.is_active %}Retired — retained for historical records{% else %}Active{% endif %}">{{ s.name }}{% if not s.is_active %} (retired){% endif %}</span>
+            {% empty %}
+              <span style="color:var(--text-muted);font-size:12px;font-style:italic">No subjects configured</span>
+            {% endfor %}
+          </div>
+        </td>
+        <td style="padding:10px 8px;text-align:center">
+          <span style="font-weight:600;color:{% if item.subject_count == 0 %}#dc2626{% elif item.subject_count < 3 %}#B45309{% else %}#16A34A{% endif %}">
+            {{ item.subject_count }}
+          </span>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="4" style="padding:32px;text-align:center;color:var(--text-muted)">
+          No grade classes found. <a href="{% url 'academics:class_management' %}">Create classes first</a>.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

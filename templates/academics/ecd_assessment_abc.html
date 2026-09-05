@@ -1,0 +1,620 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}ECD Reports — ABC Class{% endblock %}
+{% block topbar_greeting %}ECD Reports — ABC Class{% endblock %}
+{% block topbar_date %}{% if current_term %}{{ current_term.name }} &middot; {{ current_term.academic_year.name }} &middot; Supervisor's Progress Card{% else %}Supervisor's Progress Card{% endif %} &middot; {{ brand.school_name }}{% endblock %}
+{% block topbar_badges %}<div class="topbar-badge badge-amber" id="topbar-progress-badge"><span class="badge-dot"></span><span id="topbar-badge-text">Loading...</span></div>{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'branding/ecd-assessment.css' %}">
+<style>
+.class-tabs-container{background:#fff;border-bottom:1px solid #E2E8F0;margin:0 -28px 24px -28px;padding:0 28px;display:flex;align-items:center;gap:8px;overflow-x:auto;scrollbar-width:none;position:sticky;top:108px;z-index:39}
+.class-tabs-container::-webkit-scrollbar{display:none}
+.class-tab{padding:16px 24px;font-size:14px;font-weight:600;color:#64748B;text-decoration:none;border-bottom:3px solid transparent;transition:all .2s ease;white-space:nowrap}
+.class-tab:hover{color:#023AA5;background:#F8FAFC}
+.class-tab.active{color:#023AA5;border-bottom-color:#023AA5}
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "academics/_top_tabs_progress.html" %}
+<div class="content" style="padding:24px 28px">
+  {% if no_class_assigned %}
+  <div style="text-align:center; padding:60px 20px">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:16px"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+    <div style="font-size:16px; font-weight:600; color:#475569; margin-bottom:8px">No ECD classes assigned</div>
+    <div style="font-size:13px; color:#94A3B8; max-width:400px; margin:0 auto">You have no ECD class assignments for the current term. Contact your administrator to assign classes.</div>
+  </div>
+  {% else %}
+  <!-- Class tabs -->
+  <div class="class-tabs-container">
+    {% for tab in ecd_tabs %}<a href="{% url 'academics:ecd_assessment' %}?class_name={{ tab.class_name }}" class="class-tab {% if ecd_class_name == tab.class_name %}active{% endif %}">{{ tab.display_name }}</a>{% endfor %}
+
+  </div>
+
+  <!-- ACE banner -->
+  <div style="background:#1A1A2E;border-radius:8px;padding:10px 16px;margin-bottom:14px;font-size:12.5px;display:flex;align-items:center;gap:10px">
+    <strong style="color:#FBBC05">ABC Class — A.C.E. Curriculum</strong>
+    <span style="color:rgba(251,188,5,.4)">|</span>
+    <span style="color:rgba(255,255,255,.7);font-size:12px">Record Supervisor score (S%) per PACE. M% = Moderator score (optional). STK = sticker sequence number.</span>
+  </div>
+
+  <!-- Lock banner -->
+  <div id="lock-banner" style="display:none;background:#FEF2F2;border:2px solid #DC2626;border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:13px;color:#991B1B">
+    <strong>This report is locked</strong><br>
+    <span style="font-size:12px">This report cannot be edited. Contact the HOD if corrections are needed.</span>
+  </div>
+
+  <!-- Welfare warning banner -->
+  <div id="welfare-banner" style="display:none;background:#FEF3C7;border:2px solid #F59E0B;border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:13px;color:#92400E">
+    <strong>Welfare Alert</strong><br>
+    <span id="welfare-banner-text" style="font-size:12px"></span>
+  </div>
+
+  <!-- Progress bar -->
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+    <div style="flex:1;background:#EDF1F7;height:8px;border-radius:99px;overflow:hidden"><div id="progress-bar" style="width:0%;height:100%;background:#FBBC05;border-radius:99px;transition:width .3s"></div></div>
+    <span id="progress-text" style="font-size:12px;color:#8492A6;white-space:nowrap;font-weight:500">0 of 0 students complete</span>
+    <button onclick="submitAllToHOD()" style="padding:7px 14px;background:#1B7B34;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">Submit all to HOD</button>
+  </div>
+
+  <!-- Main layout -->
+  <div style="display:grid;grid-template-columns:220px 1fr;gap:16px;align-items:start">
+    <!-- Student sidebar -->
+    <div style="background:#fff;border:1px solid #DDE3EE;border-radius:10px;padding:12px 0">
+      <div id="student-list-header" style="font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8492A6;padding:0 14px 8px">Students (0)</div>
+      <div id="student-list"></div>
+    </div>
+    <!-- Main panel -->
+    <div>
+      <div style="background:#fff;border:1px solid #DDE3EE;border-radius:10px;padding:18px 20px;margin-bottom:14px;position:relative">
+        <!-- Lock overlay -->
+        <div id="lock-overlay" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.7);border-radius:10px;z-index:10;align-items:center;justify-content:center;flex-direction:column;gap:8px">
+          <span style="font-size:14px;color:#991B1B;font-weight:600">Report is locked</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <div>
+            <div id="student-name-display" style="font-size:16px;font-weight:700;color:#1A1A2E;font-style:italic">Select a student</div>
+            <div style="font-size:12px;color:#8492A6;margin-top:2px">ABC Class &middot; {% if current_term %}{{ current_term.name }} &middot; {{ current_term.academic_year.name }}{% endif %}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <button onclick="movePrev()" style="padding:6px 12px;background:#fff;color:#8492A6;border:1px solid #DDE3EE;border-radius:7px;font-size:12px;cursor:pointer">Prev</button>
+            <button onclick="moveNext()" style="padding:6px 12px;background:#023AA5;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">Next</button>
+          </div>
+        </div>
+
+        <div style="font-size:13px;font-weight:700;color:#1A1A2E;margin-bottom:12px">PACE Progress by Subject</div>
+        <div id="pace-subjects-container"></div>
+
+        <!-- Scripture -->
+        <div style="padding-top:14px;border-top:2px solid #DDE3EE;margin-bottom:16px">
+          <div style="font-size:13px;font-weight:700;color:#023AA5;margin-bottom:10px">Scripture</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+            <div style="background:#F7F9FC;border-radius:8px;padding:10px"><div style="font-size:10px;font-weight:700;color:#8492A6;margin-bottom:4px">Term 1</div><input id="scr-q1" type="text" class="pace-inp" placeholder="e.g. Psalms 100:1-4"></div>
+            <div style="background:#F7F9FC;border-radius:8px;padding:10px"><div style="font-size:10px;font-weight:700;color:#8492A6;margin-bottom:4px">Term 2</div><input id="scr-q2" type="text" class="pace-inp" placeholder="e.g. Psalms 100:1-5"></div>
+            <div style="background:#F7F9FC;border-radius:8px;padding:10px"><div style="font-size:10px;font-weight:700;color:#8492A6;margin-bottom:4px">Term 3</div><input id="scr-q3" type="text" class="pace-inp" placeholder="e.g. Psalms 96:1-5"></div>
+          </div>
+        </div>
+
+        <!-- General Assignments -->
+        <div style="padding-top:14px;border-top:2px solid #DDE3EE;margin-bottom:16px">
+          <div style="font-size:13px;font-weight:700;color:#023AA5;margin-bottom:10px">General Assignments</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+            {% for n in "123" %}
+            <div style="background:#F7F9FC;border-radius:8px;padding:10px">
+              <div style="font-size:10px;font-weight:700;color:#8492A6;margin-bottom:6px">Term {{ n }}</div>
+              <input id="asn-item-{{ n }}" class="pace-inp" placeholder="Assignment item" style="margin-bottom:4px">
+              <input id="asn-score-{{ n }}" class="pace-inp" placeholder="Score %" type="text">
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Reading Programme -->
+        <div style="padding-top:14px;border-top:2px solid #DDE3EE;margin-bottom:16px">
+          <div style="font-size:13px;font-weight:700;color:#023AA5;margin-bottom:10px">Reading Programme</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+            {% for n in "123" %}
+            <div style="background:#F7F9FC;border-radius:8px;padding:10px">
+              <div style="font-size:10px;font-weight:700;color:#8492A6;margin-bottom:6px">Term {{ n }}</div>
+              <input id="rd-wpm-{{ n }}" class="pace-inp" placeholder="w.p.m." style="margin-bottom:3px">
+              <input id="rd-pct-{{ n }}" class="pace-inp" placeholder="%" style="margin-bottom:3px">
+              <input id="rd-comp-{{ n }}" class="pace-inp" placeholder="comp score">
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Character evaluation -->
+        <div class="sec-hdr">Character Evaluation</div>
+        {% for label, fid in abc_fields_character %}
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid #DDE3EE;gap:10px">
+          <div style="font-size:13px;color:#1A1A2E;flex:1">{{ label }}</div>
+          <div style="display:flex;gap:5px;flex-shrink:0">
+            <div class="ecd-grade-btn" style="width:36px;height:36px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid transparent;display:inline-flex;align-items:center;justify-content:center;background:#E8F5EC;color:#1B7B34;border-color:#B7DFBF" onclick="selectGradeABC(this,'{{ fid }}','E')">E</div>
+            <div class="ecd-grade-btn" style="width:36px;height:36px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid transparent;display:inline-flex;align-items:center;justify-content:center;background:#E8EEF9;color:#023AA5;border-color:#BFCFE9" onclick="selectGradeABC(this,'{{ fid }}','G')">G</div>
+            <div class="ecd-grade-btn" style="width:36px;height:36px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid transparent;display:inline-flex;align-items:center;justify-content:center;background:#FEF3C7;color:#92550A;border-color:#FCD34D" onclick="selectGradeABC(this,'{{ fid }}','S')">S</div>
+            <div class="ecd-grade-btn" style="width:36px;height:36px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid transparent;display:inline-flex;align-items:center;justify-content:center;background:#FEF2F2;color:#9B1C1C;border-color:#FECACA" onclick="selectGradeABC(this,'{{ fid }}','N')">N</div>
+            <input type="hidden" id="{{ fid }}">
+          </div>
+        </div>
+        {% endfor %}
+
+        <!-- FR-ACAD-013: ABC Class Term 3 Internal Exam -->
+        <div id="internal-exam-section" style="padding-top:14px;border-top:2px solid #DDE3EE;margin-bottom:16px">
+          <div style="font-size:13px;font-weight:700;color:#023AA5;margin-bottom:10px">Term 3 Internal Exam <span style="font-weight:400;font-size:11px;color:#8492A6">(school-run internal exam using E/G/S/N grading)</span></div>
+          <div id="internal-exam-subjects"></div>
+          <p style="font-size:11px;color:#8492A6;margin-top:6px">Record results for ABC Class students who sit the Term 3 internal exam. Uses the same 4-level grading scheme as ECD assessment.</p>
+        </div>
+
+        <!-- Teacher comment -->
+        <div class="sec-hdr">Class Teacher&#x2019;s Comment <span style="color:#DC2626">*</span></div>
+        <textarea id="teacher-comment" class="comment-area" onkeyup="checkComment()" placeholder="Required (minimum 50 characters)"></textarea>
+        <div id="char-count" class="char-count">0 / 50 minimum</div>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:4px">
+        <div style="font-size:12px;color:#8492A6">All fields required before submission. Save draft at any time.</div>
+        <div style="display:flex;gap:8px">
+          <button onclick="saveDraft()" style="padding:8px 16px;background:#fff;color:#474747;border:1px solid #DDE3EE;border-radius:8px;font-size:13px;cursor:pointer">Save draft</button>
+          <button onclick="submitToHOD()" id="btn-submit" style="padding:8px 16px;background:#1B7B34;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Submit to HOD</button>
+          <button onclick="saveAndNext()" style="padding:8px 16px;background:#023AA5;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Save &amp; next student</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script>
+const CLASS_NAME = "{{ ecd_class_name }}";
+const API = "/academics/api/ecd/";
+const CSRF = "{{ csrf_token }}";
+const CURRENT_TERM = {{ current_term_num|default:"1" }};
+let students = [], current = null, isLocked = false;
+const WELFARE_FLAGS = {{ welfare_flags|default:"{}" }};
+
+// PACE subjects
+const SUBJECTS = [
+  {label:"Mathematics", code:"MATH 5-8", prefix:"M", paces:[5,6,7,8]},
+  {label:"English", code:"ENG 5-8", prefix:"E", paces:[5,6,7,8]},
+  {label:"Word Building", code:"WB 5-8", prefix:"W", paces:[5,6,7,8]},
+  {label:"Science", code:"SCI 5-8", prefix:"S", paces:[5,6,7,8]},
+  {label:"Social Studies", code:"SS 5-8", prefix:"SS", paces:[5,6,7,8]},
+  {label:"Scripture", code:"SCR 5-8", prefix:"SC", paces:[5,6,7,8]},
+];
+
+// FR-ACAD-013: Term 3 Internal Exam subjects
+const INTERNAL_EXAM_SUBJECTS = [
+  "Mathematics", "English", "Science", "Social Studies", "Word Building", "Scripture"
+];
+
+function buildInternalExamUI() {
+  const container = document.getElementById("internal-exam-subjects");
+  container.innerHTML = INTERNAL_EXAM_SUBJECTS.map(function(subj) {
+    var fid = "iex-" + subj.replace(/\s+/g, "_");
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid #DDE3EE;gap:10px">' +
+      '<div style="font-size:13px;color:#1A1A2E;flex:1">' + subj + '</div>' +
+      '<div style="display:flex;gap:5px;flex-shrink:0">' +
+      '<div class="ecd-grade-btn" style="width:36px;height:36px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid transparent;display:inline-flex;align-items:center;justify-content:center;background:#E8F5EC;color:#1B7B34;border-color:#B7DFBF" onclick="selectInternalExamGrade(this,\'' + fid + '\',\'E\')">E</div>' +
+      '<div class="ecd-grade-btn" style="width:36px;height:36px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid transparent;display:inline-flex;align-items:center;justify-content:center;background:#E8EEF9;color:#023AA5;border-color:#BFCFE9" onclick="selectInternalExamGrade(this,\'' + fid + '\',\'G\')">G</div>' +
+      '<div class="ecd-grade-btn" style="width:36px;height:36px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid transparent;display:inline-flex;align-items:center;justify-content:center;background:#FEF3C7;color:#92550A;border-color:#FCD34D" onclick="selectInternalExamGrade(this,\'' + fid + '\',\'S\')">S</div>' +
+      '<div class="ecd-grade-btn" style="width:36px;height:36px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid transparent;display:inline-flex;align-items:center;justify-content:center;background:#FEF2F2;color:#9B1C1C;border-color:#FECACA" onclick="selectInternalExamGrade(this,\'' + fid + '\',\'N\')">N</div>' +
+      '<input type="hidden" id="' + fid + '">' +
+      '</div></div>';
+  }).join('');
+  applyTermGating();
+}
+
+function selectInternalExamGrade(el, fieldId, grade) {
+  if (isLocked) return;
+  const grp = el.parentElement;
+  grp.querySelectorAll("[onclick*=\"selectInternalExamGrade\"]").forEach(function(b) {
+    b.style.background = '';
+    b.style.color = '';
+    b.style.borderColor = '';
+  });
+  el.style.background = '#023AA5';
+  el.style.color = '#fff';
+  el.style.borderColor = '#023AA5';
+  const inp = document.getElementById(fieldId);
+  if (inp) inp.value = grade;
+  saveDraft();
+}
+
+function buildPaceSubjects() {
+  const container = document.getElementById("pace-subjects-container");
+  container.innerHTML = SUBJECTS.map((subj, si) => {
+    const rows = subj.paces.map((p, pi) => {
+      const key = `${subj.prefix}${p}`;
+      return `<div class="pace-grid" style="display:grid;grid-template-columns:80px 70px 110px 80px 80px 80px;gap:8px;align-items:center;padding:7px 0;border-bottom:0.5px solid #DDE3EE;font-size:12.5px" id="pace-row-${si}-${pi}">
+        <span style="font-weight:600;color:#1A1A2E">${key}</span>
+        <span style="color:#8492A6">${p}</span>
+        <div id="pace-status-${si}-${pi}" style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:5px;background:#FEF3C7;color:#92550A;text-align:center;cursor:pointer" onclick="togglePaceStatus(${si},${pi})">In progress</div>
+        <input class="pace-inp" id="pace-s-${si}-${pi}" placeholder="—" type="number" min="0" max="100">
+        <input class="pace-inp" id="pace-m-${si}-${pi}" placeholder="—" type="number" min="0" max="100">
+        <input class="pace-inp" id="pace-d-${si}-${pi}" placeholder="—" type="date">
+      </div>`;
+    }).join('');
+    return `<div style="margin-bottom:18px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="font-size:13px;font-weight:700;color:#023AA5">${subj.label} (${subj.code})</div>
+        <div style="font-size:11px;color:#8492A6">Completed: <strong id="pace-count-${si}" style="color:#1B7B34">0/${subj.paces.length} PACEs</strong></div>
+      </div>
+      <div class="pace-grid" style="display:grid;grid-template-columns:80px 70px 110px 80px 80px 80px;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #DDE3EE">
+        <span style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8492A6">PACE</span>
+        <span style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8492A6">STK</span>
+        <span style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8492A6">Status</span>
+        <span style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8492A6">S%</span>
+        <span style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8492A6">M%</span>
+        <span style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8492A6">Date</span>
+      </div>
+      ${rows}
+    </div>`;
+  }).join('');
+}
+
+function togglePaceStatus(si, pi) {
+  if (isLocked) return;
+  const el = document.getElementById(`pace-status-${si}-${pi}`);
+  const isComplete = el.textContent.trim() === 'Complete';
+  el.textContent = isComplete ? 'In progress' : 'Complete';
+  el.style.background = isComplete ? '#FEF3C7' : '#E8F5EC';
+  el.style.color = isComplete ? '#92550A' : '#1B7B34';
+  updatePaceCount(si);
+  saveDraft();
+}
+
+function updatePaceCount(si) {
+  const count = SUBJECTS[si].paces.filter((_, pi) => {
+    const el = document.getElementById(`pace-status-${si}-${pi}`);
+    return el && el.textContent.trim() === 'Complete';
+  }).length;
+  const el = document.getElementById(`pace-count-${si}`);
+  if (el) el.textContent = `${count}/${SUBJECTS[si].paces.length} PACEs`;
+}
+
+async function init() {
+  buildPaceSubjects();
+  buildInternalExamUI();
+  // Term gating — disable fields for terms beyond current term (FR-CAL-002)
+  applyTermGating();
+  const r = await fetch(API + "students/?class_name=" + encodeURIComponent(CLASS_NAME));
+  const d = await r.json();
+  students = d.students || [];
+  renderList();
+  if (students.length) loadStudent(students[0].id);
+  refreshProgress();
+}
+
+function applyTermGating() {
+  // Term gating: fields for terms > CURRENT_TERM are disabled (FR-CAL-002)
+  for (let q = 1; q <= 3; q++) {
+    const disabled = q > CURRENT_TERM;
+    // Scripture inputs
+    const scrEl = document.getElementById("scr-q" + q);
+    if (scrEl) { scrEl.disabled = disabled; scrEl.placeholder = disabled ? "Not yet available" : scrEl.placeholder; }
+    // Assignment inputs
+    const asnItem = document.getElementById("asn-item-" + q);
+    const asnScore = document.getElementById("asn-score-" + q);
+    if (asnItem) { asnItem.disabled = disabled; asnItem.placeholder = disabled ? "Not yet available" : asnItem.placeholder; }
+    if (asnScore) { asnScore.disabled = disabled; }
+    // Reading inputs
+    const rdWpm = document.getElementById("rd-wpm-" + q);
+    const rdPct = document.getElementById("rd-pct-" + q);
+    const rdComp = document.getElementById("rd-comp-" + q);
+    if (rdWpm) { rdWpm.disabled = disabled; rdWpm.placeholder = disabled ? "—" : rdWpm.placeholder; }
+    if (rdPct) { rdPct.disabled = disabled; rdPct.placeholder = disabled ? "—" : rdPct.placeholder; }
+    if (rdComp) { rdComp.disabled = disabled; rdComp.placeholder = disabled ? "—" : rdComp.placeholder; }
+  }
+  // Apply visual dimming to future-term columns
+  for (let q = CURRENT_TERM + 1; q <= 3; q++) {
+    document.querySelectorAll('[id$="-' + q + '"], [id^="scr-q" + q], [id^="asn-item-" + q], [id^="rd-wpm-" + q]').forEach(el => {
+      el.style.opacity = '0.5';
+    });
+  }
+  // FR-ACAD-013: show internal exam section only in Term 3
+  var iexSection = document.getElementById("internal-exam-section");
+  if (iexSection) {
+    iexSection.style.display = CURRENT_TERM >= 3 ? 'block' : 'none';
+  }
+}
+
+function renderList() {
+  document.getElementById("student-list-header").textContent = "Students (" + students.length + ")";
+  document.getElementById("student-list").innerHTML = students.map(s => {
+    const hw = WELFARE_FLAGS[s.id] && WELFARE_FLAGS[s.id].length > 0;
+    const wi = hw ? '<span title="Open welfare concern" style="color:#DC2626;font-size:13px;margin-left:4px">&#9888;</span>' : '';
+    return `<div class="student-item ${current && current.id===s.id ? 'active' : ''}" onclick="loadStudent(${s.id})">
+      <div><div style="font-size:12.5px;font-weight:${current && current.id===s.id ? '600' : '400'};color:#1A1A2E">${s.first_name} ${s.last_name}${wi}</div>
+      <div style="font-size:11px;color:#8492A6">Age ${s.age||''}</div></div>
+      <span class="chip chip-grey" id="st-${s.id}">Pending</span>
+    </div>`;
+  }).join('');
+}
+
+async function loadStudent(id) {
+  current = students.find(s => s.id === id);
+  renderList();
+  document.getElementById("student-name-display").textContent = current.first_name + " " + current.last_name;
+  clearFields();
+  const r = await fetch(API + "evaluation/" + id + "/");
+  const d = await r.json();
+  isLocked = d.is_locked || d.is_term_locked || false;
+  const lockBanner = document.getElementById("lock-banner");
+  const lockOverlay = document.getElementById("lock-overlay");
+  if (isLocked) {
+    lockBanner.style.display = "block";
+    lockOverlay.style.display = "flex";
+    document.querySelectorAll(".ecd-grade-btn, .pace-inp, #teacher-comment, #scripture-ref").forEach(el => { el.style.pointerEvents = "none"; el.style.opacity = "0.5"; });
+    document.querySelectorAll("#teacher-comment, #scripture-ref").forEach(el => { el.disabled = true; el.style.background = "#f5f5f5"; });
+    document.querySelectorAll("button[onclick*='saveDraft'], button[onclick*='saveAndNext'], button[onclick*='submitToHOD'], button[onclick*='submitAllToHOD']").forEach(el => {
+      el.disabled = true; el.style.opacity = "0.5"; el.style.cursor = "not-allowed";
+    });
+    document.querySelectorAll("button[onclick*='movePrev'], button[onclick*='moveNext']").forEach(el => {
+      el.disabled = false; el.style.opacity = "1"; el.style.cursor = "pointer";
+    });
+  } else {
+    lockBanner.style.display = "none";
+    lockOverlay.style.display = "none";
+    document.querySelectorAll(".ecd-grade-btn, .pace-inp, #teacher-comment, #scripture-ref").forEach(el => { el.style.pointerEvents = "auto"; el.style.opacity = "1"; });
+    document.querySelectorAll("#teacher-comment, #scripture-ref").forEach(el => { el.disabled = false; el.style.background = "#fff"; });
+    document.querySelectorAll("button[onclick*='saveDraft'], button[onclick*='saveAndNext'], button[onclick*='submitToHOD'], button[onclick*='submitAllToHOD']").forEach(el => {
+      el.disabled = false; el.style.opacity = "1"; el.style.cursor = "pointer";
+    });
+    document.querySelectorAll("button[onclick*='movePrev'], button[onclick*='moveNext']").forEach(el => {
+      el.disabled = false; el.style.opacity = "1"; el.style.cursor = "pointer";
+    });
+  }
+  const wb = document.getElementById("welfare-banner"), wt = document.getElementById("welfare-banner-text");
+  const fw = WELFARE_FLAGS[id] || [];
+  if (fw.length > 0) {
+    wt.textContent = "This student has " + fw.length + " open welfare observation(s): " + fw.map(f => f.severity + ": " + (f.concern_type || "concern") + " (" + f.observation_date + ")").join("; ");
+    wb.style.display = "block";
+  } else { wb.style.display = "none"; }
+  const ta = document.getElementById("teacher-comment");
+  if (ta) { ta.value = d.teacher_comments || ""; checkComment(); }
+  if (d.abc_pace_progress && Array.isArray(d.abc_pace_progress)) {
+    d.abc_pace_progress.forEach(item => {
+      const si = SUBJECTS.findIndex(s => item.subject && item.subject.toLowerCase() === s.label.toLowerCase());
+      if (si < 0) return;
+      SUBJECTS[si].paces.forEach((p, pi) => {
+        if (item.pace_no == p) {
+          const statusEl = document.getElementById(`pace-status-${si}-${pi}`);
+          if (statusEl && item.status) {
+            statusEl.textContent = item.status === 'completed' ? 'Complete' : 'In progress';
+            statusEl.style.background = item.status === 'completed' ? '#E8F5EC' : '#FEF3C7';
+            statusEl.style.color = item.status === 'completed' ? '#1B7B34' : '#92550A';
+          }
+          const sEl = document.getElementById(`pace-s-${si}-${pi}`);
+          if (sEl) sEl.value = item.supervisor_score || '';
+          const mEl = document.getElementById(`pace-m-${si}-${pi}`);
+          if (mEl) mEl.value = item.moderator_score || '';
+          const dEl = document.getElementById(`pace-d-${si}-${pi}`);
+          if (dEl) dEl.value = item.date_completed || '';
+        }
+      });
+      updatePaceCount(si);
+    });
+  }
+  Object.keys(d.evaluations || {}).forEach(key => {
+    const inp = document.getElementById(key);
+    if (inp) {
+      inp.value = d.evaluations[key];
+      const grp = inp.parentElement;
+      grp.querySelectorAll("[onclick*=\"selectGradeABC\"]").forEach(b => {
+        if (b.textContent.trim() === d.evaluations[key]) {
+          b.style.background = '#023AA5';
+          b.style.color = '#fff';
+          b.style.borderColor = '#023AA5';
+        } else {
+          b.style.background = '';
+          b.style.color = '';
+          b.style.borderColor = '';
+        }
+      });
+    }
+  });
+  const btnSub = document.getElementById("btn-submit");
+  if (btnSub) {
+    if (d.status === 'pending_sign_off') {
+      btnSub.textContent = "Submitted";
+      btnSub.disabled = true;
+      btnSub.style.opacity = "0.6";
+    } else {
+      btnSub.textContent = "Submit to HOD";
+      btnSub.disabled = false;
+      btnSub.style.opacity = "1";
+    }
+  }
+  if (d.abc_scripture) {
+    Object.keys(d.abc_scripture).forEach(q => {
+      const el = document.getElementById("scr-q" + q);
+      if (el) el.value = d.abc_scripture[q];
+    });
+  }
+  if (d.abc_assignments) {
+    Object.keys(d.abc_assignments).forEach(q => {
+      const itemEl = document.getElementById("asn-item-" + q);
+      if (itemEl) itemEl.value = d.abc_assignments[q].item_name || '';
+      const scoreEl = document.getElementById("asn-score-" + q);
+      if (scoreEl) scoreEl.value = d.abc_assignments[q].score || '';
+    });
+  }
+  if (d.abc_reading) {
+    Object.keys(d.abc_reading).forEach(q => {
+      const wpmEl = document.getElementById("rd-wpm-" + q);
+      if (wpmEl) wpmEl.value = d.abc_reading[q].wpm || '';
+      const pctEl = document.getElementById("rd-pct-" + q);
+      if (pctEl) pctEl.value = d.abc_reading[q].percentage || '';
+      const compEl = document.getElementById("rd-comp-" + q);
+      if (compEl) compEl.value = d.abc_reading[q].comprehension_score || '';
+    });
+  }
+  // FR-ACAD-013: load internal exam data
+  if (d.abc_internal_exams) {
+    Object.keys(d.abc_internal_exams).forEach(function(subject) {
+      var fid = "iex-" + subject.replace(/\s+/g, "_");
+      var rating = d.abc_internal_exams[subject];
+      var inp = document.getElementById(fid);
+      if (inp) inp.value = rating;
+      var btns = document.querySelectorAll("[onclick*=\"selectInternalExamGrade\"][onclick*='" + fid + "']");
+      btns.forEach(function(b) {
+        if (b.textContent.trim() === rating) {
+          b.style.background = '#023AA5';
+          b.style.color = '#fff';
+          b.style.borderColor = '#023AA5';
+        }
+      });
+    });
+  }
+  const stEl = document.getElementById("st-" + id);
+  if (stEl) {
+    stEl.textContent = d.status === 'pending_sign_off' ? 'Done' : (d.status === 'draft' ? 'Draft' : 'Pending');
+    stEl.className = d.status === 'pending_sign_off' ? 'chip chip-green' : (d.status === 'draft' ? 'chip chip-amber' : 'chip chip-grey');
+  }
+}
+
+function clearFields() {
+  SUBJECTS.forEach((subj, si) => {
+    subj.paces.forEach((p, pi) => {
+      const statusEl = document.getElementById(`pace-status-${si}-${pi}`);
+      if (statusEl) { statusEl.textContent = 'In progress'; statusEl.style.background = '#FEF3C7'; statusEl.style.color = '#92550A'; }
+      ['s','m','d'].forEach(t => { const el = document.getElementById(`pace-${t}-${si}-${pi}`); if (el) el.value = ''; });
+    });
+    updatePaceCount(si);
+  });
+  ['scr-q1','scr-q2','scr-q3'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  for (let q = 1; q <= 3; q++) {
+    ['asn-item','asn-score','rd-wpm','rd-pct','rd-comp'].forEach(p => { const el = document.getElementById(`${p}-${q}`); if (el) el.value = ''; });
+  }
+  document.querySelectorAll("[onclick*=\"selectGradeABC\"]").forEach(b => { b.style.background = ''; b.style.color = ''; b.style.borderColor = ''; });
+  document.querySelectorAll("[onclick*=\"selectInternalExamGrade\"]").forEach(b => { b.style.background = ''; b.style.color = ''; b.style.borderColor = ''; });
+  document.querySelectorAll("[id^='iex-']").forEach(function(i) { if (i.type === 'hidden') i.value = ''; });
+  document.querySelectorAll(".ecd-domain input[type=hidden], .domain-row input[type=hidden]").forEach(i => i.value = "");
+  const ta = document.getElementById("teacher-comment");
+  if (ta) { ta.value = ''; checkComment(); }
+}
+
+function selectGradeABC(el, fieldId, grade) {
+  if (isLocked) return;
+  const grp = el.parentElement;
+  grp.querySelectorAll("[onclick*=\"selectGradeABC\"]").forEach(b => {
+    b.style.background = '';
+    b.style.color = '';
+    b.style.borderColor = '';
+  });
+  el.style.background = '#023AA5';
+  el.style.color = '#fff';
+  el.style.borderColor = '#023AA5';
+  const inp = document.getElementById(fieldId);
+  if (inp) inp.value = grade;
+  saveDraft();
+}
+
+function checkComment() {
+  const ta = document.getElementById("teacher-comment"), cnt = document.getElementById("char-count");
+  if (ta && cnt) { cnt.textContent = ta.value.length + " / 50 minimum"; cnt.style.color = ta.value.length >= 50 ? "#1B7B34" : "#9B1C1C"; }
+}
+
+async function saveDraft() {
+  if (isLocked) return;
+  if (!current) return;
+  const pace = [];
+  SUBJECTS.forEach((subj, si) => {
+    subj.paces.forEach((p, pi) => {
+      pace.push({
+        subject: subj.label,
+        pace_no: p,
+        status: (document.getElementById(`pace-status-${si}-${pi}`)?.textContent.trim() || 'In progress').toLowerCase(),
+        supervisor_score: document.getElementById(`pace-s-${si}-${pi}`)?.value || null,
+        moderator_score: document.getElementById(`pace-m-${si}-${pi}`)?.value || null,
+        date_completed: document.getElementById(`pace-d-${si}-${pi}`)?.value || '',
+      });
+    });
+  });
+  const evals = {};
+  document.querySelectorAll("input[type=hidden]").forEach(i => { if(i.value && !i.id.startsWith('scr-') && !i.id.startsWith('asn-') && !i.id.startsWith('rd-') && !i.id.startsWith('pace-')) evals[i.id] = i.value; });
+  const payload = {
+    teacher_comments: document.getElementById("teacher-comment")?.value || '',
+    evaluations: evals,
+    abc_pace_progress: pace,
+    abc_scripture: {
+      "1": document.getElementById("scr-q1")?.value || '',
+      "2": document.getElementById("scr-q2")?.value || '',
+      "3": document.getElementById("scr-q3")?.value || ''
+    },
+    abc_assignments: {
+      "1": { item_name: document.getElementById("asn-item-1")?.value || '', score: document.getElementById("asn-score-1")?.value || '' },
+      "2": { item_name: document.getElementById("asn-item-2")?.value || '', score: document.getElementById("asn-score-2")?.value || '' },
+      "3": { item_name: document.getElementById("asn-item-3")?.value || '', score: document.getElementById("asn-score-3")?.value || '' }
+    },
+    abc_reading: {
+      "1": { wpm: document.getElementById("rd-wpm-1")?.value || '', percentage: document.getElementById("rd-pct-1")?.value || '', comprehension_score: document.getElementById("rd-comp-1")?.value || '' },
+      "2": { wpm: document.getElementById("rd-wpm-2")?.value || '', percentage: document.getElementById("rd-pct-2")?.value || '', comprehension_score: document.getElementById("rd-comp-2")?.value || '' },
+      "3": { wpm: document.getElementById("rd-wpm-3")?.value || '', percentage: document.getElementById("rd-pct-3")?.value || '', comprehension_score: document.getElementById("rd-comp-3")?.value || '' }
+    },
+    // FR-ACAD-013: ABC Term 3 internal exam
+    abc_internal_exams: (function() {
+      var iex = {};
+      INTERNAL_EXAM_SUBJECTS.forEach(function(subj) {
+        var fid = "iex-" + subj.replace(/\s+/g, "_");
+        var val = document.getElementById(fid)?.value || '';
+        if (val) iex[subj] = val;
+      });
+      return iex;
+    })()
+  };
+  await fetch(API + "evaluation/" + current.id + "/", { method:"POST", headers:{"Content-Type":"application/json","X-CSRFToken":CSRF}, body: JSON.stringify(payload) });
+  if (typeof showToast === 'function') showToast("Draft saved", "success");
+  refreshProgress();
+}
+
+async function submitToHOD() {
+  if (isLocked) return;
+  if (!current) return;
+  await saveDraft();
+  const r = await fetch(API + "submit/" + current.id + "/", {
+    method: "POST",
+    headers: { "X-CSRFToken": CSRF }
+  });
+  const d = await r.json();
+  if (d.error) { alert("Cannot submit: " + d.error); }
+  else { alert("Submitted to HOD successfully!"); loadStudent(current.id); refreshProgress(); }
+}
+async function saveAndNext() { if (isLocked) return; await saveDraft(); const idx = students.findIndex(s=>s.id===current.id); if (idx < students.length-1) loadStudent(students[idx+1].id); }
+function movePrev() { if (!current) return; const idx = students.findIndex(s=>s.id===current.id); if (idx > 0) loadStudent(students[idx-1].id); }
+function moveNext() { if (!current) return; const idx = students.findIndex(s=>s.id===current.id); if (idx < students.length-1) loadStudent(students[idx+1].id); }
+async function refreshProgress() { const r = await fetch(API+"progress/?class_name="+encodeURIComponent(CLASS_NAME)); const d = await r.json(); const p = d.progress||{}; document.getElementById("progress-bar").style.width=(p.percentage||0)+"%"; document.getElementById("progress-text").textContent=(p.completed||0)+" of "+(p.total||0)+" students complete"; const badge=document.getElementById("topbar-progress-badge"); const txt=document.getElementById("topbar-badge-text"); if(badge&&txt){txt.textContent=(p.completed||0)+" of "+(p.total||0)+" complete";badge.className="topbar-badge "+(p.completed>0&&p.completed===p.total?"badge-red":"badge-amber");}}
+async function submitAllToHOD() {
+  /* Pre-validate all students before bulk submission */
+  var issues = [];
+  for (const s of students) {
+    var r = await fetch(API + "evaluation/" + s.id + "/");
+    var d = await r.json();
+    var commentLen = (d.teacher_comments || "").trim().length;
+    if (commentLen < 50) {
+      issues.push(s.first_name + " " + s.last_name + ": A teacher comment of at least 50 characters is required before this student's assessment can be submitted.");
+    }
+  }
+  if (issues.length > 0) {
+    var msg = issues.slice(0, 5).join("\n\n");
+    if (issues.length > 5) msg += "\n\n...and " + (issues.length - 5) + " more issue(s).";
+    alert(msg); return;
+  }
+  if (!confirm("Submit all " + students.length + " evaluations for this class to ECD HOD?")) return;
+  var submitted = 0, failed = 0;
+  for (const s of students) {
+    try {
+      r = await fetch(API + "submit/" + s.id + "/", {method:"POST", headers:{"X-CSRFToken":CSRF}});
+      if (r.ok) { submitted++; } else { failed++; }
+    } catch(e) { failed++; }
+  }
+  if (typeof showToast === 'function') {
+    if (failed === 0) showToast(submitted + " student(s) submitted successfully.", "success");
+    else showToast(submitted + " submitted, " + failed + " failed.", "error");
+  }
+  location.reload();
+}
+document.addEventListener("DOMContentLoaded", init);
+</script>
+{% endblock %}

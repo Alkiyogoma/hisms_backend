@@ -1,0 +1,47 @@
+{% load role_tags %}
+{% with url_name=request.resolver_match.url_name %}
+<div class="sub-nav">
+  {% if perms.students.view_student %}
+  <a href="{% url 'students:list' %}" class="sub-tab {% if url_name == 'list' or url_name == 'detail' or url_name == 'create' or url_name == 'edit' or url_name == 'upload_photo' or url_name == 'print_id' or url_name == 'generate_id' %}active{% endif %}">Students</a>
+  {% endif %}
+  {% if perms.students.view_parentguardian %}
+  <a href="{% url 'students:guardian_list' %}" class="sub-tab {% if url_name == 'guardian_list' or url_name == 'guardian_detail' or url_name == 'guardian_create' or url_name == 'guardian_link' or url_name == 'guardian_consent_withdraw' %}active{% endif %}">Guardians</a>
+  {% endif %}
+  {% if url_name == 'list' %}
+  <div style="margin-left:auto;display:flex;gap:4px;align-items:center">
+    <button onclick="setView('grid')" id="btn-grid" class="view-btn" style="padding:6px 10px;border-radius:6px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;transition:all 0.2s">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Grid
+    </button>
+    <button onclick="setView('list')" id="btn-list" class="view-btn active" style="padding:6px 10px;border-radius:6px;border:none;background:var(--hodari-blue);color:#fff;cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;transition:all 0.2s">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      List
+    </button>
+    <button onclick="window.print()" style="padding:6px 10px;border-radius:6px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;transition:all 0.2s">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z"/></svg>
+      Print
+    </button>
+  </div>
+  {% endif %}
+  {% if url_name == 'guardian_list' %}
+  <div style="margin-left:auto;display:flex;gap:4px;align-items:center">
+    <button onclick="setView('grid')" id="btn-grid" class="view-btn" style="padding:6px 10px;border-radius:6px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;transition:all 0.2s">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Grid
+    </button>
+    <button onclick="setView('list')" id="btn-list" class="view-btn active" style="padding:6px 10px;border-radius:6px;border:none;background:var(--hodari-blue);color:#fff;cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;transition:all 0.2s">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      List
+    </button>
+    {% has_perm user "students.add_parentguardian" as can_add_guardian %}
+    {% if can_add_guardian %}
+    <div style="width:1px;height:20px;background:var(--border);margin:0 4px"></div>
+    <a href="{% url 'students:guardian_create' %}" style="padding:6px 12px;border-radius:6px;background:var(--hodari-blue);color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;text-decoration:none;transition:all 0.2s">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add Guardian
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endwith %}

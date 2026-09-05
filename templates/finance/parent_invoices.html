@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Fee invoices &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Fee Invoices{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+<div class="section-hdr">
+  <span class="section-title">Your children&rsquo;s invoices</span>
+  <span class="chip chip-blue">Parent view</span>
+</div>
+
+{% if invoices %}
+<div class="card" style="padding:0;overflow:hidden">
+  <table style="width:100%;border-collapse:collapse">
+    <thead>
+      <tr style="text-align:left;background:var(--bg-metric);border-bottom:1px solid var(--border)">
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Invoice</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Student</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Term</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Total due</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Status</th>
+        <th style="padding:10px 14px"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for inv in invoices %}
+      <tr style="border-bottom:1px solid var(--border);font-size:13px;transition:background .1s" onmouseover="this.style.background='var(--bg-metric)'" onmouseout="this.style.background=''">
+        <td style="padding:10px 14px;font-family:var(--font-mono);color:var(--text-muted)">{{ inv.invoice_number|default:"N/A" }}</td>
+        <td style="padding:10px 14px;font-weight:600">{% if inv.student %}{{ inv.student.first_name }} {{ inv.student.last_name }}{% else %}N/A{% endif %}</td>
+        <td style="padding:10px 14px;color:var(--text-secondary)">{% if inv.term %}{{ inv.term.name }}{% else %}N/A{% endif %}</td>
+        <td style="padding:10px 14px;font-weight:700;font-family:var(--font-mono)">TZS {{ inv.total_due|floatformat:0 }}</td>
+        <td style="padding:10px 14px">
+          <span class="chip chip-{% if inv.status == 'paid' %}green{% elif inv.status == 'overdue' %}red{% else %}amber{% endif %}">
+            {{ inv.get_status_display }}
+          </span>
+        </td>
+        <td style="padding:10px 14px;text-align:right">
+          <a href="{% url 'finance:parent_invoice_detail' inv.pk %}" class="section-link" style="font-size:12px">View &rarr;</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div style="text-align:center;padding:48px 24px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px">
+  {% include '_partials/empty_state.html' with title='No invoices' desc='No invoices are linked to your account yet.' icon='inbox' icon_color='grey' %}
+</div>
+{% endif %}
+
+<div style="margin-top:14px">
+  <a href="/" class="btn btn-secondary btn-sm">&larr; Dashboard</a>
+</div>
+{% endblock %}

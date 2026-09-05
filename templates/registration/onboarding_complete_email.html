@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f4f6f9;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f9;padding:40px 0">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
+  <!-- Header -->
+  <tr><td style="background:#023AA5;padding:30px 40px;text-align:center">
+    <h1 style="color:#fff;margin:0;font-size:22px;letter-spacing:0.5px">{{ school_name }}</h1>
+    <p style="color:#C8A951;margin:8px 0 0;font-size:13px;letter-spacing:1px;text-transform:uppercase">Onboarding Complete</p>
+  </td></tr>
+
+  <!-- Body -->
+  <tr><td style="padding:40px">
+    <p style="color:#333;font-size:15px;line-height:1.6;margin:0 0 16px">Hello {{ staff.first_name|default:staff.user.first_name|default:staff.full_name }},</p>
+    <p style="color:#333;font-size:15px;line-height:1.6;margin:0 0 20px">Congratulations! Your onboarding process at {{ school_name }} has been completed. You now have full access to the School Management System.</p>
+
+    <!-- Staff details box -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fc;border:1px solid #e2e8f0;border-radius:6px;margin:0 0 24px">
+      <tr><td style="padding:20px">
+        <p style="color:#666;font-size:13px;margin:0 0 4px;text-transform:uppercase;letter-spacing:0.5px">Employee ID</p>
+        <p style="color:#023AA5;font-size:16px;font-weight:600;margin:0 0 16px">{{ staff.employee_id|default:"—" }}</p>
+        <p style="color:#666;font-size:13px;margin:0 0 4px;text-transform:uppercase;letter-spacing:0.5px">Department</p>
+        <p style="color:#023AA5;font-size:16px;font-weight:600;margin:0 0 16px">{{ staff.get_department_display|default:staff.department }}</p>
+        <p style="color:#666;font-size:13px;margin:0 0 4px;text-transform:uppercase;letter-spacing:0.5px">Job Title</p>
+        <p style="color:#023AA5;font-size:16px;font-weight:600;margin:0 0 16px">{{ staff.job_title|default:"—" }}</p>
+        <p style="color:#666;font-size:13px;margin:0 0 4px;text-transform:uppercase;letter-spacing:0.5px">Start Date</p>
+        <p style="color:#023AA5;font-size:16px;font-weight:600;margin:0">{{ staff.employment_start_date|date:"M d, Y"|default:"—" }}</p>
+      </td></tr>
+    </table>
+
+    <p style="color:#333;font-size:15px;line-height:1.6;margin:0 0 12px">You can now access all modules assigned to your role. If you have any questions, please contact your administrator.</p>
+
+    <!-- CTA Button -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0">
+      <tr><td align="center">
+        <a href="{{ login_url }}" style="display:inline-block;background:#023AA5;color:#fff;text-decoration:none;padding:14px 36px;border-radius:6px;font-size:15px;font-weight:600;letter-spacing:0.3px">Log In to {{ school_name }}</a>
+      </td></tr>
+    </table>
+  </td></tr>
+
+  <!-- Footer -->
+  <tr><td style="background:#f8f9fc;padding:20px 40px;border-top:1px solid #e2e8f0;text-align:center">
+    <p style="color:#999;font-size:12px;margin:0">If you did not expect this email, please contact your administrator.</p>
+    <p style="color:#999;font-size:12px;margin:8px 0 0">{{ school_name }}</p>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Progression Outcome Letter</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #f8fafc;
+            margin: 0;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #0f172a;
+        }
+        .letter {
+            background: #fff;
+            width: 780px;
+            padding: 48px 56px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px -10px rgba(30, 58, 138, 0.15);
+            border: 1px solid #f1f5f9;
+        }
+        .letter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 3px solid #023AA5;
+            padding-bottom: 16px;
+            margin-bottom: 28px;
+        }
+        .school-name { font-size: 20px; font-weight: 800; color: #023AA5; margin: 0; }
+        .school-tagline { font-size: 12px; color: #64748b; margin-top: 4px; }
+        .letter-no { font-size: 12px; color: #94a3b8; text-align: right; }
+        .letter-title {
+            text-align: center;
+            font-size: 18px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #023AA5;
+            margin-bottom: 28px;
+        }
+        .outcome-banner {
+            background: linear-gradient(135deg, #023AA5 0%, #012A7A 100%);
+            color: #fff;
+            border-radius: 12px;
+            padding: 20px 24px;
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .outcome-banner .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.15em; opacity: 0.75; }
+        .outcome-banner .value { font-size: 24px; font-weight: 800; margin-top: 4px; }
+        .meta-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            margin-bottom: 28px;
+        }
+        .meta-item {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 12px 16px;
+        }
+        .meta-item .label { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em; }
+        .meta-item .value { font-size: 15px; font-weight: 700; margin-top: 4px; }
+        .section-title { font-size: 13px; font-weight: 800; color: #023AA5; text-transform: uppercase; margin: 20px 0 8px; }
+        .body-text { font-size: 13.5px; line-height: 1.7; color: #334155; }
+        .signatures {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-top: 48px;
+        }
+        .signature { font-size: 12.5px; color: #64748b; }
+        .signature .line { border-top: 1px solid #cbd5e1; margin-top: 44px; padding-top: 8px; }
+        .print-controls {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 100;
+        }
+        .btn-print {
+            background: #023AA5;
+            color: #fff;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 16px;
+            font-weight: 700;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(30, 58, 138, 0.2);
+        }
+        .btn-print:hover { transform: translateY(-2px); }
+        @media print {
+            body { background: #fff; padding: 0; }
+            .print-controls { display: none; }
+            .letter { box-shadow: none; border: none; width: 100%; padding: 24px; }
+            .letter-header { border-bottom: 2px solid #023AA5; }
+        }
+    </style>
+</head>
+<body>
+    <div class="print-controls">
+        <button class="btn-print" onclick="window.print()">Print Letter</button>
+    </div>
+
+    <div class="letter">
+        <div class="letter-header">
+            <div>
+                <p class="school-name">{{ brand.school_name }}</p>
+                <div class="school-tagline">{{ brand.tagline|default:"Excellence in Education" }}</div>
+            </div>
+            <div class="letter-no">
+                Ref: {{ student.admission_no }}<br>
+                Date: {% now "j F Y" %}
+            </div>
+        </div>
+
+        <div class="letter-title">Progression Outcome Letter</div>
+
+        <p class="body-text">Dear Parent/Guardian of <strong>{{ student.first_name }} {{ student.last_name }}</strong>,</p>
+        <p class="body-text">
+            Following the end-of-year progression review for the academic year
+            {{ config.academic_year_from }} &ndash; {{ config.academic_year_to }}, we are pleased to inform you of
+            {{ student.first_name }}'s outcome for the {{ student.class_name }}{% if student.stream_name %} {{ student.stream_name }}{% endif %} class.
+        </p>
+
+        <div class="outcome-banner">
+            <div class="label">Final Outcome</div>
+            <div class="value">{{ case.hos_decision|default:case.system_suggested_outcome|default:"Pending" }}</div>
+        </div>
+
+        <div class="meta-grid">
+            <div class="meta-item">
+                <div class="label">Overall Average</div>
+                <div class="value">{{ case.calculated_average|floatformat:1|default:"&mdash;" }}</div>
+            </div>
+            <div class="meta-item">
+                <div class="label">Attendance Rate</div>
+                <div class="value">{{ case.calculated_attendance_rate|floatformat:1|default:"&mdash;" }}%</div>
+            </div>
+            <div class="meta-item">
+                <div class="label">Calculation Basis</div>
+                <div class="value">{{ case.get_calculation_basis_display|default:"&mdash;" }}</div>
+            </div>
+            <div class="meta-item">
+                <div class="label">Decision Date</div>
+                <div class="value">{{ case.hos_decided_at|date:"j F Y"|default:"&mdash;" }}</div>
+            </div>
+        </div>
+
+        {% if case.override_reason %}
+        <div class="section-title">Reason for Decision</div>
+        <p class="body-text">{{ case.override_reason }}</p>
+        {% endif %}
+
+        {% if case.system_suggested_outcome %}
+        <div class="section-title">System Suggestion</div>
+        <p class="body-text">{{ case.get_system_suggested_outcome_display }}</p>
+        {% endif %}
+
+        <p class="body-text">
+            Should you have any questions regarding this outcome, please contact the school office
+            or the Head of Department for {{ student.class_name }}.
+        </p>
+
+        <div class="signatures">
+            <div class="signature">
+                Head of Department
+                <div class="line">{{ case.hod_recommended_by.full_name|default:"" }}</div>
+            </div>
+            <div class="signature">
+                Head of School
+                <div class="line">{{ case.hos_decided_by.full_name|default:"" }}</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

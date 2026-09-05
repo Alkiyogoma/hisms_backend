@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Progression Results - {{ brand.school_name }}{% endblock %}
+{% block content %}
+{% include "academics/_top_tabs.html" %}
+
+<div class="section-hdr">
+  <span class="section-title">Progression Results</span>
+  <span class="chip chip-blue">Final Outcomes</span>
+</div>
+
+{% if children|length > 1 %}
+<div class="sub-nav">
+  {% for child in children %}
+  <a href="?student={{ child.pk }}{% if selected_config_id %}&config_id={{ selected_config_id }}{% endif %}" class="sub-tab {% if selected_student and selected_student.pk == child.pk %}active{% endif %}">{{ child.get_full_name }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="card" style="padding:16px 20px;margin-bottom:20px">
+  <form method="get" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <select name="config_id" class="hf2-select" style="min-width:220px;flex:1">
+      <option value="">— Choose Transition —</option>
+      {% for c in configs %}
+      <option value="{{ c.pk }}" {% if selected_config_id|stringformat:"s" == c.pk|stringformat:"s" %}selected{% endif %}>
+        {{ c.academic_year_from }} → {{ c.academic_year_to }}
+      </option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="hf-btn hf-btn-primary" style="white-space:nowrap">View Results</button>
+  </form>
+</div>
+
+{% if config %}
+<div class="card">
+  <div class="card-title-row">
+    <span class="card-title" style="margin:0">{{ config.academic_year_from }} → {{ config.academic_year_to }}</span>
+    {% if selected_student %}
+    <span style="font-size:13px;color:var(--text-muted)">{{ selected_student.get_full_name }}</span>
+    {% endif %}
+  </div>
+  {% if selected_student and config_id %}
+    {% if results %}
+    {% for r in results %}
+    <div class="trow" style="flex-wrap:wrap;gap:8px">
+      <div style="flex:1;min-width:140px">
+        <div class="trow-name">{{ r.student_name }}</div>
+        <div class="trow-sub">Class: {{ r.class_name }}</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Outcome</div>
+        <span class="chip {% if r.outcome_label == 'Promote' %}chip-green{% elif r.outcome_label == 'Retain' %}chip-grey{% elif r.outcome_label == 'Graduate' %}chip-blue{% endif %}">
+          {{ r.outcome_label }}
+        </span>
+      </div>
+      <div style="text-align:center;min-width:100px">
+        <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Next Placement</div>
+        <div style="font-weight:600;font-size:13px">{{ r.new_class }}</div>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div style="padding:40px;text-align:center">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" style="margin:0 auto 12px;opacity:0.4"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+      <div style="font-size:14px;font-weight:600;color:var(--text-secondary)">No Progression Record</div>
+      <div style="font-size:13px;color:var(--text-muted);margin-top:4px">{{ selected_student.get_full_name }} does not have a finalized outcome for this transition.</div>
+    </div>
+    {% endif %}
+  {% else %}
+  <div style="padding:40px;text-align:center">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" style="margin:0 auto 12px;opacity:0.4"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+    <div style="font-size:14px;font-weight:600;color:var(--text-secondary)">Select a Transition</div>
+    <div style="font-size:13px;color:var(--text-muted);margin-top:4px">
+      {% if configs %}
+      Choose a transition cycle above to view progression results.
+      {% else %}
+      No progression cycles have been configured yet.
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% elif not configs %}
+<div class="card">
+  {% include '_partials/empty_state.html' with title='No progression cycles' desc='No progression cycles have been configured for this school year yet.' icon='calendar' icon_color='grey' %}
+</div>
+{% endif %}
+{% endblock %}

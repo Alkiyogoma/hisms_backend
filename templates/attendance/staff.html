@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% load role_tags %}
+
+{% block title %}Staff Attendance — {{ brand.school_name }}{% endblock %}
+
+{% block topbar_greeting %}Staff Daily Presence{% endblock %}
+
+{% block extra_head %}
+{% include "includes/hodari_print_styles.html" %}
+<style>
+  @media print { .section-hdr, .print-hide { display: none !important; } }
+  .status-present { background: #DCFCE7; color: #166534; }
+  .status-late { background: #FEF3C7; color: #92400E; }
+  .status-absent { background: #FEE2E2; color: #991B1B; }
+  .status-unconfirmed { background: #F1F5F9; color: #64748B; }
+  .mark-btn { padding: 4px 12px; border-radius: 99px; border: 1.5px solid #D1D9E8; background: #fff; color: #475569; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.15s; }
+  .mark-btn:hover { border-color: var(--hodari-blue); color: var(--hodari-blue); }
+  .mark-btn.active { background: var(--hodari-blue); border-color: var(--hodari-blue); color: #fff; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% has_perm user "hr.view_staffprofile" as can_mark %}
+<div class="section-hdr">
+  <span class="section-title">Staff Attendance</span>
+  <div style="display:flex; gap:10px; align-items:center" class="print-hide">
+    <span class="chip chip-blue">{{ today|date:"l, d F Y" }}</span>
+    {% if can_mark %}
+    <form method="post" style="display:inline" onsubmit="return confirm('Mark ALL staff as Present for today?')">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="mark_all">
+      <input type="hidden" name="status" value="present">
+      <button type="submit" class="hf-btn hf-btn-primary" style="font-size:12px; padding:6px 16px">
+        Mark All Present
+      </button>
+    </form>
+    {% endif %}
+    <button onclick="window.print()" class="hf-btn hf-btn-secondary" style="font-size:12px">
+      <svg style="width:14px; height:14px; vertical-align:middle; margin-right:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z"/></svg>
+      Print
+    </button>
+  </div>
+</div>
+<p class="print-hide" style="margin:-8px 0 16px;font-size:13px;color:var(--text-muted)">
+  Mark staff as Present, Late, or Absent. Unconfirmed staff have no attendance record yet today.
+</p>
+
+<div class="card" style="padding:0; overflow:hidden">
+  <table class="h-table">
+    <thead>
+      <tr>
+        <th style="width:40px"></th>
+        <th>Staff Information</th>
+        <th>Department</th>
+        <th>Job Title</th>
+        <th>Status</th>
+        <th style="text-align:right">Check-in Time</th>
+        <th style="text-align:right" class="print-hide">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td style="padding-right:0; text-align:center">
+          <div style="width:32px; height:32px; border-radius:50%; background:var(--hodari-blue-light); color:var(--hodari-blue); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700">
+            {{ row.staff.full_name|slice:":1" }}
+          </div>
+        </td>
+        <td>
+          <div style="font-weight: 600; color: var(--text-primary);">{{ row.staff.full_name }}</div>
+          <div style="font-size: 11px; color: var(--text-muted);">{{ row.staff.user.username }}</div>
+        </td>
+        <td style="color:var(--text-secondary)">{{ row.department }}</td>
+        <td style="color:var(--text-secondary)">{{ row.staff.job_title|default:"—" }}</td>
+        <td>
+          {% if row.status == "Present" %}
+            <span class="chip status-present" style="font-size:10px">Present</span>
+          {% elif row.status == "Late" %}
+            <span class="chip status-late" style="font-size:10px">Late</span>
+          {% elif row.status == "Absent" %}
+            <span class="chip status-absent" style="font-size:10px">Absent</span>
+          {% else %}
+            <span class="chip status-unconfirmed" style="font-size:10px">Unconfirmed</span>
+          {% endif %}
+        </td>
+        <td style="text-align:right; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); font-weight: 600">
+          {{ row.check_in|default:"—" }}
+        </td>
+        <td style="text-align:right" class="print-hide">
+          {% if can_mark %}
+          {% if row.has_entry %}
+            <form method="post" style="display:inline">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="unmark">
+              <input type="hidden" name="staff_pk" value="{{ row.staff.pk }}">
+              <button type="submit" class="mark-btn" title="Remove attendance">✕</button>
+            </form>
+          {% endif %}
+          <form method="post" style="display:inline; margin-left:4px">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="mark_single">
+            <input type="hidden" name="staff_pk" value="{{ row.staff.pk }}">
+            <input type="hidden" name="status" value="present">
+            <button type="submit" class="mark-btn {% if row.status == 'Present' %}active{% endif %}" title="Mark Present">P</button>
+          </form>
+          <form method="post" style="display:inline; margin-left:2px">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="mark_single">
+            <input type="hidden" name="staff_pk" value="{{ row.staff.pk }}">
+            <input type="hidden" name="status" value="late">
+            <button type="submit" class="mark-btn {% if row.status == 'Late' %}active{% endif %}" title="Mark Late">L</button>
+          </form>
+          <form method="post" style="display:inline; margin-left:2px">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="mark_single">
+            <input type="hidden" name="staff_pk" value="{{ row.staff.pk }}">
+            <input type="hidden" name="status" value="absent">
+            <button type="submit" class="mark-btn {% if row.status == 'Absent' %}active{% endif %}" title="Mark Absent">A</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7">{% include '_partials/empty_state.html' with title='No active staff profiles' desc='Staff attendance records will appear here.' icon='users' icon_color='grey' %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

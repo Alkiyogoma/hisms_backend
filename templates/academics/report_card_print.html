@@ -1,0 +1,580 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Progress Report - {{ student.get_full_name }}</title>
+    {% include "includes/hodari_print_styles.html" %}
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Times+New+Roman:wght@400;700&family=Arial:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            background: white;
+            color: black;
+            margin: 0;
+            padding: 40px;
+            font-size: 11pt;
+        }
+        .no-print {
+            max-width: 800px;
+            margin: 0 auto 20px;
+            text-align: right;
+            background: #fff;
+            padding: 12px 20px;
+            border-radius: 10px;
+            border: 1px solid #ccc;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            font-family: Arial, sans-serif;
+        }
+        .btn {
+            padding: 8px 16px;
+            border-radius: 7px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            border: none;
+        }
+        .btn-primary { background: #023AA5; color: #fff; }
+        .btn-outline { background: #fff; color: #023AA5; border: 1.5px solid #023AA5; }
+        .btn-green { background: #1B7B34; color: #fff; }
+        
+        .report-wrapper { max-width: 800px; margin: 0 auto; }
+        
+
+        /* Report Title */
+        .report-title {
+            text-align: center;
+            font-size: 12pt;
+            font-weight: bold;
+            text-decoration: underline;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+        
+        /* Student Info */
+        .student-info-top {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 10pt;
+            margin-bottom: 5px;
+        }
+        .student-info-middle {
+            font-weight: bold;
+            font-size: 10pt;
+            margin-bottom: 10px;
+        }
+        .student-info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+            font-size: 10pt;
+            font-weight: bold;
+        }
+        .student-info-table td {
+            border: 1px solid black;
+            padding: 5px 10px;
+            width: 50%;
+        }
+        
+        /* Academic Progress Table */
+        .section-title {
+            font-weight: bold;
+            text-decoration: underline;
+            text-transform: uppercase;
+            font-size: 10pt;
+            margin-bottom: 5px;
+        }
+        
+        .academic-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9pt;
+            font-family: Arial, sans-serif;
+            margin-bottom: 0;
+        }
+        .academic-table th, .academic-table td {
+            border: 1px solid black;
+            padding: 6px;
+            text-align: center;
+        }
+        .academic-table th {
+            background-color: #023AA5;
+            color: white;
+            font-weight: bold;
+        }
+        .academic-table .subject-col {
+            text-align: left;
+            font-weight: normal;
+        }
+        .academic-table .exam-avg-row td {
+            background-color: #d9d9d9;
+            font-weight: bold;
+        }
+        
+        /* Remarks Table */
+        .remarks-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9pt;
+            font-family: Arial, sans-serif;
+            margin-bottom: 20px;
+            margin-top: -1px; /* overlap border */
+        }
+        .remarks-table th, .remarks-table td {
+            border: 1px solid black;
+            padding: 6px;
+        }
+        .remarks-table th {
+            background-color: #023AA5;
+            color: white;
+            font-weight: bold;
+            text-align: center;
+        }
+        .remarks-table .subject-col {
+            background-color: #fce49c;
+            text-align: left;
+            width: 85%; /* span equivalent to subject+quiz+mid+end+total+grade */
+        }
+        .remarks-table .remark-val-col {
+            text-align: left;
+            background-color: white;
+        }
+        
+        /* Grading Scale */
+        .grading-scale {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8pt;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .grading-scale th {
+            background-color: #023AA5;
+            color: white;
+            font-weight: bold;
+            padding: 6px;
+            border: 1px solid black;
+            text-transform: uppercase;
+        }
+        .grading-scale td {
+            border: 1px solid black;
+            padding: 5px;
+        }
+        .grading-scale .bold-row td { font-weight: bold; }
+        
+        /* Page Break */
+        .page-break { page-break-before: always; }
+        
+        /* General Traits */
+        .traits-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .traits-table {
+            width: 32%;
+            border-collapse: collapse;
+            font-size: 9pt;
+            font-family: Arial, sans-serif;
+        }
+        .traits-table th, .traits-table td {
+            border: 1px solid black;
+            padding: 4px;
+        }
+        .traits-table th {
+            background-color: #023AA5;
+            color: white;
+            font-weight: bold;
+            text-align: center;
+        }
+        .traits-table td:first-child { text-align: left; }
+        .traits-table td:last-child { text-align: center; width: 25px; }
+        
+        /* Character Grading */
+        .char-grading-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9pt;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .char-grading-table th {
+            background-color: #023AA5;
+            color: white;
+            font-weight: bold;
+            padding: 5px;
+            border: 1px solid black;
+        }
+        .char-grading-table td {
+            border: 1px solid black;
+            padding: 5px;
+        }
+        
+        /* Footer Info */
+        .footer-info-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9pt;
+            font-family: Arial, sans-serif;
+            margin-bottom: 15px;
+        }
+        .footer-info-table td {
+            border: 1px solid black;
+            padding: 6px 10px;
+            width: 50%;
+            text-align: center;
+        }
+        
+        /* Signatures */
+        .signatures-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9pt;
+            font-family: Arial, sans-serif;
+            border: 1px solid black;
+        }
+        .signatures-table td {
+            border: 1px solid black;
+            padding: 10px;
+            vertical-align: top;
+        }
+        .signatures-left { width: 55%; }
+        .signatures-right { width: 45%; position: relative; }
+        
+        .stamp-container {
+            position: absolute;
+            bottom: -30px;
+            right: 10px;
+            text-align: center;
+            width: 120px;
+            height: 120px;
+        }
+        .stamp-img {
+            width: 120px;
+            transform: rotate(-10deg);
+        }
+        .stamp-date {
+            position: absolute;
+            top: 55px;
+            left: 25px;
+            font-size: 9pt;
+            font-weight: bold;
+            color: #023AA5;
+            transform: rotate(-10deg);
+            width: 80px;
+            text-align: center;
+        }
+        
+        @media print {
+            body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+{% load static %}
+
+{% load role_tags %}
+<div class="no-print">
+    {% is_hod_like user as can_signoff_print %}
+    {% if can_signoff_print %}
+        {% if report.status == 'pending_sign_off' or report.status == 'draft' %}
+            {% if not signoff_blocked %}
+            <form method="POST" action="{% url 'academics:signoff_action' %}" style="margin:0">
+                {% csrf_token %}
+                <input type="hidden" name="report_id" value="{{ report.id }}">
+                <button type="submit" class="btn btn-green">Approve & Sign Off</button>
+            </form>
+            {% else %}
+            <span class="btn btn-green" style="opacity:0.5;cursor:not-allowed" title="{{ signoff_block_reason }}">Approve & Sign Off</span>
+            {% endif %}
+        {% endif %}
+    {% endif %}
+    {% if perms.academics.view_reportcard %}
+        <button onclick="window.print()" class="btn btn-primary" style="margin-left:8px">Print</button>
+    {% endif %}
+    {% if not perms.academics.change_reportcard %}
+        <a href="{% url 'academics:parent_reports' %}" class="btn btn-outline" style="margin-left:8px">Back</a>
+    {% else %}
+        <button onclick="window.history.go(-2)" class="btn btn-outline" style="margin-left:8px">Back</button>
+    {% endif %}
+</div>
+
+<div class="report-wrapper">
+    <!-- HEADER (standardized format) -->
+    {% include "includes/hodari_print_header.html" %}
+
+    <div class="report-title">PROGRESS REPORT</div>
+
+    <!-- STUDENT INFO -->
+    <div class="student-info-top">
+        <div>Student Name : {{ student.get_full_name }}</div>
+        <div>Grade: {{ student.class_name }}</div>
+    </div>
+    <div class="student-info-middle">
+        Admission No: {{ student.admission_number|default:"—" }}
+    </div>
+    <table class="student-info-table">
+        <tr>
+            <td>Academic Year: {{ report.term.academic_year.name }}</td>
+            <td>Date: {% now "jS F Y" %}</td>
+        </tr>
+    </table>
+
+    {% if not report.is_ecd_report %}
+        <!-- ACADEMIC PROGRESS -->
+        <div class="section-title">ACADEMIC PROGRESS</div>
+
+        <table class="academic-table">
+            <thead>
+                <tr>
+                    <th rowspan="2" style="width: 25%; text-align: left; padding-left: 10px;">Subject</th>
+                    <th colspan="4">{{ report.term.name|upper }}</th>
+                    <th rowspan="2" style="width: 8%;">Grade</th>
+                    <th rowspan="2" style="width: 15%;">Remarks</th>
+                </tr>
+                <tr>
+                    <th style="width: 10%;">Quiz ({% firstof exam_weights.quiz "20" %})</th>
+                    <th style="width: 13%;">Mid Term ({% firstof exam_weights.mid_term "30" %})</th>
+                    <th style="width: 13%;">End Term ({% firstof exam_weights.end_of_term "50" %})</th>
+                    <th style="width: 12%;">TOTAL/100</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for subj, data in subjects.items %}
+                    {% if data.quiz or data.mid or data.end or data.avg %}
+                    <tr>
+                        <td class="subject-col" style="background-color: white;">{{ subj }}</td>
+                        <td style="background-color: white;">{{ data.quiz|default:"" }}</td>
+                        <td style="background-color: white;">{{ data.mid|default:"" }}</td>
+                        <td style="background-color: white;">{{ data.end|default:"" }}</td>
+                        <td style="background-color: white;">
+                            {% if data.quiz and data.mid and data.end %}
+                                {{ data.quiz|add:data.mid|add:data.end }}
+                            {% endif %}
+                        </td>
+                        <td style="background-color: white;">{{ data.grade|default:"" }}</td>
+                        <td style="background-color: white; text-align: left;">
+                            {% if data.grade_letter == 'A*' %}Outstanding
+                            {% elif data.grade_letter == 'A' %}High
+                            {% elif data.grade_letter == 'B' %}Good
+                            {% elif data.grade_letter == 'C' %}Aspiring
+                            {% elif data.grade_letter == 'D' %}Basic
+                            {% else %}Needs Improvement
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endif %}
+                {% endfor %}
+                
+                <tr class="exam-avg-row">
+                    <td class="subject-col">Exam Average</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td>
+                        {% if report.overall_average %}{{ report.overall_average }}
+                        {% elif computed_average %}{{ computed_average|floatformat:1 }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if report.overall_average %}
+                            {% if report.overall_average >= 90 %}A*
+                            {% elif report.overall_average >= 80 %}A
+                            {% elif report.overall_average >= 70 %}B
+                            {% elif report.overall_average >= 60 %}C
+                            {% elif report.overall_average >= 50 %}D
+                            {% else %}E
+                            {% endif %}
+                        {% elif computed_average %}
+                            {% if computed_average >= 90 %}A*
+                            {% elif computed_average >= 80 %}A
+                            {% elif computed_average >= 70 %}B
+                            {% elif computed_average >= 60 %}C
+                            {% elif computed_average >= 50 %}D
+                            {% else %}E
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                    <td style="text-align: left;">
+                        {% if report.overall_average %}
+                            {% if report.overall_average >= 90 %}Outstanding
+                            {% elif report.overall_average >= 80 %}High
+                            {% elif report.overall_average >= 70 %}Good
+                            {% elif report.overall_average >= 60 %}Aspiring
+                            {% elif report.overall_average >= 50 %}Basic
+                            {% else %}Needs Improvement
+                            {% endif %}
+                        {% elif computed_average %}
+                            {% if computed_average >= 90 %}Outstanding
+                            {% elif computed_average >= 80 %}High
+                            {% elif computed_average >= 70 %}Good
+                            {% elif computed_average >= 60 %}Aspiring
+                            {% elif computed_average >= 50 %}Basic
+                            {% else %}Needs Improvement
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- REMARKS ONLY TABLE -->
+        <table class="remarks-table">
+            <thead>
+                <tr>
+                    <th style="width: 85%;"></th>
+                    <th style="width: 15%; text-align: left;">Remarks</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for subj, data in subjects.items %}
+                    {% if not data.quiz and not data.mid and not data.end and not data.avg %}
+                    <tr>
+                        <td class="subject-col">{{ subj }}</td>
+                        <td class="remark-val-col">
+                            {% if data.grade_letter == 'A*' %}Outstanding
+                            {% elif data.grade_letter == 'A' %}High
+                            {% elif data.grade_letter == 'B' %}Good
+                            {% elif data.grade_letter == 'C' %}Aspiring
+                            {% elif data.grade_letter == 'D' %}Basic
+                            {% else %}Outstanding
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- GRADING SCALE -->
+        <table class="grading-scale">
+            <thead>
+                <tr>
+                    <th colspan="6">GRADING SCALE</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="bold-row">
+                    <td>A*</td><td>A</td><td>B</td><td>C</td><td>D</td><td>E</td>
+                </tr>
+                <tr>
+                    <td>90 - 100</td><td>80 - 89</td><td>70 - 79</td><td>60 - 69</td><td>50 - 59</td><td>0 - 49</td>
+                </tr>
+                <tr>
+                    <td>Outstanding</td><td>High</td><td>Good</td><td>Aspiring</td><td>Basic</td><td>Needs Improvement</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="page-break"></div>
+
+        <!-- PAGE 2 HEADER (standardized format) -->
+        {% include "includes/hodari_print_header.html" %}
+
+        <!-- GENERAL TRAITS -->
+        <div class="section-title">GENERAL TRAITS</div>
+        <div class="traits-container">
+            <table class="traits-table">
+                <tr><th colspan="2">Work Habits</th></tr>
+                <tr><td>Works well independently</td><td>{{ report.general_traits.wh_works_independently|default:"-" }}</td></tr>
+                <tr><td>Completes work neatly</td><td>{{ report.general_traits.wh_completes_neatly|default:"-" }}</td></tr>
+                <tr><td>Completes work required</td><td>{{ report.general_traits.wh_completes_required|default:"-" }}</td></tr>
+                <tr><td>Does not disturb others</td><td>{{ report.general_traits.wh_not_disturb|default:"-" }}</td></tr>
+                <tr><td>Follows directions</td><td>{{ report.general_traits.wh_follows_directions|default:"-" }}</td></tr>
+            </table>
+            
+            <table class="traits-table">
+                <tr><th colspan="2">Personal Traits</th></tr>
+                <tr><td>Displays creativity</td><td>{{ report.general_traits.pt_creativity|default:"-" }}</td></tr>
+                <tr><td>Is honest</td><td>{{ report.general_traits.pt_honest|default:"-" }}</td></tr>
+                <tr><td>Successfully completes homework and assignments</td><td>{{ report.general_traits.pt_homework|default:"-" }}</td></tr>
+                <tr><td>Attention span</td><td>{{ report.general_traits.pt_attention|default:"-" }}</td></tr>
+                <tr><td>Displays flexibility</td><td>{{ report.general_traits.pt_flexibility|default:"-" }}</td></tr>
+            </table>
+            
+            <table class="traits-table">
+                <tr><th colspan="2">Social Traits</th></tr>
+                <tr><td>Show respect for authority</td><td>{{ report.general_traits.st_respects|default:"-" }}</td></tr>
+                <tr><td>Exhibits self-control</td><td>{{ report.general_traits.st_self_control|default:"-" }}</td></tr>
+                <tr><td>Responds well to correction</td><td>{{ report.general_traits.st_correction|default:"-" }}</td></tr>
+                <tr><td>Relates well with others</td><td>{{ report.general_traits.st_relates_well|default:"-" }}</td></tr>
+                <tr><td>Is courteous</td><td>{{ report.general_traits.st_courteous|default:"-" }}</td></tr>
+            </table>
+        </div>
+
+        <!-- CHARACTER GRADING -->
+        <table class="char-grading-table">
+            <tr><th colspan="4">Character Grading</th></tr>
+            <tr style="font-weight: bold;">
+                <td>E</td><td>G</td><td>S</td><td>N</td>
+            </tr>
+            <tr>
+                <td>Excellent</td><td>Good</td><td>Satisfactory</td><td>Needs Improvement</td>
+            </tr>
+        </table>
+
+        <!-- FOOTER INFO -->
+        <table class="footer-info-table">
+            <tr>
+                <td>Days Absent : {{ attendance.absent }}</td>
+                <td>School Reopens on: {{ report.term.next_term_start|default:"7th September 2026" }}</td>
+            </tr>
+        </table>
+
+        <!-- SIGNATURES -->
+        <table class="signatures-table">
+            <tr>
+                <td class="signatures-left">
+                    <div style="font-weight: bold; margin-bottom: 5px;">Class Teacher Remark:</div>
+                    <div style="min-height: 80px; margin-bottom: 20px;">
+                        {{ report.teacher_comments }}
+                    </div>
+                    <div style="font-weight: bold;">
+                        Head Teacher's<br>Signature
+                    </div>
+                    {% if report.signed_off_by %}
+                    <div style="margin-top:8px;font-size:12px;color:#333;font-weight:600">
+                        {{ report.signed_off_by.get_full_name|default:report.signed_off_by.username }}
+                    </div>
+                    {% endif %}
+                </td>
+                <td class="signatures-right">
+                    <div style="font-weight: bold;">
+                        Class Teacher: {{ report.generated_by.get_full_name|upper|default:"RANGE MARWA BORNFACE R.M" }}
+                    </div>
+                    
+                    {% if report.status == 'published' and report.signed_off_at %}
+                    <div class="stamp-container">
+                        <img src="{% static 'branding/hodari_school_stamp.png' %}" alt="Stamp" class="stamp-img">
+                        <div class="stamp-date">{{ report.signed_off_at|date:"d M Y"|upper }}</div>
+                    </div>
+                    {% endif %}
+                </td>
+            </tr>
+        </table>
+
+    {% else %}
+        <!-- ECD Report Placeholder -->
+        <div style="font-weight: bold; text-transform: uppercase; margin-bottom: 10px;">Developmental & Academic Progress</div>
+        {% for eval in report.ecd_evaluations.all %}
+            <div style="display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #eee;">
+                <span>{{ eval.domain }}</span>
+                <span style="font-weight: bold;">{{ eval.rating }}</span>
+            </div>
+        {% empty %}
+            <div style="padding: 20px; text-align: center; color: #666;">No evaluations recorded.</div>
+        {% endfor %}
+    {% endif %}
+</div>
+</body>
+</html>

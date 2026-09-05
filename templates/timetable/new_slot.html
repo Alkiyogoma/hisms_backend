@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+{% load hodari_forms %}
+{% block title %}New Timetable Slot &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Academic{% endblock %}
+{% block topbar_date %}{{ today_display }}{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:800px; margin:0 auto">
+  <div class="card-title">Create Timetable Slot</div>
+  <div style="font-size:13px; color:var(--text-muted); margin-bottom:24px; margin-top:-6px">
+    Subjects are filtered by the selected class's department. Cross-department assignments validated on save.
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    
+    <!-- Ensure term is preserved even if not visible -->
+    <div style="display:none">
+       {{ form.term }}
+    </div>
+
+    {% if form.non_field_errors %}
+      <div class="msg-toast msg-error" style="margin-bottom:20px">
+        {% for err in form.non_field_errors %}
+          <div style="display:flex; align-items:center; gap:8px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+            {{ err }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="hf2-section">
+      <div class="hf2-section-title">Assignment</div>
+      <div class="hf2-grid-3">
+        {% field form.class_name %}
+        {% field form.subject_name %}
+        {% field form.teacher %}
+      </div>
+    </div>
+
+    <div class="hf2-section">
+      <div class="hf2-section-title">Schedule</div>
+      <div class="hf2-grid-3">
+        <div>
+          <label class="hf-label">Days <span style="color:var(--red)">*</span></label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+            <button type="button" class="chip day-pill" data-day="mon" onclick="toggleDay(this)">Mon</button>
+            <button type="button" class="chip day-pill" data-day="tue" onclick="toggleDay(this)">Tue</button>
+            <button type="button" class="chip day-pill" data-day="wed" onclick="toggleDay(this)">Wed</button>
+            <button type="button" class="chip day-pill" data-day="thu" onclick="toggleDay(this)">Thu</button>
+            <button type="button" class="chip day-pill" data-day="fri" onclick="toggleDay(this)">Fri</button>
+          </div>
+          <div style="margin-top:6px">
+            <button type="button" id="selectAllDays" style="font-size:11px;color:var(--hodari-blue);background:none;border:none;cursor:pointer;font-weight:600">Select all</button>
+          </div>
+          <div id="dayError" style="display:none;font-size:12px;color:var(--red);margin-top:4px">Please select at least one day.</div>
+          <!-- Hidden inputs submitted with the form -->
+          <input type="hidden" name="repeat_days" id="repeatDaysField" value="">
+        </div>
+        {% field form.start_time %}
+        {% field form.end_time %}
+      </div>
+    </div>
+
+    <div class="hf2-actions">
+      <a href="{% url 'timetable:index' %}" class="hf-btn hf-btn-secondary" style="margin-right:auto">Cancel</a>
+      <button type="submit" class="hf-btn hf-btn-primary" id="submitBtn" onclick="this.classList.add('btn-loading')">
+        Create Timetable Slot
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .day-pill {
+    cursor: pointer;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 99px;
+    transition: all .15s ease;
+    user-select: none;
+  }
+  .day-pill:hover { transform: scale(1.05); }
+  .day-pill:active { transform: scale(0.95); }
+  .day-pill.chip-grey { background: #F3F4F6; color: #4B5563; border: 1px solid #D1D5DB; }
+  .day-pill.chip-blue { background: var(--blue-st-bg, #EFF6FF); color: var(--blue-st, #023AA5); border: 1px solid var(--blue-st-bd, #BFDBFE); box-shadow: 0 2px 8px rgba(2,58,165,.15); }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var DEPT_DATA = {{ dept_subject_data|safe }};
+  if (!DEPT_DATA) DEPT_DATA = { classes: {}, subjects: {} };
+
+  var classSelect = document.querySelector('select[name="class_name"]');
+  var subjectSelect = document.querySelector('select[name="subject_name"]');
+  var teacherSelect = document.querySelector('select[name="teacher"]');
+
+  if (!classSelect || !subjectSelect || !teacherSelect) return;
+
+  function getTeacherSubjects(teacherId) {
+    if (DEPT_DATA.subjects_by_teacher && DEPT_DATA.subjects_by_teacher[String(teacherId)]) {
+      return DEPT_DATA.subjects_by_teacher[String(teacherId)];
+    }
+    return null;
+  }
+
+  function getTeacherSubjectsByClass(teacherId, className) {
+    var key = String(teacherId) + ':' + className;
+    if (DEPT_DATA.subjects_by_teacher_class && DEPT_DATA.subjects_by_teacher_class[key]) {
+      return DEPT_DATA.subjects_by_teacher_class[key];
+    }
+    return null;
+  }
+
+  function teacherTeachesSubjectInClass(teacherId, subjectName, className) {
+    var classSubjects = getTeacherSubjectsByClass(teacherId, className);
+    if (classSubjects && classSubjects.length > 0) {
+      return classSubjects.indexOf(subjectName) !== -1;
+    }
+    return false;
+  }
+
+  function populateSubjects(subjectNames, preserveSelection) {
+    var currentVal = subjectSelect.value;
+    while (subjectSelect.options.length > 1) {
+      subjectSelect.remove(1);
+    }
+    (subjectNames || []).forEach(function(name) {
+      var opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      subjectSelect.appendChild(opt);
+    });
+    if (preserveSelection && currentVal) {
+      for (var i = 0; i < subjectSelect.options.length; i++) {
+        if (subjectSelect.options[i].value === currentVal) {
+          subjectSelect.value = currentVal;
+          break;
+        }
+      }
+    }
+  }
+
+  function populateTeachers(teachers, preserveSelection) {
+    var currentVal = teacherSelect.value;
+    while (teacherSelect.options.length > 1) {
+      teacherSelect.remove(1);
+    }
+    (teachers || []).forEach(function(t) {
+      var opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.full_name;
+      teacherSelect.appendChild(opt);
+    });
+    if (preserveSelection && currentVal) {
+      for (var i = 0; i < teacherSelect.options.length; i++) {
+        if (teacherSelect.options[i].value == currentVal) {
+          teacherSelect.value = currentVal;
+          break;
+        }
+      }
+    }
+  }
+
+  var lastClassName = '';
+  function filterSubjectAndTeacher() {
+    var className = classSelect.value;
+    lastClassName = className;
+    var classInfo = DEPT_DATA.classes[className];
+
+    var classSubjects = [];
+    if (classInfo && classInfo.subject_names) {
+      classSubjects = classInfo.subject_names;
+    }
+    populateSubjects(classSubjects, true);
+
+    var classTeachers = [];
+    if (DEPT_DATA.teachers_by_class && DEPT_DATA.teachers_by_class[className]) {
+      classTeachers = DEPT_DATA.teachers_by_class[className];
+    }
+    populateTeachers(classTeachers, true);
+  }
+
+  subjectSelect.addEventListener('change', function() {
+    var selectedSubject = subjectSelect.value;
+    var className = classSelect.value;
+    var classTeachers = [];
+    if (DEPT_DATA.teachers_by_class && DEPT_DATA.teachers_by_class[className]) {
+      classTeachers = DEPT_DATA.teachers_by_class[className];
+    }
+
+    var filtered;
+    if (selectedSubject && className) {
+      filtered = classTeachers.filter(function(t) {
+        return teacherTeachesSubjectInClass(t.id, selectedSubject, className);
+      });
+    } else {
+      filtered = classTeachers;
+    }
+    populateTeachers(filtered, true);
+  });
+
+  teacherSelect.addEventListener('change', function() {
+    var className = classSelect.value;
+    var teacherId = teacherSelect.value;
+    var classInfo = DEPT_DATA.classes[className];
+    var classSubjects = (classInfo && classInfo.subject_names) || [];
+
+    var allowedSubjects;
+    if (teacherId && className) {
+      var teacherClassSubjects = getTeacherSubjectsByClass(teacherId, className);
+      if (teacherClassSubjects && teacherClassSubjects.length > 0) {
+        allowedSubjects = classSubjects.filter(function(s) {
+          return teacherClassSubjects.indexOf(s) !== -1;
+        });
+        if (allowedSubjects.length === 0) allowedSubjects = classSubjects;
+      } else {
+        allowedSubjects = classSubjects;
+      }
+    } else {
+      allowedSubjects = classSubjects;
+    }
+    populateSubjects(allowedSubjects, true);
+  });
+
+  classSelect.addEventListener('change', filterSubjectAndTeacher);
+  filterSubjectAndTeacher();
+
+  // ── Repeat days: pill toggle ──
+  var dayPills = document.querySelectorAll('.day-pill');
+  var repeatField = document.getElementById('repeatDaysField');
+  var selectAllBtn = document.getElementById('selectAllDays');
+
+  function syncRepeatField() {
+    var selected = [];
+    dayPills.forEach(function(pill) {
+      if (pill.classList.contains('chip-blue')) {
+        selected.push(pill.dataset.day);
+      }
+    });
+    repeatField.value = selected.join(',');
+  }
+
+  function updateSelectAllBtn() {
+    var allActive = dayPills.length === document.querySelectorAll('.day-pill.chip-blue').length;
+    if (selectAllBtn) selectAllBtn.textContent = allActive ? 'Clear all' : 'Select all';
+  }
+
+  window.toggleDay = function(pill) {
+    if (pill.classList.contains('chip-blue')) {
+      pill.classList.remove('chip-blue');
+      pill.classList.add('chip-grey');
+    } else {
+      pill.classList.remove('chip-grey');
+      pill.classList.add('chip-blue');
+    }
+    syncRepeatField();
+    updateSelectAllBtn();
+  };
+
+  if (selectAllBtn) {
+    selectAllBtn.addEventListener('click', function() {
+      var allActive = dayPills.length === document.querySelectorAll('.day-pill.chip-blue').length;
+      dayPills.forEach(function(pill) {
+        if (allActive) {
+          pill.classList.remove('chip-blue');
+          pill.classList.add('chip-grey');
+        } else {
+          pill.classList.remove('chip-grey');
+          pill.classList.add('chip-blue');
+        }
+      });
+      syncRepeatField();
+      updateSelectAllBtn();
+    });
+  }
+
+  // ── Form submit: validate at least one day ──
+  var form = document.querySelector('form');
+  if (form) {
+    form.addEventListener('submit', function(e) {
+      var anySelected = document.querySelectorAll('.day-pill.chip-blue').length > 0;
+      var dayError = document.getElementById('dayError');
+      if (!anySelected) {
+        e.preventDefault();
+        if (dayError) dayError.style.display = 'block';
+        return false;
+      }
+      if (dayError) dayError.style.display = 'none';
+    });
+  }
+});
+</script>
+{% endblock %}

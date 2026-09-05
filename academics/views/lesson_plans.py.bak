@@ -1,0 +1,1079 @@
+import logging
+import re
+from decimal import Decimal
+
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render, reverse
+from django.utils import timezone
+from django.views.generic import CreateView, UpdateView, TemplateView, View
+import json
+
+from academics.ecd_utils import build_ecd_report_context, ecd_template_type_from_class_name, grade_class_names_for_department
+from academics.forms import LessonPlanForm, LessonPlanReviewForm, ExamScoreFilterForm, SubjectForm, TermForm
+from academics.models import (
+    AcademicYear,
+    Department,
+    ECDEvaluation,
+    ExamScore,
+    ExamType,
+    LessonPlan,
+    LessonPlanAttachment,
+    LessonPlanStatus,
+    GradeClass,
+    ProgressionConfig,
+    ProgressionCase,
+    ProgressionStatus,
+    ProgressionOutcome,
+    PromotionRun,
+    ReportCard,
+    ReportCardStatus,
+    Term,
+    GradeClass,
+    get_exam_weights,
+    get_active_exam_types,
+    get_active_ecd_templates,
+    ABCPaceProgress,
+    ABCScripture,
+    ABCReadingProgramme,
+    ABCGeneralAssignment,
+    ABCInternalExam,
+    Subject,
+)
+from academics.services import generate_class_reports, sign_off_report, calculate_progression_cases
+from audit.models import log_event
+from students.models import Student, StudentStatus, EnrollmentHistory
+from users.models import UserRole
+from core.permissions import RoleRequiredMixin
+from core.teacher_context import get_teacher_assigned_classes, get_teacher_assigned_classes_from_tca, is_ecd_teacher
+
+logger = logging.getLogger(__name__)
+from academics.grading_utils import (
+    compute_grade_with_gaps, get_grade_from_score, get_grade_label, get_full_grade_display,
+    is_pass, is_at_risk, is_critical
+)
+
+
+def _is_hod_like(role: str) -> bool:
+    return role in {
+        UserRole.SUPER_ADMIN,
+        UserRole.HEAD_OF_SCHOOL,
+        UserRole.PRIMARY_HOD,
+        UserRole.ECD_HOD,
+        UserRole.LOWER_SECONDARY_HOD,
+    }
+
+
+class LessonPlanListView(RoleRequiredMixin, TemplateView):
+    template_name = "academics/lesson_plans.html"
+    allowed_roles = [UserRole.TEACHER, UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD]
+    required_permission = "academics.view_lessonplan"
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect(f"{settings.LOGIN_URL}?next={request.path}")
+        # FRD: ECD teachers submit Weekly Focus, not lesson plans
+        if request.user.role == UserRole.TEACHER and is_ecd_teacher(request.user):
+            messages.info(request, "ECD teachers submit a Weekly Focus instead of lesson plans.")
+            return redirect("communications:weekly_focus_submit")
+        return super().dispatch(request, *args, **kwargs)
+
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        user = self.request.user
+        role = user.role
+        teacher_is_ecd = role == UserRole.TEACHER and is_ecd_teacher(user)
+
+        term_id = self.request.GET.get("term")
+        if term_id:
+            selected_term = Term.objects.filter(pk=term_id).first()
+        else:
+            from academics.utils import get_current_term
+            selected_term = get_current_term()
+
+        mine = LessonPlan.objects.filter(teacher=user).select_related("term", "reviewed_by").prefetch_related("attachments").order_by("-created_at")[:100]
+        queue = LessonPlan.objects.filter(status=LessonPlanStatus.SUBMITTED).select_related("teacher", "term").prefetch_related("attachments").order_by("submitted_at", "created_at")
+
+        if selected_term:
+            mine = mine.filter(term=selected_term)
+            queue = queue.filter(term=selected_term)
+
+        if not _is_hod_like(role):
+            queue = LessonPlan.objects.filter(
+                teacher=user, status=LessonPlanStatus.SUBMITTED
+            ).select_related("teacher", "term").prefetch_related("attachments").order_by("submitted_at", "created_at")
+            if selected_term:
+                queue = queue.filter(term=selected_term)
+
+        from academics.models import Term as TermModel
+        available_terms = TermModel.objects.filter(is_locked=False).order_by("-academic_year__name", "name")
+        ctx["available_terms"] = available_terms
+        ctx["selected_term"] = selected_term
+
+        # FR-ACAD-002: Detect teachers with MISSING plans (HODs/Admin only)
+        missing_teachers = _get_missing_plan_teachers() if _is_hod_like(role) else []
+
+        # Subject×class heatmap for HODs
+        heatmap = _build_heatmap(role) if _is_hod_like(role) else None
+
+        approved_count = LessonPlan.objects.filter(
+            teacher=user, status=LessonPlanStatus.APPROVED
+        ).count()
+
+        ctx["mine"] = mine
+        ctx["approved_count"] = approved_count
+        ctx["queue"] = queue[:120]
+        ctx["can_review"] = _is_hod_like(role)
+        ctx["can_create"] = role in {UserRole.TEACHER, UserRole.SUPER_ADMIN} and not teacher_is_ecd
+        ctx["missing_teachers"] = missing_teachers
+        ctx["missing_count"] = len(missing_teachers)
+        ctx["heatmap"] = heatmap
+        ctx["academics_tab"] = "lesson_plans"
+        return ctx
+
+
+class LessonPlanContextMixin:
+    """Shared context for lesson plan create / edit forms."""
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        user = self.request.user
+
+        # Recent submissions (non-draft) for the sidebar
+        ctx["recent_submissions"] = (
+            LessonPlan.objects.filter(teacher=user)
+            .exclude(status=LessonPlanStatus.DRAFT)
+            .select_related("term")
+            .order_by("-submitted_at", "-created_at")[:10]
+        )
+
+        # Class → subjects mapping from timetable (for JS dynamic filtering)
+        from timetable.models import TimetableSlot
+        slots = TimetableSlot.objects.filter(teacher=user).select_related("subject")
+        class_subject_map: dict[str, list[str]] = {}
+        DAY_LABEL = {"mon": "Mon", "tue": "Tue", "wed": "Wed", "thu": "Thu", "fri": "Fri"}
+        DAY_ORDER = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4}
+        timetable_days: dict[str, dict[str, dict]] = {}
+        for slot in slots:
+            cn = slot.class_name.strip()
+            sn = slot.subject_name.strip()
+            if cn not in class_subject_map:
+                class_subject_map[cn] = []
+            if sn and sn not in class_subject_map[cn]:
+                class_subject_map[cn].append(sn)
+
+            # Build timetable_days data for subject pill display
+            if cn not in timetable_days:
+                timetable_days[cn] = {}
+            if sn not in timetable_days[cn]:
+                subj = slot.subject
+                timetable_days[cn][sn] = {
+                    "code": subj.code if (subj and subj.code) else sn[:4].upper(),
+                    "color": subj.color if (subj and subj.color) else "#023AA5",
+                    "days": [],
+                }
+            day_label = DAY_LABEL.get(slot.day_of_week, slot.day_of_week[:3].title())
+            if day_label not in timetable_days[cn][sn]["days"]:
+                timetable_days[cn][sn]["days"].append(day_label)
+
+        # Sort days in each subject in Mon-Fri order
+        for cn in timetable_days:
+            for sn in timetable_days[cn]:
+                days = timetable_days[cn][sn]["days"]
+                days.sort(key=lambda d: DAY_ORDER.get(d.lower()[:3], 99))
+
+        # For admin roles, show all classes → all subjects (no day info)
+        if user.role != UserRole.TEACHER:
+            all_subjects = list(
+                Subject.objects.filter(is_active=True).values_list("name", flat=True)
+            )
+            all_classes = list(GradeClass.objects.values_list("name", flat=True))
+            class_subject_map = {cn: all_subjects for cn in all_classes}
+            # Admin has no personal timetable, so leave timetable_days empty
+
+        ctx["class_subject_map_json"] = json.dumps(class_subject_map)
+        ctx["timetable_days_json"] = json.dumps(timetable_days)
+
+        # Current term for read-only display (not user-selectable)
+        from academics.utils import get_current_term
+        current_term = get_current_term()
+        if hasattr(self, 'object') and self.object and self.object.term_id:
+            ctx["term_display"] = str(self.object.term)
+        elif current_term:
+            ctx["term_display"] = str(current_term)
+        else:
+            ctx["term_display"] = "No active term"
+        return ctx
+
+
+class LessonPlanCreateView(LessonPlanContextMixin, RoleRequiredMixin, CreateView):
+    template_name = "academics/new_lesson_plan.html"
+    form_class = LessonPlanForm
+    success_url = "/academics/lesson-plans/"
+    allowed_roles = [UserRole.TEACHER, UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD]
+    required_permission = "academics.add_lessonplan"
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+             return redirect(f"{settings.LOGIN_URL}?next={request.path}")
+        if request.user.role not in {UserRole.TEACHER, UserRole.SUPER_ADMIN}:
+            raise PermissionDenied()
+        # FRD: ECD teachers submit Weekly Focus, not lesson plans
+        if request.user.role == UserRole.TEACHER and is_ecd_teacher(request.user):
+            messages.info(request, "ECD teachers submit a Weekly Focus instead of lesson plans.")
+            return redirect("communications:weekly_focus_submit")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
+
+    def form_valid(self, form):
+        form.instance.teacher = self.request.user
+        return _lesson_plan_form_processing(self, form)
+
+class LessonPlanUpdateView(LessonPlanContextMixin, RoleRequiredMixin, UpdateView):
+    model = LessonPlan
+    template_name = "academics/new_lesson_plan.html"
+    form_class = LessonPlanForm
+    success_url = "/academics/lesson-plans/"
+    allowed_roles = [UserRole.TEACHER, UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD]
+    required_permission = "academics.change_lessonplan"
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return super().dispatch(request, *args, **kwargs)
+        plan = self.get_object()
+        # FRD: ECD teachers submit Weekly Focus, not lesson plans
+        if request.user.role == UserRole.TEACHER and is_ecd_teacher(request.user):
+            messages.info(request, "ECD teachers submit a Weekly Focus instead of lesson plans.")
+            return redirect("communications:weekly_focus_submit")
+        if plan.teacher_id != request.user.id and request.user.role != UserRole.SUPER_ADMIN:
+            raise PermissionDenied()
+        # LP-EDIT: Teacher can only edit when status = REVISION_REQUESTED. SA can edit any.
+        if request.user.role != UserRole.SUPER_ADMIN:
+            if plan.status != LessonPlanStatus.REVISION_REQUESTED:
+                messages.error(request, "You can only edit lesson plans that have been returned for revision.")
+                return redirect("academics:lesson_plans")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
+
+    def form_valid(self, form):
+        return _lesson_plan_form_processing(self, form)
+
+def _lesson_plan_snapshot(plan):
+    """Serialize a LessonPlan's key fields for audit log snapshots."""
+    return {
+        "class_name": plan.class_name,
+        "subject_name": plan.subject_name,
+        "week_start_date": str(plan.week_start_date) if plan.week_start_date else None,
+        "lesson_title": plan.lesson_title,
+        "objectives": plan.objectives,
+        "activities": plan.activities,
+        "assessment_strategy": plan.assessment_strategy,
+        "resources": plan.resources,
+        "status": plan.status,
+    }
+
+
+def _lesson_plan_form_processing(view_instance, form):
+        # FR-ACAD-010 / LP-003: Deadline and Duplicate enforcement
+        from datetime import timedelta, time as time_type, date as date_type
+        from django.conf import settings
+        from django.utils import timezone
+        now = timezone.now()
+        week_start = form.cleaned_data["week_start_date"]
+
+        # Block past weeks: only current week (this Monday) and future weeks allowed
+        today = date_type.today()
+        this_monday = today - timedelta(days=today.weekday())
+        if week_start < this_monday:
+            messages.error(view_instance.request, "Cannot submit lesson plans for past weeks. Please select the current week or a future week.")
+            return view_instance.form_invalid(form)
+
+        # Block today/tomorrow subjects for the current week
+        if week_start == this_monday:
+            from timetable.models import TimetableSlot
+            weekday_map = {0: "mon", 1: "tue", 2: "wed", 3: "thu", 4: "fri"}
+            today_code = weekday_map.get(today.weekday())
+            tomorrow_code = weekday_map.get((today.weekday() + 1) % 5) if today.weekday() < 4 else None
+            blocked_days = [today_code]
+            if tomorrow_code:
+                blocked_days.append(tomorrow_code)
+            has_class = TimetableSlot.objects.filter(
+                teacher=view_instance.request.user,
+                subject_name__iexact=form.cleaned_data["subject_name"].strip(),
+                day_of_week__in=blocked_days,
+            ).exists()
+            if has_class:
+                day_labels = [today.strftime("%A")]
+                if tomorrow_code:
+                    day_labels.append((today + timedelta(days=1)).strftime("%A"))
+                messages.error(
+                    view_instance.request,
+                    f"Cannot submit a lesson plan for '{form.cleaned_data["subject_name"]}' this week because it is scheduled for {', '.join(day_labels)}. Plans must be submitted before the lesson is taught."
+                )
+                return view_instance.form_invalid(form)
+
+        # Calculate deadline: Monday (8 AM) of the relevant week.
+        # FR-LP-003: Monday 8:00 AM
+        deadline_day = getattr(settings, "LESSON_PLAN_SUBMISSION_DEADLINE_DAY", 0) # 0 = Monday
+        deadline_time_str = getattr(settings, "LESSON_PLAN_SUBMISSION_DEADLINE_TIME", "08:00")
+        h, m = map(int, deadline_time_str.split(":"))
+        
+        days_to_monday = week_start.weekday()
+        last_monday = week_start - timedelta(days=days_to_monday)
+        
+        # Calculate the Friday before that Monday
+        # If Monday is 11th, Friday is 8th (3 days before)
+        # 11 - 3 = 8.
+        # Logic: last_monday - (7 - deadline_day) if deadline_day < 7
+        deadline_date = last_monday - timedelta(days=(7 - deadline_day) % 7)
+        
+        deadline_dt = timezone.make_aware(timezone.datetime.combine(deadline_date, time_type(h, m)))
+        
+        # Allow Super Admin to bypass deadline
+        is_late = now > deadline_dt
+        can_bypass = view_instance.request.user.role == UserRole.SUPER_ADMIN
+        
+        if view_instance.request.POST.get("action") == "submit":
+            if is_late:
+                if not can_bypass:
+                    messages.warning(view_instance.request, f"Submission deadline was {deadline_dt.strftime('%d %B, %H:%M')}. Plan will be flagged as late.")
+                else:
+                    messages.info(view_instance.request, "Super Admin: bypassing deadline.")
+                
+            form.instance.status = LessonPlanStatus.SUBMITTED
+            form.instance.submitted_at = now
+            view_instance._notify = True
+            messages.success(view_instance.request, "Lesson plan submitted for HOD review.")
+        else:
+            view_instance._notify = False
+            messages.success(view_instance.request, "Lesson plan saved as draft.")
+            
+        # Enforce Teacher-Class Integration from Timetable
+        from timetable.models import TimetableSlot
+        is_assigned = TimetableSlot.objects.filter(
+            teacher=view_instance.request.user,
+            class_name__iexact=form.cleaned_data["class_name"].strip(),
+            subject_name__iexact=form.cleaned_data["subject_name"].strip()
+        ).exists()
+        
+        if not is_assigned and view_instance.request.user.role == UserRole.TEACHER:
+            messages.error(view_instance.request, "You cannot submit a lesson plan for a class/subject you are not assigned to in the timetable.")
+            return view_instance.form_invalid(form)
+
+        # Duplicate — redirect to edit the existing plan instead of blocking
+        existing = LessonPlan.objects.filter(
+            teacher=view_instance.request.user,
+            week_start_date=week_start,
+            class_name=form.cleaned_data["class_name"],
+            subject_name=form.cleaned_data["subject_name"]
+        ).exclude(pk=form.instance.pk)
+        if existing.exists():
+            existing_plan = existing.first()
+            messages.info(
+                view_instance.request,
+                f"A lesson plan for {form.cleaned_data['class_name']} \u2014 {form.cleaned_data['subject_name']} "
+                f"already exists this week. Redirecting to edit it.",
+            )
+            return redirect("academics:lesson_plan_edit", pk=existing_plan.pk)
+        
+        # Require at least one attachment for submission
+        if view_instance.request.POST.get("action") == "submit":
+            has_new = view_instance.request.FILES and len(view_instance.request.FILES.getlist('attachments')) > 0
+            has_existing = form.instance.pk and form.instance.attachments.exists()
+            if not has_new and not has_existing:
+                messages.error(view_instance.request, "Please attach at least one file before submitting.")
+                return view_instance.form_invalid(form)
+        
+        response = super(view_instance.__class__, view_instance).form_valid(form)
+        
+        # Handle Attachments (with batch + duplicate + size validation)
+        if view_instance.request.FILES:
+            from academics.models import LessonPlanAttachment
+            from academics.validators import validate_upload_batch, check_duplicate_file, validate_attachment_file
+            files = view_instance.request.FILES.getlist('attachments')
+
+            # Combined size + count limit per MediaSettings
+            try:
+                validate_upload_batch(files, area="lesson_plans")
+            except ValidationError as e:
+                msg = e.message if hasattr(e, 'message') else str(e)
+                messages.error(view_instance.request, msg)
+                from communications.email_service import dispatch_notification
+                dispatch_notification(
+                    user=view_instance.request.user,
+                    title="File upload error",
+                    message=msg,
+                    link="",
+                )
+                return view_instance.form_invalid(form)
+
+            # Duplicate detection against existing attachments
+            if form.instance.pk:
+                existing_att = form.instance.attachments.all()
+            else:
+                existing_att = LessonPlanAttachment.objects.none()
+
+            for f in files:
+                duplicates = check_duplicate_file(f, existing_att, area="lesson_plans")
+                if duplicates:
+                    msg = f"File '{f.name}' appears to be a duplicate — skipped."
+                    messages.warning(view_instance.request, msg)
+                    from communications.email_service import dispatch_notification
+                    dispatch_notification(
+                        user=view_instance.request.user,
+                        title="Duplicate file skipped",
+                        message=msg,
+                        link="",
+                    )
+                    continue
+                try:
+                    validate_attachment_file(f, area="lesson_plans")
+                except ValidationError as e:
+                    msg = f"Attachment '{f.name}' rejected: {e.message}" if f.name else f"File rejected: {e.message}"
+                    messages.error(view_instance.request, msg)
+                    from communications.email_service import dispatch_notification
+                    dispatch_notification(
+                        user=view_instance.request.user,
+                        title="File validation error",
+                        message=msg,
+                        link="",
+                    )
+                    continue
+                import os as _os
+                raw_name = _os.path.basename(f.name)
+                safe_name = re.sub(r'[^\w\.\-\(\)]', '_', raw_name).strip()
+                f.name = safe_name
+                LessonPlanAttachment.objects.create(
+                    lesson_plan=form.instance,
+                    file=f,
+                    filename=safe_name,
+                    uploaded_by=view_instance.request.user
+                )
+
+        if view_instance._notify:
+            _notify_hod_lesson_plan(form.instance, view_instance.request.user)
+            # Generate task for HOD review
+            try:
+                from tasks.services import generate_lesson_plan_review_tasks
+                generate_lesson_plan_review_tasks(form.instance)
+            except Exception:
+                pass  # Never block lesson plan submission on task generation
+        from audit.models import log_event
+        action_type = "LESSON_PLAN_SUBMITTED" if view_instance.request.POST.get("action") == "submit" else "LESSON_PLAN_SAVED_DRAFT"
+        log_event(
+            actor=view_instance.request.user,
+            action_type=action_type,
+            model_name="LessonPlan",
+            object_id=form.instance.pk,
+            description=f"Lesson plan {form.instance.class_name} — {form.instance.subject_name} ({form.instance.week_start_date}) saved as {dict(LessonPlanStatus.choices).get(form.instance.status, 'unknown')}",
+            before=_lesson_plan_snapshot(form.instance) if form.instance.pk else None,
+            after=_lesson_plan_snapshot(form.instance),
+            request=view_instance.request,
+        )
+        return response
+
+
+class LessonPlanSubmitView(RoleRequiredMixin, LoginRequiredMixin, View):
+    login_url = "/accounts/login/"
+    allowed_roles = [UserRole.TEACHER, UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD, UserRole.SUPER_ADMIN]
+    required_permission = "academics.add_lessonplan"
+
+    def post(self, request, pk: int):
+        # FRD: ECD teachers submit Weekly Focus, not lesson plans
+        if request.user.role == UserRole.TEACHER and is_ecd_teacher(request.user):
+            messages.info(request, "ECD teachers submit a Weekly Focus instead of lesson plans.")
+            return redirect("communications:weekly_focus_submit")
+        plan = get_object_or_404(LessonPlan, pk=pk)
+        if plan.teacher_id != request.user.id and request.user.role != UserRole.SUPER_ADMIN:
+            raise PermissionDenied()
+        if plan.status in {LessonPlanStatus.APPROVED}:
+            raise ValidationError("Approved lesson plans cannot be resubmitted.")
+        # LP-RESUBMIT: Rejected plans are closed and cannot be resubmitted.
+        if plan.status == LessonPlanStatus.REJECTED:
+            messages.error(request, "This lesson plan has been rejected and cannot be resubmitted. Please create a new plan.")
+            return redirect("academics:lesson_plans")
+        # Require at least one attachment
+        if not plan.attachments.exists():
+            messages.error(request, "Please attach at least one file before submitting.")
+            return redirect("academics:lesson_plans")
+        before = _lesson_plan_snapshot(plan)
+        plan.status = LessonPlanStatus.SUBMITTED
+        plan.submitted_at = timezone.now()
+        plan.reviewer_feedback = ""
+        plan.reviewed_by = None
+        plan.reviewed_at = None
+        plan.full_clean()
+        plan.save(update_fields=["status", "submitted_at", "reviewer_feedback", "reviewed_by_id", "reviewed_at", "updated_at"])
+        _notify_hod_lesson_plan(plan, request.user)
+        # Generate task for HOD review
+        try:
+            from tasks.services import generate_lesson_plan_review_tasks
+            generate_lesson_plan_review_tasks(plan)
+        except Exception:
+            logger.exception("Failed to generate review task for lesson plan %s", plan.pk)
+        from audit.models import log_event
+        log_event(
+            actor=request.user,
+            action_type="LESSON_PLAN_SUBMITTED",
+            model_name="LessonPlan",
+            object_id=plan.pk,
+            description=f"Lesson plan {plan.class_name} — {plan.subject_name} ({plan.week_start_date}) submitted for review",
+            before=before,
+            after=_lesson_plan_snapshot(plan),
+            request=request,
+        )
+        messages.success(request, "Lesson plan submitted for review.")
+        return redirect("academics:lesson_plans")
+
+
+class LessonPlanWithdrawView(RoleRequiredMixin, LoginRequiredMixin, View):
+    """Allows a teacher to withdraw/pause a submitted plan back to draft."""
+
+    login_url = "/accounts/login/"
+    allowed_roles = [UserRole.TEACHER, UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD, UserRole.SUPER_ADMIN]
+    required_permission = "academics.change_lessonplan"
+
+    def post(self, request, pk: int):
+        if request.user.role == UserRole.TEACHER and is_ecd_teacher(request.user):
+            messages.info(request, "ECD teachers submit a Weekly Focus instead of lesson plans.")
+            return redirect("communications:weekly_focus_submit")
+        plan = get_object_or_404(LessonPlan, pk=pk)
+        if plan.teacher_id != request.user.id and request.user.role != UserRole.SUPER_ADMIN:
+            raise PermissionDenied()
+        if plan.status != LessonPlanStatus.SUBMITTED:
+            messages.error(request, "Only submitted plans can be withdrawn.")
+            return redirect("academics:lesson_plans")
+        before = _lesson_plan_snapshot(plan)
+        plan.status = LessonPlanStatus.DRAFT
+        plan.submitted_at = None
+        plan.reviewer_feedback = ""
+        plan.reviewed_by = None
+        plan.reviewed_at = None
+        plan.save(update_fields=["status", "submitted_at", "reviewer_feedback", "reviewed_by_id", "reviewed_at", "updated_at"])
+        from audit.models import log_event
+        log_event(
+            actor=request.user,
+            action_type="LESSON_PLAN_WITHDRAWN",
+            model_name="LessonPlan",
+            object_id=plan.pk,
+            description=f"Lesson plan {plan.class_name} — {plan.subject_name} ({plan.week_start_date}) withdrawn to draft",
+            before=before,
+            after=_lesson_plan_snapshot(plan),
+            request=request,
+        )
+
+        # Notify HODs that the plan was withdrawn
+        _notify_hod_lesson_plan(plan, request.user, event="withdrawn")
+
+        messages.success(request, "Lesson plan withdrawn. You can now edit and resubmit.")
+        return redirect("academics:lesson_plan_edit", pk=plan.pk)
+
+
+class LessonPlanAttachmentDeleteView(RoleRequiredMixin, LoginRequiredMixin, View):
+    """Delete a single attachment from a lesson plan.
+
+    Only allowed when the plan is in DRAFT or REVISION_REQUESTED status
+    and the requesting user is the plan owner (or Super Admin).
+    """
+
+    login_url = "/accounts/login/"
+    allowed_roles = [UserRole.TEACHER, UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD, UserRole.SUPER_ADMIN]
+    required_permission = "academics.delete_lessonplanattachment"
+
+    def post(self, request, pk: int):
+        att = get_object_or_404(LessonPlanAttachment, pk=pk)
+        plan = att.lesson_plan
+
+        if plan.teacher_id != request.user.id and request.user.role != UserRole.SUPER_ADMIN:
+            raise PermissionDenied()
+
+        if plan.status not in {LessonPlanStatus.DRAFT, LessonPlanStatus.REVISION_REQUESTED}:
+            messages.error(request, "Attachments can only be removed from draft or revision-requested plans.")
+            return redirect("academics:lesson_plan_edit", pk=plan.pk)
+
+        file_path = att.file.path
+        att.delete()
+        # Remove the physical file from disk
+        try:
+            import os
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except OSError:
+            logger.warning("Failed to remove orphaned file from disk: %s", file_path)
+
+        messages.success(request, f"Removed {att.filename}.")
+        return redirect("academics:lesson_plan_edit", pk=plan.pk)
+
+
+def _get_missing_plan_teachers():
+    """FR-ACAD-002: Return teachers who have NOT submitted a lesson plan for
+    the current week after the Friday 4 PM deadline.
+
+    Returns a list of dicts: [{teacher, department_label}]
+    Only includes Primary and Secondary teachers (ECD excluded per FRD).
+    """
+    from datetime import timedelta, time as time_type
+    from django.conf import settings as dj_settings
+    from users.models import User
+
+    now = timezone.now()
+    today = now.date()
+
+    # Determine the current week's Monday
+    days_since_monday = today.weekday()
+    this_monday = today - timedelta(days=days_since_monday)
+
+    # Calculate the deadline: Monday 8:00 AM of the relevant week
+    deadline_day = getattr(dj_settings, "LESSON_PLAN_SUBMISSION_DEADLINE_DAY", 0)  # Monday = 0
+    deadline_time_str = getattr(dj_settings, "LESSON_PLAN_SUBMISSION_DEADLINE_TIME", "08:00")  # 8 AM EAT
+    h, m = map(int, deadline_time_str.split(":"))
+    deadline_date = this_monday - timedelta(days=(7 - deadline_day) % 7)
+    deadline_dt = timezone.make_aware(timezone.datetime.combine(deadline_date, time_type(h, m)))
+
+    # Only flag missing plans after the deadline has passed
+    if now <= deadline_dt:
+        return []
+
+    # Get all active teachers (excluding ECD — use is_ecd_teacher for consistency)
+    all_teachers = User.objects.filter(
+        role=UserRole.TEACHER, is_active=True
+    ).select_related("staff_profile")
+    all_teachers = [t for t in all_teachers if not is_ecd_teacher(t)]
+
+    # Find teachers who HAVE submitted a plan for this week
+    # (exclude MISSING — those are persisted placeholders for non-submissions)
+    submitted_teacher_ids = set(
+        LessonPlan.objects.filter(
+            week_start_date=this_monday,
+            status__in=[LessonPlanStatus.SUBMITTED, LessonPlanStatus.APPROVED],
+        ).values_list("teacher_id", flat=True)
+    )
+    # Teachers with a MISSING marker are still considered non-compliant
+    missing_teacher_ids = set(
+        LessonPlan.objects.filter(
+            week_start_date=this_monday,
+            status=LessonPlanStatus.MISSING,
+        ).values_list("teacher_id", flat=True)
+    )
+
+    missing = []
+    for teacher in all_teachers:
+        if teacher.pk not in submitted_teacher_ids and teacher.pk not in missing_teacher_ids:
+            dept_label = "Primary"
+            if hasattr(teacher, "staff_profile") and teacher.staff_profile:
+                dept_label = teacher.staff_profile.department or "Primary"
+            missing.append({
+                "teacher": teacher,
+                "department_label": dept_label,
+            })
+
+    return missing
+
+
+def _notify_hod_lesson_plan(plan, actor, event="submitted"):
+    """Notify the department-appropriate HOD for lesson plan events.
+
+    Resolves the department from the lesson's class_name via GradeClass and notifies
+    the corresponding HOD role. HOS is always notified.
+
+    Args:
+        plan: LessonPlan instance
+        actor: User who performed the action
+        event: "submitted" or "withdrawn"
+    """
+    from communications.email_service import dispatch_notification
+    from users.models import User, UserRole
+    from academics.models import GradeClass, Department
+
+    # Determine department from class name
+    dept = GradeClass.objects.filter(name=plan.class_name).values_list("department", flat=True).first()
+
+    if dept == Department.ECD:
+        hod_roles = [UserRole.ECD_HOD]
+    elif dept == Department.PRIMARY:
+        hod_roles = [UserRole.PRIMARY_HOD]
+    elif dept == Department.LOWER_SECONDARY:
+        hod_roles = [UserRole.LOWER_SECONDARY_HOD]
+    else:
+        # Unknown department — notify all HOD types as fallback
+        hod_roles = [UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD]
+
+    # Always include HOS so they have school-wide visibility
+    hod_roles.append(UserRole.HEAD_OF_SCHOOL)
+
+    hods = User.objects.filter(role__in=hod_roles, is_active=True).distinct()
+    for hod in hods:
+        if event == "withdrawn":
+            title = "Lesson plan withdrawn"
+            message = f"Lesson plan withdrawn — {plan.teacher.get_full_name()}, {plan.class_name} — {plan.subject_name}"
+        else:
+            title = "New lesson plan submitted"
+            message = f"New lesson plan submitted — {plan.teacher.get_full_name()}, {plan.class_name} — {plan.subject_name}"
+        dispatch_notification(
+            user=hod,
+            title=title,
+            message=message,
+            link="/academics/lesson-plans/",
+            actor=actor
+        )
+
+
+def _build_heatmap(role):
+    """Build a subject×class coverage heatmap for the given role's department(s).
+
+    Returns a dict with:
+      subjects  — list of Subject objects (row labels)
+      classes   — list of GradeClass objects (column labels)
+      grid      — list of dicts, each {subject, cells: [{class, status, teacher, exists}]}
+      week_start — the Monday of the current week
+    """
+    from datetime import date, timedelta
+
+    if role == UserRole.ECD_HOD:
+        departments = [Department.ECD]
+    elif role == UserRole.PRIMARY_HOD:
+        departments = [Department.PRIMARY]
+    elif role == UserRole.LOWER_SECONDARY_HOD:
+        departments = [Department.LOWER_SECONDARY]
+    else:
+        departments = [Department.PRIMARY, Department.LOWER_SECONDARY]
+
+    classes = list(
+        GradeClass.objects.filter(department__in=departments).order_by("sort_order", "name")
+    )
+    subjects = list(
+        Subject.objects.filter(department__in=departments, is_active=True)
+        .order_by("name")
+        .prefetch_related("classes")
+    )
+
+    # Which (subject, class) pairs actually make sense per the timetable
+    valid_pairs: set[tuple[str, str]] = set()
+    for subj in subjects:
+        for gc in subj.classes.all():
+            valid_pairs.add((subj.name, gc.name))
+
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+
+    plans = (
+        LessonPlan.objects.filter(
+            week_start_date=week_start,
+            class_name__in=[c.name for c in classes],
+            subject_name__in=[s.name for s in subjects],
+        )
+        .select_related("teacher")
+        .order_by("-created_at")
+    )
+
+    plan_lookup: dict[tuple[str, str], LessonPlan] = {}
+    for p in plans:
+        key = (p.class_name, p.subject_name)
+        if key not in plan_lookup:
+            plan_lookup[key] = p
+
+    grid = []
+    for subj in subjects:
+        cells = []
+        for gc in classes:
+            plan = plan_lookup.get((gc.name, subj.name))
+            applicable = (subj.name, gc.name) in valid_pairs
+            if plan:
+                cells.append(
+                    {
+                        "class": gc.name,
+                        "status": plan.status,
+                        "teacher": plan.teacher.get_full_name() or plan.teacher.username,
+                        "exists": True,
+                    }
+                )
+            elif applicable:
+                cells.append(
+                    {
+                        "class": gc.name,
+                        "status": None,
+                        "teacher": None,
+                        "exists": False,
+                    }
+                )
+            else:
+                cells.append(
+                    {
+                        "class": gc.name,
+                        "status": None,
+                        "teacher": None,
+                        "exists": None,  # N/A
+                    }
+                )
+        grid.append({"subject": subj.name, "cells": cells})
+
+    return {
+        "subjects": subjects,
+        "classes": classes,
+        "grid": grid,
+        "week_start": week_start,
+    }
+
+
+class LessonPlanReviewView(RoleRequiredMixin, View):
+    login_url = "/accounts/login/"
+    allowed_roles = [UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD]
+    required_permission = "academics.view_lessonplan"
+
+    def post(self, request, pk: int):
+        if not _is_hod_like(request.user.role):
+            raise PermissionDenied()
+        plan = get_object_or_404(LessonPlan, pk=pk)
+        
+        # LP-REVIEW: Only SUBMITTED plans can be reviewed.
+        if plan.status != LessonPlanStatus.SUBMITTED:
+            messages.error(request, "Only submitted lesson plans can be reviewed.")
+            return redirect("academics:lesson_plans")
+        
+        # LP-REVIEW: HOD can only review plans from teachers in their department.
+        if request.user.role not in {UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL}:
+            from timetable.models import TimetableSlot
+            from academics.models import Department, GradeClass
+            if request.user.role == UserRole.PRIMARY_HOD:
+                allowed_depts = [Department.PRIMARY]
+            elif request.user.role == UserRole.ECD_HOD:
+                allowed_depts = [Department.ECD]
+            elif request.user.role == UserRole.LOWER_SECONDARY_HOD:
+                allowed_depts = [Department.LOWER_SECONDARY]
+            else:
+                raise PermissionDenied()
+            allowed_class_names = list(
+                GradeClass.objects.filter(department__in=allowed_depts).values_list("name", flat=True)
+            )
+            if plan.class_name not in allowed_class_names:
+                raise PermissionDenied("You can only review lesson plans from your department.")
+        
+        form = LessonPlanReviewForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, "Invalid review form.")
+            return redirect("academics:lesson_plans")
+        decision = form.cleaned_data["decision"]
+        feedback = (form.cleaned_data.get("feedback") or "").strip()
+        if decision in (LessonPlanStatus.REJECTED, LessonPlanStatus.REVISION_REQUESTED) and not feedback:
+            messages.error(request, "Feedback is required when rejecting or requesting revision.")
+            return redirect("academics:lesson_plans")
+        before = _lesson_plan_snapshot(plan)
+        plan.status = decision
+        plan.reviewed_by = request.user
+        plan.reviewed_at = timezone.now()
+        plan.reviewer_feedback = feedback
+        plan.full_clean()
+        plan.save(update_fields=["status", "reviewed_by_id", "reviewed_at", "reviewer_feedback", "updated_at"])
+        
+        from audit.models import log_event
+        action_type = "LESSON_PLAN_" + ("APPROVED" if decision == LessonPlanStatus.APPROVED else "REJECTED" if decision == LessonPlanStatus.REJECTED else "REVISION_REQUESTED")
+        log_event(
+            actor=request.user,
+            action_type=action_type,
+            model_name="LessonPlan",
+            object_id=plan.pk,
+            description=f"Lesson plan {plan.class_name} — {plan.subject_name} ({plan.term.name}) {plan.get_status_display().lower()}",
+            before=before,
+            after=_lesson_plan_snapshot(plan),
+            request=request,
+        )
+        
+        # NOTIF-05 / NOTIF-06
+        from communications.email_service import dispatch_notification
+        status_text = plan.get_status_display().lower()
+        title = f"Lesson Plan {status_text.capitalize()}"
+        msg = f"Your lesson plan for {plan.class_name} — {plan.subject_name} ({plan.term.name}) was {status_text} by {request.user.get_full_name()}."
+        if feedback:
+            msg += f"\n\nFeedback: {feedback}"
+        
+        dispatch_notification(
+            user=plan.teacher,
+            title=title,
+            message=msg,
+            link="/academics/lesson-plans/",
+            actor=request.user
+        )
+        
+        messages.success(request, f"Lesson plan {status_text}.")
+        return redirect("academics:lesson_plans")
+
+
+class LessonPlanComplianceView(RoleRequiredMixin, TemplateView):
+    """Dedicated lesson plan compliance tracking view.
+
+    Shows per-teacher submission rates, overdue plans, and historical trend
+    for the current term. Filters by department (Primary / ECD).
+    """
+    template_name = "academics/lesson_plan_compliance.html"
+    login_url = "/accounts/login/"
+    allowed_roles = [UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD]
+    required_permission = "academics.view_lessonplan"
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect(f"{self.login_url}?next={request.path}")
+        if not _is_hod_like(request.user.role):
+            raise PermissionDenied()
+        return TemplateView.dispatch(self, request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        from users.models import User
+        from django.db.models import Count, Q
+        from collections import defaultdict
+
+        user = self.request.user
+        today = timezone.localdate()
+        dept_filter = self.request.GET.get("dept", "")
+
+        term = Term.get_current()
+        if not term:
+            ctx["no_term"] = True
+            return ctx
+
+        ctx["term"] = term
+        ctx["today"] = today
+        ctx["academics_tab"] = "compliance"
+
+        # Compute expected weeks so far this term
+        if term.start_date and term.end_date:
+            weeks_elapsed = max(1, ((today - term.start_date).days // 7) + 1)
+        else:
+            weeks_elapsed = 8
+        ctx["weeks_elapsed"] = weeks_elapsed
+
+        # Determine which teachers to show based on user role
+        # ECD teachers only do Weekly Focus — never show them in lesson plan compliance
+        if user.role == UserRole.PRIMARY_HOD:
+            allowed_depts = [Department.PRIMARY]
+        elif user.role == UserRole.ECD_HOD:
+            # ECD has no lesson plans — redirect or show empty
+            allowed_depts = []
+        else:
+            # HOS / Super admin — Primary only (ECD excluded from lesson plans)
+            allowed_depts = [Department.PRIMARY]
+
+        if dept_filter in ("primary", "ecd"):
+            ctx["filter_dept"] = dept_filter
+            if dept_filter == "primary":
+                allowed_depts = [Department.PRIMARY]
+            else:
+                # ECD filter — no lesson plans exist for ECD
+                allowed_depts = []
+
+        dept_class_names = list(
+            GradeClass.objects.filter(department__in=allowed_depts).values_list("name", flat=True)
+        )
+
+        # Teachers with a staff_profile in the relevant departments
+        # NOTE: staff_profile.department may be "Primary" (capitalized) vs "PRIMARY" (enum value)
+        # Use case-insensitive match for robustness
+        from django.db.models import Q
+        dept_q = Q()
+        for d in allowed_depts:
+            dept_q |= Q(staff_profile__department__iexact=d)
+        teachers = (
+            User.objects.filter(
+                role=UserRole.TEACHER,
+                is_active=True,
+            )
+            .filter(dept_q)
+            .select_related("staff_profile")
+            .order_by("last_name", "first_name")
+        )
+
+        # All lesson plans for these teachers this term — single query
+        plans = LessonPlan.objects.filter(
+            teacher__in=teachers,
+            term=term,
+            class_name__in=dept_class_names,
+        ).values("teacher_id", "status", "week_start_date")
+
+        # Per-teacher aggregation
+        teacher_plans = defaultdict(lambda: {"submitted": set(), "approved": set(), "revision": set(), "rejected": set()})
+
+        for p in plans:
+            t = teacher_plans[p["teacher_id"]]
+            if p["status"] == LessonPlanStatus.APPROVED:
+                t["approved"].add(p["week_start_date"])
+            elif p["status"] == LessonPlanStatus.SUBMITTED:
+                t["submitted"].add(p["week_start_date"])
+            elif p["status"] == LessonPlanStatus.REVISION_REQUESTED:
+                t["revision"].add(p["week_start_date"])
+            elif p["status"] == LessonPlanStatus.REJECTED:
+                t["rejected"].add(p["week_start_date"])
+
+        # Batch fetch latest submission date per teacher — single query instead of N
+        from django.db.models import Max
+        latest_dates = LessonPlan.objects.filter(
+            teacher__in=teachers, term=term
+        ).values("teacher_id").annotate(
+            latest_submitted_at=Max("submitted_at")
+        ).values_list("teacher_id", "latest_submitted_at")
+        latest_date_map = dict(latest_dates)
+
+        # Build compliance rows
+        compliance_rows = []
+        overall_approved = 0
+        overall_expected = 0
+
+        for teacher in teachers:
+            tp = teacher_plans[teacher.pk]
+            approved_weeks = len(tp["approved"])
+            submitted_weeks = len(tp["submitted"])
+            revision_weeks = len(tp["revision"])
+            rejected_weeks = len(tp["rejected"])
+
+            # Any plan in any status counts as "covered"
+            covered = len({
+                *tp["approved"], *tp["submitted"], *tp["revision"], *tp["rejected"]
+            })
+            missing = max(0, weeks_elapsed - covered)
+
+            pct = round((approved_weeks / weeks_elapsed) * 100) if weeks_elapsed else 0
+            overall_approved += approved_weeks
+            overall_expected += weeks_elapsed
+
+            compliance_rows.append({
+                "teacher": teacher,
+                "dept": teacher.staff_profile.department if hasattr(teacher, "staff_profile") else "",
+                "submitted": submitted_weeks,
+                "approved": approved_weeks,
+                "revision": revision_weeks,
+                "rejected": rejected_weeks,
+                "missing": missing,
+                "pct": pct,
+                "grade": "A" if pct >= 90 else ("B" if pct >= 75 else ("C" if pct >= 50 else "D")),
+                "last_submission": latest_date_map.get(teacher.pk),
+            })
+
+        ctx["compliance_rows"] = compliance_rows
+        ctx["overall_pct"] = round((overall_approved / overall_expected) * 100) if overall_expected else 0
+        ctx["total_teachers"] = len(compliance_rows)
+        ctx["total_compliant"] = len([r for r in compliance_rows if r["pct"] >= 75])
+        ctx["total_missing"] = sum(r["missing"] for r in compliance_rows)
+
+        # Trend: weekly approved counts
+        weekly_data = defaultdict(int)
+        for p in plans:
+            if p["status"] == LessonPlanStatus.APPROVED:
+                weekly_data[p["week_start_date"]] += 1
+
+        ctx["weekly_trend"] = sorted(
+            [{"week": w, "count": c} for w, c in weekly_data.items()],
+            key=lambda x: x["week"]
+        )
+
+        return ctx

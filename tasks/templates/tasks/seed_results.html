@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Seed Tasks — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Task Seeder{% endblock %}
+{% block topbar_date %}Results{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:700px">
+  <div class="card-title-row">
+    <span class="card-title" style="margin-bottom:0">Task Seeding Complete</span>
+    <span class="chip chip-blue">{{ total }} tasks created</span>
+  </div>
+
+  <div style="margin-top:16px">
+    <div class="trow">
+      <div class="trow-left">
+        <div class="trow-name">Admissions</div>
+        <div class="trow-sub">Assessment scheduling, enrolment, follow-ups</div>
+      </div>
+      <div class="trow-right"><span class="chip {% if results.admissions %}chip-green{% else %}chip-grey{% endif %}">{{ results.admissions }}</span></div>
+    </div>
+
+    <div class="trow">
+      <div class="trow-left">
+        <div class="trow-name">Lesson Plans</div>
+        <div class="trow-sub">HOD reviews, teacher submissions, revisions</div>
+      </div>
+      <div class="trow-right"><span class="chip {% if results.lesson_plans %}chip-green{% else %}chip-grey{% endif %}">{{ results.lesson_plans }}</span></div>
+    </div>
+
+    <div class="trow">
+      <div class="trow-left">
+        <div class="trow-name">Exam Scores</div>
+        <div class="trow-sub">Score submissions pending review</div>
+      </div>
+      <div class="trow-right"><span class="chip {% if results.exam_scores %}chip-green{% else %}chip-grey{% endif %}">{{ results.exam_scores }}</span></div>
+    </div>
+
+    <div class="trow">
+      <div class="trow-left">
+        <div class="trow-name">Report Cards</div>
+        <div class="trow-sub">HOS sign-off pending</div>
+      </div>
+      <div class="trow-right"><span class="chip {% if results.report_cards %}chip-green{% else %}chip-grey{% endif %}">{{ results.report_cards }}</span></div>
+    </div>
+
+    <div class="trow">
+      <div class="trow-left">
+        <div class="trow-name">Overdue Invoices</div>
+        <div class="trow-sub">Fee collection follow-ups</div>
+      </div>
+      <div class="trow-right"><span class="chip {% if results.overdue_invoices %}chip-red{% else %}chip-grey{% endif %}">{{ results.overdue_invoices }}</span></div>
+    </div>
+
+    <div class="trow">
+      <div class="trow-left">
+        <div class="trow-name">Unmatched Payments</div>
+        <div class="trow-sub">Bank statement matching</div>
+      </div>
+      <div class="trow-right"><span class="chip {% if results.unmatched_payments %}chip-amber{% else %}chip-grey{% endif %}">{{ results.unmatched_payments }}</span></div>
+    </div>
+
+    <div class="trow">
+      <div class="trow-left">
+        <div class="trow-name">Welfare Alerts</div>
+        <div class="trow-sub">High/critical observations pending HOD review</div>
+      </div>
+      <div class="trow-right"><span class="chip {% if results.welfare_alerts %}chip-red{% else %}chip-grey{% endif %}">{{ results.welfare_alerts }}</span></div>
+    </div>
+
+    <div class="trow">
+      <div class="trow-left">
+        <div class="trow-name">Leave Requests</div>
+        <div class="trow-sub">HOS approval pending</div>
+      </div>
+      <div class="trow-right"><span class="chip {% if results.leave_requests %}chip-amber{% else %}chip-grey{% endif %}">{{ results.leave_requests }}</span></div>
+    </div>
+
+    <div class="trow">
+      <div class="trow-left">
+        <div class="trow-name">Payroll Approvals</div>
+        <div class="trow-sub">Pending HOS approval</div>
+      </div>
+      <div class="trow-right"><span class="chip {% if results.payroll_approvals %}chip-amber{% else %}chip-grey{% endif %}">{{ results.payroll_approvals }}</span></div>
+    </div>
+
+    <div class="trow">
+      <div class="trow-left">
+        <div class="trow-name">Fee Structures</div>
+        <div class="trow-sub">Term setup reminders</div>
+      </div>
+      <div class="trow-right"><span class="chip {% if results.fee_structures %}chip-amber{% else %}chip-grey{% endif %}">{{ results.fee_structures }}</span></div>
+    </div>
+
+    <div class="trow">
+      <div class="trow-left">
+        <div class="trow-name">Attendance Alerts</div>
+        <div class="trow-sub">Students below 85% attendance</div>
+      </div>
+      <div class="trow-right"><span class="chip {% if results.attendance_alerts %}chip-red{% else %}chip-grey{% endif %}">{{ results.attendance_alerts }}</span></div>
+    </div>
+  </div>
+
+  <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border); display:flex; gap:10px">
+    <a href="{% url 'tasks:dashboard' %}" class="btn-primary" style="padding:10px 24px; text-decoration:none">View Tasks Dashboard</a>
+    <a href="{% url 'tasks:seed' %}" class="btn-secondary" style="padding:10px 24px; text-decoration:none">Re-run Seeder</a>
+  </div>
+</div>
+{% endblock %}

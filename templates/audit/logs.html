@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% load hodari_forms %}
+{% block title %}System Logs &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}System Audit{% endblock %}
+{% block topbar_date %}{{ today_display }}{% endblock %}
+
+{% block content %}
+{% include "audit/_top_tabs.html" %}
+<div class="card">
+  <div class="card-title">Audit Logs</div>
+  <div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;margin-top:-6px">System wide activity and change tracking.</div>
+
+  <form method="get" style="margin-bottom:20px">
+    <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end">
+      <div>
+        <label style="display:block;font-size:12px;font-weight:600;color:#4a5568;margin-bottom:4px">Search</label>
+        <input type="text" name="q" value="{{ filter_q }}" placeholder="Search logs" class="hf-input" style="width:180px">
+      </div>
+      <div>
+        <label style="display:block;font-size:12px;font-weight:600;color:#4a5568;margin-bottom:4px">From</label>
+        <input type="date" name="date_from" value="{{ filter_date_from }}" class="hf-input" style="width:140px">
+      </div>
+      <div>
+        <label style="display:block;font-size:12px;font-weight:600;color:#4a5568;margin-bottom:4px">To</label>
+        <input type="date" name="date_to" value="{{ filter_date_to }}" class="hf-input" style="width:140px">
+      </div>
+      <div>
+        <label style="display:block;font-size:12px;font-weight:600;color:#4a5568;margin-bottom:4px">Action</label>
+        <select name="action_type" class="hf-select" style="width:120px">
+          <option value="">All actions</option>
+          {% for type in action_types %}
+            <option value="{{ type }}" {% if filter_action_type == type %}selected{% endif %}>{{ type }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label style="display:block;font-size:12px;font-weight:600;color:#4a5568;margin-bottom:4px">Actor</label>
+        <select name="actor_id" class="hf-select" style="min-width:120px">
+          <option value="">All actors</option>
+          {% for aid, username in actors %}
+            <option value="{{ aid }}" {% if filter_actor_id == aid|stringformat:"d" %}selected{% endif %}>{{ username }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label style="display:block;font-size:12px;font-weight:600;color:#4a5568;margin-bottom:4px">Module</label>
+        <select name="model_name" class="hf-select" style="min-width:120px">
+          <option value="">All modules</option>
+          {% for name in model_names %}
+            <option value="{{ name }}" {% if filter_model_name == name %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="display:flex;gap:6px;padding-bottom:1px">
+        <button type="submit" class="btn-primary btn-sm">Filter</button>
+        <a href="{% url 'audit:logs' %}" class="btn-secondary btn-sm">Reset</a>
+      </div>
+      <div style="display:flex;gap:6px;padding-bottom:1px">
+        <a href="?export=csv{% if filter_q %}&q={{ filter_q }}{% endif %}{% if filter_date_from %}&date_from={{ filter_date_from }}{% endif %}{% if filter_date_to %}&date_to={{ filter_date_to }}{% endif %}{% if filter_action_type %}&action_type={{ filter_action_type }}{% endif %}{% if filter_model_name %}&model_name={{ filter_model_name }}{% endif %}{% if filter_actor_id %}&actor_id={{ filter_actor_id }}{% endif %}" class="btn-secondary btn-sm">CSV</a>
+        <a href="?export=pdf{% if filter_q %}&q={{ filter_q }}{% endif %}{% if filter_date_from %}&date_from={{ filter_date_from }}{% endif %}{% if filter_date_to %}&date_to={{ filter_date_to }}{% endif %}{% if filter_action_type %}&action_type={{ filter_action_type }}{% endif %}{% if filter_model_name %}&model_name={{ filter_model_name }}{% endif %}{% if filter_actor_id %}&actor_id={{ filter_actor_id }}{% endif %}" class="btn-secondary btn-sm">PDF</a>
+      </div>
+    </div>
+  </form>
+
+  <div style="border-top:1px solid var(--border)">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="text-align:left;border-bottom:2px solid #F3F4F6">
+          <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Timestamp</th>
+          <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Actor</th>
+          <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Action</th>
+          <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Module</th>
+          <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr style="border-bottom:1px solid #F3F4F6;font-size:13px">
+          <td style="padding:12px 8px;color:var(--text-muted);font-family:var(--font-mono);white-space:nowrap">{{ log.created_at|date:"d M, H:i" }}</td>
+          <td style="padding:12px 8px;font-weight:600">{{ log.actor.get_username|default:"System" }}</td>
+          <td style="padding:12px 8px">
+            <span class="chip {% if log.action_type == 'DELETE' %}chip-red{% elif log.action_type == 'CREATE' %}chip-green{% else %}chip-blue{% endif %}" style="font-size:11px">
+              {{ log.action_type }}
+            </span>
+          </td>
+          <td style="padding:12px 8px;color:var(--text-muted)">{{ log.model_name }}</td>
+          <td style="padding:12px 8px">{{ log.description|default:"N/A" }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with title='No logs found' desc='System activity will appear here.' icon='doc' icon_color='grey' %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if is_paginated %}
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:24px;padding-top:16px;border-top:1px solid var(--border)">
+    <div style="font-size:13px;color:var(--text-muted)">
+      Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} logs
+    </div>
+    <div style="display:flex;gap:8px">
+      {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% for k, v in request.GET.items %}{% if k != 'page' %}&{{ k }}={{ v }}{% endif %}{% endfor %}" class="btn-secondary btn-sm">&larr; Previous</a>
+      {% endif %}
+      <div style="padding:6px 12px;font-size:13px;font-weight:600;background:var(--hodari-blue-light);color:var(--hodari-blue);border-radius:6px">
+        {{ page_obj.number }} / {{ paginator.num_pages }}
+      </div>
+      {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% for k, v in request.GET.items %}{% if k != 'page' %}&{{ k }}={{ v }}{% endif %}{% endfor %}" class="btn-secondary btn-sm">Next &rarr;</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

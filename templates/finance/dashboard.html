@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+{% load hodari_forms %}
+{% load role_tags %}
+{% block title %}Finance Dashboard &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Finance{% endblock %}
+{% block topbar_date %}{{ today_date }} &middot; {{ current_term.name|default:"No active term" }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .bar-row-link {
+    text-decoration: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    transition: background .12s;
+  }
+  .bar-row-link:hover {
+    background: #E8EEF9;
+  }
+
+  /* metric-compact styles now in hodari-forms.css */
+  /* Tab bar styles in _top_tabs.html */
+</style>
+{% endblock %}
+
+{% block topbar_badges %}
+{% if unmatched_payments_count > 0 %}
+<div class="topbar-badge badge-red"><span class="badge-dot"></span>{{ unmatched_payments_count }} unmatched payments</div>
+{% endif %}
+{% if overdue_count > 0 %}
+<div class="topbar-badge badge-amber"><span class="badge-dot"></span>{{ overdue_count }} overdue</div>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+
+<!-- Fee Structure Draft Warning Banner -->
+{% if fee_structure_is_draft %}
+<div style="background:var(--amber-bg);border:1px solid var(--amber-bd);border-radius:8px;padding:10px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" style="flex-shrink:0"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  <div style="flex:1">
+    <span style="font-weight:600;color:var(--amber);font-size:13px">Fee Structure in Draft state</span>
+    <span style="color:var(--text-secondary);font-size:12.5px;margin-left:8px">
+      The current term fee structure has not been published. Invoicing, assessment fees, and other dependent features will not be available until the fee structure is published.
+    </span>
+  </div>
+  <a href="{% url 'finance:fee_structure_setup' %}" class="btn btn-sm" style="background:var(--hodari-blue);color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:500;text-decoration:none;white-space:nowrap">Publish Now</a>
+</div>
+{% endif %}
+
+<!-- Term Fee Collection Header -->
+<div class="section-hdr">
+  <span class="section-title">{{ current_term.name|default:"Current" }} fee collection</span>
+  <a href="{% url 'finance:financial_reports' %}?type=collection_report" class="section-link">Collection report &rarr;</a>
+</div>
+
+<!-- Metric Cards: compact no-icon layout for large numbers -->
+<div class="metrics" style="grid-template-columns:repeat(4,1fr);gap:14px">
+  <div onclick="location.href='{% url 'finance:financial_reports' %}?type=collection_report'" class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Total billed</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#023AA5">{{ total_billed|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#5A697D">{{ current_term.name|default:"Current term" }}</div>
+  </div>
+  <div onclick="location.href='{% url 'finance:financial_reports' %}?type=collection_report'" class="metric-compact" style="background:linear-gradient(135deg,#EEF9F0,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Total received</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#059669">{{ total_received|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#059669">{{ collection_rate }}% collected</div>
+  </div>
+  <div onclick="location.href='{% url 'finance:invoice_list' %}'" class="metric-compact" style="background:linear-gradient(135deg,#FFF8ED,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Outstanding</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#B45309">{{ outstanding|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#B45309">{{ open_invoices }} accounts</div>
+  </div>
+  <div onclick="location.href='{% url 'finance:unmatched_payments' %}'" class="metric-compact" style="background:linear-gradient(135deg,#FFF0F0,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Unmatched</span>
+      <span class="mc-currency" style="background:#FEE2E2;color:#DC2626">pending</span>
+    </div>
+    <div class="mc-val" style="color:#DC2626">{{ unmatched_payments_count }}</div>
+    <div class="mc-sub" style="color:#DC2626">Awaiting resolution</div>
+  </div>
+</div>
+
+<!-- Outstanding from Prior Terms -->
+{% if prior_term_open_count > 0 %}
+<div style="margin-bottom:16px;padding:14px 18px;border-radius:10px;border:1px solid #E5E7EB;background:linear-gradient(135deg,#F9FAFB,#fff)">
+  <div style="display:flex;align-items:center;justify-content:space-between">
+    <div>
+      <div style="font-size:12px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.04em">Outstanding from prior terms</div>
+      <div style="margin-top:4px;display:flex;align-items:baseline;gap:12px">
+        <span style="font-size:22px;font-weight:700;font-family:var(--font-mono);color:#B45309">TZS {{ prior_term_open_amount|floatformat:0 }}</span>
+        <span style="font-size:13px;color:#6B7280">{{ prior_term_open_count }} unpaid or partial invoice{{ prior_term_open_count|pluralize }}</span>
+      </div>
+    </div>
+    <a href="{% url 'finance:invoice_list' %}?status=unpaid" style="font-size:12px;font-weight:500;color:var(--hodari-blue);text-decoration:none;white-space:nowrap">Review &rarr;</a>
+  </div>
+</div>
+{% endif %}
+
+<!-- Collection by Class Bar Chart — clickable rows drill down to per-class detail -->
+{% if collection_by_class %}
+<div class="card" style="margin-bottom:16px">
+  <div class="card-title-row">
+    <span class="card-title" style="margin-bottom:0">Collection by class</span>
+    <a href="{% url 'finance:financial_reports' %}?type=collection_report" class="section-link">Full report &rarr;</a>
+  </div>
+  {% for item in collection_by_class %}
+  <a href="{% url 'finance:class_collection_detail' item.class_name %}" class="bar-row-link">
+    <div class="bar-lbl" style="font-size:13px;font-weight:500;color:var(--text-primary);width:88px;flex-shrink:0">{{ item.class_name }}</div>
+    <div class="bar-track" style="flex:1;height:7px;background:#EDF1F7;border-radius:99px;overflow:hidden">
+      <div class="bar-fill" style="height:100%;border-radius:99px;width:{{ item.rate }}%;background:{% if item.rate >= 80 %}var(--green){% elif item.rate >= 50 %}var(--hodari-gold-dark){% else %}#DC2626{% endif %};transition:width .6s ease"></div>
+    </div>
+    <div class="bar-pct {% if item.rate >= 80 %}t-green{% elif item.rate >= 50 %}t-amber{% else %}t-red{% endif %}" style="font-size:12.5px;font-weight:700;font-family:var(--font-mono);width:38px;text-align:right;flex-shrink:0">{{ item.rate }}%</div>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Overdue Accounts Quick View -->
+<div class="card" style="margin-bottom:16px">
+  <div class="card-title-row">
+    <span class="card-title" style="margin-bottom:0">Overdue Accounts Summary</span>
+    <div style="display:flex;gap:6px;align-items:center">
+      <span class="chip chip-amber">{{ overdue_count }} overdue</span>
+      <a href="{% url 'finance:overdue_accounts' %}" class="section-link">View All &rarr;</a>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:4px 0">
+    <div style="text-align:center;padding:12px;border-radius:8px;background:var(--amber-bg);border:1px solid var(--amber-bd)">
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Outstanding</div>
+      <div style="font-size:18px;font-weight:700;font-family:var(--font-mono);color:var(--amber);margin:4px 0">TZS {{ outstanding|floatformat:0 }}</div>
+      <div style="font-size:11px;color:var(--text-muted)">{{ overdue_count }} account{{ overdue_count|pluralize }}</div>
+    </div>
+    <div style="text-align:center;padding:12px;border-radius:8px;background:var(--blue-st-bg);border:1px solid var(--blue-st-bd)">
+      <a href="{% url 'finance:overdue_accounts' %}" style="text-decoration:none;color:inherit;display:block">
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">View Details</div>
+        <div style="font-size:18px;font-weight:700;font-family:var(--font-mono);color:var(--hodari-blue);margin:4px 0">Drill Down &rarr;</div>
+        <div style="font-size:11px;color:var(--text-muted)">Aging breakdown</div>
+      </a>
+    </div>
+    {% if perms.finance.change_feestructure %}
+    <div style="text-align:center;padding:12px;border-radius:8px;background:var(--hodari-blue-light);border:1px solid var(--border)">
+      <a href="{% url 'finance:reminder_configuration' %}" style="text-decoration:none;color:inherit;display:block">
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Auto-Reminders</div>
+        <div style="font-size:18px;font-weight:700;font-family:var(--font-mono);color:var(--hodari-blue);margin:4px 0">Configure &rarr;</div>
+        <div style="font-size:11px;color:var(--text-muted)">Reminder settings</div>
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Unmatched Payments Card -->
+{% if unmatched_payments %}
+<div class="card" style="margin-bottom:16px">
+  <div class="card-title-row">
+    <span class="card-title" style="margin-bottom:0">Unmatched / flagged payments</span>
+    <span class="chip chip-red">{{ unmatched_payments_count }} flagged</span>
+  </div>
+  {% for upay in unmatched_payments %}
+  <div class="queue-item qi-red">
+    <div class="qi-body">
+      <div class="qi-label">TZS {{ upay.amount|floatformat:0 }} &middot; {% if upay.reference %}no student match found{% else %}amount does not match any fee item{% endif %}</div>
+      <div class="qi-sub">Ref: {{ upay.reference|default:"N/A" }} &middot; {{ upay.payment_date|date:"d M Y" }}</div>
+    </div>
+    <a href="{% url 'finance:unmatched_payments' %}" class="qi-btn">Resolve</a>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Two-column layout: Overdue + Assessment Fees / Recent Payments -->
+<div class="grid-5-5">    <div class="card">
+    <div class="card-title">Overdue accounts</div>
+    {% for account in overdue_accounts %}
+    <div class="trow">
+      <div>
+        <div class="trow-name">{{ account.invoice.student.first_name }} {{ account.invoice.student.last_name }} &middot; {{ account.invoice.student.class_name|default:"N/A" }}</div>
+        <div class="trow-sub">TZS {{ account.balance|floatformat:0 }} &middot; {{ account.days_overdue }} day{{ account.days_overdue|pluralize }} overdue</div>
+      </div>
+      <div class="trow-right" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <span class="chip {% if account.days_overdue >= 14 %}chip-red{% elif account.days_overdue >= 7 %}chip-amber{% else %}chip-gold{% endif %}">
+          {% if account.invoice.status == "overdue" %}Overdue{% else %}Partial{% endif %}
+        </span>
+        <a href="{% url 'finance:invoice_detail' account.invoice.pk %}" class="btn btn-secondary btn-sm" style="padding:3px 8px;font-size:11px">View &rarr;</a>
+        {% has_perm user "finance.change_invoice" as can_send_reminder %}
+        {% if can_send_reminder %}
+        <form method="post" action="{% url 'finance:send_reminder' account.invoice.pk %}" style="display:inline">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-secondary btn-sm" style="padding:3px 8px;font-size:11px" onclick="return confirm('Send reminder to parent?')">Remind</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% empty %}
+      {% include '_partials/empty_state.html' with icon='check' icon_color='green' title='All payments up to date' desc='No overdue accounts.' %}
+    {% endfor %}
+  </div>
+
+  <div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title-row">
+        <span class="card-title" style="margin-bottom:0">Assessment fees pending</span>
+        {% if assessment_fees_pending_count > 0 %}<span class="chip chip-amber">Blocker</span>{% endif %}
+      </div>
+      {% for inv in assessment_fees_pending %}
+      <div class="trow">
+        <div>
+          <div class="trow-name">{{ inv.applicant.child_name|default:"Applicant" }} &middot; {{ inv.applicant.grade_applying_for|default:"N/A" }}</div>
+          <div class="trow-sub">TZS {{ inv.total_due|floatformat:0 }} &middot; on hold</div>
+        </div>
+        <div class="trow-right" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span class="chip chip-red">Unpaid</span>
+          <a href="{% url 'finance:invoice_detail' inv.pk %}" class="btn btn-secondary btn-sm" style="padding:3px 8px;font-size:11px">Record &rarr;</a>
+        </div>
+      </div>
+      {% empty %}
+      {% include '_partials/empty_state.html' with icon='doc' icon_color='grey' title='No assessment fees pending' desc='All assessment fees have been processed.' %}
+      {% endfor %}
+    </div>
+
+    <div class="card">
+      <div class="card-title">Recent payments</div>
+      {% for pay in recent_payments %}
+      <div class="trow">
+        <div>
+          <div class="trow-name">{{ pay.invoice.student.first_name|default:"N/A" }} {{ pay.invoice.student.last_name|default:"" }}</div>
+          <div class="trow-sub">{{ pay.created_at|date:"d M Y, H:i" }}</div>
+        </div>
+        <div class="trow-right" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span class="chip chip-green">TZS {{ pay.amount|floatformat:0 }}</span>
+          <a href="{% url 'finance:payment_receipt_print' pay.pk %}" class="btn btn-secondary btn-sm" style="padding:3px 8px;font-size:11px" target="_blank">Receipt</a>
+        </div>
+      </div>
+      {% empty %}
+      {% include '_partials/empty_state.html' with icon='doc' icon_color='grey' title='No recent payments' desc='Payments will appear here once recorded.' %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Upcoming Events Widget -->
+{% if upcoming_events %}
+<div class="ev-widget">
+  <div class="ev-title">Upcoming events
+    <a href="/events/" class="ev-link">View calendar &rarr;</a>
+  </div>
+  {% for event in upcoming_events %}
+  <div class="ev-item">
+    <div class="ev-date">
+      <div class="ev-day">{{ event.start_date|date:"d" }}</div>
+      <div class="ev-mon">{{ event.start_date|date:"M" }}</div>
+    </div>
+    <div class="ev-body">
+      <div class="ev-name">{{ event.title }}</div>
+      <div class="ev-meta">{{ event.get_category_display }}</div>
+      {% if event.start_date == today %}
+      <div class="ev-badge ev-today">Today</div>
+      {% elif event.start_date <= today %}
+      <div class="ev-badge ev-soon">{{ event.start_date|timesince }} ago</div>
+      {% elif event.start_date <= upcoming_cutoff %}
+      <div class="ev-badge ev-soon">{{ event.start_date|timeuntil }}</div>
+      {% else %}
+      <div class="ev-badge ev-normal">{{ event.start_date|date:"M d" }}</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

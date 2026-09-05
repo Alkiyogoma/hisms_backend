@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Reports Dashboard — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Administrative Reporting{% endblock %}
+
+{% block content %}
+<div class="page-hdr">
+  <h1>Reports Dashboard</h1>
+  <p>Comprehensive analytical reports and data exports across all school modules.</p>
+</div>
+
+<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(350px, 1fr)); gap:24px; margin-top:24px">
+  {% for cat in report_categories %}
+    <a href="{% if cat.url %}{% if cat.url == '#' %}{{ cat.url }}{% else %}{% url cat.url %}{% endif %}{% else %}#{% endif %}" class="card" style="padding:24px; text-decoration:none; display:flex; flex-direction:column; gap:16px; transition:all 0.2s; border:1px solid #E2E8F0" onmouseover="this.style.borderColor='var(--hodari-blue)'; this.style.transform='translateY(-4px)'; this.style.boxShadow='0 10px 15px -3px rgba(0,0,0,0.1)'" onmouseout="this.style.borderColor='#E2E8F0'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+      <div style="width:48px; height:48px; border-radius:12px; background:rgba(2,58,165,0.08); display:flex; align-items:center; justify-content:center; color:var(--hodari-blue)">
+        <!-- Dynamic Heroicons (Fallback to generic if SVG not found) -->
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          {% if cat.icon == 'book-open' %}
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+          {% elif cat.icon == 'users' %}
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          {% elif cat.icon == 'credit-card' %}
+            <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line>
+          {% elif cat.icon == 'check-circle' %}
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>
+          {% else %}
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline>
+          {% endif %}
+        </svg>
+      </div>
+      <div>
+        <h3 style="margin:0 0 8px; font-size:18px; color:#1E293B">{{ cat.title }}</h3>
+        <p style="margin:0; font-size:14px; color:#64748B; line-height:1.5">{{ cat.description }}</p>
+      </div>
+      <div style="margin-top:auto; display:flex; align-items:center; gap:6px; color:var(--hodari-blue); font-size:13px; font-weight:600">
+        View Reports
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+      </div>
+    </a>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Create Term{% endblock %}
+{% block content %}
+<div style="max-width:700px;margin:0 auto;padding:24px">
+  <h2 style="font-size:22px;font-weight:700;color:#1a202c;margin-bottom:20px">Create New Term</h2>
+  
+  <form method="post" style="background:#fff;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+    {% csrf_token %}
+    
+    <div style="margin-bottom:16px">
+      <label style="display:block;font-size:13px;font-weight:600;color:#4a5568;margin-bottom:4px">Academic Year</label>
+      {{ form.academic_year }}
+      {% if form.academic_year.errors %}
+        <p style="color:#e53e3e;font-size:12px;margin-top:4px">{{ form.academic_year.errors.0 }}</p>
+      {% endif %}
+    </div>
+    
+    <div style="margin-bottom:16px">
+      <label style="display:block;font-size:13px;font-weight:600;color:#4a5568;margin-bottom:4px">Term Name</label>
+      {{ form.name }}
+      {% if form.name.errors %}
+        <p style="color:#e53e3e;font-size:12px;margin-top:4px">{{ form.name.errors.0 }}</p>
+      {% endif %}
+    </div>
+    
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div>
+        <label style="display:block;font-size:13px;font-weight:600;color:#4a5568;margin-bottom:4px">Start Date</label>
+        {{ form.start_date }}
+        {% if form.start_date.errors %}
+          <p style="color:#e53e3e;font-size:12px;margin-top:4px">{{ form.start_date.errors.0 }}</p>
+        {% endif %}
+      </div>
+      <div>
+        <label style="display:block;font-size:13px;font-weight:600;color:#4a5568;margin-bottom:4px">End Date</label>
+        {{ form.end_date }}
+        {% if form.end_date.errors %}
+          <p style="color:#e53e3e;font-size:12px;margin-top:4px">{{ form.end_date.errors.0 }}</p>
+        {% endif %}
+      </div>
+    </div>
+    
+    <div style="margin-bottom:16px">
+      <label style="display:block;font-size:13px;font-weight:600;color:#4a5568;margin-bottom:4px">Grading Deadline</label>
+      <p style="font-size:12px;color:#718096;margin-bottom:4px">Deadline for teachers to complete score entry.</p>
+      {{ form.grading_deadline }}
+      {% if form.grading_deadline.errors %}
+        <p style="color:#e53e3e;font-size:12px;margin-top:4px">{{ form.grading_deadline.errors.0 }}</p>
+      {% endif %}
+    </div>
+    
+    <div style="margin-bottom:20px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        {{ form.is_locked }}
+        <span style="font-size:13px;font-weight:600;color:#4a5568">Lock Term</span>
+      </label>
+      <p style="font-size:12px;color:#718096;margin-top:4px">Locked terms cannot have scores edited or reports modified.</p>
+    </div>
+    
+    <div style="display:flex;gap:12px;justify-content:flex-end">
+      <a href="{% url 'academics:terms' %}" style="padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;color:#4a5568;background:#f7fafc;border:1px solid #e2e8f0;text-decoration:none">Cancel</a>
+      <button type="submit" style="padding:10px 24px;border-radius:8px;font-size:14px;font-weight:600;color:#fff;background:#023AA5;border:none;cursor:pointer">Create Term</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

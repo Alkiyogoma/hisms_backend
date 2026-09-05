@@ -1,0 +1,500 @@
+{% extends "base.html" %}
+{% load hodari_forms %}
+{% block title %}{{ student.get_full_name }} &mdash; Academic Record{% endblock %}
+
+{% block topbar_greeting %}Academic Record{% endblock %}
+{% block topbar_date %}{{ student.get_full_name }} &middot; {{ student.admission_no }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .ar-header { display: flex; align-items: center; gap: 20px; background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 20px 24px; margin-bottom: 24px; }
+  .ar-avatar { width: 56px; height: 56px; border-radius: 50%; background: var(--hodari-blue); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; flex-shrink: 0; }
+  .ar-info h2 { margin: 0; font-size: 20px; font-weight: 800; color: #1E293B; }
+  .ar-info .ar-meta { font-size: 13px; color: #64748B; margin-top: 2px; }
+  .ar-info .ar-meta span { margin-right: 16px; }
+
+  .insight-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .insight-card { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+  .insight-card .i-val { font-size: 24px; font-weight: 800; line-height: 1.2; }
+  .insight-card .i-lbl { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #64748B; margin-top: 4px; }
+  .insight-card .i-sub { font-size: 11px; margin-top: 2px; }
+  .i-up { color: #1B7B34; } .i-down { color: #DC2626; } .i-flat { color: #92400E; }
+  .i-blue { color: var(--hodari-blue); }
+  .i-green { color: #1B7B34; }
+
+  /* Tabs */
+  .year-tab-bar { display: flex; gap: 4px; margin-bottom: 0; background: #F1F5F9; border-radius: 10px 10px 0 0; padding: 4px 4px 0 4px; border: 1px solid var(--border); border-bottom: none; }
+  .year-tab { padding: 8px 16px; font-size: 11.5px; font-weight: 700; color: #64748B; cursor: pointer; border-radius: 8px 8px 0 0; transition: all .15s; white-space: nowrap; text-transform: uppercase; letter-spacing: .04em; }
+  .year-tab:hover { color: #1E293B; background: rgba(255,255,255,.5); }
+  .year-tab.active { color: var(--hodari-blue); background: #fff; box-shadow: 0 -1px 3px rgba(0,0,0,.04); }
+  .term-tab-bar { display: flex; gap: 2px; margin-bottom: 16px; background: #fff; border: 1px solid var(--border); border-top: none; border-radius: 0 0 10px 10px; padding: 6px 12px; }
+  .term-tab { padding: 5px 14px; font-size: 12px; font-weight: 600; color: #64748B; cursor: pointer; border-radius: 6px; transition: all .15s; }
+  .term-tab:hover { background: #F1F5F9; color: #1E293B; }
+  .term-tab.active { background: var(--hodari-blue); color: #fff; }
+
+  .term-panel { display: none; }
+  .term-panel.active { display: block; }
+
+  .term-card { background: #fff; border: 1px solid var(--border); border-radius: 16px; margin-bottom: 20px; overflow: hidden; }
+  .term-card-header { padding: 16px 20px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .term-card-header h3 { margin: 0; font-size: 15px; font-weight: 700; color: #1E293B; }
+  .subj-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .subj-table th { text-align: left; padding: 10px 14px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748B; background: #F8FAFC; border-bottom: 2px solid #E2E8F0; }
+  .subj-table td { padding: 10px 14px; border-bottom: 1px solid #F1F5F9; color: #1E293B; }
+  .subj-table tr:hover td { background: #F8FAFC; }
+  .subj-table .score-cell { font-weight: 600; text-align: center; font-family: var(--font-mono); }
+  .term-footer { padding: 12px 20px; background: #F8FAFC; border-top: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 13px; }
+  .subject-trend-tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 99px; font-size: 11px; font-weight: 700; }
+  .subject-trend-tag.up { background: #E8F5EC; color: #1B7B34; }
+  .subject-trend-tag.down { background: #FEF2F2; color: #DC2626; }
+  .grade-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; }
+
+  .chart-container { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 24px; }
+  .chart-container canvas { width: 100% !important; height: 220px !important; }
+
+  .trend-row { background: #F8FAFC; border-radius: 10px; padding: 14px 18px; margin-bottom: 16px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; border: 1px solid #E2E8F0; }
+  .trend-bar-container { flex: 1; min-width: 120px; }
+  .trend-bar-track { height: 8px; background: #E2E8F0; border-radius: 4px; overflow: hidden; display: flex; }
+  .trend-bar-seg { height: 100%; transition: width 0.5s ease; }
+  .trend-bar-seg.green { background: #1B7B34; }
+  .trend-bar-seg.amber { background: #D97706; }
+  .trend-bar-seg.red { background: #DC2626; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ar-header">
+  <div class="ar-avatar">{{ student.first_name|first }}{{ student.last_name|first }}</div>
+  <div class="ar-info">
+    <h2>{{ student.get_full_name }}</h2>
+    <div class="ar-meta">
+      <span>Adm: {{ student.admission_no }}</span>
+      <span>Class: {{ student.class_name }}{% if student.stream_name %} / {{ student.stream_name }}{% endif %}</span>
+      <span>Status: {{ student.get_status_display }}</span>
+    </div>
+  </div>
+  <div style="margin-left:auto">
+    <a href="{% url 'students:detail' student.pk %}" class="hf-btn hf-btn-secondary" style="font-size:12px;padding:8px 16px">Back to Profile</a>
+  </div>
+</div>
+
+{% if has_data %}
+<!-- Key Insights -->
+<div class="insight-grid">
+  <div class="insight-card">
+    <div class="i-val {% if current_avg and current_avg >= 70 %}i-up{% elif current_avg and current_avg >= 50 %}i-flat{% else %}i-down{% endif %}">{{ current_avg|default:"N/A" }}%</div>
+    <div class="i-lbl">Current Average</div>
+    <div class="i-sub" style="color:#64748B">Grade {{ current_grade }} &middot; {{ last_term_name }}</div>
+  </div>
+  <div class="insight-card">
+    <div class="i-val i-blue">{{ lifetime_avg|default:"N/A" }}%</div>
+    <div class="i-lbl">Lifetime Average</div>
+    <div class="i-sub" style="color:#64748B">{{ report_count }} term{% if report_count != 1 %}s{% endif %}</div>
+  </div>
+  <div class="insight-card">
+    <div class="i-val {% if trajectory == 'improving' %}i-up{% elif trajectory == 'declining' %}i-down{% else %}i-flat{% endif %}">
+      {% if trajectory == 'improving' %}&uarr;{% elif trajectory == 'declining' %}&darr;{% else %}&rarr;{% endif %}
+      {{ trajectory|title }}
+    </div>
+    <div class="i-lbl">Trajectory</div>
+    <div class="i-sub" style="color:#64748B">{{ trajectory_diff|stringformat:"+d" }}% from {{ first_term_name }}</div>
+  </div>
+  <div class="insight-card">
+    <div class="i-val i-blue">{{ att_summary.rate|default:"N/A" }}%</div>
+    <div class="i-lbl">Attendance Rate</div>
+    <div class="i-sub" style="color:#64748B">{{ att_summary.present }} present &middot; {{ att_summary.absent }} absent</div>
+  </div>
+  <div class="insight-card">
+    <div class="i-val i-blue" style="font-size:20px">{{ std_dev|default:"N/A" }}</div>
+    <div class="i-lbl">Grade Stability</div>
+    <div class="i-sub" style="color:#64748B">
+      {% if std_dev %}
+        {% if std_dev < 3 %}Consistent{% elif std_dev < 6 %}Moderate{% else %}Variable{% endif %}
+      {% else %}N/A{% endif %}
+    </div>
+  </div>
+  <div class="insight-card">
+    <div class="i-val i-blue" style="font-size:20px">{{ subject_count|default:"N/A" }}</div>
+    <div class="i-lbl">Subjects</div>
+    <div class="i-sub" style="color:#64748B">Evaluated this term</div>
+  </div>
+</div>
+
+<!-- Line Chart -->
+<div class="chart-container">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+    <div style="font-size:13px;font-weight:700;color:#1E293B">Performance Trend</div>
+    <div style="display:flex;gap:10px;font-size:10.5px;font-weight:600">
+      {% for group in year_groups %}
+      {% with yr=forloop.counter0 %}
+      <span style="display:flex;align-items:center;gap:4px">
+        <span style="width:10px;height:10px;border-radius:3px;background:{% if yr == 0 %}#2563EB{% elif yr == 1 %}#D97706{% elif yr == 2 %}#1B7B34{% elif yr == 3 %}#8B5CF6{% else %}#EC4899{% endif %}"></span>
+        {{ group.year.name }}
+      </span>
+      {% endwith %}
+      {% endfor %}
+    </div>
+  </div>
+  <canvas id="perfChart"></canvas>
+</div>
+
+<!-- Grade Trend Bar + Distribution + Subject Trends -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">
+  <div class="card" style="margin:0">
+    <div class="card-title">Grade Trend</div>
+    <div class="trend-row" style="margin-bottom:0">
+      <div class="trend-bar-container">
+        <div class="trend-bar-track">
+          {% for td in term_data.values %}
+            {% with tag=td.grade %}
+              {% if tag == 'A' or tag == 'B' %}
+                <div class="trend-bar-seg green" style="width:{% widthratio 1 term_data|length 100 %}%"></div>
+              {% elif tag == 'C' %}
+                <div class="trend-bar-seg amber" style="width:{% widthratio 1 term_data|length 100 %}%"></div>
+              {% else %}
+                <div class="trend-bar-seg red" style="width:{% widthratio 1 term_data|length 100 %}%"></div>
+              {% endif %}
+            {% endwith %}
+          {% endfor %}
+        </div>
+      </div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        {% for td in term_data.values %}
+          <span style="font-size:10px;font-weight:700;color:#64748B;white-space:nowrap">{{ td.report.term.name|slice:":6" }}</span>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="card" style="margin:0">
+    <div class="card-title">{% if is_ecd %}Rating Distribution{% else %}Grade Distribution{% endif %}</div>
+    {% if is_ecd %}
+      {% for grade in "EGSN"|make_list %}
+        {% with count=grade_distribution|get_item:grade %}
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+          <span class="grade-dot" style="background:{% if grade == 'E' %}#1B7B34{% elif grade == 'G' %}#2563EB{% elif grade == 'S' %}#D97706{% else %}#DC2626{% endif %}"></span>
+          <span style="font-size:12px;font-weight:700;min-width:16px">{{ grade }}</span>
+          <div style="flex:1;height:8px;background:#E2E8F0;border-radius:4px;overflow:hidden">
+            <div style="height:100%;width:{% widthratio count term_data|length 100 %}%;background:{% if grade == 'E' %}#1B7B34{% elif grade == 'G' %}#2563EB{% elif grade == 'S' %}#D97706{% else %}#DC2626{% endif %};border-radius:4px"></div>
+          </div>
+          <span style="font-size:11px;color:#64748B;min-width:20px;text-align:right">{{ count|default:0 }}</span>
+        </div>
+        {% endwith %}
+      {% endfor %}
+    {% else %}
+      {% for grade in "ABCDE"|make_list %}
+        {% with count=grade_distribution|get_item:grade %}
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+          <span class="grade-dot" style="background:{% if grade == 'A' %}#1B7B34{% elif grade == 'B' %}#2563EB{% elif grade == 'C' %}#D97706{% elif grade == 'D' %}#EA580C{% else %}#DC2626{% endif %}"></span>
+          <span style="font-size:12px;font-weight:700;min-width:16px">{{ grade }}</span>
+          <div style="flex:1;height:8px;background:#E2E8F0;border-radius:4px;overflow:hidden">
+            <div style="height:100%;width:{% widthratio count term_data|length 100 %}%;background:{% if grade == 'A' %}#1B7B34{% elif grade == 'B' %}#2563EB{% elif grade == 'C' %}#D97706{% elif grade == 'D' %}#EA580C{% else %}#DC2626{% endif %};border-radius:4px"></div>
+          </div>
+          <span style="font-size:11px;color:#64748B;min-width:20px;text-align:right">{{ count|default:0 }}</span>
+        </div>
+        {% endwith %}
+      {% endfor %}
+    {% endif %}
+  </div>
+</div>
+
+<!-- Subject Trends + Best/Worst -->
+{% if improving_subjects or declining_subjects or best_subject %}
+<div class="trend-row" style="margin-bottom:24px">
+  {% if improving_subjects %}
+  <div>
+    <div style="font-size:10px;font-weight:700;color:#1B7B34;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Improving</div>
+    {% for s in improving_subjects %}
+      <span class="subject-trend-tag up" style="margin:2px">{{ s.name }} +{{ s.diff }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if declining_subjects %}
+  <div>
+    <div style="font-size:10px;font-weight:700;color:#DC2626;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Declining</div>
+    {% for s in declining_subjects %}
+      <span class="subject-trend-tag down" style="margin:2px">{{ s.name }} {{ s.diff }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if best_subject %}
+  <div style="margin-left:auto;display:flex;gap:20px">
+    <div>
+      <div style="font-size:10px;font-weight:700;color:#1B7B34;text-transform:uppercase">Best</div>
+      <span style="font-size:13px;font-weight:700;color:#1B7B34">{{ best_subject.name }} ({{ best_subject.weighted_avg }}%)</span>
+    </div>
+    <div>
+      <div style="font-size:10px;font-weight:700;color:#DC2626;text-transform:uppercase">Needs Attention</div>
+      <span style="font-size:13px;font-weight:700;color:#DC2626">{{ worst_subject.name }} ({{ worst_subject.weighted_avg }}%)</span>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% else %}
+<div class="trend-row" style="margin-bottom:24px">
+  <div style="font-size:12px;color:#94A3B8">Multiple terms of data needed to detect subject trends.</div>
+</div>
+{% endif %}
+
+<!-- Term Tabs -->
+<div class="year-tab-bar" id="yearTabBar">
+  {% for group in year_groups %}
+  <div class="year-tab{% if forloop.first %} active{% endif %}" data-year="{{ group.year.pk }}" onclick="switchYear({{ group.year.pk }})">{{ group.year.name }}</div>
+  {% endfor %}
+</div>
+<div class="term-tab-bar" id="termTabBar">
+  {% for group in year_groups %}
+    {% for t in group.terms %}
+    <div class="term-tab{% if forloop.parentloop.first and forloop.first %} active{% endif %}" data-year="{{ group.year.pk }}" data-term="{{ t.term.pk }}" data-panel="panel-{{ t.term.pk }}" onclick="switchTerm({{ t.term.pk }})">{{ t.term.name }}</div>
+    {% endfor %}
+  {% endfor %}
+</div>
+
+<!-- Term Panels -->
+{% for group in year_groups %}
+  {% for t in group.terms %}
+  {% with td=t.data term=t.term %}
+  <div class="term-panel{% if forloop.parentloop.first and forloop.first %} active{% endif %}" id="panel-{{ term.pk }}">
+    <div class="term-card">
+      <div class="term-card-header">
+        <div>
+          <h3>{{ term.name }} &middot; {{ term.academic_year.name }}</h3>
+          <div style="font-size:12px;color:#94A3B8;margin-top:2px">{{ term.start_date|date:"j M Y" }} to {{ term.end_date|date:"j M Y" }}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          {% if td.comparison %}
+            <span class="chip {% if td.comparison.direction == 'up' %}chip-green{% elif td.comparison.direction == 'down' %}chip-red{% else %}chip-amber{% endif %}" style="font-size:11px">
+              {{ td.comparison.direction|title }} {% if td.comparison.diff > 0 %}+{% endif %}{{ td.comparison.diff }}
+            </span>
+          {% endif %}
+          {% if td.report.status == 'published' %}
+            <span class="chip chip-green" style="font-size:11px">Published</span>
+          {% elif td.report.status == 'pending_sign_off' %}
+            <span class="chip chip-amber" style="font-size:11px">Pending</span>
+          {% else %}
+            <span class="chip" style="font-size:11px;background:#F1F5F9;color:#475569">{{ td.report.get_status_display }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div style="padding:0;overflow-x:auto">
+        <table class="subj-table">
+          <thead>
+            <tr>
+              <th style="padding-left:20px">Subject</th>
+              {% for code, name in td.exam_columns %}
+                <th class="score-cell">{{ name }}</th>
+              {% endfor %}
+              <th class="score-cell">Weighted Avg</th>
+              <th style="padding-right:20px;text-align:right">Grade</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for subj in td.subjects %}
+            <tr>
+              <td style="padding-left:20px;font-weight:600">{{ subj.name }}</td>
+              {% for code, name in td.exam_columns %}
+                <td class="score-cell">
+                  {% for det in subj.exam_details %}
+                    {% if det.code == code %}{{ det.score }}{% endif %}
+                  {% endfor %}
+                </td>
+              {% endfor %}
+              <td class="score-cell" style="font-weight:700">{{ subj.weighted_avg|default:"N/A" }}</td>
+              <td style="padding-right:20px;text-align:right">
+                <span class="chip {% if subj.weighted_avg and subj.weighted_avg >= 70 %}chip-green{% elif subj.weighted_avg and subj.weighted_avg >= 50 %}chip-amber{% else %}chip-red{% endif %}">
+                  {% if td.is_ecd %}{{ subj.weighted_avg|default:"N/A" }}{% elif subj.weighted_avg >= 80 %}A{% elif subj.weighted_avg >= 70 %}B{% elif subj.weighted_avg >= 60 %}C{% elif subj.weighted_avg >= 50 %}D{% else %}E{% endif %}
+                </span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="term-footer">
+        <div style="display:flex;align-items:center;gap:16px">
+          <span style="font-size:12px;color:#64748B">Overall:</span>
+          <span style="font-size:18px;font-weight:800;color:{% if td.overall_average and td.overall_average >= 70 %}#1B7B34{% elif td.overall_average and td.overall_average >= 50 %}#92400E{% else %}#9B1C1C{% endif %}">
+            {{ td.overall_average|default:"N/A" }}%
+          </span>
+          <span class="chip {% if td.overall_average and td.overall_average >= 70 %}chip-green{% elif td.overall_average and td.overall_average >= 50 %}chip-amber{% else %}chip-red{% endif %}">
+            {% if td.is_ecd %}Rating {{ td.grade }}{% else %}Grade {{ td.grade }}{% endif %}
+          </span>
+          {% if td.report.signed_off_by %}
+            <span style="font-size:11px;color:#94A3B8">Signed by {{ td.report.signed_off_by.get_full_name|default:td.report.signed_off_by.username }}</span>
+          {% endif %}
+        </div>
+        {% if td.report.status == 'published' %}
+        <div style="display:flex;gap:8px">
+          <a href="{% url 'academics:report_preview' td.report.pk %}" class="hf-btn hf-btn-secondary" style="font-size:11px;padding:4px 10px">View Report</a>
+          <a href="{% url 'academics:report_pdf_download' td.report.pk %}" class="hf-btn hf-btn-primary" style="font-size:11px;padding:4px 10px">Download PDF</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endwith %}
+  {% endfor %}
+{% endfor %}
+
+{% else %}
+{% include '_partials/empty_state.html' with title='No academic record data' desc='No approved exam scores or report cards found for this student.' icon='inbox' icon_color='grey' %}
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if has_data %}
+<script>
+var chartData = {{ chart_data_json|safe }};
+var yearColors = {};
+var ci = 0;
+var palette = ['#2563EB','#D97706','#1B7B34','#8B5CF6','#EC4899'];
+chartData.forEach(function(pt) {
+  if (!yearColors[pt.year]) {
+    yearColors[pt.year] = palette[ci % palette.length];
+    ci++;
+  }
+});
+
+function drawChart() {
+  var canvas = document.getElementById('perfChart');
+  if (!canvas) return;
+  if (!chartData || chartData.length < 2) {
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    return;
+  }
+  var rect = canvas.parentElement.getBoundingClientRect();
+  var w = Math.min(rect.width - 40, 900);
+  var h = 220;
+  var dpr = window.devicePixelRatio || 1;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  var ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  var pad = { top: 20, bottom: 30, left: 40, right: 20 };
+  var cw = w - pad.left - pad.right;
+  var ch = h - pad.top - pad.bottom;
+
+  var values = chartData.map(function(p) { return p.value; });
+  var minV = Math.min.apply(null, values);
+  var maxV = Math.max.apply(null, values);
+  var range = maxV - minV || 20;
+  var yPad = range * 0.1;
+  var yMin = Math.max(0, minV - yPad);
+  var yMax = Math.min(100, maxV + yPad);
+
+  function xPos(i) { return pad.left + (i / (chartData.length - 1 || 1)) * cw; }
+  function yPos(v) { return pad.top + ch - ((v - yMin) / (yMax - yMin)) * ch; }
+
+  // Grid lines
+  ctx.strokeStyle = '#F1F5F9';
+  ctx.lineWidth = 1;
+  for (var g = 0; g <= 4; g++) {
+    var gy = pad.top + (g / 4) * ch;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, gy);
+    ctx.lineTo(w - pad.right, gy);
+    ctx.stroke();
+    var lbl = Math.round(yMax - (g / 4) * (yMax - yMin));
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = '10px system-ui, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(lbl + '%', pad.left - 6, gy + 4);
+  }
+
+  // X labels
+  ctx.fillStyle = '#94A3B8';
+  ctx.font = '10px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  chartData.forEach(function(pt, i) {
+    ctx.fillText(pt.label, xPos(i), h - pad.bottom + 16);
+  });
+
+  // Group points by year for multi-line
+  var byYear = {};
+  chartData.forEach(function(pt, i) {
+    if (!byYear[pt.year]) byYear[pt.year] = [];
+    byYear[pt.year].push({ idx: i, val: pt.value });
+  });
+
+  // Draw lines
+  Object.keys(byYear).forEach(function(year) {
+    var pts = byYear[year];
+    var color = yearColors[year];
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    pts.forEach(function(p, i) {
+      var x = xPos(p.idx);
+      var y = yPos(p.val);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // Dots
+    pts.forEach(function(p) {
+      var x = xPos(p.idx);
+      var y = yPos(p.val);
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(x, y, 2, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  });
+
+  // Value labels on dots
+  ctx.font = '9px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  chartData.forEach(function(pt, i) {
+    var x = xPos(i);
+    var y = yPos(pt.value);
+    ctx.fillStyle = '#1E293B';
+    ctx.fillText(pt.value + '%', x, y - 10);
+  });
+}
+
+// Tab switching
+function switchYear(yearPk) {
+  document.querySelectorAll('.year-tab').forEach(function(t) {
+    t.classList.toggle('active', parseInt(t.dataset.year) === yearPk);
+  });
+  document.querySelectorAll('.term-tab').forEach(function(t) {
+    t.style.display = parseInt(t.dataset.year) === yearPk ? '' : 'none';
+  });
+  // Activate first term of this year
+  var firstTerm = document.querySelector('.term-tab[data-year="' + yearPk + '"]');
+  if (firstTerm) switchTerm(parseInt(firstTerm.dataset.term));
+}
+
+function switchTerm(termPk) {
+  document.querySelectorAll('.term-tab').forEach(function(t) {
+    t.classList.toggle('active', parseInt(t.dataset.term) === termPk);
+  });
+  document.querySelectorAll('.term-panel').forEach(function(p) {
+    p.classList.toggle('active', p.id === 'panel-' + termPk);
+  });
+}
+
+// Initial: show only first year's term tabs
+document.addEventListener('DOMContentLoaded', function() {
+  var firstYearTab = document.querySelector('.year-tab.active');
+  if (firstYearTab) {
+    var ypk = parseInt(firstYearTab.dataset.year);
+    document.querySelectorAll('.term-tab').forEach(function(t) {
+      t.style.display = parseInt(t.dataset.year) === ypk ? '' : 'none';
+    });
+  }
+  drawChart();
+  window.addEventListener('resize', drawChart);
+});
+</script>
+{% endif %}
+{% endblock %}

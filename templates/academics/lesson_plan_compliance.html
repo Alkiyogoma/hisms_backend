@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+{% block title %}Lesson Plan Compliance &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Lesson Plan Compliance{% endblock %}
+{% block topbar_date %}{{ today|date:"l jS F Y" }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .compliance-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .compliance-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .compliance-card .sm-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+  .compliance-card .sm-value { font-size: 28px; font-weight: 800; }
+  .compliance-card .sm-sub { font-size: 12px; margin-top: 4px; }
+  .c-green .sm-value { color: #1B7B34; } .c-green .sm-label { color: #1B7B34; }
+  .c-amber .sm-value { color: #92400E; } .c-amber .sm-label { color: #92400E; }
+  .c-red .sm-value { color: #9B1C1C; } .c-red .sm-label { color: #9B1C1C; }
+  .c-blue .sm-value { color: var(--hodari-blue); } .c-blue .sm-label { color: var(--hodari-blue); }
+  .compliance-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+  .compliance-table th { text-align: left; padding: 12px 16px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748B; background: #F8FAFC; border-bottom: 2px solid #E2E8F0; position: sticky; top: 0; }
+  .compliance-table td { padding: 14px 16px; border-bottom: 1px solid #F1F5F9; color: #1E293B; }
+  .compliance-table tr:hover td { background: #F8FAFC; }
+  .comp-bar { height: 6px; border-radius: 3px; background: #E2E8F0; overflow: hidden; min-width: 80px; }
+  .comp-bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+  .comp-bar-fill.green { background: #1B7B34; }
+  .comp-bar-fill.amber { background: #D97706; }
+  .comp-bar-fill.red { background: #DC2626; }
+  .dept-filter { display: flex; gap: 8px; margin-bottom: 20px; }
+  .dept-filter a { padding: 8px 16px; border-radius: 8px; font-size: 12px; font-weight: 600; text-decoration: none; transition: all 0.15s; }
+  .dept-filter a.active { background: var(--hodari-blue); color: #fff; }
+  .dept-filter a:not(.active) { background: #F1F5F9; color: #475569; }
+  .dept-filter a:not(.active):hover { background: #E2E8F0; }
+  .trend-chart { display: flex; align-items: flex-end; gap: 6px; height: 80px; padding: 8px 0; }
+  .trend-bar { flex: 1; border-radius: 4px 4px 0 0; min-height: 4px; background: var(--hodari-blue); opacity: 0.7; transition: opacity 0.2s; position: relative; }
+  .trend-bar:hover { opacity: 1; }
+  .trend-bar-label { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: 9px; color: #94A3B8; white-space: nowrap; font-weight: 600; }
+  .heatmap-wrap { overflow-x: auto; }
+  .heatmap-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+  .heatmap-table th { padding: 10px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #64748B; background: #F8FAFC; border-bottom: 2px solid #E2E8F0; text-align: center; }
+  .heatmap-table th:first-child { text-align: left; }
+  .heatmap-table td { padding: 8px 12px; border-bottom: 1px solid #F1F5F9; text-align: center; }
+  .heatmap-table td:first-child { text-align: left; font-weight: 600; color: #1E293B; white-space: nowrap; }
+  .heatmap-table tr:hover td { background: #F8FAFC; }
+  .hm-cell { display: inline-flex; align-items: center; justify-content: center; min-width: 64px; padding: 4px 10px; border-radius: 6px; font-size: 10px; font-weight: 700; }
+  .hm-approved { background: #DCFCE7; color: #166534; }
+  .hm-submitted { background: #DBEAFE; color: #1E40AF; }
+  .hm-draft { background: #F1F5F9; color: #475569; }
+  .hm-revision { background: #FEF3C7; color: #92400E; }
+  .hm-rejected { background: #FEE2E2; color: #991B1B; }
+  .hm-missing { background: #FEE2E2; color: #991B1B; }
+  .hm-none { background: #F8FAFC; color: #CBD5E1; }
+  .wk-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+  .wk-nav-btn { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid #E2E8F0; background: #fff; cursor: pointer; transition: all 0.15s; text-decoration: none; color: #475569; }
+  .wk-nav-btn:hover { background: var(--hodari-blue); color: #fff; border-color: var(--hodari-blue); }
+  .wk-label { font-size: 14px; font-weight: 700; color: #1E293B; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "academics/_lesson_plan_tabs.html" %}
+{% if no_term %}
+<div class="card" style="text-align:center;padding:60px 24px">
+  <h3 style="margin:0 0 8px;font-size:18px;color:#1E293B;font-weight:700">No active term</h3>
+  <p style="margin:0;color:#64748B;font-size:14px">Compliance data is only available when a term is in session.</p>
+</div>
+{% else %}
+<!-- Summary cards -->
+<div class="compliance-summary">
+  <div class="compliance-card c-blue">
+    <div class="sm-label">Total Teachers</div>
+    <div class="sm-value">{{ total_teachers }}</div>
+    <div class="sm-sub" style="color:#64748B">{{ term.name }}</div>
+  </div>
+  <div class="compliance-card {% if overall_pct >= 75 %}c-green{% elif overall_pct >= 50 %}c-amber{% else %}c-red{% endif %}">
+    <div class="sm-label">Compliance Rate</div>
+    <div class="sm-value">{{ overall_pct }}%</div>
+    <div class="sm-sub" style="color:#64748B">{{ total_compliant }} of {{ total_teachers }} teachers compliant</div>
+  </div>
+  <div class="compliance-card c-amber">
+    <div class="sm-label">Missing Submissions</div>
+    <div class="sm-value">{{ total_missing }}</div>
+    <div class="sm-sub" style="color:#64748B">over {{ weeks_elapsed }} week{% if weeks_elapsed != 1 %}s{% endif %}</div>
+  </div>
+  <div class="compliance-card c-green">
+    <div class="sm-label">Weeks Elapsed</div>
+    <div class="sm-value">{{ weeks_elapsed }}</div>
+    <div class="sm-sub" style="color:#64748B">{{ term.start_date|date:"j M" }} &ndash; {{ term.end_date|date:"j M" }}</div>
+  </div>
+</div>
+
+<!-- Trend chart -->
+<div class="card" style="margin-bottom:20px">
+  <div class="card-title">Weekly approved plans</div>
+  {% if weekly_trend %}
+  {% with max_count=weekly_trend|dictsortreversed:"count"|first %}
+  <div class="trend-chart">
+    {% for w in weekly_trend %}
+    <div class="trend-bar" style="height:{% widthratio w.count max_count.count 60 %}px">
+      <div class="trend-bar-label">{{ w.week|date:"d/m" }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endwith %}
+  {% else %}
+  {% include '_partials/empty_state.html' with title='No approved plans yet this term' icon='inbox' icon_color='grey' %}
+  {% endif %}
+</div>
+
+<!-- Weekly Coverage Heatmap -->
+<div id="compliance-heatmap" class="card" style="margin-bottom:20px">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px">
+    <div class="card-title" style="margin:0">Weekly Coverage Heatmap</div>
+    <div class="wk-nav">
+      <a href="?week={{ week_offset|add:'-1' }}{% if filter_dept %}&dept={{ filter_dept }}{% endif %}"
+         class="wk-nav-btn" title="Previous week"
+         hx-get="?week={{ week_offset|add:'-1' }}{% if filter_dept %}&dept={{ filter_dept }}{% endif %}"
+         hx-target="#compliance-heatmap" hx-swap="outerHTML" hx-select="#compliance-heatmap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+      </a>
+      <span class="wk-label">Week of {{ selected_monday|date:"j M" }} &ndash; {{ selected_sunday|date:"j M, Y" }}</span>
+      <a href="?week={{ week_offset|add:'1' }}{% if filter_dept %}&dept={{ filter_dept }}{% endif %}"
+         class="wk-nav-btn" title="Next week"
+         hx-get="?week={{ week_offset|add:'1' }}{% if filter_dept %}&dept={{ filter_dept }}{% endif %}"
+         hx-target="#compliance-heatmap" hx-swap="outerHTML" hx-select="#compliance-heatmap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+      </a>
+      {% if week_offset != 0 %}
+      <a href="?week=0{% if filter_dept %}&dept={{ filter_dept }}{% endif %}"
+         style="font-size:11px; font-weight:700; color:var(--hodari-blue); text-decoration:none; padding:4px 10px; border-radius:6px; background:#EFF6FF; border:1px solid #BFDBFE"
+         hx-get="?week=0{% if filter_dept %}&dept={{ filter_dept }}{% endif %}"
+         hx-target="#compliance-heatmap" hx-swap="outerHTML" hx-select="#compliance-heatmap">This Week</a>
+      {% endif %}
+    </div>
+  </div>
+  {% if heatmap_data %}
+  <div class="heatmap-wrap">
+    <table class="heatmap-table">
+      <thead>
+        <tr>
+          <th style="min-width:140px">Teacher</th>
+          {% for dn in day_names %}
+          <th>{{ dn }}<br><span style="font-weight:400; font-size:9px; color:#94A3B8">{{ forloop.counter0|add:1 }}</span></th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in heatmap_data %}
+        <tr>
+          <td>{{ row.teacher.get_full_name|default:row.teacher.username }}</td>
+          {% for d in row.days %}
+          <td>
+            <span class="hm-cell hm-{{ d.status }}"
+                  title="{% if d.subject %}{{ d.subject }} — {{ d.class }}{% endif %}">
+              {% if d.status == 'approved' %}Approved
+              {% elif d.status == 'submitted' %}Submitted
+              {% elif d.status == 'draft' %}Draft
+              {% elif d.status == 'revision_requested' %}Revision
+              {% elif d.status == 'rejected' %}Rejected
+              {% elif d.status == 'missing' %}Missing
+              {% else %}&mdash;{% endif %}
+            </span>
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="text-align:center; padding:30px; color:#94A3B8; font-size:13px">No teacher data for this week.</div>
+  {% endif %}
+</div>
+
+<!-- Controls -->
+<div class="section-hdr">
+  <span class="section-title">Compliance by teacher</span>
+</div>
+
+<div class="dept-filter">
+  <a href="?" class="{% if not filter_dept %}active{% endif %}">All</a>
+  <a href="?dept=primary" class="{% if filter_dept == 'primary' %}active{% endif %}">Primary</a>
+</div>
+
+<table class="compliance-table">
+  <thead>
+    <tr>
+      <th>Teacher</th>
+      <th>Department</th>
+      <th>Submitted</th>
+      <th>Approved</th>
+      <th>Revision</th>
+      <th>Missing</th>
+      <th>Compliance</th>
+      <th>Status</th>
+      <th>Last</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in compliance_rows %}
+    <tr>
+      <td style="font-weight:600">{{ row.teacher.get_full_name|default:row.teacher.username }}</td>
+      <td>{{ row.dept|default:"N/A" }}</td>
+      <td>{{ row.submitted }}</td>
+      <td>{{ row.approved }}</td>
+      <td>{{ row.revision }}</td>
+      <td{% if row.missing > 0 %} style="color:#DC2626;font-weight:600"{% endif %}>{{ row.missing }}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="comp-bar">
+            <div class="comp-bar-fill {% if row.pct >= 90 %}green{% elif row.pct >= 50 %}amber{% else %}red{% endif %}" style="width:{{ row.pct }}%"></div>
+          </div>
+          <span style="font-weight:700;font-size:12px;min-width:36px">{{ row.pct }}%</span>
+        </div>
+      </td>
+      <td>
+        <span class="chip {% if row.grade == 'A' %}chip-green{% elif row.grade == 'B' %}chip-amber{% else %}chip-red{% endif %}">{{ row.grade }}</span>
+      </td>
+      <td style="font-size:12px;color:#64748B">{{ row.last_submission|date:"d M"|default:"N/A" }}</td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="9">{% include '_partials/empty_state.html' with title='No teachers found' desc='No teachers are assigned to the selected department.' icon='users' icon_color='grey' %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% if comp_total_pages > 1 %}
+<div style="display:flex;justify-content:center;align-items:center;gap:6px;padding-top:12px;border-top:1px solid var(--border)">
+  {% if comp_has_prev %}<a href="?comp_page={{ comp_page|add:'-1' }}" style="padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;background:#F1F5F9;color:#475569;text-decoration:none">&larr;</a>{% endif %}
+  <span style="font-size:11px;color:#64748B;font-weight:600">Page {{ comp_page }}/{{ comp_total_pages }}</span>
+  {% if comp_has_next %}<a href="?comp_page={{ comp_page|add:'1' }}" style="padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;background:#F1F5F9;color:#475569;text-decoration:none">&rarr;</a>{% endif %}
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

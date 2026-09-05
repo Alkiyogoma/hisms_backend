@@ -1,0 +1,1474 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Attendance">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#023AA5">
+<link rel="icon" type="image/png" sizes="192x192" href="{% static 'attendance/pwa/icons/icon-192.png' %}">
+<link rel="icon" type="image/png" sizes="512x512" href="{% static 'attendance/pwa/icons/icon-512.png' %}">
+<link rel="apple-touch-icon" href="{% static 'attendance/pwa/icons/icon-192.png' %}">
+<meta name="csrf-token" content="{{ csrf_token }}">
+<link rel="manifest" href="{% url 'attendance:pwa_manifest' %}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<title>Attendance — {{ brand.school_name }}</title>
+<style>
+:root {
+  --blue:#2563EB; --blue-dark:#1D4ED8;
+  --green:#16A34A; --green-light:#DCFCE7;
+  --orange:#F59E0B; --orange-light:#FEF3C7;
+  --red:#DC2626; --red-light:#FEE2E2;
+  --bg:#F8FAFC; --card:#FFFFFF;
+  --text:#0F172A; --text-secondary:#64748B; --text-muted:#94A3B8;
+  --border:#E2E8F0;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  background:var(--bg);color:var(--text);
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
+.page{display:none;min-height:100vh;background:var(--bg)}
+.page.active{display:block}
+
+/* ─── Splash Screen ─── */
+.splash{
+  position:fixed;inset:0;z-index:9999;
+  background:linear-gradient(135deg,#023AA5 0%,#1D4ED8 50%,#2563EB 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transition:opacity .4s ease,visibility .4s ease;
+}
+.splash.hide{opacity:0;visibility:hidden;pointer-events:none}
+.splash-logo{
+  width:80px;height:80px;border-radius:20px;
+  background:rgba(255,255,255,.15);backdrop-filter:blur(10px);
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:20px;animation:pulse 1.5s ease-in-out infinite;
+}
+.splash-logo img{width:48px;height:48px}
+.splash-name{color:#fff;font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:6px}
+.splash-sub{color:rgba(255,255,255,.6);font-size:13px}
+.splash-dots{display:flex;gap:6px;margin-top:24px}
+.splash-dots span{
+  width:8px;height:8px;border-radius:4px;background:rgba(255,255,255,.3);
+  animation:bounce 1.2s ease-in-out infinite;
+}
+.splash-dots span:nth-child(2){animation-delay:.15s}
+.splash-dots span:nth-child(3){animation-delay:.3s}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+
+/* ─── Header ─── */
+.header-checkin{
+  background:#fff;padding:16px 20px;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border);
+}
+.header-checkin h1{font-size:20px;font-weight:700}
+.header-checkin .h-actions{display:flex;gap:8px}
+.header-checkin .h-btn{
+  width:40px;height:40px;border-radius:12px;border:none;
+  background:var(--bg);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+}
+.header-checkin .h-btn:active{background:var(--border)}
+
+/* ─── Profile ─── */
+.profile-section{
+  background:rgba(37,99,235,.85);
+  backdrop-filter:blur(20px) saturate(1.6);
+  -webkit-backdrop-filter:blur(20px) saturate(1.6);
+  color:#fff;padding:20px 20px 24px;
+  border-bottom:1px solid rgba(255,255,255,.15);
+}
+.profile-row{display:flex;align-items:center;gap:12px}
+.profile-avatar{
+  width:42px;height:42px;border-radius:21px;
+  background:#023AA5;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;font-weight:700;flex-shrink:0;
+  color:#fff;
+}
+.profile-info{flex:1}
+.profile-name{font-size:16px;font-weight:700;color:#1e293b}
+.profile-email{font-size:12px;color:#64748b;margin-top:2px}
+.profile-badge{
+  padding:8px 16px;border-radius:20px;
+  background:rgba(255,255,255,.15);
+  font-size:14px;font-weight:700;
+  display:flex;align-items:center;gap:6px;
+  backdrop-filter:blur(8px);
+}
+.stats-checkin{display:flex;gap:10px;margin-top:4px}
+.stat-checkin{
+  flex:1;background:rgba(255,255,255,.15);
+  border-radius:16px;padding:16px 12px;text-align:center;
+  cursor:pointer;position:relative;
+}
+.stat-checkin:active{background:rgba(255,255,255,.25)}
+.stat-checkin .sc-icon{display:flex;align-items:center;justify-content:flex-start;margin-bottom:8px}
+.stat-checkin .sc-value{font-size:28px;font-weight:800;line-height:1}
+.stat-checkin .sc-label{font-size:12px;color:rgba(255,255,255,.7);margin-top:4px}
+.pending-tag{
+  position:absolute;top:8px;right:8px;
+  padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;
+  background:rgba(255,255,255,.25);color:#fff;
+}
+
+/* ─── Scan List ─── */
+.scan-section{padding:16px 20px 140px}
+.scan-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:10px;
+}
+.scan-title{font-size:13px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em}
+.scan-count{font-size:12px;font-weight:700;padding:3px 10px;border-radius:10px;background:var(--blue);color:#fff}
+.scan-empty{text-align:center;padding:32px 20px}
+.scan-empty svg{opacity:.25;margin-bottom:8px}
+.scan-empty p{font-size:14px;color:var(--text-muted)}
+.scan-empty .se-sub{font-size:12px;margin-top:4px}
+
+/* ─── Swipeable Card ─── */
+.swipe-container{position:relative;margin-bottom:8px;overflow:hidden;border-radius:14px}
+.swipe-bg{position:absolute;top:0;bottom:0;left:0;right:0;display:flex;align-items:center;opacity:0;transition:opacity .1s ease}
+.swipe-action{
+  width:100%;height:100%;display:flex;align-items:center;
+  gap:8px;font-size:13px;font-weight:700;color:#fff;
+}
+.swipe-bg-left .swipe-action{padding-left:20px;justify-content:flex-start}
+.swipe-bg-right .swipe-action{padding-right:20px;justify-content:flex-end}
+.swipe-delete{background:var(--red)}
+.swipe-save{background:var(--green)}
+
+.scan-card{
+  background:#fff;border:1px solid var(--border);
+  padding:14px 16px;display:flex;align-items:center;gap:10px;
+  position:relative;z-index:2;
+  touch-action:pan-y;
+  transition:transform .2s ease;
+  border-radius:14px;
+  border-left:4px solid transparent;
+}
+.scan-card.mode-in{border-left-color:var(--green)}
+.scan-card.mode-out{border-left-color:var(--orange)}
+.scan-card.dragging{transition:none}
+.scan-card .pc-avatar{
+  width:40px;height:40px;border-radius:20px;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:15px;flex-shrink:0;
+}
+.scan-card .pc-info{flex:1;min-width:0;overflow:hidden}
+.scan-card .pc-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.scan-card .pc-meta{font-size:11px;color:var(--text-muted);margin-top:1px;display:flex;align-items:center;gap:6px;overflow:hidden}
+.scan-card .pc-meta span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+.scan-card .pc-right{text-align:right;flex-shrink:0;max-width:90px}
+.scan-card .pc-time{font-size:13px;font-weight:700}
+.scan-badge{
+  display:inline-block;padding:3px 10px;border-radius:6px;
+  font-size:10px;font-weight:800;margin-top:3px;letter-spacing:.02em;
+}
+.badge-in{background:#166534;color:#fff}
+.badge-out{background:#92400e;color:#fff}
+.badge-qr{background:#334155;color:#fff;margin-left:4px}
+.badge-manual{background:#5B21B6;color:#fff;margin-left:4px}
+.swipe-hint{
+  text-align:center;font-size:11px;color:var(--text-muted);
+  padding:8px 0 0;margin-top:4px;
+}
+
+/* ─── Bottom Action Bar ─── */
+.bottom-actions{
+  position:fixed;bottom:20px;left:16px;right:16px;
+  background:rgba(255,255,255,.72);
+  backdrop-filter:blur(20px) saturate(1.6);
+  -webkit-backdrop-filter:blur(20px) saturate(1.6);
+  border:1px solid rgba(255,255,255,.5);
+  border-radius:20px;
+  padding:16px;
+  display:flex;gap:10px;z-index:50;
+  box-shadow:0 8px 32px rgba(0,0,0,.08),0 2px 8px rgba(0,0,0,.04),inset 0 1px 0 rgba(255,255,255,.6);
+}
+.action-btn{
+  padding:14px;border-radius:14px;border:none;
+  font-family:'Inter';font-size:14px;font-weight:600;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:transform .15s;
+}
+.action-btn:active{transform:scale(.96)}
+.btn-scan{flex:1;background:var(--blue);color:#fff;box-shadow:0 4px 14px rgba(37,99,235,.3)}
+.btn-manual{background:#fff;color:var(--text);border:1.5px solid var(--border)}
+.btn-submit{flex:1.2;background:var(--green);color:#fff;box-shadow:0 4px 14px rgba(22,163,74,.3);font-weight:700}
+.btn-clear{background:#F1F5F9;color:var(--text-secondary);border:1.5px solid var(--border);font-size:13px;padding:14px 16px}
+
+/* ─── Confirmation Modal ─── */
+.confirm-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;
+  display:none;align-items:center;justify-content:center;
+}
+.confirm-overlay.show{display:flex}
+.confirm-sheet{
+  background:#fff;border-radius:20px;width:90%;max-width:360px;
+  padding:28px 24px;text-align:center;
+  animation:popIn .25s ease;
+}
+@keyframes popIn{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
+.confirm-avatar{
+  width:72px;height:72px;border-radius:36px;
+  margin:0 auto 16px;display:flex;align-items:center;justify-content:center;
+  font-size:28px;font-weight:700;
+  border:3px solid var(--blue);color:var(--blue);background:rgba(37,99,235,.08);
+}
+.confirm-name{font-size:20px;font-weight:700;margin-bottom:4px}
+.confirm-id{font-size:13px;color:var(--text-muted);margin-bottom:4px}
+.confirm-question{font-size:15px;font-weight:600;color:var(--text-secondary);margin:16px 0}
+.confirm-actions{display:flex;gap:10px}
+.confirm-actions button{
+  flex:1;padding:14px;border-radius:14px;font-family:'Inter';
+  font-weight:700;font-size:14px;cursor:pointer;border:none;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:transform .15s;
+}
+.confirm-actions button:active{transform:scale(.95)}
+.btn-checkin{background:var(--green);color:#fff}
+.btn-checkout{background:var(--orange);color:#fff}
+.btn-cancel-scan{width:100%;padding:12px;border:none;background:transparent;color:var(--text-muted);font-family:'Inter';font-size:13px;font-weight:600;margin-top:8px;cursor:pointer}
+
+/* ─── QR Scanner ─── */
+.scanner-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:200;
+  display:none;flex-direction:column;
+}
+.scanner-overlay.show{display:flex}
+.scanner-top{
+  padding:16px 20px;display:flex;align-items:center;justify-content:space-between;
+  color:#fff;
+}
+.scanner-top .close-scan{
+  width:40px;height:40px;border-radius:12px;border:none;
+  background:rgba(255,255,255,.15);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+}
+.scanner-top h2{font-size:16px;font-weight:600}
+.scanner-top .scan-count-badge{
+  padding:4px 12px;border-radius:10px;
+  background:rgba(255,255,255,.2);font-size:12px;font-weight:700;
+}
+.scanner-viewport{
+  flex:1;display:flex;align-items:center;justify-content:center;
+  position:relative;margin:0 20px;border-radius:20px;overflow:hidden;
+}
+#qr-reader{width:100%!important;height:100%!important}
+#qr-reader video{width:100%!important;height:100%!important;object-fit:cover!important}
+.scanner-frame-overlay{
+  position:absolute;inset:0;z-index:10;
+  display:flex;align-items:center;justify-content:center;
+  pointer-events:none;
+}
+.scan-frame{
+  width:200px;height:200px;position:relative;border-radius:12px;
+}
+.scan-frame::before{
+  content:'';position:absolute;inset:-4px;z-index:1;border-radius:20px;
+  pointer-events:none;
+  background:
+    linear-gradient(var(--blue),var(--blue)) 0 0 / 36px 4px no-repeat,
+    linear-gradient(var(--blue),var(--blue)) 0 0 / 4px 36px no-repeat,
+    linear-gradient(var(--orange),var(--orange)) 100% 0 / 36px 4px no-repeat,
+    linear-gradient(var(--orange),var(--orange)) 100% 0 / 4px 36px no-repeat,
+    linear-gradient(var(--blue),var(--blue)) 0 100% / 36px 4px no-repeat,
+    linear-gradient(var(--blue),var(--blue)) 0 100% / 4px 36px no-repeat,
+    linear-gradient(var(--blue),var(--blue)) 100% 100% / 36px 4px no-repeat,
+    linear-gradient(var(--blue),var(--blue)) 100% 100% / 4px 36px no-repeat;
+}
+.scan-frame::after{
+  content:'';position:absolute;top:0;left:0;z-index:1;
+  width:100%;height:2px;background:rgba(37,99,235,.6);
+  animation:scanLine 2s ease-in-out infinite;
+}
+@keyframes scanLine{0%,100%{top:0;opacity:.3}50%{top:100%;opacity:.9}}
+.scanner-bottom{padding:20px;text-align:center;color:rgba(255,255,255,.7);font-size:13px}
+
+/* ─── Manual Entry ─── */
+.manual-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;
+  display:none;align-items:flex-end;justify-content:center;
+}
+.manual-overlay.show{display:flex}
+.manual-sheet{
+  background:#fff;border-radius:20px 20px 0 0;
+  width:100%;max-width:500px;padding:24px 20px;
+  animation:slideUp .25s ease;
+}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.manual-handle{width:40px;height:4px;border-radius:2px;background:var(--border);margin:0 auto 16px}
+.manual-title{font-size:16px;font-weight:700;margin-bottom:16px}
+.manual-field{margin-bottom:12px}
+.manual-field label{font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px}
+.manual-field input{
+  width:100%;padding:14px;border:1.5px solid var(--border);border-radius:12px;
+  font-size:16px;font-family:'Inter';
+}
+.manual-field input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.manual-actions{display:flex;gap:10px;margin-top:16px}
+.manual-actions button{
+  flex:1;padding:14px;border-radius:12px;font-family:'Inter';
+  font-weight:700;font-size:14px;cursor:pointer;border:none;
+}
+.manual-actions .m-cancel{background:var(--bg);color:var(--text-secondary)}
+.manual-actions .m-confirm{background:var(--blue);color:#fff}
+
+/* ─── Report Headers ─── */
+.header-report{padding:14px 20px;display:flex;align-items:center;justify-content:space-between;color:#fff}
+.header-report .back-btn,.header-report .refresh-btn{
+  width:36px;height:36px;border-radius:10px;border:none;
+  background:rgba(255,255,255,.2);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+}
+.header-report h1{font-size:18px;font-weight:700;flex:1;margin-left:12px}
+.header-checkin-report{background:var(--green)}
+.header-checkout-report{background:var(--orange)}
+
+.report-stats{display:flex;gap:8px;padding:14px 20px}
+.report-stat{flex:1;text-align:center;padding:12px 4px;border-radius:12px}
+.report-stat .rs-icon{display:flex;justify-content:center;margin-bottom:6px}
+.report-stat .rs-value{font-size:24px;font-weight:800;line-height:1}
+.report-stat .rs-label{font-size:11px;margin-top:4px;font-weight:500}
+.report-stat-green{background:var(--green-light)}
+.report-stat-green .rs-value,.report-stat-green .rs-label{color:var(--green)}
+.report-stat-orange{background:var(--orange-light)}
+.report-stat-orange .rs-value,.report-stat-orange .rs-label{color:var(--orange)}
+
+.report-search{padding:0 20px 12px}
+.search-box{
+  display:flex;align-items:center;gap:10px;
+  background:#fff;border:1.5px solid var(--border);border-radius:14px;
+  padding:0 16px;
+}
+.search-box:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.search-box input{
+  flex:1;padding:14px 0;border:none;background:transparent;
+  font-size:14px;font-family:'Inter';color:var(--text);
+}
+.search-box input::placeholder{color:var(--text-muted)}
+.search-box input:focus{outline:none}
+
+.report-list{padding:0 20px;padding-bottom:24px}
+.report-empty{text-align:center;padding:60px 20px;color:var(--text-muted)}
+.report-empty p{font-size:14px;margin-top:8px}
+
+.student-card{
+  background:#fff;border-radius:14px;padding:14px 16px;
+  margin-bottom:8px;border:1px solid var(--border);
+  display:flex;align-items:center;gap:12px;
+}
+.student-avatar{
+  width:40px;height:40px;border-radius:20px;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:16px;flex-shrink:0;
+}
+.student-info{flex:1;min-width:0}
+.student-name{font-size:14px;font-weight:600}
+.student-meta{font-size:11px;color:var(--text-muted);margin-top:2px}
+.student-time{text-align:right;flex-shrink:0}
+.student-time .st-time{font-size:13px;font-weight:700}
+.student-badge{display:inline-block;padding:2px 10px;border-radius:8px;font-size:10px;font-weight:700;margin-top:3px}
+.badge-in{background:var(--green-light);color:var(--green)}
+.badge-out{background:var(--orange-light);color:var(--orange)}
+
+/* ─── Toast ─── */
+.toast{
+  position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-10px);
+  background:#1e293b;color:#fff;padding:12px 22px;
+  border-radius:12px;font-size:13px;font-weight:500;font-family:'Inter';
+  z-index:300;opacity:0;transition:all .3s ease;pointer-events:none;
+  display:flex;align-items:center;gap:8px;white-space:nowrap;
+  box-shadow:0 4px 20px rgba(0,0,0,.15);max-width:90vw;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.error{background:#DC2626}
+.toast.success{background:#16A34A}
+
+.loading{text-align:center;padding:40px;color:var(--text-muted);font-size:13px}
+.loading::before{
+  content:'';display:block;width:28px;height:28px;margin:0 auto 12px;
+  border:3px solid var(--border);border-top-color:var(--blue);
+  border-radius:50%;animation:spinner .6s linear infinite;
+}
+@keyframes spinner{to{transform:rotate(360deg)}}
+.status-bar{height:env(safe-area-inset-top,0px);background:var(--blue)}
+
+/* ─── Flash feedback on card ─── */
+@keyframes flashGreen{0%{background:#DCFCE7}100%{background:#fff}}
+@keyframes flashRed{0%{background:#FEE2E2}100%{background:#fff}}
+
+/* ─── PWA Install Banner ─── */
+.install-banner{
+  position:fixed;bottom:0;left:0;right:0;z-index:250;
+  background:#fff;border-top:1px solid var(--border);
+  padding:16px 20px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));
+  display:flex;align-items:center;gap:14px;
+  box-shadow:0 -4px 20px rgba(0,0,0,.08);
+  transform:translateY(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);
+}
+.install-banner.show{transform:translateY(0)}
+.install-banner .ib-icon{
+  width:44px;height:44px;border-radius:12px;background:var(--blue);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.install-banner .ib-text{flex:1}
+.install-banner .ib-title{font-size:14px;font-weight:700;color:var(--text)}
+.install-banner .ib-sub{font-size:12px;color:var(--text-secondary);margin-top:2px}
+.install-banner .ib-actions{display:flex;gap:8px;flex-shrink:0}
+.install-banner .ib-btn{
+  padding:8px 16px;border-radius:10px;border:none;font-size:13px;
+  font-weight:600;cursor:pointer;font-family:'Inter';
+}
+.install-banner .ib-install{background:var(--blue);color:#fff}
+.install-banner .ib-install:active{opacity:.85}
+.install-banner .ib-dismiss{background:var(--bg);color:var(--text-secondary)}
+.flash-success{animation:flashGreen .6s ease}
+.flash-error{animation:flashRed .6s ease}
+</style>
+</head>
+<body>
+
+<!-- Splash Screen -->
+<div class="splash" id="splash">
+  <div class="splash-logo"><img src="{% static 'branding/favicon.ico' %}" alt="Hodari"></div>
+  <div class="splash-name">Hodari Attendance</div>
+  <div class="splash-sub">{{ school_name }}</div>
+  <div class="splash-dots"><span></span><span></span><span></span></div>
+</div>
+
+<!-- ═══════ PAGE 1: CHECK-IN ═══════ -->
+<div class="page active" id="page-checkin">
+  <div class="status-bar"></div>
+  <div class="header-checkin">
+    <div class="profile-row">
+      <div class="profile-avatar">{{ user.get_full_name|default:user.username|first|upper }}</div>
+      <div class="profile-info">
+        <div class="profile-name">{{ user.get_full_name|default:user.username }}</div>
+        <div class="profile-email">{{ user_role_display }}</div>
+      </div>
+    </div>
+    <div class="h-actions">
+      <button class="h-btn" onclick="refreshCheckin()" title="Refresh">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      </button>
+      <button class="h-btn" onclick="confirmLogout()" title="Logout">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="profile-section">
+    <div class="stats-checkin">
+      <div class="stat-checkin" onclick="goToCheckinReport()">
+        <div class="sc-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg></div>
+        <div class="sc-value" id="checkinToday">0</div>
+        <div class="sc-label">Check-In Today</div>
+        <span class="pending-tag" id="pendingInTag" style="display:none">+<span id="pendingInCount">0</span> pending</span>
+      </div>
+      <div class="stat-checkin" onclick="goToCheckoutReport()">
+        <div class="sc-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></div>
+        <div class="sc-value" id="checkoutToday">0</div>
+        <div class="sc-label">Check-Out Today</div>
+        <span class="pending-tag" id="pendingOutTag" style="display:none">+<span id="pendingOutCount">0</span> pending</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="scan-section">
+    <div class="scan-header">
+      <span class="scan-title">Pending Scans</span>
+      <span class="scan-count" id="scanCount">0</span>
+    </div>
+    <div id="scanList">
+      <div class="scan-empty">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round">
+          <path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/>
+          <path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
+          <rect x="7" y="7" width="10" height="10" rx="1.5"/>
+        </svg>
+        <p>No pending scans</p>
+        <p class="se-sub">Tap Scan QR to start</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-actions" id="bottomIdle">
+    <button class="action-btn btn-scan" onclick="openScanner()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/>
+        <path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
+        <line x1="7" y1="12" x2="17" y2="12"/>
+      </svg>
+      Scan QR
+    </button>
+    <button class="action-btn btn-manual" onclick="openManual()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+      </svg>
+      Manual
+    </button>
+  </div>
+  <div class="bottom-actions" id="bottomPending" style="display:none">
+    <button class="action-btn btn-clear" onclick="clearAll()">Clear</button>
+    <button class="action-btn btn-scan" onclick="openScanner()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/>
+        <path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
+        <line x1="7" y1="12" x2="17" y2="12"/>
+      </svg>
+      Scan
+    </button>
+    <button class="action-btn btn-submit" onclick="submitAll()">Submit <span id="submitCount">0</span></button>
+  </div>
+</div>
+
+<!-- ═══════ PAGE 2: CHECK-IN REPORT ═══════ -->
+<div class="page" id="page-checkin-report">
+  <div class="header-report header-checkin-report">
+    <button class="back-btn" onclick="goToCheckin()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+    <h1>Check-In Report</h1>
+    <button class="refresh-btn" onclick="loadCheckinReport()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+  </div>
+  <div class="report-stats">
+    <div class="report-stat report-stat-green"><div class="rs-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><div class="rs-value" id="crTotal">0</div><div class="rs-label">Total</div></div>
+    <div class="report-stat report-stat-green"><div class="rs-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/></svg></div><div class="rs-value" id="crFiltered">0</div><div class="rs-label">Filtered</div></div>
+    <div class="report-stat report-stat-green"><div class="rs-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div><div class="rs-value" id="crClasses">0</div><div class="rs-label">Classes</div></div>
+  </div>
+  <div class="report-search"><div class="search-box"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="crSearch" placeholder="Search by name or student ID..." oninput="filterCR()"></div></div>
+  <div class="report-list" id="crList"><div class="loading">Loading...</div></div>
+</div>
+
+<!-- ═══════ PAGE 3: CHECK-OUT REPORT ═══════ -->
+<div class="page" id="page-checkout-report">
+  <div class="header-report header-checkout-report">
+    <button class="back-btn" onclick="goToCheckin()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+    <h1>Check-Out Report</h1>
+    <button class="refresh-btn" onclick="loadCheckoutReport()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+  </div>
+  <div class="report-stats">
+    <div class="report-stat report-stat-orange"><div class="rs-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><div class="rs-value" id="coTotal">0</div><div class="rs-label">Total</div></div>
+    <div class="report-stat report-stat-orange"><div class="rs-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/></svg></div><div class="rs-value" id="coFiltered">0</div><div class="rs-label">Filtered</div></div>
+    <div class="report-stat report-stat-orange"><div class="rs-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div><div class="rs-value" id="coClasses">0</div><div class="rs-label">Classes</div></div>
+  </div>
+  <div class="report-search"><div class="search-box"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="coSearch" placeholder="Search by name or student ID..." oninput="filterCO()"></div></div>
+  <div class="report-list" id="coList"><div class="loading">Loading...</div></div>
+</div>
+
+<!-- ═══════ QR SCANNER ═══════ -->
+<div class="scanner-overlay" id="scannerOverlay">
+  <div class="scanner-top">
+    <button class="close-scan" onclick="closeScanner()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <h2>Scan QR Code</h2>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="close-scan" id="torchBtn" onclick="toggleTorch()" title="Toggle flashlight">
+        <svg id="torchOff" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M9 18h6M10 22h4M12 2v1m6.36 2.64l-.7.7M21 12h-1M4 12H3m2.64-6.36l-.7-.7M16 12a4 4 0 0 1-8 0"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        <svg id="torchOn" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2" stroke-linecap="round" style="display:none"><path d="M9 18h6M10 22h4M12 2v1M18.36 5.64l-.7.7M21 12h-1M4 12H3m2.64-6.36l-.7-.7M16 12a4 4 0 0 1-8 0"/></svg>
+      </button>
+      <span class="scan-count-badge" id="scannerBadge">0 scanned</span>
+    </div>
+  </div>
+  <div class="scanner-viewport">
+    <div id="qr-reader" style="width:100%;height:100%"></div>
+    <div class="scanner-frame-overlay"><div class="scan-frame"></div></div>
+  </div>
+  <div class="scanner-bottom">Align QR code within the frame to scan</div>
+</div>
+
+<!-- ═══════ CONFIRM MODAL ═══════ -->
+<div class="confirm-overlay" id="confirmOverlay" onclick="if(event.target===this)cancelConfirm()">
+  <div class="confirm-sheet">
+    <div class="confirm-avatar" id="confirmAvatar">A</div>
+    <div class="confirm-name" id="confirmName">Student Name</div>
+    <div class="confirm-id" id="confirmId">ID: H-085</div>
+    <div class="confirm-question">Is this student checking in or out?</div>
+    <div class="confirm-actions">
+      <button class="btn-checkin" onclick="confirmMode('IN')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+        Check In
+      </button>
+      <button class="btn-checkout" onclick="confirmMode('OUT')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Check Out
+      </button>
+    </div>
+    <button class="btn-cancel-scan" onclick="cancelConfirm()">Cancel</button>
+  </div>
+</div>
+
+<!-- ═══════ MANUAL ENTRY ═══════ -->
+<div class="manual-overlay" id="manualOverlay" onclick="if(event.target===this)closeManual()">
+  <div class="manual-sheet">
+    <div class="manual-handle"></div>
+    <div class="manual-title">Manual Entry</div>
+    <div class="manual-field"><label>Student ID</label><input type="text" id="manualStudentId" placeholder="Enter student ID"></div>
+    <div class="manual-actions">
+      <button class="m-cancel" onclick="closeManual()">Cancel</button>
+      <button class="m-confirm" onclick="submitManual()">Add to List</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ LOGOUT ═══════ -->
+<div class="manual-overlay" id="logoutOverlay" onclick="if(event.target===this)closeLogout()">
+  <div class="manual-sheet" style="background:rgba(255,255,255,.88);backdrop-filter:blur(24px) saturate(1.6);-webkit-backdrop-filter:blur(24px) saturate(1.6);border:1px solid rgba(255,255,255,.5);box-shadow:0 -8px 40px rgba(0,0,0,.1)">
+    <div class="manual-handle"></div>
+    <div class="manual-title">Logout</div>
+    <p style="font-size:14px;color:var(--text-secondary);margin-bottom:16px">Are you sure you want to logout?</p>
+    <div class="manual-actions">
+      <button class="m-cancel" onclick="closeLogout()">Cancel</button>
+      <button class="m-confirm" style="background:#DC2626" onclick="doLogout()">Logout</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ GENERIC CONFIRM ═══════ -->
+<div class="manual-overlay" id="confirmModal" onclick="if(event.target===this)closeConfirmModal()">
+  <div class="manual-sheet" style="background:rgba(255,255,255,.88);backdrop-filter:blur(24px) saturate(1.6);-webkit-backdrop-filter:blur(24px) saturate(1.6);border:1px solid rgba(255,255,255,.5);box-shadow:0 -8px 40px rgba(0,0,0,.1)">
+    <div class="manual-handle"></div>
+    <div class="manual-title" id="confirmTitle"></div>
+    <p style="font-size:14px;color:var(--text-secondary);margin-bottom:16px" id="confirmMsg"></p>
+    <div class="manual-actions">
+      <button class="m-cancel" onclick="closeConfirmModal()">Cancel</button>
+      <button class="m-confirm" id="confirmAction" onclick="doConfirmAction()"></button>
+    </div>
+  </div>
+</div>
+
+<div id="installBanner" class="install-banner">
+  <div class="ib-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+  <div class="ib-text">
+    <div class="ib-title">Install Hodari</div>
+    <div class="ib-sub" id="ibSub">Add to home screen for faster access</div>
+  </div>
+  <div class="ib-actions">
+    <button class="ib-btn ib-dismiss" onclick="dismissInstall()">Not now</button>
+    <button class="ib-btn ib-install" id="ibInstallBtn" onclick="doInstall()">Install</button>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+(function(){
+  var API=window.location.origin;
+  var html5Qr=null, isScanning=false;
+  var pendingScans=[];
+  var pendingStudentId='';
+  var pendingSource='qr';
+  var checkinData=[], checkoutData=[];
+  var swipeState={};
+
+  function savePending(){try{localStorage.setItem('hodari_pending',JSON.stringify(pendingScans))}catch(e){}}
+  function loadPending(){try{var d=localStorage.getItem('hodari_pending');if(d){pendingScans=JSON.parse(d);pendingScans.forEach(function(s){s.time=new Date(s.time)})}}catch(e){pendingScans=[]}}
+  loadPending();
+
+  function localTimestamp(){
+    var n=new Date();
+    var off=n.getTimezoneOffset();
+    var sign=off<=0?'+':'-';
+    var absOff=Math.abs(off);
+    var tzH=String(Math.floor(absOff/60)).padStart(2,'0');
+    var tzM=String(absOff%60).padStart(2,'0');
+    return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0')+'T'+String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')+':'+String(n.getSeconds()).padStart(2,'0')+sign+tzH+':'+tzM;
+  }
+
+  function getCSRF(){var m=document.querySelector('meta[name="csrf-token"]');return m?m.getAttribute('content'):'';}
+
+  // ── Feedback Engine (haptics + Web Audio) ──
+  var _audioCtx=null;
+  function getAudioCtx(){if(!_audioCtx){try{_audioCtx=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}}return _audioCtx;}
+  function _tone(freq,dur,vol,delay){
+    if(fb.silent)return;
+    var ctx=getAudioCtx();if(!ctx)return;
+    if(ctx.state==='suspended')ctx.resume();
+    var osc=ctx.createOscillator(),gain=ctx.createGain();
+    osc.type='sine';osc.frequency.value=freq;
+    gain.gain.setValueAtTime(vol||0.15,ctx.currentTime+(delay||0));
+    gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+(delay||0)+dur);
+    osc.connect(gain);gain.connect(ctx.destination);
+    osc.start(ctx.currentTime+(delay||0));osc.stop(ctx.currentTime+(delay||0)+dur);
+  }
+  function _haptic(pattern){
+    if(fb.silent)return;
+    if(!('vibrate' in navigator))return;
+    try{navigator.vibrate(pattern)}catch(e){}
+  }
+
+  var fb={
+    silent:localStorage.getItem('hodari_silent')==='1',
+    toggleSilent:function(){this.silent=!this.silent;localStorage.setItem('hodari_silent',this.silent?'1':'0');return this.silent},
+
+    // QR scan detected (successful read)
+    scanSuccess:function(){_haptic(50);_tone(880,0.1,0.12)},
+
+    // Scan fails / unreadable / duplicate
+    scanFail:function(){_haptic([40,60,40]);_tone(220,0.15,0.18)},
+    duplicate:function(){_haptic([40,60,40]);_tone(220,0.15,0.18)},
+
+    // Swipe-to-save (card crosses commit threshold)
+    swipeSave:function(){_haptic(30);_tone(520,0.06,0.08)},
+
+    // Swipe-to-delete (stronger pulse)
+    swipeDelete:function(){_haptic(70);_tone(300,0.08,0.1)},
+
+    // Submit batch — success
+    submitSuccess:function(){_haptic([30,40,30]);_tone(660,0.12,0.15,0);_tone(880,0.12,0.15,0.12)},
+
+    // Submit batch — fail
+    submitFail:function(){_haptic([100,50,100]);_tone(440,0.15,0.15,0);_tone(330,0.2,0.15,0.15)},
+
+    // Manual entry saved
+    manualSave:function(){_haptic(40);_tone(660,0.08,0.1)},
+
+    // Clear button
+    clear:function(){_haptic(30)},
+
+    // Undo restore
+    undo:function(){_haptic([30,50,30]);_tone(740,0.1,0.1)},
+
+    // Generic tap
+    tap:function(){_haptic(15)},
+
+    // Generic success
+    success:function(){_haptic([30,50,30]);_tone(660,0.1,0.1)},
+
+    // Generic error
+    error:function(){_haptic(100);_tone(300,0.15,0.12)}
+  };
+  window.fb=fb;
+
+  // ── Respect prefers-reduced-motion ──
+  if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    fb.silent=true;localStorage.setItem('hodari_silent','1');
+  }
+
+  function showToast(msg,type){
+    var t=document.getElementById('toast');
+    t.innerHTML=msg;
+    t.className='toast'+(type==='error'?' error':type==='success'?' success':'');
+    t.classList.add('show');
+    var dur=type==='error'?5000:2500;
+    clearTimeout(t._timer);
+    t._timer=setTimeout(function(){t.classList.remove('show')},dur);
+  }
+
+  function apiFetch(url,opts){
+    return fetch(url,opts).then(function(r){
+      if(r.ok)return r.json();
+      if(r.status===403||r.status===401){showToast('Session expired — redirecting...',true);setTimeout(function(){window.location.href=API+'/accounts/login/'},1500);throw new Error('auth_redirect')}
+      return r.json().then(function(d){
+        console.error('API error',r.status,url,d);
+        throw new Error(d.detail||d.message||JSON.stringify(d)||r.statusText);
+      },function(){
+        console.error('API error',r.status,url,r.statusText);
+        throw new Error(r.statusText||'Server error');
+      });
+    }).catch(function(e){
+      if(e.message!=='auth_redirect')console.error('apiFetch failed:',url,e);
+      throw e;
+    });
+  }
+  function apiPost(p,b){return apiFetch(API+p,{method:'POST',credentials:'same-origin',headers:{'X-CSRFToken':getCSRF(),'Content-Type':'application/json'},body:JSON.stringify(b)})}
+  function apiGet(p){return apiFetch(API+p,{credentials:'same-origin',headers:{'X-CSRFToken':getCSRF()}})}
+
+  // ── Navigation ──
+  function showPage(id){document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});document.getElementById(id).classList.add('active')}
+  window.goToCheckin=function(){showPage('page-checkin');loadCheckinStats()};
+  window.goToCheckinReport=function(){showPage('page-checkin-report');loadCheckinReport()};
+  window.goToCheckoutReport=function(){showPage('page-checkout-report');loadCheckoutReport()};
+
+  // ── Stats ──
+  function loadCheckinStats(){
+    apiGet('/attendance/api/scans/today/').then(function(d){
+      var arr=Array.isArray(d)?d:(d.results||d.scans||d.data||[]);
+      var ci=arr.filter(function(s){return s.scan_type==='IN'}).length;
+      var co=arr.filter(function(s){return s.scan_type==='OUT'}).length;
+      document.getElementById('checkinToday').textContent=ci;
+      document.getElementById('checkoutToday').textContent=co;
+    }).catch(function(){});
+  }
+  window.refreshCheckin=function(){loadCheckinStats();showToast('Refreshed')};
+
+  // ── Pending Scans ──
+  function addPending(studentId,mode,studentName,source){
+    if(pendingScans.some(function(s){return s.id===studentId&&s.mode===mode})){
+      showToast('Already in the list',true);fb.duplicate();return;
+    }
+    pendingScans.push({id:studentId,name:studentName||'Unknown',mode:mode,time:new Date(),source:source||'qr'});
+    savePending();
+    fb.scanSuccess();
+    renderPending();
+    showToast((mode==='IN'?'Checked in: ':'Checked out: ')+(studentName||studentId),'success');
+  }
+
+  window.removePending=function(idx){
+    pendingScans.splice(idx,1);
+    renderPending();
+    savePending();
+    updatePendingBadge();
+    fb.clear();
+  };
+
+  window.swipeSave=function(idx,cardEl){
+    var s=pendingScans[idx];
+    if(!s){showToast('Scan not found',true);fb.error();return;}
+    var isOut=s.mode==='OUT';
+    var url=isOut?'/attendance/api/checkout/':'/attendance/api/checkin/';
+    var body={students:[{id:s.id,timestamp:localTimestamp()}]};
+    if(isOut){body.students[0].parent_name='';body.students[0].reason=''}
+    var card=cardEl||document.querySelector('[data-idx="'+idx+'"]');
+
+    if(!navigator.onLine){
+      var syncType=isOut?'checkout':'checkin';
+      queueOfflineSubmission(syncType,s.id,localTimestamp()).then(function(result){
+        if(result&&result.ok){
+          if(card){card.style.transition='transform .25s ease,opacity .25s ease';card.style.transform='translateX(-300px)';card.style.opacity='0'}
+          showToast('Queued: '+(s.name||s.id),'success');
+          fb.swipeSave();
+          setTimeout(function(){pendingScans.splice(idx,1);renderPending();savePending();updatePendingBadge()},250);
+          if('sync' in navigator.serviceWorker){
+            navigator.serviceWorker.ready.then(function(reg){return reg.sync.register('hodari-offline-sync')}).catch(function(){});
+          }
+        } else {
+          showToast('Failed to queue',true);fb.error();
+        }
+      });
+      return;
+    }
+
+    showToast('Saving...',false);
+    console.log('[PWA] swipeSave sending',url,body);
+    apiPost(url,body).then(function(d){
+      console.log('[PWA] swipeSave response',d);
+      var ok=d.summary&&d.summary.successful||0;
+      var fail=d.summary&&d.summary.failed||0;
+      if(ok){
+        if(card){card.style.transition='transform .25s ease,opacity .25s ease';card.style.transform='translateX(-300px)';card.style.opacity='0'}
+        showToast('Saved: '+(s.name||s.id),'success');
+        fb.swipeSave();
+        setTimeout(function(){pendingScans.splice(idx,1);renderPending();savePending();updatePendingBadge();loadCheckinStats()},250);
+      } else {
+        var errMsg='Failed to save';
+        if(d.data&&d.data[0]&&d.data[0].message)errMsg=d.data[0].message;
+        else if(d.message)errMsg=d.message;
+        showToast(errMsg,true);
+        fb.error();
+        if(card){card.style.transform='';card.style.opacity=''}
+      }
+    }).catch(function(e){
+      console.error('[PWA] swipeSave error',e);
+      var msg='Save failed';
+      if(e.message&&e.message!=='auth_redirect')msg+=': '+e.message;
+      showToast(msg,true);
+      fb.error();
+      if(card){card.style.transform='';card.style.opacity=''}
+    });
+  };
+
+  window.clearAll=function(){
+    if(pendingScans.length){
+      var n=pendingScans.length;
+      showConfirmModal('Clear All','Are you sure you want to clear '+n+' pending scan'+(n>1?'s':'')+'?','Clear','#DC2626',function(){
+        pendingScans=[];savePending();renderPending();fb.clear();
+      });
+    }
+  };
+
+  function updatePendingBadge(){
+    var n=pendingScans.length;
+    var badge=document.getElementById('pendingBadge');
+    if(badge)badge.textContent=n;
+    var sb=document.getElementById('scannerBadge');
+    if(sb)sb.textContent=n+' scanned';
+  }
+
+  function renderPending(){
+    var n=pendingScans.length;
+    var inCount=pendingScans.filter(function(s){return s.mode==='IN'}).length;
+    var outCount=pendingScans.filter(function(s){return s.mode==='OUT'}).length;
+    var pb=document.getElementById('pendingBadge');if(pb)pb.textContent=n;
+    document.getElementById('scanCount').textContent=n;
+    document.getElementById('submitCount').textContent=n;
+    var sb=document.getElementById('scannerBadge');if(sb)sb.textContent=n+' scanned';
+
+    var inTag=document.getElementById('pendingInTag');
+    var outTag=document.getElementById('pendingOutTag');
+    if(inCount){inTag.style.display='';document.getElementById('pendingInCount').textContent=inCount}else inTag.style.display='none';
+    if(outCount){outTag.style.display='';document.getElementById('pendingOutCount').textContent=outCount}else outTag.style.display='none';
+
+    document.getElementById('bottomIdle').style.display=n===0?'flex':'none';
+    document.getElementById('bottomPending').style.display=n>0?'flex':'none';
+
+    var el=document.getElementById('scanList');
+    if(!n){
+      el.innerHTML='<div class="scan-empty"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1.5"/></svg><p>No pending scans</p><p class="se-sub">Tap Scan QR to start</p></div>';
+      return;
+    }
+    el.innerHTML=pendingScans.map(function(s,i){
+      var isIn=s.mode==='IN';
+      var initial=(s.name||'?').charAt(0).toUpperCase();
+      var time=s.time.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+      return '<div class="swipe-container" data-idx="'+i+'">'+
+        '<div class="swipe-bg swipe-bg-left"><div class="swipe-action swipe-delete"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete</div></div>'+
+        '<div class="swipe-bg swipe-bg-right"><div class="swipe-action swipe-save"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Save</div></div>'+
+        '<div class="scan-card '+(isIn?'mode-in':'mode-out')+'" data-idx="'+i+'">'+
+          '<div class="pc-avatar" style="background:'+(isIn?'var(--green-light)':'var(--orange-light)')+';color:'+(isIn?'var(--green)':'var(--orange)')+'">'+
+            (isIn?'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>':'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>')+
+          '</div>'+
+          '<div class="pc-info"><div class="pc-name">'+s.name+'</div><div class="pc-meta"><span>ID: '+s.id+'</span><span class="scan-badge '+(isIn?'badge-in':'badge-out')+'">'+(isIn?'IN':'OUT')+'</span></div></div>'+
+          '<div class="pc-right"><div class="pc-time">'+time+'</div><span class="scan-badge '+(s.source==='manual'?'badge-manual':'badge-qr')+'">'+(s.source==='manual'?'Manual':'QR')+'</span></div>'+
+        '</div></div>';
+    }).join('')+'<div class="swipe-hint">Swipe left = delete | Swipe right = save</div>';
+
+    initSwipe();
+  }
+
+  // ── Swipe gestures (industry-standard physics) ──
+  var SWIPE_COMMIT_RATIO=0.4;   // 40% of card width to commit
+  var SWIPE_FLING_VELOCITY=1000; // px/s — fast fling triggers even below threshold
+  var SWIPE_MAX_DRAG=250;        // max px card can travel
+  var SWIPE_RUBBER_BAND=0.3;     // resistance past max
+  var SWIPE_UNDO_WINDOW=3500;    // ms to show undo toast before permanent delete
+
+  function initSwipe(){
+    document.querySelectorAll('.scan-card').forEach(function(card){
+      var startX=0,startY=0,currentX=0,isDragging=false,dragStarted=false;
+      var startTime=0,cardWidth=card.offsetWidth||300;
+      card.addEventListener('touchstart',function(e){
+        startX=e.touches[0].clientX;startY=e.touches[0].clientY;
+        isDragging=true;dragStarted=false;currentX=0;startTime=Date.now();
+        card.style.transition='none';
+      },{passive:true});
+      card.addEventListener('touchmove',function(e){
+        if(!isDragging)return;
+        var dx=e.touches[0].clientX-startX;
+        var dy=e.touches[0].clientY-startY;
+        if(!dragStarted){
+          if(Math.abs(dy)>Math.abs(dx)&&Math.abs(dy)>10)return;
+          if(Math.abs(dx)<15)return;
+          dragStarted=true;
+          card.classList.add('dragging');
+          cardWidth=card.offsetWidth||300;
+        }
+        e.preventDefault();
+        // Rubber-band resistance past max
+        if(Math.abs(dx)>SWIPE_MAX_DRAG){
+          var excess=Math.abs(dx)-SWIPE_MAX_DRAG;
+          var dampened=SWIPE_MAX_DRAG+excess*SWIPE_RUBBER_BAND;
+          currentX=dx>0?dampened:-dampened;
+        } else {
+          currentX=dx;
+        }
+        card.style.transform='translateX('+currentX+'px)';
+        // Scale background icons based on progress
+        var progress=Math.min(Math.abs(currentX)/(cardWidth*SWIPE_COMMIT_RATIO),1);
+        var leftBg=card.parentElement.querySelector('.swipe-bg-left');
+        var rightBg=card.parentElement.querySelector('.swipe-bg-right');
+        if(leftBg)leftBg.style.opacity=currentX<0?progress:0;
+        if(rightBg)rightBg.style.opacity=currentX>0?progress:0;
+        // Scale icon when past threshold
+        var icon=card.parentElement.querySelector(currentX<0?'.swipe-bg-left .swipe-action':'.swipe-bg-right .swipe-action');
+        if(icon)icon.style.transform='scale('+(0.8+progress*0.4)+')';
+      },{passive:false});
+      card.addEventListener('touchend',function(){
+        isDragging=false;card.classList.remove('dragging');
+        if(!dragStarted||Math.abs(currentX)<15){card.style.transform='';currentX=0;return}
+        var idx=parseInt(card.dataset.idx);
+        var s=pendingScans[idx];
+        if(!s){card.style.transform='';currentX=0;return}
+        // Velocity calculation (px/s)
+        var elapsed=Math.max(Date.now()-startTime,1);
+        var velocity=Math.abs(currentX)/(elapsed/1000);
+        var commitDist=cardWidth*SWIPE_COMMIT_RATIO;
+        var isFling=velocity>=SWIPE_FLING_VELOCITY;
+        var isCommitLeft=currentX<0&&(Math.abs(currentX)>=commitDist||isFling);
+        var isCommitRight=currentX>0&&(currentX>=commitDist||isFling);
+        // Reset background opacity
+        var leftBg=card.parentElement.querySelector('.swipe-bg-left');
+        var rightBg=card.parentElement.querySelector('.swipe-bg-right');
+        if(leftBg)leftBg.style.opacity=0;
+        if(rightBg)rightBg.style.opacity=0;
+        var icon=card.parentElement.querySelector('.swipe-action');
+        if(icon)icon.style.transform='';
+        if(isCommitLeft){
+          // DELETE — swipe left
+          fb.swipeDelete();
+          card.style.transition='transform .22s cubic-bezier(.4,0,.2,1),opacity .22s ease';
+          card.style.transform='translateX(-110%)';
+          card.style.opacity='0';
+          // Undo window — hold before permanent delete
+          var undoId='_undo_'+idx+'_'+Date.now();
+          showToast('Removed: '+(s.name||s.id)+'. <span id="'+undoId+'" style="color:#fff;text-decoration:underline;cursor:pointer;margin-left:8px">UNDO</span>','error');
+          setTimeout(function(){
+            var undoEl=document.getElementById(undoId);
+            if(undoEl)undoEl.onclick=function(){
+              // Restore scan
+              pendingScans.splice(idx,0,s);
+              renderPending();savePending();updatePendingBadge();
+              showToast('Restored: '+(s.name||s.id),'success');fb.undo();
+            };
+          },100);
+          setTimeout(function(){
+            // Check if user clicked undo — if s still at same position, delete permanently
+            var curIdx=pendingScans.indexOf(s);
+            if(curIdx!==-1){
+              pendingScans.splice(curIdx,1);
+              renderPending();savePending();updatePendingBadge();
+            }
+          },SWIPE_UNDO_WINDOW);
+        } else if(isCommitRight){
+          // SAVE — swipe right
+          fb.swipeSave();
+          swipeSave(idx,card);
+        } else {
+          // Snap back — below commit threshold
+          card.style.transition='transform .25s cubic-bezier(.4,0,.2,1)';
+          card.style.transform='';
+        }
+        currentX=0;
+      });
+    });
+  }
+
+  // ── QR Scanner ──
+  window.openScanner=function(){document.getElementById('scannerOverlay').classList.add('show');startScanner()};
+  window.closeScanner=function(){stopScanner();document.getElementById('scannerOverlay').classList.remove('show')};
+
+  function startScanner(){
+    if(isScanning)return;
+    if(typeof Html5Qrcode==='undefined'){loadQrLibrary(function(){startScanner()});return}
+    if(!html5Qr)html5Qr=new Html5Qrcode('qr-reader');
+    isScanning=true;
+    html5Qr.start({facingMode:'environment'},{fps:10,qrbox:{width:250,height:250},aspectRatio:1},
+      function(code){
+        fb.scanSuccess();
+        closeScanner();
+        showStudentConfirm(code.trim());
+      },
+      function(){}
+    ).catch(function(){stopScanner()});
+  }
+  function stopScanner(){if(html5Qr&&isScanning){html5Qr.stop().then(function(){isScanning=false}).catch(function(){isScanning=false})}else isScanning=false}
+
+  var torchOn=false;
+  window.toggleTorch=function(){
+    if(!isScanning)return;
+    try{
+      var v=document.querySelector('#qr-reader video');
+      if(v&&v.srcObject){
+        var t=v.srcObject.getVideoTracks()[0];
+        if(t&&t.getCapabilities&&t.getCapabilities().torch){
+          torchOn=!torchOn;
+          t.applyConstraints({advanced:[{torch:torchOn}]});
+          document.getElementById('torchOn').style.display=torchOn?'':'none';
+          document.getElementById('torchOff').style.display=torchOn?'none':'';
+        } else {
+          showToast('Torch not available on this device',true);
+        }
+      }
+    }catch(e){console.log('Torch error',e);showToast('Torch not supported',true)}
+  };
+
+  var qrLibLoaded=false;
+  window.loadQrLibrary=function(cb){
+    if(qrLibLoaded){if(cb)cb();return}
+    var s=document.createElement('script');s.src='/static/attendance/pwa/html5-qrcode.min.js';
+    s.onload=function(){qrLibLoaded=true;if(cb)cb()};
+    s.onerror=function(){showToast('QR library failed',true)};
+    document.head.appendChild(s);
+  };
+
+  // ── Confirm Modal ──
+  var pendingStudentData=null;
+  var qrLookupPending=false;
+  var qrLookupFailed=false;
+  function showStudentConfirm(studentId){
+    pendingStudentId=studentId;
+    pendingStudentData=null;
+    pendingSource='qr';
+    qrLookupPending=true;
+    qrLookupFailed=false;
+    document.getElementById('confirmAvatar').textContent='?';
+    document.getElementById('confirmName').textContent='Looking up student...';
+    document.getElementById('confirmId').textContent='Scanning QR code...';
+    document.getElementById('confirmOverlay').classList.add('show');
+    document.querySelector('.btn-checkin').disabled=true;
+    document.querySelector('.btn-checkout').disabled=true;
+    document.querySelector('.btn-checkin').style.opacity='.5';
+    document.querySelector('.btn-checkout').style.opacity='.5';
+    fb.scanSuccess();
+    apiPost('/attendance/api/qr/lookup/',{qr_code:studentId}).then(function(d){
+      var s=d.data||d;
+      pendingStudentData={id:s.id||studentId,name:s.name||studentId,admission_no:s.admission_no||'',class:s.class||''};
+      document.getElementById('confirmAvatar').textContent=(s.name||'?').charAt(0).toUpperCase();
+      document.getElementById('confirmName').textContent=s.name||'Unknown';
+      document.getElementById('confirmId').textContent='ID: '+(s.admission_no||'')+' | '+(s.class||'');
+    }).catch(function(){
+      qrLookupFailed=true;
+      pendingStudentData=null;
+      document.getElementById('confirmAvatar').textContent='?';
+      document.getElementById('confirmName').textContent='Student not found';
+      document.getElementById('confirmId').textContent='QR: '+studentId.substring(0,40);
+      document.querySelector('.btn-checkin').disabled=true;
+      document.querySelector('.btn-checkout').disabled=true;
+      document.querySelector('.btn-checkin').style.opacity='.3';
+      document.querySelector('.btn-checkout').style.opacity='.3';
+      showToast('Student not found. Check the QR code.',true);
+    }).finally(function(){
+      qrLookupPending=false;
+      if(!qrLookupFailed){
+        document.querySelector('.btn-checkin').disabled=false;
+        document.querySelector('.btn-checkout').disabled=false;
+        document.querySelector('.btn-checkin').style.opacity='1';
+        document.querySelector('.btn-checkout').style.opacity='1';
+      }
+    });
+  }
+  window.confirmMode=function(mode){
+    if(qrLookupPending){showToast('Please wait, looking up student...',true);return}
+    if(qrLookupFailed||!pendingStudentData){showToast('Cannot proceed — student not found',true);return}
+    document.getElementById('confirmOverlay').classList.remove('show');
+    var resolvedId=pendingStudentData?pendingStudentData.id:pendingStudentId;
+    var name=pendingStudentData?pendingStudentData.name:'Unknown';
+    addPending(resolvedId,mode,name,pendingSource);
+    pendingStudentId='';pendingStudentData=null;pendingSource='qr';
+    setTimeout(function(){openScanner()},300);
+  };
+  window.cancelConfirm=function(){
+    document.getElementById('confirmOverlay').classList.remove('show');
+    pendingStudentId='';
+    pendingStudentData=null;
+    qrLookupFailed=false;
+    setTimeout(function(){openScanner()},300);
+  };
+
+  // ── Manual Entry ──
+  window.openManual=function(){document.getElementById('manualOverlay').classList.add('show');document.getElementById('manualStudentId').value='';document.getElementById('manualStudentId').focus()};
+  window.closeManual=function(){document.getElementById('manualOverlay').classList.remove('show')};
+  window.submitManual=function(){
+    var id=document.getElementById('manualStudentId').value.trim();
+    if(!id){showToast('Enter a student ID',true);return}
+    closeManual();
+    fb.tap();
+    pendingStudentId=id;
+    pendingStudentData={id:id,name:'Unknown',admission_no:id,class:''};
+    pendingSource='manual';
+    document.getElementById('confirmAvatar').textContent='?';
+    document.getElementById('confirmName').textContent='Looking up student...';
+    document.getElementById('confirmId').textContent='Manual entry...';
+    document.getElementById('confirmOverlay').classList.add('show');
+    document.querySelector('.btn-checkin').disabled=true;
+    document.querySelector('.btn-checkout').disabled=true;
+    document.querySelector('.btn-checkin').style.opacity='.5';
+    document.querySelector('.btn-checkout').style.opacity='.5';
+    apiPost('/attendance/api/qr/lookup/',{qr_code:id}).then(function(d){
+      var s=d.data||d;
+      pendingStudentData={id:s.id||id,name:s.name||'Unknown',admission_no:s.admission_no||'',class:s.class||''};
+      document.getElementById('confirmAvatar').textContent=(s.name||'?').charAt(0).toUpperCase();
+      document.getElementById('confirmName').textContent=s.name||'Unknown';
+      document.getElementById('confirmId').textContent='ID: '+(s.admission_no||'')+' | '+(s.class||'');
+    }).catch(function(){
+      qrLookupFailed=true;
+      pendingStudentData=null;
+      document.getElementById('confirmAvatar').textContent='?';
+      document.getElementById('confirmName').textContent='Student not found';
+      document.getElementById('confirmId').textContent='ID: '+id;
+      document.querySelector('.btn-checkin').disabled=true;
+      document.querySelector('.btn-checkout').disabled=true;
+      document.querySelector('.btn-checkin').style.opacity='.3';
+      document.querySelector('.btn-checkout').style.opacity='.3';
+      showToast('Student not found. Check the ID.',true);
+    }).finally(function(){
+      qrLookupPending=false;
+      if(!qrLookupFailed){
+        document.querySelector('.btn-checkin').disabled=false;
+        document.querySelector('.btn-checkout').disabled=false;
+        document.querySelector('.btn-checkin').style.opacity='1';
+        document.querySelector('.btn-checkout').style.opacity='1';
+      }
+    });
+  };
+
+  // ── Submit All ──
+  window.submitAll=function(){
+    if(!pendingScans.length)return;
+    var inScans=pendingScans.filter(function(s){return s.mode==='IN'});
+    var outScans=pendingScans.filter(function(s){return s.mode==='OUT'});
+    var total=pendingScans.length;
+    fb.tap();
+    showToast('Submitting '+total+' scan(s)...',false);
+    console.log('[PWA] submitAll',inScans.length,'checkin,',outScans.length,'checkout');
+
+    // If offline, queue all submissions for background sync
+    if(!navigator.onLine){
+      var queuePromises=[];
+      inScans.forEach(function(s){
+        queuePromises.push(queueOfflineSubmission('checkin',s.id,localTimestamp()));
+      });
+      outScans.forEach(function(s){
+        queuePromises.push(queueOfflineSubmission('checkout',s.id,localTimestamp()));
+      });
+      Promise.all(queuePromises).then(function(){
+        pendingScans=[];savePending();renderPending();
+        showToast(total+' queued for sync','success');
+        if('sync' in navigator.serviceWorker){
+          navigator.serviceWorker.ready.then(function(reg){
+            return reg.sync.register('hodari-offline-sync');
+          }).catch(function(){});
+        }
+      }).catch(function(){
+        showToast('Failed to queue — try again',true);
+      });
+      return;
+    }
+
+    var promises=[];
+    if(inScans.length){
+      promises.push(apiPost('/attendance/api/checkin/',{students:inScans.map(function(s){return{id:s.id,timestamp:localTimestamp()}})}));
+    }
+    if(outScans.length){
+      promises.push(apiPost('/attendance/api/checkout/',{students:outScans.map(function(s){return{id:s.id,timestamp:localTimestamp(),parent_name:'',reason:''}})}));
+    }
+    Promise.all(promises).then(function(results){
+      var ok=0,fail=0;
+      var failMessages=[];
+      results.forEach(function(d){
+        ok+=d.summary&&d.summary.successful||0;
+        fail+=d.summary&&d.summary.failed||0;
+        if(d.data){
+          d.data.forEach(function(item){
+            if(item.status==='error'&&item.message){
+              failMessages.push(item.message);
+            }
+          });
+        }
+      });
+      if(ok)showToast(ok+' student'+(ok>1?'s':'')+' submitted','success');
+      if(fail){
+        var msg=fail+' failed';
+        if(failMessages.length)msg+=': '+failMessages[0];
+        showToast(msg,true);
+      }
+      if(!fail){
+        pendingScans=[];
+      }
+      savePending();renderPending();updatePendingBadge();
+      ok?fb.submitSuccess():fb.submitFail();
+      loadCheckinStats();
+    }).catch(function(e){
+      console.error('submitAll failed:',e);
+      if(e.message!=='auth_redirect'){
+        showToast('Submit failed: '+e.message,true);
+        fb.submitFail();
+        // Keep pendingScans intact so user can retry
+      }
+    });
+  };
+
+  // ── Reports ──
+  window.loadCheckinReport=function(){
+    document.getElementById('crList').innerHTML='<div class="loading">Loading...</div>';
+    apiGet('/attendance/api/scans/today/').then(function(d){
+      var arr=Array.isArray(d)?d:(d.results||d.scans||d.data||[]);
+      checkinData=arr.filter(function(s){return s.scan_type==='IN'});renderCR(checkinData);
+    }).catch(function(e){if(e.message!=='auth_redirect')document.getElementById('crList').innerHTML='<div class="report-empty"><p>Failed to load</p></div>'});
+  };
+  function renderCR(data){
+    var q=(document.getElementById('crSearch').value||'').toLowerCase();
+    var f=q?data.filter(function(s){return(s.student_name||'').toLowerCase().includes(q)||(s.student_id||'').toLowerCase().includes(q)||(s.class||'').toLowerCase().includes(q)}):data;
+    var c={};data.forEach(function(s){if(s.class)c[s.class]=1});
+    document.getElementById('crTotal').textContent=data.length;
+    document.getElementById('crFiltered').textContent=f.length;
+    document.getElementById('crClasses').textContent=Object.keys(c).length;
+    var el=document.getElementById('crList');
+    if(!f.length){el.innerHTML='<div class="report-empty"><p>No students found</p></div>';return}
+    el.innerHTML=f.map(function(s){
+      var n=s.student_name||'Unknown',cl=s.class||'',t=s.scan_time||s.time||'--:--',adm=s.student_id||'',i=n.charAt(0).toUpperCase();
+      return '<div class="student-card"><div class="student-avatar" style="background:var(--green-light);color:var(--green)">'+i+'</div><div class="student-info"><div class="student-name">'+n+'</div><div class="student-meta">'+cl+' | '+adm+'</div></div><div class="student-time"><div class="st-time">'+t+'</div><span class="student-badge badge-in">IN</span></div></div>';
+    }).join('');
+  }
+  window.filterCR=function(){renderCR(checkinData)};
+
+  window.loadCheckoutReport=function(){
+    document.getElementById('coList').innerHTML='<div class="loading">Loading...</div>';
+    apiGet('/attendance/api/scans/today/').then(function(d){
+      var arr=Array.isArray(d)?d:(d.results||d.scans||d.data||[]);
+      checkoutData=arr.filter(function(s){return s.scan_type==='OUT'});renderCO(checkoutData);
+    }).catch(function(e){if(e.message!=='auth_redirect')document.getElementById('coList').innerHTML='<div class="report-empty"><p>Failed to load</p></div>'});
+  };
+  function renderCO(data){
+    var q=(document.getElementById('coSearch').value||'').toLowerCase();
+    var f=q?data.filter(function(s){return(s.student_name||'').toLowerCase().includes(q)||(s.student_id||'').toLowerCase().includes(q)||(s.class||'').toLowerCase().includes(q)}):data;
+    var c={};data.forEach(function(s){if(s.class)c[s.class]=1});
+    document.getElementById('coTotal').textContent=data.length;
+    document.getElementById('coFiltered').textContent=f.length;
+    document.getElementById('coClasses').textContent=Object.keys(c).length;
+    var el=document.getElementById('coList');
+    if(!f.length){el.innerHTML='<div class="report-empty"><p>No students found</p></div>';return}
+    el.innerHTML=f.map(function(s){
+      var n=s.student_name||'Unknown',cl=s.class||'',t=s.scan_time||s.time||'--:--',adm=s.student_id||'',i=n.charAt(0).toUpperCase();
+      return '<div class="student-card"><div class="student-avatar" style="background:var(--orange-light);color:var(--orange)">'+i+'</div><div class="student-info"><div class="student-name">'+n+'</div><div class="student-meta">'+cl+' | '+adm+'</div></div><div class="student-time"><div class="st-time">'+t+'</div><span class="student-badge badge-out">OUT</span></div></div>';
+    }).join('');
+  }
+  window.filterCO=function(){renderCO(checkoutData)};
+
+  // ── Logout ──
+  window.confirmLogout=function(){document.getElementById('logoutOverlay').classList.add('show')};
+  window.closeLogout=function(){document.getElementById('logoutOverlay').classList.remove('show')};
+  window.doLogout=function(){closeLogout();fetch(API+'/accounts/logout/',{method:'POST',headers:{'X-CSRFToken':getCSRF()}}).finally(function(){window.location.href=API+'/accounts/login/'})};
+
+  // ── Generic Confirm Modal ──
+  var _confirmCb=null;
+  window.showConfirmModal=function(title,msg,btnText,btnColor,cb){
+    document.getElementById('confirmOverlay').classList.remove('show');
+    document.getElementById('confirmTitle').textContent=title;
+    document.getElementById('confirmMsg').textContent=msg;
+    var btn=document.getElementById('confirmAction');
+    btn.textContent=btnText;btn.style.background=btnColor||'var(--blue)';
+    _confirmCb=cb;
+    document.getElementById('confirmModal').classList.add('show');
+  };
+  window.closeConfirmModal=function(){
+    document.getElementById('confirmModal').classList.remove('show');_confirmCb=null;
+  };
+  window.doConfirmAction=function(){closeConfirmModal();if(_confirmCb)_confirmCb()};
+
+  // ── Offline Sync Helpers ──
+  function queueOfflineSubmission(type, studentId, timestamp) {
+    if (!navigator.serviceWorker || !navigator.serviceWorker.controller) {
+      return Promise.resolve({ ok: false });
+    }
+    return new Promise(function(resolve) {
+      var channel = new MessageChannel();
+      channel.port1.onmessage = function(e) { resolve(e.data); };
+      navigator.serviceWorker.controller.postMessage(
+        {
+          type: 'QUEUE_OFFLINE_SUBMISSION',
+          submissionType: type,
+          studentId: studentId,
+          timestamp: timestamp,
+          csrfToken: getCSRF(),
+        },
+        [channel.port2]
+      );
+    });
+  }
+
+  function getSyncQueueFromSW() {
+    if (!navigator.serviceWorker || !navigator.serviceWorker.controller) {
+      return Promise.resolve({ entries: [] });
+    }
+    return new Promise(function(resolve) {
+      var channel = new MessageChannel();
+      channel.port1.onmessage = function(e) { resolve(e.data); };
+      navigator.serviceWorker.controller.postMessage(
+        { type: 'GET_SYNC_QUEUE' },
+        [channel.port2]
+      );
+    });
+  }
+
+  function clearSyncQueueInSW() {
+    if (!navigator.serviceWorker || !navigator.serviceWorker.controller) {
+      return Promise.resolve({ ok: false });
+    }
+    return new Promise(function(resolve) {
+      var channel = new MessageChannel();
+      channel.port1.onmessage = function(e) { resolve(e.data); };
+      navigator.serviceWorker.controller.postMessage(
+        { type: 'CLEAR_SYNC_QUEUE' },
+        [channel.port2]
+      );
+    });
+  }
+
+  // ── Init ──
+  loadCheckinStats();renderPending();
+  setInterval(loadCheckinStats,30000);
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('{% url "attendance:pwa_sw" %}',{scope:'/attendance/pwa/'}).then(function(r){
+      console.log('SW registered, scope:',r.scope);
+    }).catch(function(e){console.warn('SW registration failed:',e)});
+    // Listen for sync completion messages from SW
+    navigator.serviceWorker.addEventListener('message',function(e){
+      if(e.data&&e.data.type==='SYNC_COMPLETE'){
+        showToast(e.data.synced+' offline submission(s) synced','success');
+        loadCheckinStats();
+      }
+      if(e.data&&e.data.type==='NEW_VERSION'){
+        showToast('New version available. Refreshing...','info');
+        setTimeout(function(){window.location.reload()},1500);
+      }
+    });
+  }
+
+  // ── PWA Install Banner ──
+  var _deferredPrompt=null;
+  var DISMISS_KEY='hodari_install_dismissed';
+  var REPROMPT_DAYS=3;
+
+  function isRunningAsPwa(){
+    return window.matchMedia('(display-mode:standalone)').matches||('standalone' in navigator&&navigator.standalone);
+  }
+  function isIos(){return/iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase())}
+  function shouldShowBanner(){
+    if(isRunningAsPwa())return false;
+    var last=localStorage.getItem(DISMISS_KEY);
+    if(!last)return true;
+    return(Date.now()-Number(last))/(1000*60*60*24)>=REPROMPT_DAYS;
+  }
+  function showInstallBanner(){
+    if(!shouldShowBanner())return;
+    var b=document.getElementById('installBanner');
+    if(!b)return;
+    if(isIos()){
+      document.getElementById('ibSub').textContent='Tap Share then "Add to Home Screen"';
+      document.getElementById('ibInstallBtn').textContent='Got it';
+      document.getElementById('ibInstallBtn').onclick=function(){dismissInstall()};
+    }
+    setTimeout(function(){b.classList.add('show')},800);
+  }
+  window.dismissInstall=function(){
+    localStorage.setItem(DISMISS_KEY,Date.now().toString());
+    document.getElementById('installBanner').classList.remove('show');
+  };
+  window.doInstall=function(){
+    if(isIos()){
+      document.getElementById('ibSub').textContent='Tap Share then "Add to Home Screen"';
+      document.getElementById('ibInstallBtn').textContent='Got it';
+      document.getElementById('ibInstallBtn').onclick=function(){dismissInstall()};
+      return;
+    }
+    if(!_deferredPrompt){dismissInstall();return}
+    _deferredPrompt.prompt();
+    _deferredPrompt.userChoice.then(function(r){_deferredPrompt=null;dismissInstall()});
+  };
+
+  window.addEventListener('beforeinstallprompt',function(e){
+    e.preventDefault();_deferredPrompt=e;showInstallBanner();
+  });
+  window.addEventListener('appinstalled',function(){_deferredPrompt=null;dismissInstall()});
+
+  // Show banner on load (delayed) and after first successful submit
+  if(!isRunningAsPwa()){showInstallBanner()}
+  var _origSubmitSuccess=fb.submitSuccess;
+  fb.submitSuccess=function(){
+    _origSubmitSuccess.call(fb);
+    var b=document.getElementById('installBanner');
+    if(b&&!b.classList.contains('show')&&shouldShowBanner()){b.classList.add('show')}
+  };
+
+  setTimeout(function(){var s=document.getElementById('splash');if(s)s.classList.add('hide')},1200);
+  setTimeout(function(){var s=document.getElementById('splash');if(s)s.remove()},1800);
+})();
+</script>
+</body>
+</html>

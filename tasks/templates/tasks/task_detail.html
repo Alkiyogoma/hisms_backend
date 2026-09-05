@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}{{ task.title }} — Tasks & Todo{% endblock %}
+
+{% block topbar_greeting %}Task Detail{% endblock %}
+{% block topbar_date %}{{ task.get_task_type_display }}{% endblock %}
+
+{% block content %}
+{% include "tasks/_top_tabs.html" %}
+<div style="max-width:720px;margin:0 auto">
+
+  <div class="page-hdr" style="margin-bottom:16px">
+    <div>
+      <h1 style="margin:0 0 4px;font-size:18px">{{ task.title }}</h1>
+      <div style="font-size:12px;color:var(--text-muted)">{{ task.get_task_type_display }}</div>
+    </div>
+    <div>
+      {% if task.is_overdue %}
+        <span class="chip chip-red">Overdue</span>
+      {% elif task.status == 'in_progress' %}
+        <span class="chip chip-amber">In Progress</span>
+      {% else %}
+        <span class="chip chip-blue">{{ task.get_status_display }}</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">Details</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:4px 0">
+      <div><span class="hf-label">Priority</span><div style="font-weight:600;margin-top:2px">{{ task.get_priority_display }}</div></div>
+      <div><span class="hf-label">Due</span><div style="font-weight:600;margin-top:2px">{{ task.due_date|date:"d M Y, H:i" }}</div></div>
+      {% if task.assigned_to %}
+      <div><span class="hf-label">Assigned to</span><div style="font-weight:600;margin-top:2px">{{ task.assigned_to.get_full_name|default:task.assigned_to.username }}</div></div>
+      {% endif %}
+      {% if task.created_by %}
+      <div><span class="hf-label">Created by</span><div style="font-weight:600;margin-top:2px">{{ task.created_by.get_full_name|default:task.created_by.username }}</div></div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if task.description %}
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">Description</div>
+    <div style="font-size:13px;color:var(--text-secondary);line-height:1.6;padding:4px 0">{{ task.description }}</div>
+  </div>
+  {% endif %}
+
+  {% if task.status != 'completed' %}
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">Actions</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;padding:8px 0">
+      {% for action in task.actions_available %}
+        {% if action == 'mark_complete' or action == 'approve' or action == 'sign_off' or action == 'submit' %}
+        <form method="post" action="{% url 'tasks:take_action' task.pk %}" style="display:inline">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="{{ action }}">
+          <button type="submit" class="hf-btn" style="background:var(--hodari-blue);color:#fff">{{ action|title }}</button>
+        </form>
+        {% endif %}
+      {% endfor %}
+      <form method="post" action="{% url 'tasks:mark_complete' task.pk %}" style="display:inline">
+        {% csrf_token %}
+        <button type="submit" class="hf-btn" style="background:var(--green-bg);color:var(--green);border-color:var(--green-bd)">Complete</button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if task.metadata.module_url %}
+  <div style="margin-bottom:16px">
+    <a href="{{ task.metadata.module_url }}" class="hf-btn" style="text-decoration:none">Go to source &rarr;</a>
+  </div>
+  {% endif %}
+
+  {% if history %}
+  <div class="card">
+    <div class="card-title">History</div>
+    <div style="padding:4px 0">
+      {% for h in history %}
+      <div style="font-size:13px;color:var(--text-secondary);padding:8px 0;border-bottom:1px solid var(--border)">
+        <strong>{{ h.get_action_display }}</strong> by {{ h.changed_by.get_full_name|default:"System" }}
+        <span style="color:var(--text-muted)"> &middot; {{ h.created_at|date:"d M, H:i" }}</span>
+        {% if h.comment %}<div style="color:var(--text-muted);font-style:italic;margin-top:2px">{{ h.comment }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

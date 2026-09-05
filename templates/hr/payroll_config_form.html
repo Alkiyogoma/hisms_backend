@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Payroll Configuration — {{ brand.school_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  :root {
+    --hodari-blue: #023AA5; --hodari-blue-dark: #012880; --hodari-blue-mid: #1A56C4;
+    --hodari-blue-light: #E8EEF9; --hodari-blue-pale: #F0F4FB;
+    --hodari-gold: #FBBC05; --hodari-gold-light: #FEF3C7;
+    --hodari-charcoal: #474747; --hodari-charcoal-lt: #6B6B6B;
+    --bg-page: #F2F5FA; --bg-card: #FFFFFF;
+    --text-primary: #1A1A2E; --text-secondary: #474747; --text-muted: #8492A6;
+    --border: #DDE3EE; --border-strong: #B8C4D8;
+    --green: #1B7B34; --green-bg: #E8F5EC; --green-bd: #B7DFBF;
+    --amber: #92550A; --amber-bg: #FEF3C7; --amber-bd: #FCD34D;
+    --red: #9B1C1C; --red-bg: #FEF2F2; --red-bd: #FECACA;
+    --blue-st: #023AA5; --blue-st-bg: #E8EEF9; --blue-st-bd: #93C5FD;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Roboto', sans-serif; background: var(--bg-page); color: var(--text-primary); }
+  .config-page { padding: 24px 28px; max-width: 800px; margin: 0 auto; }
+  .section-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); font-weight: 500; margin-bottom: 12px; }
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin-bottom: 24px; }
+  .form-group { margin-bottom: 20px; }
+  .form-group label { display: block; font-size: 13px; font-weight: 500; color: var(--text-primary); margin-bottom: 6px; }
+  .form-group .help-text { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+  .hf2-input { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 14px; color: var(--text-primary); background: #fff; }
+  .hf2-input:focus { outline: none; border-color: var(--hodari-blue); box-shadow: 0 0 0 3px rgba(2,58,165,0.1); }
+  .btn-primary { background: var(--hodari-blue); color: #fff; border: none; padding: 10px 24px; border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-primary:hover { background: var(--hodari-blue-dark); }
+  .btn-secondary { background: #fff; color: var(--hodari-blue); border: 1px solid var(--border-strong); padding: 8px 18px; border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: none; }
+  .btn-secondary:hover { border-color: var(--hodari-blue); }
+  .info-note { background: var(--hodari-blue-light); border: 1px solid var(--blue-st-bd); border-radius: 8px; padding: 12px 16px; font-size: 13px; color: var(--hodari-blue); margin-bottom: 20px; }
+  .info-note strong { font-weight: 600; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "hr/_top_tabs.html" %}
+<div class="config-page">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+    <div>
+      <h1 style="font-family:'Merriweather',serif;font-size:22px;font-weight:700;color:var(--text-primary);margin-bottom:4px;">Payroll Configuration</h1>
+      <p style="font-size:13px;color:var(--text-muted);">Configure NSSF rates and payroll settings</p>
+    </div>
+    <a href="{% url 'hr:payroll_list' %}" class="btn-secondary">← Back to Payroll</a>
+  </div>
+
+  <div class="info-note">
+    <strong> Tanzania Statutory Settings</strong><br>
+    Current Tanzania NSSF rates: <strong>Employee 10%</strong> + <strong>Employer 10%</strong> (total 20% of gross salary).
+    Update these rates here if the Finance Act changes. All previous rates are preserved in payroll history.
+  </div>
+
+  <div class="card">
+    <div class="section-label">Payroll Settings</div>
+    <form method="POST">
+      {% csrf_token %}
+
+      <div class="two-col">
+        <div class="form-group">
+          <label for="id_nssf_employee_rate">NSSF Employee Rate (%)</label>
+          <input type="number" name="nssf_employee_rate" id="id_nssf_employee_rate"
+                 value="{{ form.nssf_employee_rate.value|default:'10.00' }}" step="0.01" class="hf2-input" required>
+          <div class="help-text">Deducted from employee's gross salary (default: 10.00%)</div>
+        </div>
+
+        <div class="form-group">
+          <label for="id_nssf_employer_rate">NSSF Employer Rate (%)</label>
+          <input type="number" name="nssf_employer_rate" id="id_nssf_employer_rate"
+                 value="{{ form.nssf_employer_rate.value|default:'10.00' }}" step="0.01" class="hf2-input" required>
+          <div class="help-text">Paid by the school on top of gross salary (default: 10.00%)</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="id_working_days_per_month">Working Days Per Month</label>
+        <input type="number" name="working_days_per_month" id="id_working_days_per_month"
+               value="{{ form.working_days_per_month.value|default:'26' }}" class="hf2-input" required>
+        <div class="help-text">Used for daily rate calculations (e.g., unpaid leave deduction = basic_salary / this value)</div>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:24px;padding-top:20px;border-top:1px solid var(--border);">
+        <button type="submit" class="btn-primary"> Save Configuration</button>
+        <a href="{% url 'hr:payroll_list' %}" class="btn-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Summary Display -->
+  <div class="card">
+    <div class="section-label">Current Effective Rates</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div style="padding:16px;background:var(--green-bg);border-radius:8px;border:1px solid var(--green-bd);">
+        <div style="font-size:11px;color:var(--green);text-transform:uppercase;letter-spacing:.05em;font-weight:500;">NSSF Employee</div>
+        <div style="font-family:'Roboto Mono',monospace;font-size:24px;font-weight:500;color:var(--green);margin-top:4px;">{{ form.nssf_employee_rate.value|default:"10.00" }}%</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">of gross salary</div>
+      </div>
+      <div style="padding:16px;background:var(--hodari-blue-light);border-radius:8px;border:1px solid var(--blue-st-bd);">
+        <div style="font-size:11px;color:var(--hodari-blue);text-transform:uppercase;letter-spacing:.05em;font-weight:500;">NSSF Employer</div>
+        <div style="font-family:'Roboto Mono',monospace;font-size:24px;font-weight:500;color:var(--hodari-blue);margin-top:4px;">{{ form.nssf_employer_rate.value|default:"10.00" }}%</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">school liability</div>
+      </div>
+      <div style="padding:16px;background:var(--amber-bg);border-radius:8px;border:1px solid var(--amber-bd);">
+        <div style="font-size:11px;color:var(--amber);text-transform:uppercase;letter-spacing:.05em;font-weight:500;">Working Days</div>
+        <div style="font-family:'Roboto Mono',monospace;font-size:24px;font-weight:500;color:var(--amber);margin-top:4px;">{{ form.working_days_per_month.value|default:"26" }}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">per month for daily rate</div>
+      </div>
+      <div style="padding:16px;background:var(--blue-st-bg);border-radius:8px;border:1px solid var(--blue-st-bd);">
+        <div style="font-size:11px;color:var(--hodari-blue);text-transform:uppercase;letter-spacing:.05em;font-weight:500;">Total NSSF Liability</div>
+        <div style="font-family:'Roboto Mono',monospace;font-size:24px;font-weight:500;color:var(--hodari-blue);margin-top:4px;">
+          {% with ee=form.nssf_employee_rate.value|default:10.00|floatformat:2 er=form.nssf_employer_rate.value|default:10.00|floatformat:2 %}
+            {{ ee|add:er }}%
+          {% endwith %}
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">ee + employer combined</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

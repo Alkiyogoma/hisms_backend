@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Grades & Report Cards{% endblock %}
+{% block content %}
+
+<div class="page-hdr">
+  <div>
+    <h1>Grades & Report Cards</h1>
+    <p>{% if active_term %}{{ active_term.name }} · {% endif %}Academic performance for your children</p>
+  </div>
+</div>
+
+<!-- Child Selector -->
+{% if children|length > 1 %}
+<div class="sub-nav" style="margin-bottom:20px">
+  {% for child in children %}
+  <a href="?student={{ child.id }}" class="sub-tab {% if selected_student and selected_student.id == child.id %}active{% endif %}">{{ child.get_full_name }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if selected_student %}
+
+<!-- Overall Average -->
+{% if overall_average > 0 %}
+<div class="card" style="padding:16px;margin-bottom:16px">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:16px">
+    <div style="text-align:center;min-width:80px">
+      <div style="font-size:28px;font-weight:800;color:{% if overall_average >= 80 %}#16A34A{% elif overall_average >= 50 %}#CA8A04{% else %}#DC2626{% endif %}">{{ overall_average }}%</div>
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600">Overall Average</div>
+    </div>
+    <div style="width:100%;display:grid;grid-template-columns:repeat(2,1fr);gap:12px">
+      {# dictsort:0 sorts dict.items tuples by index 0 (the key), NOT a dict key name — do not change to a string arg #}
+      {% for subj, avg in subject_averages.items|dictsort:0 %}
+      <div style="text-align:center">
+        <div style="font-size:14px;font-weight:700;color:{% if avg >= 80 %}#16A34A{% elif avg >= 50 %}#CA8A04{% else %}#DC2626{% endif %}">{{ avg }}%</div>
+        <div style="font-size:10px;color:var(--text-muted)">{{ subj|truncatechars:20 }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Exam Scores -->
+{% if exam_scores %}
+<div class="card" style="padding:0;margin-bottom:16px;overflow:hidden">
+  <div style="padding:12px 16px;border-bottom:1px solid var(--border)">
+    <h2 style="margin:0;font-size:14px;font-weight:700">Exam Scores</h2>
+  </div>
+  {% for subject_data in exam_scores %}
+  <div style="padding:12px 16px{% if not forloop.last %};border-bottom:1px solid var(--border){% endif %}">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <h3 style="margin:0;font-weight:600;font-size:13px">{{ subject_data.subject_name }}</h3>
+      <span style="font-weight:700;font-size:12px;color:{% if subject_data.average >= 80 %}#16A34A{% elif subject_data.average >= 50 %}#CA8A04{% else %}#DC2626{% endif %}">Avg: {{ subject_data.average }}%</span>
+    </div>
+    <div style="height:5px;background:#E2E8F0;border-radius:99px;overflow:hidden;margin-bottom:10px">
+      <div style="height:100%;width:{{ subject_data.average }}%;background:{% if subject_data.average >= 80 %}#16A34A{% elif subject_data.average >= 50 %}#CA8A04{% else %}#DC2626{% endif %};border-radius:99px"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px">
+      {% for score in subject_data.scores %}
+      <div style="padding:6px 10px;background:#F8FAFC;border-radius:6px">
+        <div style="font-size:10px;color:var(--text-muted)">{{ score.exam_type.name|default:"Exam" }}</div>
+        <div style="font-size:12px;font-weight:600">{{ score.score }}{% if score.max_score %}/{{ score.max_score }}{% endif %}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Cambridge Checkpoint Scores -->
+{% if checkpoint_scores %}
+<div class="card" style="padding:0;margin-bottom:16px;overflow:hidden">
+  <div style="padding:12px 16px;border-bottom:1px solid var(--border)">
+    <h2 style="margin:0;font-size:14px;font-weight:700">Cambridge Checkpoint Scores</h2>
+    <p style="margin:4px 0 0;font-size:11px;color:var(--text-muted)">Scale: 1.0 (lowest) to 6.0 (highest)</p>
+  </div>
+  {% for subject_data in checkpoint_scores %}
+  <div style="padding:12px 16px{% if not forloop.last %};border-bottom:1px solid var(--border){% endif %}">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <h3 style="margin:0;font-weight:600;font-size:13px">{{ subject_data.subject_name }}</h3>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px">
+      {% for score in subject_data.scores %}
+      <div style="padding:6px 10px;background:#F8FAFC;border-radius:6px">
+        <div style="font-size:10px;color:var(--text-muted)">Score</div>
+        <div style="font-size:13px;font-weight:700;color:{% if score.score >= 5 %}#16A34A{% elif score.score >= 3 %}#CA8A04{% else %}#DC2626{% endif %}">{{ score.score }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Report Cards -->
+{% if report_cards %}
+<div class="card" style="padding:0;margin-bottom:16px;overflow:hidden">
+  <div style="padding:12px 16px;border-bottom:1px solid var(--border)">
+    <h2 style="margin:0;font-size:14px;font-weight:700">Published Report Cards</h2>
+  </div>
+  {% for rc in report_cards %}
+  <div style="padding:12px 16px;display:flex;align-items:center;justify-content:space-between{% if not forloop.last %};border-bottom:1px solid var(--border){% endif %}">
+    <div>
+      <div style="font-weight:600;font-size:13px">{{ rc.term.name }}</div>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:2px">
+        {% if rc.signed_off_by %}Signed by {{ rc.signed_off_by.get_full_name }}{% endif %}
+      </div>
+    </div>
+    <span style="padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;background:#DCFCE7;color:#166534">Published</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if not exam_scores and not report_cards and not checkpoint_scores %}
+<div class="card" style="padding:48px;text-align:center">
+  {% include '_partials/empty_state.html' with title='No Grades Available' desc='No grades or report cards are available for this student yet.' icon='doc' icon_color='grey' %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="card" style="padding:48px;text-align:center">
+  {% include '_partials/empty_state.html' with title='No Children Found' desc='No students are linked to your parent account.' icon='users' icon_color='blue' %}
+</div>
+{% endif %}
+
+<style>
+  @media(min-width: 541px) {
+    .card { padding: 24px !important; }
+    .card h2 { font-size: 16px !important; }
+  }
+</style>
+{% endblock %}

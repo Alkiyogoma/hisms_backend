@@ -1,0 +1,120 @@
+﻿{# Admissions Detail — Progress Bar #}
+{# States: green=done, blue=current, gold=next, grey=future #}
+<div id="pipeline-progress" data-refresh-url="{% url 'admissions:detail' applicant.pk %}">
+{% with st=applicant.status %}
+
+{% if st == 'denied' or st == 'withdrawn' or st == 'assessment_failed' %}
+<div class="card" style="padding:16px 20px;border-left:3px solid var(--red)">
+  <div style="display:flex;align-items:center;gap:10px">
+    <div style="width:12px;height:12px;border-radius:50%;background:var(--red);flex-shrink:0"></div>
+    <div>
+      <div style="font-size:13px;font-weight:700;color:var(--red)">Application {{ applicant.get_status_display }}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px">This application has been {{ applicant.status }}.</div>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="padding:14px 16px;margin-top:8px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <div style="flex:1"></div>
+    <div style="flex:2;text-align:center">
+      <div style="font-size:13px;font-weight:700;color:var(--text-primary)">Admission Progress</div>
+    </div>
+    <div style="flex:1"></div>
+  </div>
+  <div style="display:flex;align-items:flex-start;gap:0;overflow-x:auto;padding-bottom:4px">
+  {% for step in progress_steps %}
+    {% if not forloop.first %}
+      <div style="display:flex;align-items:center;padding-top:14px;flex-shrink:0">
+        <div style="width:20px;height:2px;{% if step.state == 'done' or step.state == 'current' %}background:var(--green){% else %}background:var(--border){% endif %}"></div>
+      </div>
+    {% endif %}
+    <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:56px">
+      <div style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2.5px solid;flex-shrink:0;transition:all 0.3s;{% if step.state == 'done' %}border-color:var(--green);background:var(--green){% elif step.state == 'current' %}border-color:var(--red);background:var(--red);box-shadow:0 0 0 4px rgba(220,38,38,0.15){% else %}border-color:var(--border);background:var(--bg-body){% endif %}">
+        {% if step.state == 'done' %}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+        {% elif step.state == 'current' %}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        {% else %}
+          <span style="font-size:10px;font-weight:700;color:var(--text-muted)">{{ step.num }}</span>
+        {% endif %}
+      </div>
+      <div style="margin-top:5px;font-size:9.5px;font-weight:{% if step.state == 'current' %}700{% elif step.state == 'done' %}600{% else %}500{% endif %};color:{% if step.state == 'done' %}var(--green){% elif step.state == 'current' %}var(--red){% else %}var(--text-muted){% endif %};text-align:center;white-space:nowrap;line-height:1.2">{{ step.label }}</div>
+    </div>
+  {% endfor %}
+  </div>
+</div>
+
+{% else %}
+<div class="card" style="padding:14px 16px">
+  {# ── Header ── #}
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <div style="flex:1;text-align:left">
+      {% if st != 'enrolled' and current_step_label %}
+      <span class="chip" style="background:var(--hodari-blue-light);color:var(--hodari-blue);border-color:var(--hodari-blue-mid);font-size:10px;padding:2px 10px">Current: {{ current_step_label }} &mdash; {{ current_step_actor }}</span>
+      {% endif %}
+      {% if st == 'enrolled' %}
+      <span class="chip chip-green" style="font-size:10px">All steps complete</span>
+      {% endif %}
+    </div>
+    <div style="flex:0 0 auto;text-align:center;padding:0 12px">
+      <div style="font-size:13px;font-weight:700;color:var(--text-primary);white-space:nowrap">Admission Progress</div>
+    </div>
+    <div style="flex:1;text-align:right">
+      {% if st == 'enrolled' %}
+        <span class="chip chip-green" style="font-size:10px">Complete</span>
+      {% elif st == 'admitted' or st == 'conditional' %}
+        <span class="chip chip-green" style="font-size:10px">Admitted</span>
+      {% elif st == 'waitlisted' %}
+        <span class="chip" style="background:#EFF6FF;color:#2563EB;border-color:#BFDBFE;font-size:10px">Waitlisted</span>
+      {% elif next_step_label %}
+        <span class="chip" style="background:var(--hodari-gold-light);color:var(--amber);border-color:var(--hodari-gold);font-size:10px;padding:2px 10px">Next: {{ next_step_label }} &mdash; {{ next_step_actor }}</span>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ── Step circles ── #}
+  <div style="display:flex;align-items:flex-start;gap:0;overflow-x:auto;padding-bottom:4px" id="stepScroller">
+  {% for step in progress_steps %}
+    {% if not forloop.first %}
+      {# Connector line #}
+      <div style="display:flex;align-items:center;padding-top:14px;flex-shrink:0">
+        <div style="width:20px;height:2px;{% if step.state == 'done' or step.state == 'current' %}background:var(--green){% else %}background:var(--border){% endif %}"></div>
+      </div>
+    {% endif %}
+
+    {# Step circle + label #}
+    <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:56px">
+      {# Circle #}
+      <div style="
+        width:30px;height:30px;border-radius:50%;
+        display:flex;align-items:center;justify-content:center;
+        border:2.5px solid;
+        {% if step.state == 'done' %}border-color:var(--green);background:var(--green){% elif step.state == 'current' %}border-color:var(--hodari-blue);background:var(--hodari-blue);box-shadow:0 0 0 4px rgba(2,58,165,0.15){% else %}border-color:var(--border);background:var(--bg-body){% endif %};
+        flex-shrink:0;transition:all 0.3s
+      ">
+        {% if step.state == 'done' %}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+        {% elif step.state == 'current' %}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><circle cx="12" cy="12" r="3"/></svg>
+        {% else %}
+          <span style="font-size:10px;font-weight:700;color:var(--text-muted)">{{ step.num }}</span>
+        {% endif %}
+      </div>
+      {# Label #}
+      <div style="margin-top:5px;font-size:9.5px;font-weight:{% if step.state == 'current' %}700{% elif step.state == 'done' %}600{% else %}500{% endif %};color:{% if step.state == 'done' %}var(--green){% elif step.state == 'current' %}var(--hodari-blue){% else %}var(--text-muted){% endif %};text-align:center;white-space:nowrap;line-height:1.2">
+        {{ step.label }}
+      </div>
+      {# Actor (only for current and next) #}
+      {% if step.state == 'current' or step.state == 'next' %}
+      <div style="margin-top:1px;font-size:8px;color:{% if step.state == 'current' %}var(--hodari-blue){% else %}var(--amber){% endif %};text-align:center;white-space:nowrap;opacity:0.8">
+        {{ step.actor }}
+      </div>
+      {% endif %}
+    </div>
+  {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endwith %}
+</div>

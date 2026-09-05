@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Budget vs Actual &mdash; Finance &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Budget vs Actual{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+<div class="section-hdr">
+  <span class="section-title">Budget vs Actual comparison</span>
+  <div style="display:flex;align-items:center;gap:8px">
+    <a href="{% url 'finance:budget_list' %}" class="btn btn-secondary btn-sm">&larr; Budgets</a>
+    <a href="{% url 'finance:dashboard' %}" class="btn btn-secondary btn-sm">&larr; Dashboard</a>
+  </div>
+</div>
+
+<!-- Term selector + CSV -->
+<form method="get" class="hf2-toolbar" style="padding:16px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;margin-bottom:20px">
+  <span class="hf2-toolbar-label">Term</span>
+  <select name="term" class="hf2-select" style="min-width:200px" onchange="this.form.submit()">
+    <option value="">Select term</option>
+    {% for term in terms %}
+    <option value="{{ term.pk }}" {% if selected_term.pk == term.pk %}selected{% endif %}>{{ term.name }} ({{ term.academic_year.name }})</option>
+    {% endfor %}
+  </select>
+  <a href="?{% if selected_term.pk %}term={{ selected_term.pk }}&{% endif %}format=csv"
+     class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center;gap:4px;margin-left:auto" download>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Export CSV
+  </a>
+</form>
+
+{% if selected_term %}
+<!-- Summary metric cards -->
+<div class="metrics" style="grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Total Allocated</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#023AA5">{{ total_allocated|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#5A697D">{{ budget_data|length }} categor{{ budget_data|length|pluralize:"y,ies" }}</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FFF8ED,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Total Spent</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#B45309">{{ total_spent|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#B45309">&nbsp;</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,{% if total_variance < 0 %}#FFF0F0{% else %}#EEF9F0{% endif %},#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Variance</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:{% if total_variance < 0 %}#DC2626{% else %}#059669{% endif %}">{{ total_variance|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#5A697D">Under (+)/Over (-) budget</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,{% if overall_utilization >= 90 %}#FFF0F0{% elif overall_utilization >= 75 %}#FFF8ED{% else %}#EEF9F0{% endif %},#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Utilization</span>
+      <span class="mc-currency">%</span>
+    </div>
+    <div class="mc-val" style="color:{% if overall_utilization >= 90 %}#DC2626{% elif overall_utilization >= 75 %}#B45309{% else %}#059669{% endif %}">{{ overall_utilization }}</div>
+    <div class="mc-sub" style="color:{% if over_budget_count > 0 %}#DC2626{% else %}#059669{% endif %}">
+      {% if over_budget_count > 0 %}{{ over_budget_count }} over budget{% else %}All on track{% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Budget Data Table -->
+<div class="card" style="padding:0;overflow:hidden">
+  <table style="width:100%;border-collapse:collapse">
+    <thead>
+      <tr style="text-align:left;background:var(--bg-metric);border-bottom:1px solid var(--border)">
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Category</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;text-align:right">Allocated</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;text-align:right">Spent</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;text-align:right">Variance</th>
+        <th style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Utilization</th>
+        <th style="padding:10px 14px"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in budget_data %}
+      <tr style="border-bottom:1px solid var(--border);font-size:13px;transition:background .1s" onmouseover="this.style.background='var(--bg-metric)'" onmouseout="this.style.background=''">
+        <td style="padding:10px 14px;font-weight:600">
+          {{ item.category_label }}
+          {% if item.is_frozen %}<span class="chip chip-grey" style="font-size:9px;margin-left:4px">Frozen</span>{% endif %}
+        </td>
+        <td style="padding:10px 14px;text-align:right;font-family:var(--font-mono)">TZS {{ item.allocated|floatformat:0 }}</td>
+        <td style="padding:10px 14px;text-align:right;font-family:var(--font-mono);font-weight:600">{{ item.spent|floatformat:0 }}</td>
+        <td style="padding:10px 14px;text-align:right;font-family:var(--font-mono)">
+          <span style="color:{% if item.status == 'over' %}#DC2626{% elif item.status == 'under' %}#16A34A{% else %}#6B7280{% endif %};font-weight:600">
+            {{ item.variance|floatformat:0 }}
+          </span>
+        </td>
+        <td style="padding:10px 14px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="flex:1;height:6px;background:#EDF1F7;border-radius:99px;overflow:hidden;max-width:120px">
+              <div style="height:100%;border-radius:99px;width:{{ item.utilization }}%;background:{% if item.utilization >= 90 %}#DC2626{% elif item.utilization >= 75 %}#E0A800{% else %}var(--green){% endif %}"></div>
+            </div>
+            <span style="font-size:11px;font-weight:600;font-family:var(--font-mono);min-width:40px;text-align:right">{{ item.utilization }}%</span>
+          </div>
+        </td>
+        <td style="padding:10px 14px;text-align:right">
+          <span class="chip {% if item.status == 'over' %}chip-red{% elif item.status == 'under' %}chip-green{% else %}chip-grey{% endif %}" style="font-size:10px;text-transform:uppercase">
+            {{ item.status }}
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr style="background:var(--bg-metric);border-top:2px solid var(--border);font-weight:700">
+        <td style="padding:10px 14px;font-size:13px">TOTAL</td>
+        <td style="padding:10px 14px;text-align:right;font-family:var(--font-mono)">TZS {{ total_allocated|floatformat:0 }}</td>
+        <td style="padding:10px 14px;text-align:right;font-family:var(--font-mono)">TZS {{ total_spent|floatformat:0 }}</td>
+        <td style="padding:10px 14px;text-align:right;font-family:var(--font-mono)">TZS {{ total_variance|floatformat:0 }}</td>
+        <td style="padding:10px 14px" colspan="2">{{ overall_utilization }}% overall</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+{% else %}
+<div style="text-align:center;padding:48px 24px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px">
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" style="margin-bottom:12px"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+  <div style="font-size:16px;font-weight:600;color:var(--text-primary)">Select a term</div>
+  <div style="font-size:13px;color:var(--text-muted);margin-top:4px">Choose a term above to view budget vs actual spending comparison.</div>
+</div>
+{% endif %}
+{% endblock %}

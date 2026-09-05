@@ -1,0 +1,191 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Install Attendance App &mdash; {{ school_name }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="manifest" href="{% url 'attendance:pwa_manifest' %}">
+  <meta name="theme-color" content="#023AA5">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{
+      font-family:'Poppins',-apple-system,BlinkMacSystemFont,sans-serif;
+      background:#F2F5FA;color:#1A1A2E;
+      display:flex;align-items:center;justify-content:center;
+      min-height:100vh;padding:24px;
+    }
+    .card{
+      background:#fff;border-radius:16px;
+      box-shadow:0 4px 24px rgba(0,0,0,.08);
+      max-width:420px;width:100%;padding:32px 28px;text-align:center;
+    }
+    .logo{
+      width:72px;height:72px;
+      background:#023AA5;border-radius:16px;
+      display:flex;align-items:center;justify-content:center;
+      margin:0 auto 18px;
+    }
+    .logo-inner{
+      width:44px;height:44px;border-radius:10px;
+      background:#FBBC05;display:flex;
+      align-items:center;justify-content:center;
+    }
+    .logo-inner span{font-size:26px;font-weight:800;color:#023AA5}
+    h1{font-size:22px;font-weight:700;margin-bottom:4px}
+    .sub{font-size:14px;color:#8492A6;margin-bottom:20px}
+    .badge{
+      display:inline-flex;align-items:center;gap:6px;
+      padding:4px 14px;border-radius:99px;font-size:11px;font-weight:600;
+      background:#E8F5EC;color:#1B7B34;margin-bottom:20px;
+    }
+    .qr-wrap{
+      background:#f9fafb;border:2px dashed #d1d5db;
+      border-radius:12px;padding:24px;margin-bottom:24px;
+    }
+    .qr-placeholder{
+      width:180px;height:180px;margin:0 auto;display:flex;
+      align-items:center;justify-content:center;
+      border:2px solid #023AA5;border-radius:12px;
+    }
+    .qr-label{font-size:12px;color:#9ca3af;margin-top:10px}
+    .steps{text-align:left;margin-bottom:20px}
+    .step{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid #f3f4f6}
+    .step:last-child{border-bottom:none}
+    .step-num{
+      width:28px;height:28px;border-radius:50%;
+      background:#023AA5;color:#fff;
+      display:flex;align-items:center;justify-content:center;
+      font-size:13px;font-weight:700;flex-shrink:0;
+    }
+    .step-body{font-size:13px;line-height:1.5;padding-top:3px}
+    .step-body strong{display:block;margin-bottom:2px;color:#1A1A2E}
+    .step-body span{color:#8492A6}
+    .btn-open{
+      display:inline-flex;align-items:center;justify-content:center;gap:8px;
+      width:100%;padding:14px;border-radius:10px;
+      background:#023AA5;color:#fff;
+      font-size:15px;font-weight:600;font-family:'Poppins';
+      border:none;cursor:pointer;text-decoration:none;
+      transition:background .15s;
+    }
+    .btn-open:hover{background:#012880}
+    .info{font-size:12px;color:#9ca3af;margin-top:12px}
+    .info a{color:#023AA5;text-decoration:none}
+    .os-toggle{display:flex;gap:8px;margin-bottom:16px}
+    .os-btn{
+      flex:1;padding:8px;border-radius:8px;border:1.5px solid #DDE3EE;
+      font-family:'Poppins';font-size:12px;font-weight:600;
+      cursor:pointer;background:#fff;color:#474747;transition:all .15s;
+    }
+    .os-btn.active{background:#023AA5;color:#fff;border-color:#023AA5}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo"><div class="logo-inner"><span>H</span></div></div>
+    <h1>Attendance App</h1>
+    <p class="sub">Install on your phone for fast attendance marking with QR scanning</p>
+    <div class="badge">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1B7B34" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Version"><polyline points="20 6 9 17 4 12"/></svg>
+      v{{ pwa_version }} &middot; {{ school_name }}
+    </div>
+
+    <div class="os-toggle" id="osToggle">
+      <button class="os-btn active" data-os="android" onclick="setOS('android')">Android</button>
+      <button class="os-btn" data-os="ios" onclick="setOS('ios')">iOS</button>
+    </div>
+
+    <div class="qr-wrap">
+      <div style="width:180px;height:180px;margin:0 auto;">
+        <img src="{% url 'attendance:qr_generate' %}?data={{ pwa_url|urlencode }}&size=180"
+             alt="Scan to open Attendance App"
+             style="width:100%;height:100%;border-radius:12px;">
+      </div>
+      <p class="qr-label">Scan with your phone camera to open<br>
+        <a href="{{ pwa_url }}" style="color:#023AA5;font-size:12px">{{ pwa_url }}</a>
+      </p>
+    </div>
+
+    <div id="androidSteps" class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <strong>Open this page on Chrome</strong>
+          <span>Visit the URL above on your Android phone using Chrome</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <strong>Tap Install App</strong>
+          <span>Tap the browser menu &rarr; <strong>Install App</strong> or look for the install banner</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <strong>Open from Home Screen</strong>
+          <span>The Attendance app will appear on your home screen like a native app</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="iosSteps" class="steps" style="display:none">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <strong>Open this page in Safari</strong>
+          <span>Visit the URL above on your iPhone using Safari browser</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <strong>Tap Share button</strong>
+          <span>Tap the Share icon at the bottom of Safari (square with arrow)</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <strong>Add to Home Screen</strong>
+          <span>Scroll down and tap <strong>Add to Home Screen</strong>, then tap Add</span>
+        </div>
+      </div>
+    </div>
+
+    <a href="{% url 'attendance:pwa_app' %}" class="btn-open" id="openBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="22 12 16 12 16 20 8 20 8 12 2 12 12 2 22 12"/></svg>
+      Open Attendance App
+    </a>
+    <button id="installBtn" class="btn-open" style="display:none;background:#16A34A;margin-top:10px" onclick="installPWA()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Install App
+    </button>
+    <p class="info"><a href="{% url 'attendance:today' %}">&larr; Back to attendance module</a></p>
+  </div>
+
+  <script>
+    function setOS(os){
+      document.querySelectorAll('.os-btn').forEach(b=>b.classList.toggle('active',b.dataset.os===os));
+      document.getElementById('androidSteps').style.display=os==='android'?'block':'none';
+      document.getElementById('iosSteps').style.display=os==='ios'?'block':'none';
+    }
+    var deferredInstall=null;
+    window.addEventListener('beforeinstallprompt',function(e){
+      e.preventDefault();
+      deferredInstall=e;
+      document.getElementById('installBtn').style.display='inline-flex';
+    });
+    function installPWA(){
+      if(!deferredInstall)return;
+      deferredInstall.prompt();
+      deferredInstall.userChoice.then(function(r){deferredInstall=null;document.getElementById('installBtn').style.display='none'});
+    }
+  </script>
+</body>
+</html>

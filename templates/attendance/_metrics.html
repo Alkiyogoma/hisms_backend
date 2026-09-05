@@ -1,0 +1,32 @@
+<div class="metrics" id="attendance-metrics"
+     style="grid-template-columns:repeat(5,minmax(0,1fr))"
+     hx-get="{% url 'attendance:today' %}?date={{ date|date:'Y-m-d' }}&class_name={{ class_name|urlencode }}"
+     hx-trigger="attendance-updated from:body"
+     hx-select="#attendance-metrics"
+     hx-swap="outerHTML">
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF9F0,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Present</span></div>
+    <div class="mc-val" style="color:#059669">{{ summary.present|default:"0" }}</div>
+    <div class="mc-sub" style="color:#059669">{% if summary.total %}{{ summary.present_pct }}% of expected{% else %}No data{% endif %}</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FFF0F0,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Absent</span></div>
+    <div class="mc-val" style="color:#DC2626">{{ summary.absent|default:"0" }}</div>
+    <div class="mc-sub no-print-area" style="color:#DC2626">Requires followup</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FFF8ED,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Late</span></div>
+    <div class="mc-val" style="color:#B45309">{{ summary.late|default:"0" }}</div>
+    <div class="mc-sub" style="color:#B45309">Verified reasons</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Enrolled</span></div>
+    <div class="mc-val" style="color:#023AA5">{{ summary.total|default:"0" }}</div>
+    <div class="mc-sub" style="color:#5A697D">In class</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#F9FAFB,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Unconfirmed</span></div>
+    <div class="mc-val" style="color:#6B7280">{{ summary.unconfirmed|default:"0" }}</div>
+    <div class="mc-sub no-print-area" style="color:#6B7280">Not yet marked</div>
+  </div>
+</div>

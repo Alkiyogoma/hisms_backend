@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Parent Portal - Welfare{% endblock %}
+
+{% block content %}
+<div class="page-hdr">
+  <h1>Welfare Observations</h1>
+  <p>Welfare observations for your children</p>
+</div>
+
+{% if children|length > 1 %}
+<div class="sub-nav" style="margin-bottom:16px">
+  <a href="?" class="sub-tab {% if not selected_student_id %}active{% endif %}">All Children</a>
+  {% for child in children %}
+  <a href="?student={{ child.id }}" class="sub-tab {% if selected_student_id == child.id %}active{% endif %}">{{ child.get_full_name }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if active_observations or resolved_observations %}
+
+<!-- Active Observations -->
+{% if active_observations %}
+<div class="card" style="padding:0;margin-bottom:16px;overflow:hidden">
+  <div style="padding:16px 20px;border-bottom:1px solid var(--border)">
+    <h2 style="margin:0;font-size:15px;font-weight:700">Open Observations</h2>
+  </div>
+  {% for obs in active_observations %}
+  <div style="padding:14px 20px;border-bottom:1px solid var(--border)">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span style="font-weight:600;font-size:13px">{{ obs.student.get_full_name }}</span>
+          <span class="chip chip-grey" style="font-size:10px">{{ obs.student.class_name }}</span>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">
+          {{ obs.get_concern_type_display }} &middot; {{ obs.observation_date|date:"d M Y" }}
+        </div>
+        <div style="font-size:13px;color:var(--text-primary);line-height:1.5">
+          {{ obs.observation_text|truncatewords:30 }}
+        </div>
+        {% if obs.action_taken %}
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px;font-style:italic">
+          Action: {{ obs.action_taken|truncatewords:20 }}
+        </div>
+        {% endif %}
+      </div>
+      <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+        <span class="chip {% if obs.severity == 'critical' %}chip-red{% elif obs.severity == 'high' %}chip-amber{% elif obs.severity == 'medium' %}chip-blue{% else %}chip-grey{% endif %}">
+          {{ obs.get_severity_display }}
+        </span>
+        <span class="chip chip-grey">{{ obs.get_hod_status_display }}</span>
+        {% if obs.parent_contacted %}
+        <span class="chip chip-green" style="font-size:10px">Contacted</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Resolved Observations -->
+{% if resolved_observations %}
+<div class="card" style="padding:0;overflow:hidden">
+  <div style="padding:16px 20px;border-bottom:1px solid var(--border);background:var(--bg-page)">
+    <h2 style="margin:0;font-size:15px;font-weight:700">Resolved</h2>
+  </div>
+  {% for obs in resolved_observations %}
+  <div style="padding:12px 20px;border-bottom:1px solid var(--border);opacity:0.8">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <div style="flex:1;min-width:0">
+        <span style="font-weight:600;font-size:13px">{{ obs.student.get_full_name }}</span>
+        <span style="font-size:12px;color:var(--text-muted);margin-left:8px">{{ obs.get_concern_type_display }}</span>
+        <span style="font-size:11px;color:var(--text-muted);margin-left:8px">{{ obs.observation_date|date:"d M" }}</span>
+      </div>
+      <span class="chip chip-green" style="font-size:10px">Resolved</span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="card" style="padding:48px;text-align:center">
+  {% include '_partials/empty_state.html' with title='No Welfare Observations' desc='There are no welfare observations recorded for your children yet.' icon='inbox' icon_color='grey' %}
+</div>
+{% endif %}
+{% endblock %}

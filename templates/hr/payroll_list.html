@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+{% load role_tags %}
+
+{% block title %}Payroll Runs — {{ brand.school_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  :root {
+    --hodari-blue: #023AA5; --hodari-blue-dark: #012880; --hodari-blue-mid: #1A56C4;
+    --hodari-blue-light: #E8EEF9; --hodari-blue-pale: #F0F4FB;
+    --hodari-gold: #FBBC05; --hodari-gold-dark: #E0A800;
+    --hodari-charcoal: #474747; --hodari-charcoal-lt: #6B6B6B;
+    --bg-page: #F2F5FA; --bg-card: #FFFFFF;
+    --text-primary: #1A1A2E; --text-secondary: #474747; --text-muted: #8492A6;
+    --border: #DDE3EE; --border-strong: #B8C4D8;
+    --green: #1B7B34; --green-bg: #E8F5EC; --green-bd: #B7DFBF;
+    --amber: #92550A; --amber-bg: #FEF3C7; --amber-bd: #FCD34D;
+    --red: #9B1C1C; --red-bg: #FEF2F2; --red-bd: #FECACA;
+    --blue-st: #023AA5; --blue-st-bg: #E8EEF9; --blue-st-bd: #93C5FD;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Roboto', sans-serif; background: var(--bg-page); color: var(--text-primary); }
+  .payroll-page { padding: 24px 28px; max-width: 1200px; margin: 0 auto; }
+  .metric-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .metric-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; }
+  .metric-card .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+  .metric-card .value { font-family: 'Roboto Mono', monospace; font-size: 26px; font-weight: 500; margin-top: 4px; }
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 24px; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { background: var(--bg-page); font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
+  tbody td { padding: 12px; font-size: 13px; border-bottom: 1px solid var(--border); }
+  tbody tr:hover { background: var(--hodari-blue-pale); }
+  .badge-pill { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 11px; font-weight: 500; }
+  .badge-pill.green { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-bd); }
+  .badge-pill.amber { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-bd); }
+  .badge-pill.red { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-bd); }
+  .badge-pill.blue { background: var(--blue-st-bg); color: var(--blue-st); border: 1px solid var(--blue-st-bd); }
+  .btn-primary { background: var(--hodari-blue); color: #fff; border: none; padding: 8px 18px; border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: none; }
+  .btn-primary:hover { background: var(--hodari-blue-dark); }
+  .btn-secondary { background: #fff; color: var(--hodari-blue); border: 1px solid var(--border-strong); padding: 8px 18px; border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: none; }
+  .btn-secondary:hover { border-color: var(--hodari-blue); }
+  .btn-sm { padding: 5px 12px; font-size: 12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "hr/_top_tabs.html" %}
+<div class="payroll-page">
+  {% has_perm user "hr.add_payrollrun" as can_add_payroll %}
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+    <div>
+      <h1 style="font-family:'Merriweather',serif;font-size:22px;font-weight:700;color:var(--text-primary);margin-bottom:4px;">Payroll Runs</h1>
+      <p style="font-size:13px;color:var(--text-muted);">Manage salary payments and payroll periods</p>
+    </div>
+    {% if can_add_payroll %}
+    <a href="{% url 'hr:payroll_create' %}" class="btn-primary">+ New Payroll Run</a>
+    {% endif %}
+  </div>
+
+  <div class="metric-row">
+    <div class="metric-card">
+      <div class="label">Draft</div>
+      <div class="value" style="color:var(--amber);">{{ draft_count }}</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">Pending Approval</div>
+      <div class="value" style="color:var(--hodari-blue);">{{ pending_approval }}</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">Total Paid</div>
+      <div class="value" style="color:var(--green);">TZS {{ total_paid|floatformat:0|intcomma }}</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>Period</th>
+          <th>Type</th>
+          <th>Status</th>
+          <th>Employees</th>
+          <th>Total Net Pay</th>
+          <th>Payment Date</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for run in payroll_runs %}
+        <tr>
+          <td><strong>{{ run.period_name }}</strong></td>
+          <td>{{ run.get_payroll_type_display }}</td>
+          <td>
+            {% if run.status == 'paid' %}
+            <span class="badge-pill green">{{ run.get_status_display }}</span>
+            {% elif run.status == 'approved' %}
+            <span class="badge-pill blue">{{ run.get_status_display }}</span>
+            {% elif run.status == 'pending_approval' %}
+            <span class="badge-pill amber">{{ run.get_status_display }}</span>
+            {% else %}
+            <span class="badge-pill" style="background:var(--bg-page);color:var(--text-muted);border:1px solid var(--border);">{{ run.get_status_display }}</span>
+            {% endif %}
+          </td>
+          <td>{{ run.employee_count }}</td>
+          <td style="font-family:'Roboto Mono',monospace;">TZS {{ run.total_net_pay|floatformat:0|intcomma }}</td>
+          <td>{{ run.payment_date|date:"d M Y"|default:"N/A" }}</td>
+          <td><a href="{% url 'hr:payroll_detail' run.pk %}" class="btn-secondary btn-sm">View</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7">{% include '_partials/empty_state.html' with title='No payroll runs found' desc='Create your first payroll run to get started.' icon='doc' icon_color='blue' %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

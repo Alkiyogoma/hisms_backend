@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Progression Overview - {{ brand.school_name }}{% endblock %}
+{% block content %}
+{% include "academics/_top_tabs.html" %}
+
+<div class="section-hdr">
+    <div style="display:flex;align-items:center;gap:12px">
+        <span class="section-title">Progression Overview</span>
+        <span class="chip chip-blue">Read Only</span>
+    </div>
+</div>
+
+<form method="get" style="display:flex;gap:16px;align-items:center;margin-bottom:20px">
+    <select name="config_id" style="padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:250px">
+        <option value="">— Choose Cycle —</option>
+        {% for c in configs %}
+        <option value="{{ c.pk }}" {% if selected_config_id|stringformat:"s" == c.pk|stringformat:"s" %}selected{% endif %}>
+            {{ c.academic_year_from }} → {{ c.academic_year_to }}
+        </option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="hf-btn hf-btn-primary">View</button>
+</form>
+
+{% if config %}
+<div class="card">
+    <div class="card-title">Your Students — {{ config.academic_year_from }} → {{ config.academic_year_to }}</div>
+    {% if cases_data %}
+    <div class="trow" style="background:var(--bg-page);border-radius:8px;margin-bottom:12px;font-weight:700;color:var(--text-secondary);font-size:11px;text-transform:uppercase;letter-spacing:0.05em">
+        <div style="flex:3">Student</div>
+        <div style="flex:1;text-align:center">Average</div>
+        <div style="flex:1;text-align:center">Attendance</div>
+        <div style="flex:1;text-align:center">System Suggestion</div>
+        <div style="flex:1;text-align:center">Status</div>
+    </div>
+    {% for d in cases_data %}
+    <div class="trow">
+        <div style="flex:3">
+            <div class="trow-name">{{ d.student_name }}</div>
+            <div class="trow-sub">{{ d.admission_no }} · {{ d.class_name }}</div>
+        </div>
+        <div style="flex:1;text-align:center;display:flex;align-items:center;justify-content:center">
+            {% if d.calculated_average is not None %}{{ d.calculated_average }}%{% else %}—{% endif %}
+        </div>
+        <div style="flex:1;text-align:center;display:flex;align-items:center;justify-content:center">
+            {% if d.calculated_attendance_rate is not None %}{{ d.calculated_attendance_rate }}%{% else %}—{% endif %}
+        </div>
+        <div style="flex:1;text-align:center;display:flex;align-items:center;justify-content:center">
+            {% if d.system_suggested_outcome %}
+            <span class="chip chip-grey">{{ d.system_suggested_outcome_label }}</span>
+            {% else %}—{% endif %}
+        </div>
+        <div style="flex:1;text-align:center;display:flex;align-items:center;justify-content:center">
+            <span class="chip {% if d.status == 'finalized' %}chip-green{% else %}chip-yellow{% endif %}">
+                {{ d.status_label }}
+            </span>
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    {% include '_partials/empty_state.html' with title='No students found' desc='No students are assigned to your classes in this cycle.' icon='users' icon_color='grey' %}
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

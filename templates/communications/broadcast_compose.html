@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% load hodari_forms role_tags %}
+{% block title %}Compose Broadcast &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Communications{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:800px;margin:0 auto">
+  <div class="card-title">Compose New Broadcast</div>
+  <div style="font-size:13px;color:var(--text-muted);margin-bottom:20px;margin-top:-6px">
+    Broadcasts are delivered as in-app notifications and tracked in audit logs.
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    
+    <div class="hf2-section">
+      <div class="hf2-section-title">Target Audience</div>
+      <div class="hf2-grid-2">
+        <div class="hf2-group">
+          <label class="hf2-label">Recipients</label>
+          <select name="audience" class="hf2-select" id="id_audience" onchange="toggleGrade()">
+            {% for val, lbl in audience_choices %}
+              <option value="{{ val }}">{{ lbl }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <div class="hf2-group" id="grade_wrap" style="display:none">
+          <label class="hf2-label">Specific Grade</label>
+          <select name="target_grade" class="hf2-select">
+            <option value="">Select a grade...</option>
+            {% for g in grades %}
+              <option value="{{ g }}">{{ g }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="hf2-section">
+      <div class="hf2-section-title">Message Templates (Optional)</div>
+      <div class="hf2-group">
+        <label class="hf2-label">Select a template to auto-fill content</label>
+        <select class="hf2-select" id="id_template_selector" onchange="applyTemplate()">
+          <option value="">-- Choose a template --</option>
+          {% for key, val in message_templates.items %}
+            <option value="{{ key }}" data-subject="{{ val.subject }}" data-body="{{ val.body }}">{{ key }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="hf2-section">
+      <div class="hf2-section-title">Message Content</div>
+      <div class="hf2-grid-1">
+        <div class="hf2-group">
+          <label class="hf2-label">Subject Line</label>
+          <input type="text" name="subject" id="id_subject" class="hf2-input" placeholder="e.g. Upcoming Sports Day Details" required
+            value="{% if broadcast %}{{ broadcast.subject }}{% endif %}">
+        </div>
+        <div class="hf2-group">
+          <label class="hf2-label">Message Body</label>
+          <textarea name="body" id="id_body" class="hf2-textarea" rows="8" placeholder="Enter the full message here..." required>{% if broadcast %}{{ broadcast.body }}{% endif %}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="hf2-actions">
+      <a href="{% url 'communications:broadcast_list' %}" class="btn-secondary" style="margin-right:auto">Cancel</a>
+      {% has_perm user "communications.add_broadcast" as can_compose %}
+      {% if can_compose %}
+      <button type="submit" class="btn-primary">Save Draft & Preview</button>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<script>
+  function toggleGrade() {
+    const aud = document.getElementById('id_audience').value;
+    document.getElementById('grade_wrap').style.display = (aud === 'grade') ? 'block' : 'none';
+  }
+
+  function applyTemplate() {
+    const sel = document.getElementById('id_template_selector');
+    const opt = sel.options[sel.selectedIndex];
+    if (opt.value) {
+      document.getElementById('id_subject').value = opt.getAttribute('data-subject');
+      document.getElementById('id_body').value = opt.getAttribute('data-body');
+    }
+  }
+</script>
+{% endblock %}

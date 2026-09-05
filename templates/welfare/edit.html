@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% load hodari_forms %}
+{% block title %}Edit Welfare Observation #{{ obs.id }} — {{ brand.school_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .form-header { border-bottom: 2px solid var(--hodari-blue); padding-bottom: 20px; margin-bottom: 30px; }
+  .form-title { font-family: var(--font-display); font-size: 24px; color: var(--hodari-blue); font-weight: 800; margin: 0; }
+  .form-subtitle { color: var(--text-muted); font-size: 13px; margin-top: 4px; font-weight: 600; }
+  .readonly-field { background: #F8FAFC; border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-size: 14px; color: var(--text-primary); }
+  .edit-notice { background: #FEF3C7; border: 1px solid #F59E0B; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #92400E; margin-bottom: 20px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="main-content">
+  <div class="form-header">
+    <div>
+      <h1 class="form-title">Edit Welfare Observation #{{ obs.id }}</h1>
+      <p class="form-subtitle">Student: {{ obs.student.first_name }} {{ obs.student.last_name }} ({{ obs.student.class_name }})</p>
+    </div>
+    <a href="{% url 'welfare:detail' obs.pk %}" class="btn-secondary">Cancel</a>
+  </div>
+
+  <div class="edit-notice">
+    <strong>Edit window:</strong> You can only edit <em>Action Taken</em> and <em>Follow-up</em> fields within 24 hours of submission, before HOD review.
+  </div>
+
+  <form method="post" action="{% url 'welfare:edit' obs.pk %}">
+    {% csrf_token %}
+
+    <div style="margin-bottom: 24px">
+      <label style="font-weight:700;font-size:13px;display:block;margin-bottom:6px">Concern Type</label>
+      <div class="readonly-field">{{ obs.get_concern_type_display }}</div>
+    </div>
+
+    <div style="margin-bottom: 24px">
+      <label style="font-weight:700;font-size:13px;display:block;margin-bottom:6px">Severity</label>
+      <div class="readonly-field">{{ obs.get_severity_display }}</div>
+    </div>
+
+    <div style="margin-bottom: 24px">
+      <label style="font-weight:700;font-size:13px;display:block;margin-bottom:6px">Observation Date</label>
+      <div class="readonly-field">{{ obs.observation_date }}</div>
+    </div>
+
+    <div style="margin-bottom: 24px">
+      <label style="font-weight:700;font-size:13px;display:block;margin-bottom:6px">What Was Observed</label>
+      <div class="readonly-field" style="white-space:pre-wrap">{{ obs.observation_text }}</div>
+    </div>
+
+    <div style="margin-bottom: 24px">
+      <label style="font-weight:700;font-size:13px;display:block;margin-bottom:6px">Parent Contacted</label>
+      <div class="readonly-field">{% if obs.parent_contacted %}Yes{% else %}No{% endif %}</div>
+    </div>
+
+    <hr style="margin:30px 0;border:none;border-top:1px solid var(--border)">
+
+    <div style="margin-bottom: 24px">
+      <label for="action_taken" style="font-weight:700;font-size:13px;display:block;margin-bottom:6px">Action Taken Today *</label>
+      <textarea name="action_taken" id="action_taken" rows="4" required
+        style="width:100%;padding:12px;border:1.5px solid #DDE3EE;border-radius:8px;font-size:14px;resize:vertical"
+      >{{ obs.action_taken }}</textarea>
+    </div>
+
+    <div style="margin-bottom: 24px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" name="follow_up_required" value="on" {% if obs.follow_up_required %}checked{% endif %}
+          style="width:18px;height:18px;accent-color:var(--hodari-blue)">
+        <span style="font-weight:700;font-size:13px">Follow-up Required</span>
+      </label>
+    </div>
+
+    <div style="margin-bottom: 30px" id="follow_up_date_wrap" {% if not obs.follow_up_required %}style="display:none"{% endif %}>
+      <label for="follow_up_date" style="font-weight:700;font-size:13px;display:block;margin-bottom:6px">Follow-up Date</label>
+      <input type="date" name="follow_up_date" id="follow_up_date" value="{{ obs.follow_up_date|default:'' }}"
+        style="padding:10px;border:1.5px solid #DDE3EE;border-radius:8px;font-size:14px">
+    </div>
+
+    {% has_perm user "welfare.change_welfareobservation" as can_edit %}
+    {% if can_edit %}
+    <div style="display:flex;gap:12px">
+      <button type="submit" class="btn-primary">Save Changes</button>
+      <a href="{% url 'welfare:detail' obs.pk %}" class="btn-secondary">Cancel</a>
+    </div>
+    {% endif %}
+  </form>
+</div>
+
+<script>
+document.querySelector('[name="follow_up_required"]').addEventListener('change', function() {
+  document.getElementById('follow_up_date_wrap').style.display = this.checked ? 'block' : 'none';
+});
+</script>
+{% endblock %}

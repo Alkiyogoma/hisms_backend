@@ -1,0 +1,465 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}{{ guardian.full_name }} — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Parent / Guardian Profile{% endblock %}
+
+{% block content %}
+{% include "students/_top_tabs.html" %}
+<style>
+  .gp-hero {
+    background: linear-gradient(135deg, #023AA5 0%, #1B5ECC 100%);
+    border-radius: 14px;
+    padding: 32px 36px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+  .gp-hero::after {
+    content: '';
+    position: absolute;
+    right: -30px;
+    top: -30px;
+    width: 160px;
+    height: 160px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 50%;
+  }
+  .gp-avatar {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    font-weight: 800;
+    color: #fff;
+    flex-shrink: 0;
+    border: 3px solid rgba(255,255,255,0.3);
+  }
+  .gp-info h2 { margin: 0 0 6px; font-size: 22px; font-weight: 800; }
+  .gp-meta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+  .gp-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(255,255,255,0.15);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .gp-pill svg { width: 12px; height: 12px; opacity: 0.8; }
+
+  .gp-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 18px;
+  }
+  .gp-detail-item label {
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    font-weight: 700;
+    margin-bottom: 3px;
+  }
+  .gp-detail-item span {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-dark);
+  }
+
+  .gp-student-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #fff;
+    transition: box-shadow 0.15s, border-color 0.15s;
+  }
+  .gp-student-card:hover {
+    border-color: var(--hodari-blue);
+    box-shadow: 0 2px 8px rgba(2,58,165,0.08);
+  }
+  .gp-student-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--hodari-blue);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .gp-student-info { flex: 1; min-width: 0; }
+  .gp-student-info .name { font-weight: 700; font-size: 13px; color: var(--text-dark); }
+  .gp-student-info .meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  /* Relationship Breakdown Styles */
+  .rel-breakdown {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .rel-stat {
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+  }
+  .rel-stat .count {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--hodari-blue);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .rel-stat .label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748B;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .rel-student-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 16px;
+    align-items: center;
+    padding: 14px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #fff;
+    transition: all 0.15s;
+  }
+  .rel-student-row:hover {
+    border-color: var(--hodari-blue);
+    box-shadow: 0 2px 8px rgba(2,58,165,0.06);
+  }
+  .rel-student-name {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+  .rel-student-name .avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #023AA5, #1A56C4);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .rel-student-name .info { min-width: 0; }
+  .rel-student-name .info .n { font-weight: 700; font-size: 13px; color: #1E293B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rel-student-name .info .c { font-size: 11px; color: #64748B; margin-top: 1px; }
+
+  .rel-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .rel-badge.primary { background: #EFF6FF; color: #1E40AF; border: 1px solid #BFDBFE; }
+  .rel-badge.secondary { background: #F8FAFC; color: #64748B; border: 1px solid #E2E8F0; }
+
+  .rel-type-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .rel-type-badge.mother { background: #FDF2F8; color: #9D174D; border: 1px solid #FBCFE8; }
+  .rel-type-badge.father { background: #EFF6FF; color: #1E40AF; border: 1px solid #BFDBFE; }
+  .rel-type-badge.guardian { background: #F0FDF4; color: #166534; border: 1px solid #BBF7D0; }
+  .rel-type-badge.other { background: #F8FAFC; color: #64748B; border: 1px solid #E2E8F0; }
+
+  @media (max-width: 900px) {
+    .gp-hero { flex-direction: column; text-align: center; padding: 24px 20px; }
+    .gp-meta { justify-content: center; }
+    .gp-grid { grid-template-columns: 1fr !important; }
+    .rel-breakdown { grid-template-columns: repeat(2, 1fr); }
+    .rel-student-row { grid-template-columns: 1fr; gap: 8px; }
+  }
+</style>
+
+<div class="gp-grid" style="display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start">
+  {#  LEFT COLUMN  #}
+  <div style="display:flex;flex-direction:column;gap:20px">
+
+    {#  Hero Card  #}
+    <div class="gp-hero">
+      <div class="gp-avatar">{{ guardian.full_name|slice:":1" }}</div>
+      <div class="gp-info">
+        <h2>{{ guardian.full_name }}</h2>
+        <div class="gp-meta">
+          {% if guardian.phone %}
+          <span class="gp-pill">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+            {{ guardian.phone }}
+          </span>
+          {% endif %}
+          {% if guardian.email %}
+          <span class="gp-pill">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 01-2.06 0L2 7"/></svg>
+            {{ guardian.email }}
+          </span>
+          {% endif %}
+          {% if guardian.pdpa_consent_given %}
+          <span class="gp-pill" style="background:rgba(76,175,80,0.35)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+            PDPA Consented
+          </span>
+          {% else %}
+          <span class="gp-pill" style="background:rgba(244,67,54,0.3)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            PDPA Pending
+          </span>
+          {% endif %}
+          {% if guardian.preferred_language %}
+          <span class="gp-pill">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            {{ guardian.get_preferred_language_display }}
+          </span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {#  Relationship Breakdown  #}
+    <div class="card" style="border-top:4px solid var(--hodari-blue)">
+      <div class="card-title-row" style="margin-bottom:16px">
+        <div class="card-title" style="margin:0;font-size:14px">Relationship Breakdown</div>
+        <span class="chip chip-blue" style="font-size:11px">{{ linked_students|length }} Student{{ linked_students|length|pluralize }}</span>
+      </div>
+
+      {#  Summary Stats  #}
+      <div class="rel-breakdown">
+        <div class="rel-stat">
+          <div class="count">{{ rel_stats.total }}</div>
+          <div class="label">Total Links</div>
+        </div>
+        <div class="rel-stat">
+          <div class="count" style="color:#16a34a">{{ rel_stats.primary_count }}</div>
+          <div class="label">Primary Contact</div>
+        </div>
+        <div class="rel-stat">
+          <div class="count" style="color:#d97706">{{ rel_stats.mother_count|add:rel_stats.father_count|add:rel_stats.parent_count }}</div>
+          <div class="label">Parents</div>
+        </div>
+        <div class="rel-stat">
+          <div class="count" style="color:#64748B">{{ rel_stats.other_count }}</div>
+          <div class="label">Other</div>
+        </div>
+      </div>
+
+      {#  Detailed Student List  #}
+      <div style="display:flex;flex-direction:column;gap:10px">
+        {% for sl in linked_students %}
+        <a href="{% url 'students:detail' sl.student.pk %}" style="text-decoration:none;color:inherit">
+          <div class="rel-student-row">
+            <div class="rel-student-name">
+              <div class="avatar">{{ sl.student.first_name|slice:":1" }}{{ sl.student.last_name|slice:":1" }}</div>
+              <div class="info">
+                <div class="n">{{ sl.student.first_name }} {{ sl.student.last_name }}</div>
+                <div class="c">{{ sl.student.class_name }} · ADM {{ sl.student.admission_no }}</div>
+              </div>
+            </div>
+
+            <span class="rel-type-badge
+              {% if sl.relationship == 'mother' %}mother
+              {% elif sl.relationship == 'father' %}father
+              {% elif sl.relationship == 'parent' %}father
+              {% elif sl.relationship == 'guardian' or sl.relationship == 'step_mother' or sl.relationship == 'step_father' %}guardian
+              {% else %}other{% endif %}">
+              {{ sl.get_relationship_display }}
+            </span>
+
+            {% if sl.is_primary %}
+              <span class="rel-badge primary">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                Primary
+              </span>
+            {% else %}
+              <span class="rel-badge secondary">Secondary</span>
+            {% endif %}
+
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+          </div>
+        </a>
+        {% empty %}
+        {% include '_partials/empty_state.html' with title='No students linked' desc='Link a student to this guardian.' icon='users' icon_color='blue' action_url='/students/' action_text='Link a student' %}
+        {% endfor %}
+      </div>
+    </div>
+
+    {#  Contact Details  #}
+    <div class="card">
+      <div class="card-title-row" style="margin-bottom:16px">
+        <div class="card-title" style="margin:0;font-size:14px">Contact Information</div>
+      </div>
+      <div class="gp-detail-grid">
+        <div class="gp-detail-item">
+          <label>Primary Phone</label>
+          <span>{{ guardian.phone|default:"N/A" }}</span>
+        </div>
+        <div class="gp-detail-item">
+          <label>Secondary Phone</label>
+          <span>{{ guardian.secondary_phone|default:"N/A" }}</span>
+        </div>
+        <div class="gp-detail-item">
+          <label>Email Address</label>
+          <span>{{ guardian.email|default:"N/A" }}</span>
+        </div>
+        <div class="gp-detail-item">
+          <label>Home Address</label>
+          <span>{{ guardian.address|default:"N/A" }}</span>
+        </div>
+        <div class="gp-detail-item">
+          <label>Preferred Invoice Name</label>
+          <span>{{ guardian.preferred_invoice_name|default:"N/A" }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+    {#  RIGHT SIDEBAR  #}
+  <div style="display:flex;flex-direction:column;gap:20px">
+    {#  Actions  #}
+    <div class="card">
+      <div class="card-title" style="font-size:13px;margin-bottom:12px">Actions</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        {% has_perm user "students.change_parentguardian" as can_change_guardian %}
+        {% if guardian.user and can_change_guardian %}
+        <a href="{% url 'users:impersonate_start' guardian.user.pk %}"
+           class="hf-btn hf-btn-primary" style="width:100%;justify-content:center;text-decoration:none">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          View as Parent
+        </a>
+        {% endif %}
+        <a href="{% url 'students:guardian_list' %}"
+           class="hf-btn hf-btn-secondary" style="width:100%;justify-content:center;text-decoration:none">
+          ← Back to List
+        </a>
+      </div>
+    </div>
+
+    {#  PDPA Consent  #}
+    <div class="card">
+      <div class="card-title" style="font-size:13px;margin-bottom:12px">PDPA Consent</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="gp-detail-item">
+          <label>Status</label>
+          {% if guardian.has_given_consent %}
+            <span class="chip chip-green" style="width:fit-content">Consented</span>
+          {% else %}
+            <span class="chip chip-red" style="width:fit-content">Not Consented</span>
+          {% endif %}
+        </div>
+        {% if guardian.pdpa_consented_at %}
+        <div class="gp-detail-item">
+          <label>Consented At</label>
+          <span>{{ guardian.pdpa_consented_at|date:"d M Y H:i" }}</span>
+        </div>
+        {% endif %}
+        {% if guardian.pdpa_consent_method %}
+        <div class="gp-detail-item">
+          <label>Method</label>
+          <span>{{ guardian.get_pdpa_consent_method_display }}</span>
+        </div>
+        {% endif %}
+        {% if guardian.pdpa_consent_version %}
+        <div class="gp-detail-item">
+          <label>Version</label>
+          <span>{{ guardian.pdpa_consent_version }}</span>
+        </div>
+        {% endif %}
+        {% has_perm user "students.change_parentguardian" as can_withdraw_consent %}
+        {% if guardian.has_given_consent and can_withdraw_consent %}
+        <button type="button" class="hf-btn hf-btn-outline" style="width:100%;justify-content:center;color:#DC2626;border-color:#FECACA"
+          onclick="confirmDeleteModal({title:'Withdraw Consent?',body:'Withdraw PDPA consent for <strong>{{ guardian.full_name }}</strong>?',detail:'This can be re-recorded later.',confirmText:'Withdraw Consent',url:'{% url 'students:guardian_consent_withdraw' guardian.pk %}',type:'warning'})">
+          Withdraw Consent
+        </button>
+        {% endif %}
+      </div>
+    </div>
+
+    {#  Consent History  #}
+    {% if consent_logs %}
+    <div class="card">
+      <div class="card-title" style="font-size:13px;margin-bottom:12px">Consent History</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        {% for log in consent_logs %}
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #F1F5F9">
+          <div style="width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0;background:{% if log.action == 'given' %}#22C55E{% elif log.action == 'withdrawn' %}#EF4444{% else %}#FBBC05{% endif %}"></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;font-weight:600">
+              {{ log.get_action_display }}
+              {% if log.version %} &middot; v{{ log.version }}{% endif %}
+            </div>
+            <div style="font-size:10.5px;color:#8492A6;margin-top:1px">
+              {{ log.created_at|date:"d M Y H:i" }} &middot; {{ log.actor.get_full_name|default:log.actor.username }}
+              {% if log.method %} &middot; {{ log.get_method_display }}{% endif %}
+            </div>
+            {% if log.notes %}
+            <div style="font-size:10.5px;color:#64748B;margin-top:2px">{{ log.notes }}</div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {#  Account Status  #}
+    <div class="card">
+      <div class="card-title" style="font-size:13px;margin-bottom:12px">Account Details</div>
+      <div class="gp-detail-grid" style="grid-template-columns:1fr">
+        <div class="gp-detail-item">
+          <label>Guardian ID</label>
+          <span style="font-family:monospace;font-size:12px">#{{ guardian.pk }}</span>
+        </div>
+        <div class="gp-detail-item">
+          <label>Registered</label>
+          <span>{{ guardian.created_at|date:"d M Y" }}</span>
+        </div>
+        {% if guardian.user %}
+        <div class="gp-detail-item">
+          <label>Portal Access</label>
+          <span class="chip chip-green" style="width:fit-content">Active</span>
+        </div>
+        {% else %}
+        <div class="gp-detail-item">
+          <label>Portal Access</label>
+          <span class="chip chip-grey" style="width:fit-content">Not Registered</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

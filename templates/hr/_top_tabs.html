@@ -1,0 +1,71 @@
+<style>
+  .hr-tab-bar {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 32px;
+    padding: 4px;
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border, #E0E7EF);
+    border-radius: 10px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .hr-tab-bar::-webkit-scrollbar { height: 4px; }
+  .hr-tab-bar::-webkit-scrollbar-thumb { background: #D1D9E8; border-radius: 99px; }
+  .hr-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary, #5A697D);
+    text-decoration: none;
+    border-radius: 7px;
+    white-space: nowrap;
+    transition: background .13s, color .13s;
+  }
+  .hr-tab:hover {
+    background: #EFF2F6;
+    color: var(--text-primary, #1A1A2E);
+  }
+  .hr-tab.active,
+  .hr-tab.active:hover {
+    background: var(--hodari-blue, #023AA5);
+    color: #fff;
+  }
+  .hr-tab .tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+    background: #DC2626;
+    border-radius: 99px;
+    line-height: 1;
+  }
+</style>
+{% load role_tags %}
+{% with url_name=request.resolver_match.url_name %}
+<div class="hr-tab-bar">
+  {% if perms.hr.view_staffprofile %}
+  <a href="{% url 'hr:dashboard' %}" class="hr-tab {% if url_name == 'dashboard' %}active{% endif %}">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    Dashboard
+  </a>
+  {% endif %}
+  {% if perms.hr.view_staffprofile %}
+  <a href="{% url 'hr:staff_list' %}" class="hr-tab {% if url_name == 'staff_list' or url_name == 'staff_detail' or url_name == 'staff_create' or url_name == 'staff_edit' or url_name == 'staff_departure' or url_name == 'user_list' or url_name == 'user_create' or url_name == 'user_edit' or url_name == 'onboarding_start' or url_name == 'onboarding_tabbed' or url_name == 'onboarding_step' or url_name == 'offboarding_detail' or url_name == 'teacher_assignment_edit' or url_name == 'teacher_assignment_delete' %}active{% endif %}">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    Staff
+  </a>
+  {% endif %}
+  {# Leave, Payroll, Statutory — hidden for now #}
+</div>
+{% endwith %}

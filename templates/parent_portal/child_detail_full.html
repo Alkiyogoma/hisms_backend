@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% block title %}{{ student.first_name }} {{ student.last_name }} — Parent Portal{% endblock %}
+{% block content %}
+
+{% if error %}
+<div class="card" style="padding:48px;text-align:center">
+  <p style="color:var(--text-muted);font-size:14px;margin:0">{{ error }}</p>
+  <a href="{% url 'parent_portal:children_list' %}" class="hf-btn hf-btn-primary" style="margin-top:16px">Back to My Children</a>
+</div>
+{% else %}
+
+<!-- Breadcrumb -->
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted);margin-bottom:20px">
+  <a href="{% url 'parent_portal:children_list' %}" style="color:var(--hodari-blue);text-decoration:none">My Children</a>
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg>
+  <span style="color:var(--text-primary);font-weight:600">{{ student.first_name }} {{ student.last_name }}</span>
+</div>
+
+<!-- Profile Header -->
+<div class="card" style="padding:0;overflow:hidden;margin-bottom:24px">
+  <div style="display:flex;align-items:stretch">
+    <div style="display:flex;align-items:center;justify-content:center;padding:28px 32px;background:linear-gradient(135deg,#023AA5 0%,#1A56C4 100%);min-width:160px">
+      <div style="width:100px;height:100px;border-radius:50%;background:rgba(255,255,255,0.15);color:#fff;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:700;border:3px solid rgba(255,255,255,0.3)">
+        {% if student.photo %}
+          <img src="{{ student.photo.url }}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">
+        {% else %}
+          {{ student.first_name.0 }}{{ student.last_name.0 }}
+        {% endif %}
+      </div>
+    </div>
+    <div style="flex:1;padding:24px 28px;display:flex;flex-direction:column;justify-content:center">
+      <h1 style="margin:0;font-size:22px;font-weight:800;color:#1E293B">{{ student.first_name }} {{ student.last_name }}</h1>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:14px;color:#64748B;flex-wrap:wrap">
+        <span style="font-family:monospace;font-weight:700;color:var(--hodari-blue);background:#EFF6FF;padding:2px 8px;border-radius:6px;font-size:12px">{{ student.admission_no }}</span>
+        <span>{{ student.class_name|default:"—" }}</span>
+        {% if student.stream_name %}<span>· {{ student.stream_name }}</span>{% endif %}
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">
+        {% if student.gender %}<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:99px;font-size:12px;font-weight:600;background:#F8FAFC;border:1px solid #E2E8F0;color:#475569">{{ student.get_gender_display }}</span>{% endif %}
+        {% if student.date_of_birth %}<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:99px;font-size:12px;font-weight:600;background:#F8FAFC;border:1px solid #E2E8F0;color:#475569">Age {{ student.age }}</span>{% endif %}
+        {% if student.blood_type %}<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:99px;font-size:12px;font-weight:600;background:#F8FAFC;border:1px solid #E2E8F0;color:#475569">{{ student.blood_type }}</span>{% endif %}
+        {% if student.allergies_medical %}<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:99px;font-size:12px;font-weight:700;background:#FEF2F2;border:1px solid #FECACA;color:#9B1C1C">Medical Alert</span>{% endif %}
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;padding:14px 20px;align-self:flex-start">
+      <a href="{% url 'parent_portal:guardian_list' student.id %}" class="hf-btn hf-btn-secondary" style="font-size:12px;text-align:center">Guardians</a>
+      <a href="{% url 'parent_portal:child_overview' student.id %}" class="hf-btn hf-btn-secondary" style="font-size:12px;text-align:center">Overview</a>
+    </div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 340px;gap:24px;align-items:start">
+
+  <!-- Main Column -->
+  <div style="display:flex;flex-direction:column;gap:24px">
+
+    <!-- Attendance -->
+    <div class="card" style="padding:24px">
+      <h3 style="margin:0 0 16px;font-size:16px;font-weight:700">Attendance (Last 30 Days)</h3>
+      {% if att_stats.total %}
+      <div style="display:flex;gap:24px;margin-bottom:16px">
+        <div style="text-align:center">
+          <div style="font-size:28px;font-weight:800;color:var(--hodari-blue)">{{ att_stats.rate }}%</div>
+          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:600">Attendance Rate</div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:4px">
+          <div style="display:flex;gap:8px;font-size:12px">
+            <span style="color:#16A34A;font-weight:600">Present: {{ att_stats.present }}</span>
+            <span style="color:#CA8A04;font-weight:600">Late: {{ att_stats.late }}</span>
+            <span style="color:#DC2626;font-weight:600">Absent: {{ att_stats.absent }}</span>
+          </div>
+          <div style="height:8px;background:#E2E8F0;border-radius:99px;overflow:hidden">
+            <div style="height:100%;width:{{ att_stats.rate }}%;background:var(--hodari-blue);border-radius:99px"></div>
+          </div>
+        </div>
+      </div>
+      {% if recent_attendance %}
+      <table class="h-table">
+        <thead><tr><th>Date</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for e in recent_attendance %}
+          <tr>
+            <td>{{ e.date|date:"d M Y" }}</td>
+            <td>
+              {% with s=e.status|lower %}
+              {% if "present" in s %}<span style="color:#16A34A;font-weight:600">Present</span>
+              {% elif "late" in s %}<span style="color:#CA8A04;font-weight:600">Late</span>
+              {% elif "absent" in s %}<span style="color:#DC2626;font-weight:600">Absent</span>
+              {% else %}<span>{{ e.status }}</span>{% endif %}
+              {% endwith %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+      {% else %}
+      <p style="color:var(--text-muted);font-size:13px;margin:0">No attendance records in the last 30 days.</p>
+      {% endif %}
+    </div>
+
+    <!-- Academic Scores -->
+    {% if grouped_scores %}
+    <div class="card" style="padding:24px">
+      <h3 style="margin:0 0 16px;font-size:16px;font-weight:700">Academic Scores{% if active_term %} — {{ active_term.name }}{% endif %}</h3>
+      <table class="h-table">
+        <thead>
+          <tr>
+            <th>Subject</th>
+            <th style="text-align:center">Quiz</th>
+            <th style="text-align:center">Mid</th>
+            <th style="text-align:center">End</th>
+            <th style="text-align:center">Average</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in grouped_scores.values %}
+          <tr>
+            <td style="font-weight:600">{{ d.subject }}</td>
+            <td style="text-align:center">{% if d.quiz %}{{ d.quiz }}{% else %}—{% endif %}</td>
+            <td style="text-align:center">{% if d.mid %}{{ d.mid }}{% else %}—{% endif %}</td>
+            <td style="text-align:center">{% if d.end %}{{ d.end }}{% else %}—{% endif %}</td>
+            <td style="text-align:center;font-weight:700">{{ d.average }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    <!-- Report Cards -->
+    {% if report_cards %}
+    <div class="card" style="padding:24px">
+      <h3 style="margin:0 0 16px;font-size:16px;font-weight:700">Report Cards</h3>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        {% for rc in report_cards %}
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#F8FAFC;border:1px solid var(--border);border-radius:8px">
+          <div>
+            <div style="font-weight:600;font-size:14px">{{ rc.term.name }}</div>
+            <div style="font-size:12px;color:var(--text-muted)">{{ rc.term.academic_year }}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            {% if rc.overall_average %}<span style="font-weight:700;font-size:14px">{{ rc.overall_average }}%</span>{% endif %}
+            <a href="{% url 'academics:report_preview' rc.pk %}" class="hf-btn hf-btn-secondary" style="font-size:11px;padding:4px 10px">View Report</a>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Guardians -->
+    <div class="card" style="padding:24px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <h3 style="margin:0;font-size:16px;font-weight:700">Guardians</h3>
+        <a href="{% url 'parent_portal:guardian_list' student.id %}" class="hf-btn hf-btn-secondary" style="font-size:12px">Manage</a>
+      </div>
+      {% if guardian_links %}
+      <div style="display:flex;flex-direction:column;gap:8px">
+        {% for gl in guardian_links %}
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:#F8FAFC;border:1px solid var(--border);border-radius:8px">
+          <div style="width:36px;height:36px;border-radius:50%;background:var(--hodari-blue);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">
+            {{ gl.guardian.full_name.0 }}
+          </div>
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:14px">{{ gl.guardian.full_name }}</div>
+            <div style="font-size:12px;color:var(--text-muted)">{{ gl.get_relationship_display }} · {{ gl.guardian.phone }}</div>
+          </div>
+          {% if gl.is_primary %}<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#EFF6FF;color:#1E40AF">Primary</span>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p style="color:var(--text-muted);font-size:13px;margin:0">No guardians linked.</p>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <!-- Sidebar Column -->
+  <div style="display:flex;flex-direction:column;gap:24px">
+
+    <!-- Overall Average -->
+    <div class="card" style="padding:24px;text-align:center">
+      <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:8px">Overall Average</div>
+      <div style="font-size:36px;font-weight:800;color:var(--hodari-blue)">{{ overall_average }}%</div>
+      {% if active_term %}<div style="font-size:12px;color:var(--text-muted);margin-top:4px">{{ active_term.name }}</div>{% endif %}
+      {% if grouped_scores %}<div style="font-size:12px;color:var(--text-muted)">{{ grouped_scores|length }} subject{{ grouped_scores|length|pluralize }}</div>{% endif %}
+    </div>
+
+    <!-- Personal Info -->
+    <div class="card" style="padding:24px">
+      <h3 style="margin:0 0 16px;font-size:16px;font-weight:700">Personal Information</h3>
+      <div style="display:flex;flex-direction:column;gap:12px;font-size:13px">
+        <div><span style="color:var(--text-muted)">Date of Birth</span><br><strong>{{ student.date_of_birth|date:"d M Y"|default:"—" }}</strong></div>
+        <div><span style="color:var(--text-muted)">Gender</span><br><strong>{{ student.get_gender_display|default:"—" }}</strong></div>
+        <div><span style="color:var(--text-muted)">Nationality</span><br><strong>{{ student.nationality|default:"—" }}</strong></div>
+        <div><span style="color:var(--text-muted)">Religion</span><br><strong>{{ student.religion|default:"—" }}</strong></div>
+        <div><span style="color:var(--text-muted)">Blood Type</span><br><strong>{{ student.blood_type|default:"—" }}</strong></div>
+        {% if student.allergies_medical %}
+        <div style="padding:10px;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px">
+          <span style="color:#9B1C1C;font-weight:700;font-size:11px;text-transform:uppercase">Medical / Allergies</span><br>
+          <strong style="color:#9B1C1C">{{ student.allergies_medical }}</strong>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Enrichment Grades -->
+    {% if enrichment_grades %}
+    <div class="card" style="padding:24px">
+      <h3 style="margin:0 0 16px;font-size:16px;font-weight:700">Enrichment Grades</h3>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        {% for eg in enrichment_grades %}
+        <div style="display:flex;justify-content:space-between;padding:8px 12px;background:#F8FAFC;border-radius:6px;font-size:13px">
+          <span>{{ eg.enrichment_subject.name }}</span>
+          <strong>{{ eg.letter_grade }}</strong>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Teacher Comments -->
+    {% if teacher_comments %}
+    <div class="card" style="padding:24px">
+      <h3 style="margin:0 0 16px;font-size:16px;font-weight:700">Teacher Comments</h3>
+      {% for c in teacher_comments %}
+      <div style="padding:12px;background:#F8FAFC;border-radius:8px;margin-bottom:8px;font-size:13px">
+        <strong>{{ c.subject }}</strong>
+        <p style="margin:4px 0 0;color:var(--text-secondary)">{{ c.comment }}</p>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Learner Attributes -->
+    {% if learner_attributes %}
+    <div class="card" style="padding:24px">
+      <h3 style="margin:0 0 16px;font-size:16px;font-weight:700">Learner Attributes</h3>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        {% for a in learner_attributes %}
+        <div style="display:flex;justify-content:space-between;padding:8px 12px;background:#F8FAFC;border-radius:6px;font-size:13px">
+          <span>Attribute {{ a.attribute_number }}</span>
+          <strong>{{ a.rating }}</strong>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+
+</div>
+
+{% endif %}
+{% endblock %}

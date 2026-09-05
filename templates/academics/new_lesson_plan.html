@@ -1,0 +1,920 @@
+{% extends "base.html" %}
+{% load hodari_forms %}
+{% block title %}{% if form.instance.pk %}Edit{% else %}New{% endif %} Lesson Plan &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Lesson Plan Management{% endblock %}
+{% block topbar_date %}{{ today_display }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .lp-create-layout {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 24px;
+    align-items: start;
+    max-width: 1300px;
+    margin: 0 auto;
+  }
+  .lp-create-main { display: flex; flex-direction: column; gap: 20px; }
+  .lp-create-sidebar { display: flex; flex-direction: column; gap: 20px; }
+
+  /* Status tags */
+  .status-tag { padding: 3px 10px; border-radius: 99px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+  .st-approved { background: #E8F5EC; color: #1B7B34; }
+  .st-rejected, .st-revision_requested { background: #FEF2F2; color: #9B1C1C; }
+  .st-submitted { background: #FFFBEB; color: #92400E; }
+  .st-draft { background: #F1F5F9; color: #475569; }
+
+  /* Recent submissions */
+  .recent-item { padding: 12px; border: 1px solid #E2E8F0; border-radius: 10px; margin-bottom: 10px; transition: all 0.15s; }
+  .recent-item:hover { border-color: var(--hodari-blue); background: #F8FAFC; }
+  .recent-subject { font-size: 13px; font-weight: 700; color: #1E293B; margin-top: 6px; }
+  .recent-meta { font-size: 11px; color: #64748B; font-weight: 600; margin-top: 2px; }
+  .recent-edit { display: inline-block; margin-top: 6px; font-size: 11px; font-weight: 700; color: var(--hodari-blue); text-decoration: none; }
+  .recent-edit:hover { text-decoration: underline; }
+
+  /* Sidebar section title */
+  .sidebar-section-title { font-size: 11px; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 10px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+
+  /* Upload zone */
+  .upload-zone { border: 2px dashed #CBD5E1; border-radius: 12px; padding: 28px 20px; text-align: center; cursor: pointer; transition: all 0.2s; background: #F8FAFC; }
+  .upload-zone:hover { border-color: var(--hodari-blue); background: #EFF6FF; }
+
+  /* File items */
+  .file-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; margin-bottom: 8px; font-size: 13px; }
+  .file-info { display: flex; align-items: center; gap: 8px; overflow: hidden; }
+  .file-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: #1E293B; }
+
+  /* Section label */
+  .section-label { font-size: 10px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+
+  /* Past-week warning on input */
+  .hf2-input.hf2-warn { border-color: #F59E0B; background: #FFFBEB; }
+  .hf2-input.hf2-warn:focus { border-color: #D97706; box-shadow: 0 0 0 3px rgba(245,158,11,0.15); }
+  .hf2-group.hf2-group-warn { flex-direction: row; flex-wrap: wrap; }
+  .hf2-group.hf2-group-warn .hf2-label { flex: 0 0 100%; }
+  .hf2-group.hf2-group-warn .hf2-input { flex: 1 1 auto; min-width: 140px; }
+  .hf2-warn-msg { flex: 0 0 auto; font-size: 11px; color: #92400E; font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+
+  /* Tips card */
+  .tips-card { background: var(--hodari-blue); border-radius: 16px; padding: 20px; color: #fff; }
+  .tips-card h4 { margin: 0 0 10px 0; font-size: 14px; font-weight: 700; }
+  .tips-card ul { margin: 0; padding-left: 20px; font-size: 12px; line-height: 1.7; opacity: 0.9; }
+
+  /* Subject validation hint */
+  .subject-hint { display: none; margin-top: 8px; padding: 10px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; line-height: 1.5; animation: hintFadeIn 0.2s ease; }
+  .subject-hint.warn { display: flex; align-items: flex-start; gap: 8px; background: #FFF7ED; border: 1px solid #FED7AA; color: #9A3412; }
+
+  .subject-hint svg { flex-shrink: 0; margin-top: 1px; }
+  @keyframes hintFadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Timetable subject pills */
+  .timetable-pills-container { margin-top: 14px; }
+  .timetable-pills-container.visible { display: flex; flex-direction: column; gap: 8px; }
+  .timetable-pills-label { font-size: 10px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .subject-pill { display: inline-flex; align-items: center; gap: 10px; padding: 8px 14px; border-radius: 10px; border: 2px solid #E2E8F0; cursor: pointer; transition: all 0.15s; background: #fff; }
+  .subject-pill:hover { border-color: var(--pill-color, var(--hodari-blue)); background: #F8FAFC; }
+  .subject-pill.active { border-color: var(--pill-color, var(--hodari-blue)); background: #F0F5FF; }
+  .pill-subject-code { font-size: 12px; font-weight: 800; color: var(--pill-color); min-width: 48px; }
+  .pill-days { display: flex; gap: 6px; align-items: center; }
+  .day-dot { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 26px; border-radius: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; background: #F1F5F9; color: #94A3B8; transition: all 0.15s; }
+  .day-dot.active { background: var(--day-color); color: #fff; }
+
+  /* Responsive */
+  .edit-preview-btn { color: var(--hodari-blue); font-weight: 700; text-decoration: none; font-size: 12px; cursor: pointer; background: none; border: none; padding: 4px 8px; border-radius: 6px; transition: background 0.15s; }
+  .edit-preview-btn:hover { background: #EFF6FF; }
+  .edit-preview-btn.active { background: #DBEAFE; }
+.edit-preview-container { margin-top: 10px; border-radius: 8px; overflow: hidden; border: 1px solid #E2E8F0; display: none; }
+.edit-preview-container.open { display: block; }
+.edit-preview-container iframe { width: 100%; height: 85vh; min-height: 600px; border: none; }
+.edit-preview-container img { width: 100%; max-height: 85vh; min-height: 600px; object-fit: contain; display: block; background: #F8FAFC; }
+
+/* Full-screen file preview modal */
+#filePreviewModal { display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); }
+#filePreviewModal .fp-inner { position:absolute; inset:16px; background:#fff; border-radius:12px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.4); }
+#filePreviewModal .fp-header { display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid #E2E8F0; background:#F8FAFC; flex-shrink:0; }
+#filePreviewModal .fp-header span { font-size:14px; font-weight:700; color:#1E293B; }
+#filePreviewModal .fp-header a { padding:5px 12px; font-size:12px; text-decoration:none; color:#64748B; border:1px solid #E2E8F0; border-radius:6px; display:inline-flex; align-items:center; gap:4px; }
+#filePreviewModal .fp-header a:hover { background:#F1F5F9; }
+#filePreviewModal .fp-close { background:none; border:none; cursor:pointer; padding:4px; color:#64748B; border-radius:6px; }
+#filePreviewModal .fp-close:hover { background:#F1F5F9; }
+#filePreviewModal .fp-body { flex:1; display:flex; align-items:center; justify-content:center; overflow:auto; background:#F1F5F9; padding:0; }
+#filePreviewModal .fp-body iframe { width:100%; height:100%; border:none; }
+#filePreviewModal .fp-body img { max-width:100%; max-height:100%; object-fit:contain; }
+  .edit-preview-container pre { width: 100%; max-height: 75vh; min-height: 400px; overflow: auto; padding: 16px; margin: 0; font-size: 12px; line-height: 1.5; background: #F8FAFC; border: none; font-family: 'SF Mono', 'Fira Code', monospace; white-space: pre-wrap; word-break: break-word; }
+  .edit-preview-container .csv-scroll { max-height: 75vh; min-height: 400px; overflow: auto; overflow-x: auto; }
+  .edit-preview-container .csv-scroll table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .edit-preview-container .csv-scroll table th { background: #F1F5F9; padding: 8px 12px; text-align: left; font-weight: 700; color: #475569; border-bottom: 2px solid #E2E8F0; position: sticky; top: 0; }
+  .edit-preview-container .csv-scroll table td { padding: 6px 12px; border-bottom: 1px solid #F1F5F9; color: #334155; }
+  .edit-preview-container .csv-scroll table tr:hover td { background: #F8FAFC; }
+
+  @media (max-width: 900px) {
+    .lp-create-layout { grid-template-columns: 1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "academics/_lesson_plan_tabs.html" %}
+<form method="post" enctype="multipart/form-data" id="lessonPlanForm">
+  {% csrf_token %}
+
+  <div class="lp-create-layout">
+    <!-- ============ LEFT: Form + Attachments + Buttons ============ -->
+    <div class="lp-create-main">
+
+      <!-- Schedule & Details -->
+      <div class="card">
+        <div class="card-title">{% if form.instance.pk %}Edit{% else %}Create{% endif %} Lesson Plan</div>
+        <div style="font-size:13px; color:var(--text-muted); margin-bottom:24px; margin-top:-6px">
+          Lesson plans must be submitted by Monday 8:00 AM of the relevant week.
+        </div>
+
+        {% if form.non_field_errors %}
+          <div class="msg-toast msg-error" style="margin-bottom:20px">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="hf2-section">
+          <div class="hf2-section-title">Schedule & Details</div>
+          <div class="hf2-grid-2">
+            <div class="hf2-group">
+              <label class="hf2-label">Term</label>
+              <div style="padding:8px 12px;background:#F1F5F9;border-radius:8px;font-weight:600;color:#475569;font-size:14px">
+                {{ term_display|default:"Current active term" }}
+              </div>
+            </div>
+            <div class="hf2-group">
+              <label class="hf2-label">Week</label>
+              <div style="display:flex;align-items:center;gap:0">
+                <a href="?week={{ week_offset|add:'-1' }}" style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;border:1.5px solid #E2E8F0;border-radius:8px 0 0 8px;background:#F8FAFC;color:#475569;text-decoration:none;transition:all 0.15s;cursor:pointer" onmouseover="this.style.background='#E2E8F0'" onmouseout="this.style.background='#F8FAFC'">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+                </a>
+                <div style="flex:1;text-align:center;padding:8px 12px;background:#F1F5F9;border-top:1.5px solid #E2E8F0;border-bottom:1.5px solid #E2E8F0;font-weight:600;color:#1E293B;font-size:13px;white-space:nowrap">
+                  {{ current_monday|date:"M j" }} – {{ current_friday|date:"M j, Y" }}
+                </div>
+                <a href="?week={{ week_offset|add:'1' }}" style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;border:1.5px solid #E2E8F0;border-radius:0 8px 8px 0;background:#F8FAFC;color:#475569;text-decoration:none;transition:all 0.15s;cursor:pointer" onmouseover="this.style.background='#E2E8F0'" onmouseout="this.style.background='#F8FAFC'">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+                </a>
+                {% if week_offset != 0 %}
+                <a href="?week=0" style="margin-left:6px;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;color:var(--hodari-blue);text-decoration:none;background:#EFF6FF;border:1px solid #BFDBFE;transition:all 0.15s" onmouseover="this.style.background='#DBEAFE'" onmouseout="this.style.background='#EFF6FF'">This week</a>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          <input type="hidden" id="id_week_start_date" name="week_start_date" value="{% if form.instance.pk %}{{ form.instance.week_start_date|date:'Y-m-d' }}{% else %}{{ current_monday|date:'Y-m-d' }}{% endif %}">
+          {{ form.day_of_week }}
+          <input type="hidden" id="id_class_name" name="class_name" value="{% if form.instance.pk %}{{ form.instance.class_name }}{% endif %}">
+          <input type="hidden" id="id_subject_name" name="subject_name" value="{% if form.instance.pk %}{{ form.instance.subject_name }}{% endif %}">
+          {% if is_super_admin %}<input type="hidden" id="id_slot_teacher_id" name="slot_teacher_id" value="">{% endif %}
+          <div id="subject-hint" class="subject-hint"></div>
+          <div id="timetable-grid-wrap" class="timetable-pills-container">
+            <div class="timetable-pills-label">Timetable — tap a slot to select</div>
+            <div id="timetable-grid" style="display:grid;grid-template-columns:auto repeat(5,1fr);gap:4px;margin-top:6px"></div>
+          </div>
+          <!-- Slot detail panel (shown when a slot is clicked) -->
+          <div id="slot-detail" style="display:none;margin-top:16px;border:1.5px solid #E2E8F0;border-radius:12px;padding:14px 18px">
+            <div style="display:flex;align-items:flex-start;gap:14px">
+              <div id="slot-detail-icon" style="width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0"></div>
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:2px">
+                  <div id="slot-detail-title" style="font-size:14px;font-weight:700;color:#1E293B"></div>
+                  <div id="slot-detail-badge" style="flex-shrink:0"></div>
+                </div>
+                <div id="slot-detail-sub" style="font-size:11px;color:#64748B;font-weight:500;margin-bottom:10px"></div>
+                <div id="slot-detail-body"></div>
+              </div>
+            </div>
+          </div>
+          <!-- Title field (only when slot selected) -->
+          <div id="title-field-wrap" style="display:none;margin-top:16px">
+            <label class="hf2-label">Lesson Title</label>
+            <input type="text" id="id_lesson_title" name="lesson_title" placeholder="e.g. Introduction to Fractions"
+                   style="width:100%;padding:10px 14px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:13px;font-weight:500;color:#1E293B;transition:border-color 0.15s"
+                   onfocus="this.style.borderColor='var(--hodari-blue)'" onblur="this.style.borderColor='#E2E8F0'">
+          </div>
+        </div>
+      </div>
+
+      <!-- Attachments (below form) -->
+      <div class="card" style="padding:20px">
+        <div class="sidebar-section-title" style="border-bottom:none; padding-bottom:0; margin-bottom:14px">Attachments</div>
+
+        {% if form.instance.pk and form.instance.attachments.exists %}
+          <div style="margin-bottom:16px">
+            <div class="section-label">Uploaded Documents</div>
+            {% for att in form.instance.attachments.all %}
+              <div class="file-item" style="flex-direction:column; align-items:stretch">
+                <div style="display:flex; align-items:center; gap:12px; width:100%">
+                  <div class="file-info" style="flex:1; min-width:0">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:#64748B; flex-shrink:0"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                    <span class="file-name" title="{{ att.filename }}">{{ att.filename }}</span>
+                  </div>
+                  <button type="button" class="edit-preview-btn" data-att-id="{{ att.id }}" data-file-url="{{ att.file.url }}" data-file-name="{{ att.filename }}" onclick="toggleEditPreview(this)">Preview</button>
+                  <a href="{{ att.file.url }}" download style="color:var(--hodari-blue); font-weight:700; text-decoration:none; font-size:12px">Download</a>
+                  {% if form.instance.status == 'draft' or form.instance.status == 'revision_requested' %}
+                  <button type="button" style="background:none; border:none; color:#DC2626; cursor:pointer; font-size:12px; font-weight:700; padding:0" onclick="deleteAttachment({{ att.id }}, '{{ att.filename|escapejs }}')">Remove</button>
+                  {% endif %}
+                </div>
+                <div class="edit-preview-container" id="ep-{{ att.id }}"></div>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <div onclick="document.getElementById('file-input').click()">
+          <div class="upload-zone">
+            <div style="color:#94A3B8; margin-bottom:10px">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            </div>
+            <div style="font-size:13px; font-weight:700; color:#1E293B">Add Resources</div>
+            <div style="font-size:11px; color:#64748B; margin-top:4px">PDF, Word, Excel, PowerPoint, Images, CSV &middot; Max 10 MB each</div>
+          </div>
+          <input type="file" name="attachments" id="file-input" multiple style="display:none" onchange="handleFileSelection(this)">
+        </div>
+
+        <div id="new-files-list" style="margin-top:14px; display:none">
+          <div class="section-label" style="color:var(--hodari-blue)">Queued for Upload</div>
+          <div id="file-queue"></div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="hf2-actions" style="margin-top:0">
+        <a href="{% url 'academics:lesson_plans' %}" class="hf-btn hf-btn-secondary" style="margin-right:auto">Cancel</a>
+        <button type="submit" name="action" value="draft" id="btn-draft" class="hf-btn hf-btn-secondary">Save as Draft</button>
+        <button type="submit" name="action" value="submit" id="btn-submit" class="hf-btn hf-btn-primary">Submit for Review</button>
+      </div>
+    </div>
+
+    <!-- ============ RIGHT: Recent Submissions + Tips ============ -->
+    <div class="lp-create-sidebar">
+
+      <!-- Recent Submissions -->
+      <div class="card" style="padding:20px">
+        <div class="sidebar-section-title">Recent Submissions</div>
+
+        {% for p in recent_submissions %}
+          <div class="recent-item">
+            <div style="display:flex; align-items:center; gap:8px">
+              <span class="status-tag st-{{ p.status }}">{{ p.get_status_display }}</span>
+              <span style="font-size:10px; color:#94A3B8; font-weight:600">#{{ p.id }}</span>
+            </div>
+            <div class="recent-subject">{{ p.subject_name }}</div>
+            <div class="recent-meta">{{ p.class_name }} &middot; Week of {{ p.week_start_date|date:"d M" }}</div>
+            {% with att_count=p.attachments.all|length %}
+            <div style="display:flex; gap:4px; margin-top:6px; flex-wrap:wrap; align-items:center">
+              {% if att_count > 0 %}
+                <button type="button" class="hf-btn hf-btn-secondary hf-btn-sm" style="font-size:10px; padding:3px 8px"
+                  onclick="var el=document.getElementById('att-list-{{ p.id }}');el.style.display=el.style.display==='none'?'block':'none'">
+                  Files ({{ att_count }})
+                </button>
+              {% endif %}
+              {% if p.status == 'draft' or p.status == 'rejected' or p.status == 'revision_requested' %}
+                <a href="{% url 'academics:lesson_plan_edit' p.id %}" class="hf-btn hf-btn-secondary hf-btn-sm" style="text-decoration:none; font-size:10px; padding:3px 8px">
+                  Edit
+                </a>
+                <form method="post" action="{% url 'academics:submit_lesson_plan' p.id %}" style="display:inline">
+                  {% csrf_token %}
+                  <button class="hf-btn hf-btn-primary hf-btn-sm" style="font-size:10px; padding:3px 8px">
+                    {% if p.status == 'revision_requested' %}Resubmit{% else %}Submit{% endif %}
+                  </button>
+                </form>
+                <button type="button" class="hf-btn hf-btn-danger hf-btn-sm" style="font-size:10px; padding:3px 8px"
+                  onclick="confirmDeleteModal({title:'Delete Lesson Plan?',body:'Delete this <strong>{{ p.subject_name }}</strong> lesson plan for <strong>{{ p.class_name }}</strong>?',detail:'This cannot be undone.',confirmText:'Delete Plan',url:'{% url 'academics:delete_lesson_plan' p.id %}'})">
+                  Delete
+                </button>
+              {% elif p.status == 'submitted' %}
+                <form method="post" action="{% url 'academics:withdraw_lesson_plan' p.id %}" style="display:inline">
+                  {% csrf_token %}
+                  <button class="hf-btn hf-btn-secondary hf-btn-sm" style="font-size:10px; padding:3px 8px">
+                    Withdraw
+                  </button>
+                </form>
+              {% elif p.status == 'approved' %}
+                <div style="font-size:10px; color:#1B7B34; font-weight:600">Approved</div>
+              {% endif %}
+            </div>
+            {% if att_count > 0 %}
+              <div id="att-list-{{ p.id }}" style="display:none; margin-top:6px; padding:6px; background:#F8FAFC; border-radius:6px; border:1px solid #E2E8F0">
+                {% for att in p.attachments.all %}
+                  <div style="display:flex; align-items:center; gap:4px; padding:2px 0">
+                    <a href="#" onclick="event.preventDefault();openFilePreview('{{ att.file.url|escapejs }}','{{ att.filename|escapejs }}');return false"
+                       style="font-size:10px; color:var(--hodari-blue); text-decoration:none; font-weight:600; border-bottom:1px dashed var(--hodari-blue)">
+                      {{ att.filename|truncatechars:25 }}
+                    </a>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        {% endwith %}
+        {% empty %}
+          {% include '_partials/empty_state.html' with title='No submissions yet' desc='Your submitted lesson plans will appear here.' icon='doc' icon_color='grey' %}
+        {% endfor %}
+      </div>
+
+      <!-- Submission Tips -->
+      <div class="tips-card">
+        <h4>Submission Tips</h4>
+        <ul>
+          <li>Attach supporting documents (PDF/PPT) in the upload area above.</li>
+          <li>Submit before Monday 8:00 AM to avoid late flags.</li>
+          <li>Only one lesson plan per subject per week is allowed.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</form>
+
+<!-- Full-screen File Preview Modal -->
+<div id="filePreviewModal" onclick="if(event.target===this)closeFilePreview()">
+  <div class="fp-inner">
+    <div class="fp-header">
+      <span id="fpTitle">Document</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <a id="fpDownload" href="#" target="_blank" style="padding:5px 12px;font-size:12px;text-decoration:none;color:#64748B;border:1px solid #E2E8F0;border-radius:6px;display:inline-flex;align-items:center;gap:4px">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download
+        </a>
+        <button class="fp-close" onclick="closeFilePreview()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="fp-body" id="fpBody"></div>
+  </div>
+</div>
+
+<script>
+var timetableSlotsJSON = {{ timetable_slots_json|safe }};
+var currentMondayStr   = '{{ current_monday|date:"Y-m-d" }}';
+var weekDates = [{% for d in week_dates %}'{{ d|date:"j M" }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+var LP_OUTLINE = {
+  'approved':           {border: '#16A34A', bg: '#F0FDF4', fg: '#166534', label: 'Approved'},
+  'submitted':          {border: '#2563EB', bg: '#EFF6FF', fg: '#1E40AF', label: 'Submitted'},
+  'draft':              {border: '#94A3B8', bg: '#F8FAFC', fg: '#475569', label: 'Draft'},
+  'missing':            {border: '#DC2626', bg: '#FEF2F2', fg: '#991B1B', label: 'Missing'},
+  'revision_requested': {border: '#D97706', bg: '#FFFBEB', fg: '#92400E', label: 'Revision'},
+  'rejected':           {border: '#DC2626', bg: '#FEF2F2', fg: '#991B1B', label: 'Rejected'},
+};
+
+var DAY_COLORS = { Mon: '#3B82F6', Tue: '#10B981', Wed: '#F59E0B', Thu: '#8B5CF6', Fri: '#EF4444' };
+var DAY_CODES  = ['mon','tue','wed','thu','fri'];
+var DAY_LABELS = ['Mon','Tue','Wed','Thu','Fri'];
+
+function renderTimetableGrid() {
+  var gridEl = document.getElementById('timetable-grid');
+  var wrapEl = document.getElementById('timetable-grid-wrap');
+  if (!gridEl) return;
+  gridEl.innerHTML = '';
+  if (!timetableSlotsJSON || !timetableSlotsJSON.length) {
+    if (wrapEl) wrapEl.classList.remove('visible');
+    return;
+  }
+  if (wrapEl) wrapEl.classList.add('visible');
+
+  var classMap = {};
+  timetableSlotsJSON.forEach(function(s) {
+    if (!classMap[s.class_name]) classMap[s.class_name] = {};
+    if (!classMap[s.class_name][s.day]) classMap[s.class_name][s.day] = [];
+    classMap[s.class_name][s.day].push(s);
+  });
+
+  var classes = Object.keys(classMap).sort();
+
+  var corner = document.createElement('div');
+  corner.style.cssText = 'font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:0.05em;padding:6px 10px';
+  corner.textContent = 'Class';
+  gridEl.appendChild(corner);
+  DAY_LABELS.forEach(function(label, i) {
+    var h = document.createElement('div');
+    h.style.cssText = 'text-align:center;padding:6px 4px;border-bottom:2px solid ' + DAY_COLORS[label] + '30';
+    var lbl = document.createElement('div');
+    lbl.style.cssText = 'font-size:10px;font-weight:700;color:' + DAY_COLORS[label] + ';text-transform:uppercase;letter-spacing:0.05em';
+    lbl.textContent = label;
+    h.appendChild(lbl);
+    var dt = document.createElement('div');
+    dt.style.cssText = 'font-size:10px;font-weight:500;color:#94A3B8;margin-top:2px';
+    dt.textContent = weekDates[i] || '';
+    h.appendChild(dt);
+    gridEl.appendChild(h);
+  });
+
+  classes.forEach(function(cls) {
+    var row = document.createElement('div');
+    row.style.cssText = 'font-size:12px;font-weight:600;color:#334155;padding:8px 10px;border-radius:8px 0 0 8px;background:#F8FAFC;display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+    row.textContent = cls;
+    gridEl.appendChild(row);
+
+    DAY_CODES.forEach(function(dayCode, idx) {
+      var cell = document.createElement('div');
+      cell.style.cssText = 'border:1px solid #E2E8F0;border-radius:8px;padding:6px 4px;min-height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;transition:all 0.15s;cursor:default;background:#fff';
+      var slots = classMap[cls][dayCode] || [];
+      if (slots.length > 0) {
+        slots.forEach(function(slot) {
+          var chip = document.createElement('div');
+          var dc = slot.color || '#023AA5';
+          chip.style.cssText = 'padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;transition:all 0.15s;text-align:center;width:100%;line-height:1.3;position:relative;border:2px solid transparent';
+          chip.style.background = dc + '12';
+          chip.style.color = dc;
+          chip.textContent = slot.subject_code;
+          chip.title = cls + ' — ' + slot.subject_name + ' (' + slot.start_time + '–' + slot.end_time + ')';
+          chip.setAttribute('data-slot-idx', timetableSlotsJSON.indexOf(slot));
+
+          /* Outline stroke for LP status */
+          if (slot.lp) {
+            var oi = LP_OUTLINE[slot.lp.status];
+            if (oi) {
+              chip.style.borderColor = oi.border;
+              chip.style.background = oi.bg;
+              chip.title += ' — ' + oi.label;
+            }
+          }
+
+          chip.addEventListener('click', function() { selectGridSlot(this); });
+          chip.addEventListener('mouseenter', function() { if (!this.classList.contains('selected')) { this.style.transform = 'scale(1.05)'; } });
+          chip.addEventListener('mouseleave', function() { if (!this.classList.contains('selected')) { this.style.transform = 'scale(1)'; } });
+          cell.appendChild(chip);
+        });
+        cell.style.borderColor = DAY_COLORS[DAY_LABELS[idx]] + '40';
+        cell.style.cursor = 'pointer';
+      } else {
+        var empty = document.createElement('span');
+        empty.style.cssText = 'font-size:9px;color:#CBD5E1';
+        empty.textContent = '—';
+        cell.appendChild(empty);
+      }
+      gridEl.appendChild(cell);
+    });
+  });
+}
+
+function selectGridSlot(chipEl) {
+  var idx = parseInt(chipEl.getAttribute('data-slot-idx'));
+  var slot = timetableSlotsJSON[idx];
+  if (!slot) return;
+
+  var cls = slot.class_name;
+  var subj = slot.subject_name;
+  var day = slot.day;
+  var dayIdx = DAY_CODES.indexOf(day);
+
+  /* Set hidden form fields */
+  document.getElementById('id_class_name').value = cls;
+  document.getElementById('id_subject_name').value = subj;
+  document.getElementById('id_day_of_week').value = day;
+  var tidEl = document.getElementById('id_slot_teacher_id');
+  if (tidEl) tidEl.value = slot.teacher_id || '';
+
+  /* Highlight selected chip */
+  document.querySelectorAll('#timetable-grid [data-slot-idx]').forEach(function(c) {
+    c.classList.remove('selected');
+    c.style.transform = 'scale(1)';
+  });
+  chipEl.classList.add('selected');
+  chipEl.style.transform = 'scale(1.05)';
+
+  /* Show title field */
+  var titleWrap = document.getElementById('title-field-wrap');
+  if (titleWrap) titleWrap.style.display = 'block';
+  var titleInput = document.getElementById('id_lesson_title');
+  if (titleInput && slot.lp) titleInput.value = slot.lp.title || '';
+
+  /* Populate detail panel */
+  var panel = document.getElementById('slot-detail');
+  var body = document.getElementById('slot-detail-body');
+  var icon = document.getElementById('slot-detail-icon');
+  var titleEl = document.getElementById('slot-detail-title');
+  var subEl = document.getElementById('slot-detail-sub');
+  var badgeEl = document.getElementById('slot-detail-badge');
+  if (!panel) return;
+  panel.style.display = 'block';
+
+  var dc = slot.color || '#023AA5';
+  icon.style.background = dc + '18';
+  icon.style.color = dc;
+  icon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>';
+  titleEl.textContent = cls + ' — ' + subj;
+  var subText = DAY_LABELS[dayIdx] + ' · ' + slot.start_time + ' – ' + slot.end_time;
+  if (slot.teacher_name) subText += '  ·  ' + slot.teacher_name;
+  subEl.textContent = subText;
+
+  if (slot.lp) {
+    var lp = slot.lp;
+    var oi = LP_OUTLINE[lp.status];
+    badgeEl.innerHTML = '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;border:1.5px solid ' + (oi ? oi.border : '#94A3B8') + ';background:' + (oi ? oi.bg : '#F8FAFC') + ';color:' + (oi ? oi.fg : '#475569') + '">' + (oi ? oi.label : lp.status) + '</span>';
+
+    var html = '<div style="display:grid;grid-template-columns:52px 1fr;gap:4px 14px;align-items:baseline">';
+    if (lp.title) {
+      html += '<span style="font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:0.04em">Title</span>';
+      html += '<span style="font-size:12px;font-weight:600;color:#1E293B">' + lp.title + '</span>';
+    }
+    if (lp.submitted_at) {
+      html += '<span style="font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:0.04em">Date</span>';
+      html += '<span style="font-size:12px;color:#475569">' + lp.submitted_at + '</span>';
+    } else if (lp.created_at) {
+      html += '<span style="font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:0.04em">Date</span>';
+      html += '<span style="font-size:12px;color:#475569">Draft since ' + lp.created_at + '</span>';
+    }
+    if (lp.attachment_count > 0) {
+      html += '<span style="font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:0.04em">Files</span>';
+      html += '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#475569;font-weight:500">';
+      html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>';
+      html += lp.attachment_count + ' file' + (lp.attachment_count > 1 ? 's' : '');
+      if (lp.attachments && lp.attachments.length) {
+        lp.attachments.forEach(function(att) {
+          html += ' &mdash; ';
+          html += '<a href="#" onclick="event.preventDefault();openFilePreview(\'' + encodeURI(att.url) + '\',\'' + att.name.replace(/'/g, "\\'") + '\');return false" style="color:var(--hodari-blue);text-decoration:none;font-weight:600;cursor:pointer;border-bottom:1px dashed var(--hodari-blue)">' + att.name + '</a>';
+        });
+      }
+      html += '</span>';
+    }
+    html += '</div>';
+    body.innerHTML = html;
+  } else {
+    badgeEl.innerHTML = '';
+    body.innerHTML = '<span style="font-size:12px;color:#94A3B8;font-weight:500">No lesson plan yet — fill in the title below and save or submit.</span>';
+  }
+}
+
+/* Render timetable grid on load */
+renderTimetableGrid();
+
+/* Auto-select the matching slot when editing an existing plan */
+(function() {
+  var editCls = document.getElementById('id_class_name').value;
+  var editSubj = document.getElementById('id_subject_name').value;
+  var editDay = document.getElementById('id_day_of_week') ? document.getElementById('id_day_of_week').value : '';
+  if (editCls && editSubj) {
+    var chips = document.querySelectorAll('#timetable-grid [data-slot-idx]');
+    for (var i = 0; i < chips.length; i++) {
+      var idx = parseInt(chips[i].getAttribute('data-slot-idx'));
+      var slot = timetableSlotsJSON[idx];
+      if (slot && slot.class_name === editCls && slot.subject_name === editSubj && (!editDay || slot.day === editDay)) {
+        selectGridSlot(chips[i]);
+        break;
+      }
+    }
+  }
+})();
+
+/*  File upload handling with validation + duplicate detection  */
+var ALLOWED_EXTENSIONS = ['pdf','doc','docx','xls','xlsx','csv','ppt','pptx','jpg','jpeg','png','gif','webp','svg','txt'];
+var MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+var CSRF_TOKEN = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+var LESSON_PLAN_ID = '{{ form.instance.pk|default:"" }}';
+
+/* Accumulated file list across multiple picker selections */
+var accumulatedFiles = [];
+
+function handleFileSelection(input) {
+  // Merge new files into accumulated list, avoiding duplicates by name+size
+  for (var i = 0; i < input.files.length; i++) {
+    var newFile = input.files[i];
+    var isDupe = accumulatedFiles.some(function(f) {
+      return f.name === newFile.name && f.size === newFile.size;
+    });
+    if (!isDupe) accumulatedFiles.push(newFile);
+  }
+  // Replace input.files so the form submits the accumulated set
+  var dt = new DataTransfer();
+  accumulatedFiles.forEach(function(f) { dt.items.add(f); });
+  input.files = dt.files;
+  updateFileList(input);
+}
+
+function removeQueuedFile(name, size) {
+  accumulatedFiles = accumulatedFiles.filter(function(f) {
+    return !(f.name === name && f.size === size);
+  });
+  var input = document.getElementById('file-input');
+  var dt = new DataTransfer();
+  accumulatedFiles.forEach(function(f) { dt.items.add(f); });
+  input.files = dt.files;
+  updateFileList(input);
+}
+
+/* SHA-256 hash of first 64 KB — matches server-side _compute_file_hash */
+async function hashFileFirst64KB(file) {
+  var CHUNK = 64 * 1024;
+  var slice = file.slice(0, CHUNK);
+  var buffer = await slice.arrayBuffer();
+  /* Append total size to match server-side: sha.update(str(total_size)) */
+  var sizeStr = String(file.size);
+  var sizeBytes = new TextEncoder().encode(sizeStr);
+  var combined = new Uint8Array(buffer.byteLength + sizeBytes.byteLength);
+  combined.set(new Uint8Array(buffer), 0);
+  combined.set(sizeBytes, buffer.byteLength);
+  var finalBuffer = await crypto.subtle.digest('SHA-256', combined);
+  var finalArray = Array.from(new Uint8Array(finalBuffer));
+  return finalArray.map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+}
+
+/* Check file hashes against server */
+async function checkDuplicates(fileHashPairs) {
+  if (!fileHashPairs.length) return [];
+  try {
+    var resp = await fetch('/academics/duplicate-check/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': CSRF_TOKEN
+      },
+      body: JSON.stringify({
+        hashes: fileHashPairs,
+        lesson_plan_id: LESSON_PLAN_ID || null
+      })
+    });
+    if (!resp.ok) return [];
+    var data = await resp.json();
+    return data.results || [];
+  } catch(e) {
+    return [];
+  }
+}
+
+function updateFileList(input) {
+  var list = document.getElementById('file-queue');
+  var container = document.getElementById('new-files-list');
+  var errorDiv = document.getElementById('file-errors');
+  list.innerHTML = '';
+  if (errorDiv) errorDiv.innerHTML = '';
+
+  if (input.files.length > 0) {
+    container.style.display = 'block';
+    var rejected = [];
+    var validFiles = [];
+    for (var i = 0; i < input.files.length; i++) {
+      var file = input.files[i];
+      var ext = file.name.split('.').pop().toLowerCase();
+      var sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+
+      // Validate extension
+      if (ALLOWED_EXTENSIONS.indexOf(ext) === -1) {
+        rejected.push(file.name + ': ".' + ext + '" is not an allowed file type.');
+        continue;
+      }
+      // Validate size
+      if (file.size > MAX_FILE_SIZE) {
+        rejected.push(file.name + ': ' + sizeMB + ' MB exceeds the 10 MB limit.');
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    // Render valid file items (without duplicate badges yet)
+    validFiles.forEach(function(file) {
+      var ext = file.name.split('.').pop().toLowerCase();
+      var sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+      var ic = ext === 'pdf' ? '#DC2626' : (['jpg','jpeg','png','gif','webp','svg'].indexOf(ext) !== -1 ? '#16A34A' : '#2563EB');
+      var div = document.createElement('div');
+      div.className = 'file-item';
+      div.style.background = '#fff';
+      var sizeLabel = file.size > 1024 * 1024 ? sizeMB + ' MB' : (file.size / 1024).toFixed(1) + ' KB';
+      div.setAttribute('data-filename', file.name);
+      div.innerHTML = '<div class="file-info"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="' + ic + '" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg><span class="file-name">' + file.name + '</span></div><div style="display:flex;align-items:center;gap:8px"><span class="dup-badge" style="display:none;background:#FEF2F2;color:#991B1B;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700">DUPLICATE</span><span style="font-size:10px; color:#94A3B8; font-weight:700">' + sizeLabel + '</span><button type="button" onclick="removeQueuedFile(this.getAttribute(\'data-rm-name\'), +this.getAttribute(\'data-rm-size\'))" data-rm-name="' + file.name + '" data-rm-size="' + file.size + '" style="background:none;border:none;cursor:pointer;color:#DC2626;padding:2px" title="Remove file"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
+      list.appendChild(div);
+    });
+
+    // Show rejected files as error messages
+    if (rejected.length > 0) {
+      if (!errorDiv) {
+        errorDiv = document.createElement('div');
+        errorDiv.id = 'file-errors';
+        errorDiv.style.cssText = 'margin-top:10px; padding:10px 12px; background:#FEF2F2; border:1px solid #FECACA; border-radius:8px; font-size:12px; color:#991B1B; line-height:1.6;';
+        list.parentNode.insertBefore(errorDiv, list.nextSibling);
+      }
+      errorDiv.innerHTML = rejected.map(function(r) { return r; }).join('<br>');
+    }
+    // If all files were rejected, hide the queue
+    if (list.children.length === 0 && rejected.length > 0) {
+      container.style.display = 'none';
+    }
+
+    // Async: compute hashes and check for duplicates
+    if (validFiles.length > 0) {
+      Promise.all(validFiles.map(async function(file) {
+        var hash = await hashFileFirst64KB(file);
+        return { hash: hash, filename: file.name };
+      })).then(function(hashPairs) {
+        return checkDuplicates(hashPairs);
+      }).then(function(results) {
+        results.forEach(function(r) {
+          if (r.duplicate) {
+            var item = list.querySelector('[data-filename="' + CSS.escape(r.filename) + '"]');
+            if (item) {
+              var badge = item.querySelector('.dup-badge');
+              if (badge) {
+                badge.style.display = 'inline';
+                badge.title = 'Duplicate of: ' + r.existing_name;
+              }
+              item.style.borderColor = '#FECACA';
+              item.style.background = '#FFFBF2';
+            }
+          }
+        });
+      }).catch(function() { /* silent — duplicates are advisory, not blocking */ });
+    }
+  } else {
+    container.style.display = 'none';
+  }
+}
+
+/*  ========== File Preview on Edit Page ==========  */
+function getFileExt(name) {
+  var parts = name.split('.');
+  return parts.length > 1 ? parts.pop().toLowerCase() : '';
+}
+
+function getCSRFToken() {
+  var input = document.querySelector('[name=csrfmiddlewaretoken]');
+  return input ? input.value : '';
+}
+
+function deleteAttachment(attId, filename) {
+  confirmDeleteModal({title:'Remove Attachment?',body:'Remove <strong>' + filename + '</strong> from this lesson plan?',detail:'This file will be permanently deleted.',confirmText:'Remove File',type:'danger',onConfirm:function(){
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/academics/lesson-plans/attachments/' + attId + '/delete/';
+    var csrf = document.createElement('input');
+    csrf.type = 'hidden';
+    csrf.name = 'csrfmiddlewaretoken';
+    csrf.value = getCSRFToken();
+    form.appendChild(csrf);
+    form.style.display = 'none';
+    document.body.appendChild(form);
+    form.submit();
+  }});
+}
+function canPreviewExt(ext) {
+  return ['pdf','jpg','jpeg','png','gif','webp','svg','docx','xlsx','csv','txt'].indexOf(ext) !== -1;
+}
+
+function canPreviewOfficeEdit(ext) {
+  return ['docx', 'xlsx'].indexOf(ext) !== -1;
+}
+
+function toggleEditPreview(btn) {
+  var id = btn.getAttribute('data-att-id');
+  var fileUrl = btn.getAttribute('data-file-url');
+  var fileName = btn.getAttribute('data-file-name');
+  var container = document.getElementById('ep-' + id);
+  if (!container) return;
+
+  var isOpen = container.classList.contains('open');
+  if (isOpen) {
+    container.classList.remove('open');
+    container.innerHTML = '';
+    btn.classList.remove('active');
+    btn.textContent = 'Preview';
+    return;
+  }
+
+  var ext = getFileExt(fileName);
+  var isPdfOrImage = ext === 'pdf' || ['jpg','jpeg','png','gif','webp','svg'].indexOf(ext) !== -1;
+  if (isPdfOrImage) {
+    openFilePreview(encodeURI(fileUrl), fileName);
+    return;
+  }
+  if (!canPreviewExt(ext)) {
+    container.innerHTML = '<div style="padding:16px;text-align:center;color:#94A3B8;font-size:12px">Preview not available. <a href="' + fileUrl + '" download style="color:var(--hodari-blue);font-weight:700">Download file</a></div>';
+    container.classList.add('open');
+    btn.classList.add('active');
+    btn.textContent = 'Close';
+    return;
+  }
+
+  var fullUrl = encodeURI(fileUrl);
+  container.classList.add('open');
+  btn.classList.add('active');
+  btn.textContent = 'Close';
+
+  if (ext === 'pdf') {
+    container.innerHTML = '<iframe src="' + fullUrl + '" loading="lazy"></iframe>';
+  } else if (['jpg','jpeg','png','gif','webp','svg'].indexOf(ext) !== -1) {
+    container.innerHTML = '<img src="' + fullUrl + '" alt="' + fileName + '" loading="lazy">';
+  } else if (ext === 'docx' || ext === 'xlsx') {
+    container.innerHTML = '<div style="padding:16px;text-align:center;color:#64748B;font-size:12px">Loading preview…</div>';
+    if ((ext === 'docx' && typeof mammoth === 'undefined') || (ext === 'xlsx' && typeof XLSX === 'undefined')) {
+      container.innerHTML = '<div style="padding:16px;text-align:center;color:#94A3B8;font-size:12px">Preview library still loading. <a href="' + fileUrl + '" download style="color:var(--hodari-blue);font-weight:700">Download file</a></div>';
+      return;
+    }
+    fetch(fullUrl).then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.arrayBuffer();
+    }).then(function(buffer) {
+      if (ext === 'docx') {
+        mammoth.convertToHtml({arrayBuffer: buffer}).then(function(result) {
+          container.innerHTML = '<div style="padding:16px;font-size:13px;line-height:1.6;color:#1E293B;max-height:75vh;min-height:400px;overflow-y:auto">' + result.value + '</div>';
+        }).catch(function() {
+          container.innerHTML = '<div style="padding:16px;text-align:center;color:#DC2626;font-size:12px">Preview failed. <a href="' + fileUrl + '" download style="color:var(--hodari-blue);font-weight:700">Download file</a></div>';
+        });
+      } else {
+        var workbook = XLSX.read(buffer, {type: 'array'});
+        var sheet = workbook.Sheets[workbook.SheetNames[0]];
+        var html = XLSX.utils.sheet_to_html(sheet, {editable: false});
+        container.innerHTML = '<div class="csv-scroll">' + html + '</div>';
+      }
+    }).catch(function() {
+      container.innerHTML = '<div style="padding:16px;text-align:center;color:#DC2626;font-size:12px">Could not load file for preview. <a href="' + fileUrl + '" download style="color:var(--hodari-blue);font-weight:700">Download file</a></div>';
+    });
+  } else if (ext === 'csv') {
+    container.innerHTML = '<div style="padding:16px;text-align:center;color:#64748B;font-size:12px">Loading CSV preview...</div>';
+    fetch(fullUrl).then(function(r) { return r.text(); }).then(function(text) {
+      var lines = text.split('\n').filter(function(l) { return l.trim(); });
+      if (lines.length === 0) { container.innerHTML = '<div style="padding:16px;text-align:center;color:#94A3B8;font-size:12px">Empty CSV file</div>'; return; }
+      var rows = lines.map(function(line) { return parseEditCsvLine(line); });
+      var header = rows[0];
+      var bodyRows = rows.slice(1);
+      var html = '<div class="csv-scroll"><table><thead><tr>';
+      header.forEach(function(h) { html += '<th>' + escapeEditHtml(h.trim()) + '</th>'; });
+      html += '</tr></thead><tbody>';
+      bodyRows.forEach(function(row) {
+        html += '<tr>';
+        row.forEach(function(cell) { html += '<td>' + escapeEditHtml(cell.trim()) + '</td>'; });
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+      container.innerHTML = html;
+    }).catch(function() {
+      container.innerHTML = '<div style="padding:16px;text-align:center;color:#DC2626;font-size:12px">Could not load CSV preview. <a href="' + fileUrl + '" download style="color:var(--hodari-blue);font-weight:700">Download file</a></div>';
+    });
+  } else if (ext === 'txt') {
+    container.innerHTML = '<div style="padding:16px;text-align:center;color:#64748B;font-size:12px">Loading text preview...</div>';
+    fetch(fullUrl).then(function(r) { return r.text(); }).then(function(text) {
+      container.innerHTML = '<pre>' + escapeEditHtml(text) + '</pre>';
+    }).catch(function() {
+      container.innerHTML = '<div style="padding:16px;text-align:center;color:#DC2626;font-size:12px">Could not load text preview. <a href="' + fileUrl + '" download style="color:var(--hodari-blue);font-weight:700">Download file</a></div>';
+    });
+  }
+}
+
+function parseEditCsvLine(line) {
+  var result = [];
+  var current = '';
+  var inQuotes = false;
+  for (var i = 0; i < line.length; i++) {
+    var ch = line[i];
+    if (inQuotes) {
+      if (ch === '"' && i + 1 < line.length && line[i + 1] === '"') { current += '"'; i++; }
+      else if (ch === '"') { inQuotes = false; }
+      else { current += ch; }
+    } else {
+      if (ch === '"') { inQuotes = true; }
+      else if (ch === ',') { result.push(current); current = ''; }
+      else { current += ch; }
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+function escapeEditHtml(text) {
+  var d = document.createElement('div');
+  d.appendChild(document.createTextNode(text));
+  return d.innerHTML;
+}
+
+function openFilePreview(url, title) {
+  var modal = document.getElementById('filePreviewModal');
+  var body = document.getElementById('fpBody');
+  var titleEl = document.getElementById('fpTitle');
+  var downloadBtn = document.getElementById('fpDownload');
+  titleEl.textContent = title;
+  downloadBtn.href = url;
+  body.innerHTML = '';
+  var ext = url.split('.').pop().toLowerCase().split('?')[0];
+  if (['jpg','jpeg','png','gif','webp','bmp','svg'].indexOf(ext) !== -1) {
+    var img = document.createElement('img');
+    img.src = url;
+    body.appendChild(img);
+  } else if (ext === 'pdf') {
+    var iframe = document.createElement('iframe');
+    iframe.src = url;
+    body.appendChild(iframe);
+  } else {
+    body.innerHTML = '<div style="text-align:center;padding:40px;color:#64748B"><div style="font-size:48px;margin-bottom:12px">&#128196;</div><div style="font-size:14px;font-weight:600">' + title + '</div><div style="font-size:12px;margin-top:8px;color:#94A3B8">Click Download to view this file</div></div>';
+  }
+  modal.style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeFilePreview() {
+  var modal = document.getElementById('filePreviewModal');
+  modal.style.display = 'none';
+  document.body.style.overflow = '';
+  document.getElementById('fpBody').innerHTML = '';
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    var fp = document.getElementById('filePreviewModal');
+    if (fp && fp.style.display === 'block') { closeFilePreview(); }
+  }
+});
+</script>
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+{% endblock %}
+{% endblock %}

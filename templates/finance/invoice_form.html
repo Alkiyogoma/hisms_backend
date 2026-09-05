@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% load hodari_forms %}
+{% block title %}{% if is_misc %}Manual Invoice{% else %}Create Invoice{% endif %} &mdash; Finance &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Finance{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+<div class="section-hdr">
+  <span class="section-title">{% if is_misc %}Manual / Miscellaneous Invoice{% else %}Create Invoice{% endif %}</span>
+  <a href="{% url 'finance:invoice_list' %}" class="section-link">&larr; Back to invoices</a>
+</div>
+
+{% has_perm user "finance.add_invoice" as can_create %}
+{% if can_create %}
+<form method="post" style="max-width:640px">
+  {% csrf_token %}
+
+  <div class="card">
+    <div class="card-title">Invoice details</div>
+
+    <div class="hf2-group">
+      <label class="hf2-label">Invoice type <span class="hf2-req">*</span></label>
+      <select name="invoice_type" class="hf2-select" id="invoiceTypeSelect">
+        <option value="misc" {% if is_misc %}selected{% endif %}>Miscellaneous charge</option>
+        <option value="assessment">Assessment fee</option>
+      </select>
+    </div>
+
+    <div class="hf2-group">
+      <label class="hf2-label">Student <span class="hf2-req">*</span></label>
+      <select name="student" required class="hf2-select">
+        <option value="">Select student...</option>
+        {% for s in students %}
+        <option value="{{ s.pk }}">{{ s.first_name }} {{ s.last_name }} • {{ s.admission_no }} ({{ s.class_name }})</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="hf2-group">
+      <label class="hf2-label">Term (optional)</label>
+      <select name="term" class="hf2-select">
+        <option value="">No term association</option>
+        {% for t in terms %}
+        <option value="{{ t.pk }}">{{ t.name }} ({{ t.academic_year.name }})</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="hf2-group">
+      <label class="hf2-label">Amount (TZS) <span class="hf2-req">*</span></label>
+      <input type="number" name="amount" step="0.01" min="0.01" required class="hf2-input" placeholder="e.g. 500000">
+    </div>
+
+    <div class="hf2-group">
+      <label class="hf2-label">Due date</label>
+      <input type="date" name="due_date" class="hf2-input hf2-date" value="{{ today|date:'Y-m-d' }}">
+    </div>
+
+    <div class="hf2-group">
+      <label class="hf2-label">Description / Reason <span class="hf2-req">*</span></label>
+      <textarea name="description" rows="3" required class="hf2-textarea" placeholder="What is this charge for? e.g. Sports uniform, Field trip, Music lesson, Assessment fee..."></textarea>
+    </div>
+
+    <div class="hf2-actions">
+      <button type="submit" class="btn btn-primary">Create invoice</button>
+      <a href="{% url 'finance:invoice_list' %}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </div>
+</form>
+{% else %}
+<div style="max-width:640px;padding:40px;text-align:center">
+  <p style="color:var(--text-muted);font-size:14px">You do not have permission to create invoices.</p>
+  <a href="{% url 'finance:invoice_list' %}" class="btn btn-secondary">Back to Invoices</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Auto-set due date to 14 days from today
+document.addEventListener('DOMContentLoaded', function() {
+  var dueDateInput = document.querySelector('input[name="due_date"]');
+  if (dueDateInput && !dueDateInput.value) {
+    var today = new Date();
+    today.setDate(today.getDate() + 14);
+    var yyyy = today.getFullYear();
+    var mm = String(today.getMonth() + 1).padStart(2, '0');
+    var dd = String(today.getDate()).padStart(2, '0');
+    dueDateInput.value = yyyy + '-' + mm + '-' + dd;
+  }
+  
+  // Update placeholder text based on invoice type
+  var typeSelect = document.getElementById('invoiceTypeSelect');
+  var descField = document.querySelector('textarea[name="description"]');
+  if (typeSelect && descField) {
+    typeSelect.addEventListener('change', function() {
+      if (this.value === 'assessment') {
+        descField.placeholder = 'Assessment fee for applicant';
+      } else {
+        descField.placeholder = 'What is this charge for? e.g. Sports uniform, Field trip, Music lesson...';
+      }
+    });
+  }
+});
+</script>
+{% endblock %}

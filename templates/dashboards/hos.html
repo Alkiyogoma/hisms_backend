@@ -1,0 +1,411 @@
+{% extends "base.html" %}
+{% block title %}HOS Dashboard &mdash; {{ brand.school_name }}{% endblock %}
+
+{% block topbar_greeting %}Good {% if hour < 12 %}morning{% elif hour < 17 %}afternoon{% else %}evening{% endif %}, Principal {{ user.last_name|default:user.username }}{% endblock %}
+{% block topbar_date %}{{ today_display }} &middot; {{ term_label }}{% endblock %}
+
+{% block topbar_badges %}
+<div class="topbar-badge badge-red"><span class="badge-dot"></span>{{ alert_count }} alert{{ alert_count|pluralize }}</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+  .hos-stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
+  .hos-stat-card { border-radius: 8px; padding: 12px; text-align: center; border-width: 1px; border-style: solid; }
+  .hos-stat-val { font-size: 22px; font-weight: 700; font-family: var(--font-mono); line-height: 1.2; }
+  .hos-stat-lbl { font-size: 10.5px; font-weight: 600; margin-top: 2px; }
+  .hos-section-gap { margin-bottom: 20px; }
+
+  .at-risk-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .at-risk-card { display: block; text-decoration: none; color: inherit; border-radius: 8px; padding: 12px; border: 1px solid var(--border); background: #fff; transition: box-shadow .12s; }
+  .at-risk-card:hover { box-shadow: 0 2px 8px rgba(2,58,165,0.1); }
+  .at-risk-card.red { border-left: 3px solid #DC2626; }
+  .at-risk-card.amber { border-left: 3px solid #D97706; }
+  .at-risk-name { font-size: 13px; font-weight: 600; color: #1A1A2E; margin-bottom: 2px; }
+  .at-risk-class { font-size: 11px; color: #8492A6; }
+  .at-risk-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid #F1F5F9; }
+  .at-risk-avg { font-size: 12px; color: #8492A6; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="hos-dashboard" hx-trigger="every 60s" hx-get="." hx-select="#hos-dashboard" hx-swap="outerHTML" hx-target="#hos-dashboard">
+<div class="section-hdr">
+  <span class="section-title">School overview &middot; today</span>
+  <a href="/reports/" class="section-link">View full report &rarr;</a>
+</div>
+
+<div class="metrics">
+  <a href="{% url 'attendance:today' %}" class="metric-compact" style="background:linear-gradient(135deg,#EEF9F0,#fff);text-decoration:none;color:inherit">
+    <div class="mc-lbl-row"><span class="mc-lbl">Attendance today</span></div>
+    <div class="mc-val" style="color:#059669">{{ att_pct }}<span class="mc-currency" style="margin-left:4px;vertical-align:middle">%</span></div>
+    <div class="mc-sub" style="color:#059669">{{ present_today }} present today</div>
+  </a>
+  <a href="{% url 'academics:lesson_plans' %}" class="metric-compact" style="background:linear-gradient(135deg,#FFF8ED,#fff);text-decoration:none;color:inherit">
+    <div class="mc-lbl-row"><span class="mc-lbl">Lesson plans this week</span></div>
+    <div class="mc-val" style="color:#B45309;font-size:24px">{{ plans_ratio }}</div>
+    <div class="mc-sub" style="color:#B45309">{{ plans_pending_count }} pending review</div>
+  </a>
+  <a href="{% url 'academics:report_card_list' %}" class="metric-compact" style="background:linear-gradient(135deg,#FFF0F0,#fff);text-decoration:none;color:inherit">
+    <div class="mc-lbl-row"><span class="mc-lbl">Reports awaiting review</span></div>
+    <div class="mc-val" style="color:#DC2626">{{ reports_awaiting }}</div>
+    <div class="mc-sub" style="color:#DC2626">Action required</div>
+  </a>
+  <a href="{% url 'finance:dashboard' %}" class="metric-compact" style="background:linear-gradient(135deg,#FFFBEB,#fff);text-decoration:none;color:inherit">
+    <div class="mc-lbl-row"><span class="mc-lbl">Term fee collection</span></div>
+    <div class="mc-val" style="color:#B45309">{{ fee_collection_pct }}<span class="mc-currency" style="margin-left:4px;vertical-align:middle">%</span></div>
+    <div class="mc-sub" style="color:#B45309">{{ overdue_accounts }} overdue accounts</div>
+  </a>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 3fr;gap:14px;margin-bottom:18px">
+  <a href="{% url 'welfare:hod_dashboard' %}" class="metric-compact" style="background:linear-gradient(135deg,#F3E8FF,#fff);text-decoration:none;color:inherit;height:100%">
+    <div class="mc-lbl-row"><span class="mc-lbl">Critical welfare cases</span></div>
+    <div class="mc-val" style="color:#7C3AED">{{ critical_welfare_count|default:0 }}</div>
+    <div class="mc-sub" style="color:#DC2626{% if critical_welfare_count > 0 %};font-weight:700{% endif %}">{{ critical_welfare_count|default:0 }} require attention</div>
+  </a>
+  <div class="card" style="border-left:4px solid var(--hodari-blue);margin:0;display:flex;flex-direction:column;justify-content:center">
+    <div class="card-title-row" style="padding:0 0 6px 0">
+      <span class="card-title" style="margin-bottom:0;font-size:13px">Performance pulse &middot; {{ term_label }}</span>
+      <a href="{% url 'academics:analytics' %}" class="section-link" style="font-size:11px">Full analytics &rarr;</a>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px">
+      <div style="text-align:center">
+        <div style="font-size:20px;font-weight:700;font-family:var(--font-mono);color:#1A1A2E">{{ school_avg }}%</div>
+        <div style="font-size:9.5px;font-weight:600;color:#8492A6;margin-top:1px">School avg &middot; Grade {{ school_grade }}
+          {% if perf_trend %}
+          <span style="color:{% if perf_trend.direction == 'up' %}#1B7B34{% elif perf_trend.direction == 'down' %}#9B1C1C{% else %}#8492A6{% endif %}">
+            {% if perf_trend.direction == 'up' %}&uarr;{% elif perf_trend.direction == 'down' %}&darr;{% else %}&rarr;{% endif %}
+            {{ perf_trend.diff }}%
+          </span>
+          {% endif %}
+        </div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:20px;font-weight:700;font-family:var(--font-mono);color:#1B7B34">{{ pass_rate }}%</div>
+        <div style="font-size:9.5px;font-weight:600;color:#8492A6;margin-top:1px">Pass rate (C+) &middot; {{ total_with_scores }} students</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:20px;font-weight:700;font-family:var(--font-mono);color:#D97706">{{ d_count }}</div>
+        <div style="font-size:9.5px;font-weight:600;color:#8492A6;margin-top:1px">At grade D &middot; flagged</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:20px;font-weight:700;font-family:var(--font-mono);color:#DC2626">{{ e_count }}</div>
+        <div style="font-size:9.5px;font-weight:600;color:#8492A6;margin-top:1px">At grade E &middot; critical</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:20px;font-weight:700;font-family:var(--font-mono);color:#9B1C1C">{{ flagged_class_count }}</div>
+        <div style="font-size:9.5px;font-weight:600;color:#8492A6;margin-top:1px">Classes below C &middot; attention</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">
+<div class="ev-widget">
+  <div class="ev-title">Upcoming events
+    <a href="{% url 'events:list' %}" class="ev-link">View calendar &rarr;</a>
+  </div>
+  {% for ev in upcoming_events %}
+  <div class="ev-item">
+    <div class="ev-date">
+      <div class="ev-day">{{ ev.start_date|date:"d" }}</div>
+      <div class="ev-mon">{{ ev.start_date|date:"M" }}</div>
+    </div>
+    <div class="ev-body">
+      <div class="ev-name">{{ ev.title }}</div>
+      <div class="ev-meta">{{ ev.get_category_display }}</div>
+      <div class="ev-badge ev-normal">{{ ev.start_date|date:"M d" }}</div>
+    </div>
+  </div>
+  {% empty %}
+  <div style="padding:10px; color:var(--text-muted); font-size:12px">No upcoming events.</div>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <div class="card-title-row">
+    <a href="/attendance/staff/" class="card-title" style="margin-bottom:0;text-decoration:none;color:inherit">Staff in school today &nearr;</a>
+    {% if unconfirmed_staff > 0 %}
+      <span class="chip chip-red">{{ unconfirmed_staff }} unconfirmed</span>
+    {% endif %}
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px">
+    <div class="hos-stat-card" style="background:var(--green-st-bg,#E8F5EC);border-color:var(--green-st-bd,#B7DFBF);padding:12px">
+      <div class="hos-stat-val" style="font-size:24px;color:#1B7B34">{{ present_staff }}</div>
+      <div class="hos-stat-lbl" style="font-size:11px;color:#1B7B34">Present</div>
+    </div>
+    <div class="hos-stat-card" style="background:var(--red-st-bg,#FEF2F2);border-color:var(--red-st-bd,#FECACA);padding:12px">
+      <div class="hos-stat-val" style="font-size:24px;color:#9B1C1C">{{ absent_staff }}</div>
+      <div class="hos-stat-lbl" style="font-size:11px;color:#9B1C1C">Absent</div>
+    </div>
+    <div class="hos-stat-card" style="background:var(--gold-st-bg,#FEF3C7);border-color:var(--gold-st-bd,#FCD34D);padding:12px">
+      <div class="hos-stat-val" style="font-size:24px;color:#92550A">{{ unconfirmed_staff }}</div>
+      <div class="hos-stat-lbl" style="font-size:11px;color:#92550A">Unconfirmed</div>
+    </div>
+    <div class="hos-stat-card" style="background:var(--blue-st-bg,#F0F4FB);border-color:var(--blue-st-bd,#BFCFE9);padding:12px">
+      <div class="hos-stat-val" style="font-size:24px;color:var(--hodari-blue)">{{ expected_staff }}</div>
+      <div class="hos-stat-lbl" style="font-size:11px;color:var(--hodari-blue)">Expected</div>
+    </div>
+  </div>
+  <div style="font-size:10.5px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;margin:10px 0 6px">Student attendance</div>
+  <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px">
+    <div class="hos-stat-card" style="background:var(--green-st-bg,#E8F5EC);border-color:var(--green-st-bd,#B7DFBF);padding:12px">
+      <div class="hos-stat-val" style="font-size:24px;color:#1B7B34">{{ checked_in_today }}</div>
+      <div class="hos-stat-lbl" style="font-size:11px;color:#1B7B34">Checked in{% if late_today > 0 %} ({{ late_today }} late){% endif %}</div>
+    </div>
+    <div class="hos-stat-card" style="background:var(--red-st-bg,#FEF2F2);border-color:var(--red-st-bd,#FECACA);padding:12px">
+      <div class="hos-stat-val" style="font-size:24px;color:#9B1C1C">{{ absent_today }}</div>
+      <div class="hos-stat-lbl" style="font-size:11px;color:#9B1C1C">Absent</div>
+    </div>
+    <div class="hos-stat-card" style="background:var(--gold-st-bg,#FEF3C7);border-color:var(--gold-st-bd,#FCD34D);padding:12px">
+      <div class="hos-stat-val" style="font-size:24px;color:#92550A">{{ unconfirmed_today }}</div>
+      <div class="hos-stat-lbl" style="font-size:11px;color:#92550A">Unconfirmed</div>
+    </div>
+    <div class="hos-stat-card" style="background:var(--blue-st-bg,#F0F4FB);border-color:var(--blue-st-bd,#BFCFE9);padding:12px">
+      <div class="hos-stat-val" style="font-size:24px;color:var(--hodari-blue)">{{ present_today }}</div>
+      <div class="hos-stat-lbl" style="font-size:11px;color:var(--hodari-blue)">Present on time</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="card hos-section-gap">
+  <div class="card-title-row">
+    <a href="{% url 'discipline:list' %}" class="card-title" style="margin-bottom:0;text-decoration:none;color:inherit">Discipline incidents escalated &nearr;</a>
+    {% if high_critical_count > 0 %}
+      <span class="chip chip-red">{{ high_critical_count }} high/critical</span>
+    {% endif %}
+    <a href="{% url 'discipline:list' %}" class="section-link" style="margin-left:auto">View all &rarr;</a>
+  </div>
+  {% for inc in escalated_behaviour %}
+  <a href="{% url 'discipline:detail' inc.pk %}" class="trow" style="text-decoration:none;color:inherit;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;{% if inc.severity == 'critical' %}border-left:3px solid #9B1C1C;{% elif inc.severity == 'high' %}border-left:3px solid #D97706;{% endif %}">
+    <div>
+      <div class="trow-name">
+        <span class="severity-chip severity-{{ inc.severity }}">{{ inc.get_severity_display }}</span>
+        <span class="status-chip status-{{ inc.status }}">{{ inc.get_status_display }}</span>
+        {{ inc.student.first_name }} {{ inc.student.last_name }} &middot; {{ inc.summary|truncatewords:10 }}
+      </div>
+      <div class="trow-sub">{{ inc.reported_by.get_full_name|default:inc.reported_by.username }} &middot; {{ inc.created_at|date:"d M Y" }}</div>
+    </div>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M9 18l6-6-6-6"/></svg>
+  </a>
+  {% empty %}
+  <div style="padding:10px; color:var(--text-muted); font-size:12px">No escalated discipline incidents.</div>
+  {% endfor %}
+  {% if behaviour_pending_count > 0 %}
+  <div class="trow" style="border-top:1px solid var(--border);margin-top:4px;padding-top:8px">
+    <div class="trow-name" style="font-size:12px;color:var(--text-muted)">{{ behaviour_pending_count }} incident{{ behaviour_pending_count|pluralize:",s" }} pending review &middot; <a href="{% url 'discipline:hod_queue' %}" style="color:var(--primary)">Review in HOD queue</a></div>
+  </div>
+  {% endif %}
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <a href="{% url 'academics:lesson_plans' %}" class="card-title" style="text-decoration:none;color:inherit">Lesson plan compliance by dept &nearr;</a>
+    {% for dept in dept_compliance %}
+    <div class="bar-row">
+      <div class="bar-lbl">{{ dept.name }}</div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:{{ dept.pct }}%; background:{% if dept.pct > 80 %}#1B7B34{% elif dept.pct > 50 %}#FBBC05{% else %}#D97706{% endif %}"></div>
+      </div>
+      <div class="bar-pct {% if dept.pct > 80 %}t-green{% elif dept.pct > 50 %}t-gold{% else %}t-amber{% endif %}">
+        {% if dept.note %}{{ dept.note }}{% else %}{{ dept.pct }}%{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    <span class="card-title" style="margin-bottom:0">Academic performance by dept &middot; {{ term_label }}</span>
+    {% for dept in dept_perf_list %}
+    <div class="bar-row">
+      <div class="bar-lbl">{{ dept.name }}</div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:{{ dept.avg|default:0 }}%; background:{% if dept.avg >= 70 %}#1B7B34{% elif dept.avg >= 50 %}#FBBC05{% else %}#DC2626{% endif %}"></div>
+      </div>
+      <div class="bar-pct {% if dept.avg >= 70 %}t-green{% elif dept.avg >= 50 %}t-gold{% else %}t-red{% endif %}">
+        {% if dept.avg > 0 %}{{ dept.avg }}% &middot; Grade {{ dept.grade }}{% else %}N/A{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <a href="{% url 'attendance:today' %}" class="card-title" style="text-decoration:none;color:inherit">Attendance by class today &nearr;</a>
+    {% for cls in class_attendance %}
+    <div class="trow">
+      <div><div class="trow-name">{{ cls.name }}</div></div>
+      <span class="trow-right">
+        <span class="status-dot {% if cls.pct >= 90 %}dot-green{% elif cls.pct >= 80 %}dot-amber{% else %}dot-red{% endif %}"></span>
+        <span class="trow-val {% if cls.pct >= 90 %}t-green{% elif cls.pct >= 80 %}t-amber{% else %}t-red{% endif %}">{{ cls.pct }}%</span>
+      </span>
+    </div>
+    {% empty %}
+    <div style="padding:10px; color:var(--text-muted); font-size:12px">No attendance data for today.</div>
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    <span class="card-title" style="margin-bottom:0">Class averages &middot; {{ term_label }}</span>
+    {% for cls in class_perf_list|slice:":8" %}
+    <div class="trow">
+      <div>
+        <div class="trow-name">{{ cls.name }}</div>
+      </div>
+      <span class="trow-right">
+        <span class="status-dot {% if cls.avg >= 70 %}dot-green{% elif cls.avg >= 60 %}dot-amber{% else %}dot-red{% endif %}"></span>
+        <span class="trow-val {% if cls.avg >= 70 %}t-green{% elif cls.avg >= 60 %}t-gold{% else %}t-red{% endif %}">{{ cls.avg }}%</span>
+        <span class="chip {% if cls.avg >= 70 %}chip-green{% elif cls.avg >= 60 %}chip-amber{% else %}chip-red{% endif %}" style="font-size:10px;margin-left:6px">{{ cls.grade }}</span>
+      </span>
+    </div>
+    {% empty %}
+    <div style="padding:10px; color:var(--text-muted); font-size:12px">No performance data for this term.</div>
+    {% endfor %}
+  </div>
+</div>
+
+{% if hos_decision_queue %}
+<div class="hos-section-gap">
+  <div class="card" style="border-left:4px solid #1A56C4">
+    <div class="card-title-row">
+      <span class="card-title" style="margin-bottom:0">Applicants awaiting your decision</span>
+      <span class="chip chip-blue">{{ hos_decision_count }} pending</span>
+    </div>
+    {% for item in hos_decision_queue %}
+    <a href="{% url 'admissions:detail' item.applicant.pk %}" class="trow" style="text-decoration:none;color:inherit;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-left:3px solid #1A56C4;margin:0 12px 6px;border-radius:0 6px 6px 0;background:#F8FAFC">
+      <div>
+        <div class="trow-name">{{ item.applicant.child_full_name }} &middot; {{ item.applicant.grade_applying_for }}</div>
+        <div class="trow-sub">HOD recommendation: {{ item.result_display }}{% if item.hod_comments %} &middot; {{ item.hod_comments|truncatewords:12 }}{% endif %}</div>
+      </div>
+      <span class="trow-right">
+        <span class="chip chip-blue" style="font-size:11px">Decide &rarr;</span>
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if admission_actions %}
+<div class="hos-section-gap">
+  <div class="card">
+    <div class="card-title-row">
+      <span class="card-title" style="margin-bottom:0">Admission actions needed</span>
+      <a href="{% url 'admissions:actions_needed' %}" class="section-link" style="margin-left:auto">View all &rarr;</a>
+    </div>
+    {% for action in admission_actions %}
+    <a href="{{ action.link }}" class="trow" style="text-decoration:none;color:inherit;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;{% if action.severity == 'high' %}border-left:3px solid #DC2626;{% else %}border-left:3px solid #D97706;{% endif %}">
+      <div>
+        <div class="trow-name">{{ action.applicant.child_full_name }} &middot; {{ action.title }}</div>
+        <div class="trow-sub">{{ action.description|truncatewords:15 }}</div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M9 18l6-6-6-6"/></svg>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="grid-6-4">
+  <div class="card">
+    <a href="/admissions/" class="card-title" style="text-decoration:none;color:inherit">Admissions pipeline &nearr;</a>
+    <div class="pipeline">
+      {% for stage in pipeline_stages %}
+        <div class="pipe-col">
+          <div class="pipe-count">{{ stage.count }}</div>
+          <div class="pipe-bar-wrap">
+            <div class="pipe-bar" style="height:{{ stage.bar_height }}px; background:{{ stage.color }}"></div>
+          </div>
+          <div class="pipe-lbl" style="cursor:pointer" onclick="window.location.href='/admissions/'">{{ stage.label }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="/audit/logs/" class="card-title" style="text-decoration:none;color:inherit">Recent audit activity &nearr;</a>
+    {% for entry in recent_audit %}
+    <div class="audit-row">
+      <div class="audit-icon {% if entry.severity == 'warn' %}ai-amber{% else %}ai-blue{% endif %}">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M7 5.5V10M7 4v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div>
+        <div class="audit-text">{{ entry.label }}</div>
+        <div class="audit-meta">{{ entry.actor }} &middot; {{ entry.when }}</div>
+      </div>
+    </div>
+    {% empty %}
+    <div style="padding:20px; text-align:center; color:var(--text-muted)">No recent activity recorded.</div>
+    {% endfor %}
+  </div>
+</div>
+
+{% if ecd_welfare_by_class %}
+<div class="card hos-section-gap">
+  <div class="card-title-row">
+    <span class="card-title" style="margin-bottom:0">ECD Welfare Summary &middot; {{ term_label }}</span>
+    <a href="{% url 'welfare:hod_dashboard_ecd' %}" class="section-link">Full dashboard &rarr;</a>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:10px">
+    {% for cname, data in ecd_welfare_by_class.items %}
+    <div style="background:#F9FAFB;border-radius:10px;padding:14px;border:1px solid var(--border)">
+      <div style="font-size:12px;font-weight:700;color:#1A1A2E;margin-bottom:8px">{{ cname }}</div>
+      <div style="display:flex;gap:12px;margin-bottom:6px">
+        <span style="font-size:11px;color:var(--text-muted)">Total: <strong style="color:#1e40af">{{ data.total }}</strong></span>
+        <span style="font-size:11px;color:var(--text-muted)">Open: <strong style="color:#DC2626">{{ data.open }}</strong></span>
+      </div>
+      <div style="font-size:10.5px;color:var(--text-muted);margin-bottom:4px">
+        Severity:
+        {% if data.severities.critical %}<span class="chip chip-red" style="font-size:9px;margin:1px">{{ data.severities.critical }} Critical</span>{% endif %}
+        {% if data.severities.high %}<span class="chip chip-amber" style="font-size:9px;margin:1px">{{ data.severities.high }} High</span>{% endif %}
+        {% if data.severities.medium %}<span class="chip chip-blue" style="font-size:9px;margin:1px">{{ data.severities.medium }} Med</span>{% endif %}
+        {% if data.severities.low %}<span class="chip chip-grey" style="font-size:9px;margin:1px">{{ data.severities.low }} Low</span>{% endif %}
+      </div>
+      <div style="font-size:10.5px;color:var(--text-muted)">
+        Types:
+        {% for t, c in data.concern_types.items %}
+        <span style="margin-right:4px">{{ t|title }}: {{ c }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if at_risk_students %}
+<div class="card hos-section-gap">
+  <div class="card-title-row">
+    <span class="card-title" style="margin-bottom:0">At-risk students school-wide &middot; D or below in any subject</span>
+    <span class="chip chip-red">{{ at_risk_students|length }} flagged</span>
+  </div>
+  <div class="at-risk-grid">
+  {% for item in at_risk_students|slice:":12" %}
+  <a href="{% url 'academics:student_academic_record' item.student.pk %}" class="at-risk-card {% if item.flag_color == 'red' %}red{% else %}amber{% endif %}">
+    <div class="at-risk-name">{{ item.student.get_full_name }}</div>
+    <div class="at-risk-class">{{ item.student.class_name }} &middot; {{ item.subject }}</div>
+    <div class="at-risk-footer">
+      <span class="at-risk-avg">{{ item.average }}% in {{ item.subject }}</span>
+      <span class="chip {% if item.flag_color == 'red' %}chip-red{% else %}chip-amber{% endif %}" style="font-size:10px">
+        {% if item.average < 50 %}Grade E{% else %}Grade D{% endif %}
+      </span>
+    </div>
+  </a>
+  {% endfor %}
+  </div>
+  {% if at_risk_students|length > 12 %}
+  <div style="text-align:center;padding:12px 0 4px">
+    <a href="{% url 'academics:analytics' %}" class="section-link">View all {{ at_risk_students|length }} flagged students &rarr;</a>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+</div>
+{% endblock %}

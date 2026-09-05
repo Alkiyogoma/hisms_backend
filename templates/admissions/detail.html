@@ -1,0 +1,827 @@
+{% extends "base.html" %}
+{% load static %}
+{% load role_tags %}
+{% load hodari_forms %}
+{% block title %}Applicant &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Admissions{% endblock %}
+{% block topbar_date %}{{ today_display }}{% endblock %}
+{% block topbar_badges %}
+  <a href="{% url 'admissions:actions_needed' %}" class="topbar-badge badge-red" style="background:#FEF2F2;color:#9B1C1C;border-color:#FECACA;text-decoration:none;cursor:pointer">
+    <span class="badge-dot"></span>{{ critical_action_count }} actions needed
+  </a>
+{% endblock %}
+{% block content %}
+  {% include "admissions/_top_tabs.html" %}
+  <div class="detail-grid">
+    <aside>
+      <div class="applicant-hero">
+        {% has_perm user "admissions.upload_applicant_photo" as can_upload_photo %}
+        <div style="position:relative;display:inline-block">
+          <div class="app-avatar" {% if can_upload_photo %}style="cursor:pointer" onclick="document.getElementById('applicant-photo-input').click()"{% endif %}>
+            {% if applicant.photo %}
+              <img src="{{ applicant.photo.url }}" alt="{{ applicant.child_full_name }}" style="width:100%;height:100%;object-fit:cover;display:block">
+            {% else %}
+              <div class="app-initials">{{ applicant.child_full_name|slice:":1" }}</div>
+            {% endif %}
+          </div>
+          <div style="position:absolute;bottom:0;right:-4px;background:#fff;color:#023AA5;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.2);z-index:1">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </div>
+        </div>
+        <form id="applicant-photo-form" method="post" action="{% url 'admissions:upload_photo' applicant.pk %}" enctype="multipart/form-data" style="display:none">
+          {% csrf_token %}
+          <input type="file" name="photo" id="applicant-photo-input" accept="image/*" onchange="document.getElementById('applicant-photo-form').submit()">
+        </form>
+        <h1 class="app-name" style="font-size:18px;font-weight:700;margin:0 0 2px 0;line-height:1.2">{{ applicant.child_full_name }}</h1>
+        <div class="app-grade">Applying for {{ applicant.grade_applying_for }}</div>
+        <div class="app-status">{{ applicant.get_status_display }}</div>
+        {% if applicant.reference_number %}
+        <div style="margin-top:6px;font-family:var(--mono,monospace);font-size:11px;color:var(--text-muted,#888)">{{ applicant.reference_number }}</div>
+        {% endif %}
+        
+        {% if can_edit_inquiry %}
+        {% has_perm user "admissions.change_applicant" as can_edit %}
+        {% if can_edit %}
+        <div style="margin-top:12px;text-align:center">
+          <button
+            hx-get="{% url 'admissions:edit_inquiry' applicant.pk %}"
+            hx-target="#edit-inquiry-modal-content"
+            hx-swap="innerHTML"
+            onclick="document.getElementById('edit-inquiry-modal').style.display='flex'"
+            class="btn-secondary"
+            style="display:inline-block;padding:6px 14px;font-size:12px;text-decoration:none;border-radius:6px"
+          >
+            Edit Inquiry
+          </button>
+        </div>
+        {% endif %}
+        {% endif %}
+
+        {% has_perm user "admissions.view_applicant" as can_offer_letter %}
+        {% if applicant.status == 'admitted' or applicant.status == 'conditional' %}
+        {% if can_offer_letter %}
+        <div style="margin-top: 16px; text-align: center;">
+          <a href="{% url 'admissions:offer_letter' applicant.id %}" target="_blank" class="btn btn-primary" style="display: inline-block; padding: 6px 12px; font-size: 13px; text-decoration: none; border-radius: 6px; background: #023AA5; color: white;">
+            Print Offer Letter
+          </a>
+        </div>
+        {% endif %}
+        {% endif %}
+        {% if applicant.notes|has_parent_submission %}
+        <div style="margin-top: 8px; text-align: center; display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;">
+          <button type="button" onclick="window.print()" class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px; border-radius: 6px; border: 1px solid var(--line); background: white; color: var(--navy); cursor: pointer;">
+            Print Admission Form
+          </button>
+          {% if admission_invoice %}
+          <a href="{% url 'finance:invoice_print' admission_invoice.pk %}" target="_blank" class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px; border-radius: 6px; border: 1px solid var(--line); background: white; color: var(--navy); text-decoration: none;">
+            Print Invoice
+          </a>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="card-title">Parent / Guardian</div>
+        <div class="info-row"><div class="info-lbl">Name</div><div class="info-val">{{ applicant.parent_full_name }}</div></div>
+        <div class="info-row"><div class="info-lbl">Phone</div><div class="info-val">{{ applicant.parent_phone }}</div></div>
+        {% if applicant.parent_email %}
+          <div class="info-row"><div class="info-lbl">Email</div><div class="info-val">{{ applicant.parent_email }}</div></div>
+        {% endif %}
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="card-title">Student Details</div>
+        <div class="info-row"><div class="info-lbl">DOB</div><div class="info-val">{{ applicant.child_date_of_birth }}</div></div>
+        <div class="info-row"><div class="info-lbl">Previous School</div><div class="info-val">{{ applicant.previous_school|default:"N/A" }}</div></div>
+        <div class="info-row">
+          <div class="info-lbl">Sibling Enrolled</div>
+          <div class="info-val">{% if applicant.sibling_currently_enrolled %}Yes{% else %}No{% endif %}</div>
+        </div>
+        {% if applicant.parent_relationship %}
+        <div class="info-row"><div class="info-lbl">Relationship</div><div class="info-val">{{ applicant.get_parent_relationship_display }}</div></div>
+        {% endif %}
+        {% if applicant.target_enrollment_year %}
+        <div class="info-row">
+          <div class="info-lbl">Target Enrollment</div>
+          <div class="info-val">{{ applicant.target_enrollment_month|month_name }} {{ applicant.target_enrollment_year }}</div>
+        </div>
+        {% endif %}
+      </div>
+
+      {% if applicant.notes %}
+        <div class="card" style="margin-top:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:4px 0" onclick="var el=document.getElementById('inquiry-details-body');el.style.display=el.style.display==='none'?'block':'none';this.querySelector('.chev').style.transform=el.style.display==='none'?'rotate(0deg)':'rotate(90deg)'">
+            <div class="card-title" style="margin:0;display:flex;align-items:center;gap:8px">
+              <span class="chev" style="display:inline-block;transition:transform 0.2s;font-size:10px;transform:rotate({% if applicant.notes|has_parent_submission %}90deg{% else %}0deg{% endif %})">&#9654;</span>
+              {% if applicant.notes|has_parent_submission %}Admission Form Data{% else %}Inquiry Details{% endif %}
+            </div>
+          </div>
+          <div id="inquiry-details-body" style="display:{% if applicant.notes|has_parent_submission %}block{% else %}none{% endif %};font-size:12.5px;color:var(--text-secondary);margin-top:8px">
+            {{ applicant.notes|format_parent_notes }}
+          </div>
+        </div>
+      {% endif %}
+
+      {% if not is_fee_officer_view %}
+      {% if internal_notes %}
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title">Staff Internal Notes</div>
+        {% for note in internal_notes %}
+        <div style="padding:10px 0;border-bottom:1px solid var(--border)">
+          <div style="font-size:12px;font-weight:600;color:var(--text-primary);display:flex;justify-content:space-between;align-items:flex-start">
+            <span>{{ note.author.get_full_name|default:note.author.username }} <span style="font-weight:400;color:var(--text-muted)">({{ note.author.get_role_display }})</span></span>
+            {% has_perm user "admissions.edit_admission_note" as can_edit_note %}
+            {% if can_edit_note %}
+            <span style="display:flex;gap:6px;flex-shrink:0">
+              <button
+                hx-get="{% url 'admissions:internal_note_edit' note.pk %}"
+                hx-target="#note-edit-{{ note.pk }}"
+                hx-swap="innerHTML"
+                onclick="var el=document.getElementById('note-edit-{{ note.pk }}');el.style.display=el.style.display==='block'?'none':'block'"
+                style="background:none;border:none;cursor:pointer;color:var(--hodari-blue);font-size:11px;padding:2px 4px"
+                title="Edit note"
+              >Edit</button>
+              {% endif %}
+            {% if can_edit_note %}
+              <form method="post" action="{% url 'admissions:internal_note_delete' note.pk %}" style="display:inline" onsubmit="return confirm('Delete this note?')">
+                {% csrf_token %}
+                <button type="submit" style="background:none;border:none;cursor:pointer;color:#DC2626;font-size:11px;padding:2px 4px" title="Delete note">Delete</button>
+              </form>
+            {% endif %}
+            </span>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">{{ note.created_at|date:"d M Y, H:i" }}</div>
+          <div style="font-size:12.5px;color:var(--text-secondary);white-space:pre-wrap">{{ note.body }}</div>
+          <div id="note-edit-{{ note.pk }}" style="display:none;margin-top:8px"></div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% endif %}
+
+      {% if not is_fee_officer_view %}
+      <div class="card" style="margin-top:16px">
+        <div class="card-title">Add Internal Note</div>
+        <form method="post" action="{% url 'admissions:internal_note' applicant.pk %}" style="display:flex;gap:8px;align-items:flex-end">
+          {% csrf_token %}
+          <textarea name="body" rows="2" placeholder="Type an internal note..." style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:var(--font-ui);resize:vertical"></textarea>
+          <button type="submit" style="padding:8px 16px;background:var(--hodari-blue);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">Add Note</button>
+        </form>
+      </div>
+      {% endif %}
+
+      {% if not is_fee_officer_view %}
+      <div class="card" style="margin-top:16px">
+        <div class="card-title-row">
+          <div class="card-title" style="margin:0">Admission Checklist</div>
+          {% with received_count=0 %}
+            {% for row in document_rows %}{% if row.doc and row.doc.is_received %}{% endif %}{% endfor %}
+          {% endwith %}
+          <span class="chip" style="background:var(--bg-metric);color:var(--text-muted);border-color:var(--border);font-size:10px;padding:2px 8px">Documents</span>
+        </div>
+        <div
+          hx-get="{% url 'admissions:documents' applicant.id %}"
+          hx-trigger="load"
+          hx-swap="innerHTML"
+        ></div>
+      </div>
+      {% endif %}
+
+      {% if not is_fee_officer_view %}
+      <div class="card" style="margin-top:16px">
+        <div class="card-title">Update Status</div>
+        <div
+          hx-get="{% url 'admissions:transition' applicant.id %}"
+          hx-trigger="load"
+          hx-swap="innerHTML"
+        ></div>
+      </div>
+      {% endif %}
+    </aside>
+
+    <main style="display:flex;flex-direction:column;gap:16px">
+
+      {# ── PIPELINE PROGRESS BAR ── #}
+      {% include "admissions/_progress_bar.html" %}
+      {% if is_fee_officer_view %}
+      <div class="card">
+        <div class="card-title-row">
+          <div class="card-title" style="margin:0">Assessment Fee Gate</div>
+          {% if applicant.assessment and applicant.assessment.assessment_fee_confirmed_paid %}
+            <span class="chip chip-green" style="font-size:10px;padding:2px 8px">Paid confirmed</span>
+          {% elif applicant.assessment %}
+            <span class="chip" style="background:var(--hodari-gold-light);color:var(--amber);border-color:var(--hodari-gold);font-size:10px;padding:2px 8px">Awaiting payment</span>
+          {% else %}
+            <span class="chip" style="background:var(--bg-metric);color:var(--text-muted);border-color:var(--border);font-size:10px;padding:2px 8px">Not available</span>
+          {% endif %}
+        </div>
+        <div
+          hx-get="{% url 'admissions:fee_confirm' applicant.id %}"
+          hx-trigger="load"
+          hx-swap="innerHTML"
+        ></div>
+      </div>
+      {% else %}
+
+      {# ── EARLY STAGES: show info banners or meeting form ── #}
+      {% if applicant.status == 'inquiry_received' %}
+      <div id="meeting-section"
+        hx-get="{% url 'admissions:meeting' applicant.id %}"
+        hx-trigger="load"
+        hx-swap="innerHTML"
+      ></div>
+      {% elif applicant.status == 'meeting_scheduled' or applicant.status == 'meeting_completed' or applicant.status == 'declined_at_meeting' %}
+      <div class="card">
+        <div class="card-title" style="margin:0 0 8px">Next steps</div>
+        {% if applicant.status == 'meeting_scheduled' %}
+          <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--hodari-gold-light);border:1px solid var(--hodari-gold);border-radius:10px;margin-bottom:12px">
+            <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--hodari-gold);color:#fff">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--amber)">Awaiting meeting</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Record the meeting outcome, or reschedule if the parent did not attend.</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <button type="button" class="btn-primary" style="flex:1;background:var(--green);border-color:var(--green)" onclick="confirmDeleteModal({title:'Mark Meeting Completed?',body:'Mark this meeting as completed?',detail:'This will move the applicant to Meeting completed, allowing assessment scheduling.',confirmText:'Confirm',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'meeting_completed'},{name:'reason',value:'Meeting completed successfully.'}]})">Mark Completed</button>
+            <button type="button" class="btn-secondary" style="flex:1;border-color:#DC2626;color:#DC2626" onclick="confirmDeleteModal({title:'Declined at Meeting?',body:'Was the applicant declined at the meeting?',detail:'This will move the applicant to Declined at meeting. Assessment scheduling will not be available.',confirmText:'Decline',url:'{% url 'admissions:transition' applicant.id %}',type:'danger',extraData:[{name:'to_status',value:'declined_at_meeting'},{name:'reason',value:'Applicant declined at meeting.'}]})">Declined</button>
+          </div>
+          <button type="button" class="btn-secondary" style="width:100%;border-color:var(--hodari-gold);color:var(--amber)" onclick="var el=document.getElementById('reschedule-section');el.style.display=el.style.display==='none'?'block':'none';this.textContent=el.style.display==='none'?'Parent did not attend? Reschedule':'Hide reschedule'">Parent did not attend? Reschedule</button>
+          <div id="reschedule-section" style="display:none;margin-top:12px"
+            hx-get="{% url 'admissions:meeting_reschedule' applicant.id %}"
+            hx-trigger="load"
+            hx-swap="innerHTML"
+          ></div>
+        {% elif applicant.status == 'meeting_completed' %}
+          <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--hodari-blue-light);border:1px solid var(--hodari-blue-mid);border-radius:10px">
+            <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--hodari-blue);color:#fff">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l2 2"/></svg>
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--hodari-blue)">Meeting completed</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Move this applicant to <strong>Assessment pending</strong> to unlock the assessment scheduling form.</div>
+            </div>
+          </div>
+          <button type="button" class="btn-primary" style="width:100%;background:var(--green);border-color:var(--green);margin-top:12px" onclick="confirmDeleteModal({title:'Move to Assessment Pending?',body:'Unlock the assessment scheduling form for this applicant?',detail:'This will allow you to schedule an assessment, set fees, and send logistics to the parent.',confirmText:'Confirm',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'assessment_pending'},{name:'reason',value:'Meeting completed. Moving to assessment stage.'}]})">Move to Assessment Pending</button>
+        {% elif applicant.status == 'declined_at_meeting' %}
+          <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#FEF2F2;border:1px solid #FECACA;border-radius:10px">
+            <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#DC2626;color:#fff">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:#DC2626">Declined at meeting</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px">This applicant was declined after the meeting. You can reschedule or withdraw.</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button type="button" class="btn-primary" style="flex:1;background:var(--green);border-color:var(--green)" onclick="confirmDeleteModal({title:'Reschedule Meeting?',body:'Move this applicant back to Meeting Scheduled to reschedule a new meeting?',detail:'This will allow you to schedule a new meeting with the parent.',confirmText:'Reschedule',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'meeting_scheduled'},{name:'reason',value:'Declined at meeting — rescheduling.'}]})">Reschedule Meeting</button>
+            <button type="button" class="btn-secondary" style="flex:1;border-color:#DC2626;color:#DC2626" onclick="confirmDeleteModal({title:'Withdraw Application?',body:'Withdraw this applicant?',detail:'This will move the applicant to Withdrawn status.',confirmText:'Withdraw',url:'{% url 'admissions:transition' applicant.id %}',type:'danger',extraData:[{name:'to_status',value:'withdrawn'},{name:'reason',value:'Withdrawn after declining at meeting.'}]})">Withdraw</button>
+          </div>
+        {% endif %}
+      </div>
+
+      {# ── ASSESSMENT STAGES ── #}
+      {% else %}
+
+      {# ── EARLY ASSESSMENT: show full scheduling form + fee gate (only assessment_pending) ── #}
+      {% if applicant.status == 'assessment_pending' %}
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title-row">
+            <div class="card-title" style="margin:0">Assessment Scheduling</div>
+            {% if applicant.assessment %}
+              <span class="chip chip-green" style="font-size:10px;padding:2px 8px">Scheduled</span>
+            {% else %}
+              <span class="chip" style="background:var(--hodari-gold-light);color:var(--amber);border-color:var(--hodari-gold);font-size:10px;padding:2px 8px">Not scheduled</span>
+            {% endif %}
+          </div>
+          <div id="assessment-section"
+            hx-get="{% url 'admissions:assessment' applicant.id %}"
+            hx-trigger="load"
+            hx-swap="innerHTML"
+          ></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="card" style="margin:0">
+            <div class="card-title-row">
+              <div class="card-title" style="margin:0">Assessment Fee Gate</div>
+              {% if applicant.assessment and applicant.assessment.assessment_fee_confirmed_paid %}
+                <span class="chip chip-green" style="font-size:10px;padding:2px 8px">Paid confirmed</span>
+              {% elif applicant.assessment %}
+                <span class="chip" style="background:var(--hodari-gold-light);color:var(--amber);border-color:var(--hodari-gold);font-size:10px;padding:2px 8px">Awaiting payment</span>
+              {% else %}
+                <span class="chip" style="background:var(--bg-metric);color:var(--text-muted);border-color:var(--border);font-size:10px;padding:2px 8px">Not available</span>
+              {% endif %}
+            </div>
+            <div
+              hx-get="{% url 'admissions:fee_confirm' applicant.id %}"
+              hx-trigger="load"
+              hx-swap="innerHTML"
+            ></div>
+          </div>
+
+          {% if applicant.assessment and applicant.assessment.assessment_fee_confirmed_paid %}
+          <div class="card" style="margin:0;">
+            <div class="card-title-row">
+              <div class="card-title" style="margin:0">Assessment Complete</div>
+              {% if applicant.status == 'assessment_failed' %}
+                <span class="chip" style="background:#FEF2F2;color:#DC2626;border-color:#FECACA;font-size:10px;padding:2px 8px">Failed</span>
+              {% elif applicant.status == 'assessment_completed' or applicant.status == 'report_pending' or applicant.status == 'hos_decision' or applicant.status == 'admitted' or applicant.status == 'conditional' or applicant.status == 'enrolled' or applicant.status == 'form_submitted' or applicant.status == 'invoice_generated' or applicant.status == 'invoice_paid' %}
+                <span class="chip chip-green" style="font-size:10px;padding:2px 8px">Completed</span>
+              {% else %}
+                <span class="chip" style="background:var(--hodari-gold-light);color:var(--amber);border-color:var(--hodari-gold);font-size:10px;padding:2px 8px">Pending</span>
+              {% endif %}
+            </div>
+            {% if applicant.status == 'assessment_failed' %}
+              <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#FEF2F2;border:1px solid #FECACA;border-radius:10px">
+                <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#DC2626;color:#fff">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:13px;font-weight:600;color:#DC2626">Assessment not successful</div>
+                  <div style="font-size:11px;color:#DC2626;margin-top:2px">The applicant did not meet the assessment requirements.</div>
+                </div>
+              </div>
+            {% elif applicant.status == 'assessment_completed' or applicant.status == 'report_pending' or applicant.status == 'hos_decision' or applicant.status == 'admitted' or applicant.status == 'conditional' or applicant.status == 'enrolled' or applicant.status == 'form_submitted' or applicant.status == 'invoice_generated' or applicant.status == 'invoice_paid' %}
+              <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--green-bg);border:1px solid var(--green-bd);border-radius:10px">
+                <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--green);color:#fff">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:13px;font-weight:600;color:var(--green)">Assessment completed</div>
+                  <div style="font-size:11px;color:var(--green);margin-top:2px">Result submitted and forwarded to HOD for review.</div>
+                </div>
+              </div>
+            {% else %}
+              {% if applicant.assessment.logistics_sent_at %}
+              <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--hodari-gold-light);border:1px solid var(--hodari-gold);border-radius:10px;margin-bottom:12px">
+                <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--hodari-gold);color:#fff">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:13px;font-weight:600;color:var(--amber)">Ready to mark complete</div>
+                  <div style="font-size:11px;color:var(--amber);margin-top:2px">Logistics sent at {{ applicant.assessment.logistics_sent_at|date:"d M Y, H:i" }}. Mark when assessment is done.</div>
+                </div>
+              </div>
+              {% else %}
+              <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--hodari-gold-light);border:1px solid var(--hodari-gold);border-radius:10px;margin-bottom:12px">
+                <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--hodari-gold);color:#fff">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:13px;font-weight:600;color:var(--amber)">Awaiting logistics</div>
+                  <div style="font-size:11px;color:var(--amber);margin-top:2px">Send logistics to parent to proceed with assessment completion.</div>
+                </div>
+              </div>
+              {% endif %}
+              {% if applicant.status != 'assessment_completed' and applicant.status != 'report_pending' and applicant.status != 'hos_decision' and applicant.status != 'admitted' and applicant.status != 'conditional' and applicant.status != 'enrolled' and applicant.status != 'waitlisted' and applicant.status != 'flagged_for_review' %}
+              <button type="button" class="btn-primary" style="width:100%;background:var(--green);border-color:var(--green)" onclick="confirmDeleteModal({title:'Mark Assessment Complete?',body:'Mark this assessment as complete?',detail:'This will send the result to HOD for review. This action cannot be undone.',confirmText:'Confirm',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'assessment_completed'},{name:'reason',value:'Assessment completed by Admin Officer.'}]})">Mark Assessment Complete</button>
+              {% endif %}
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      {# ── ASSESSMENT FEE PAID: action card (no scheduling form needed) ── #}
+      {% elif applicant.status == 'assessment_fee_paid' %}
+      <div class="card">
+        <div class="card-title-row">
+          <div class="card-title" style="margin:0">Assessment Fee Confirmed — Actions</div>
+          <span class="chip" style="background:#F0FDF4;color:#16A34A;border-color:#BBF7D0;font-size:10px;padding:2px 8px">Fee confirmed</span>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">The assessment fee has been confirmed as paid. When the assessment is done, mark it complete below.</div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px">
+          <button type="button" onclick="confirmDeleteModal({title:'Mark Assessment Complete?',body:'Mark this assessment as completed?',detail:'This will move the applicant to Assessment Completed for report submission.',confirmText:'Confirm',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'assessment_completed'},{name:'reason',value:'Assessment completed — confirmed by Finance Officer.'}]})"
+            style="flex:1;min-width:140px;padding:12px 16px;font-size:13px;font-weight:700;color:#fff;background:#16A34A;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background 0.2s"
+            onmouseover="this.style.background='#15803D'" onmouseout="this.style.background='#16A34A'">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Mark Assessment Complete
+          </button>
+          <button type="button" onclick="confirmDeleteModal({title:'Withdraw Application?',body:'Withdraw this applicant?',detail:'This will move the applicant to Withdrawn status.',confirmText:'Withdraw',url:'{% url 'admissions:transition' applicant.id %}',type:'danger',extraData:[{name:'to_status',value:'withdrawn'},{name:'reason',value:'Application withdrawn.'}]})"
+            style="flex:1;min-width:120px;padding:12px 16px;font-size:13px;font-weight:700;color:#fff;background:#DC2626;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background 0.2s"
+            onmouseover="this.style.background='#B91C1C'" onmouseout="this.style.background='#DC2626'">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Withdraw
+          </button>
+        </div>
+      </div>
+
+      {# ── ADVANCED ASSESSMENT: read-only summary (no scheduling form) ── #}
+      {% elif applicant.status == 'assessment_confirmed' or applicant.status == 'assessment_completed' or applicant.status == 'report_pending' or applicant.status == 'hos_review' or applicant.status == 'hos_decision' or applicant.status == 'assessment_failed' %}
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title-row">
+            <div class="card-title" style="margin:0">Assessment Schedule</div>
+            {% if applicant.assessment %}
+              <span class="chip chip-green" style="font-size:10px;padding:2px 8px">Completed</span>
+            {% else %}
+              <span class="chip" style="background:var(--bg-metric);color:var(--text-muted);border-color:var(--border);font-size:10px;padding:2px 8px">N/A</span>
+            {% endif %}
+          </div>
+          {% if applicant.assessment %}
+          <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--green-bg);border:1px solid var(--green-bd);border-radius:10px">
+            <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--green);color:#fff">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:600;color:var(--green)">Assessment completed</div>
+              <div style="font-size:11px;color:var(--green);margin-top:2px">{{ applicant.assessment.scheduled_date|date:"d M Y" }} at {{ applicant.assessment.scheduled_time|time:"H:i" }} &mdash; {{ applicant.assessment.location }}</div>
+            </div>
+          </div>
+          {% else %}
+          <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--bg-metric);border:1px solid var(--border);border-radius:10px">
+            <div style="font-size:12px;color:var(--text-muted)">No assessment record found.</div>
+          </div>
+          {% endif %}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="card" style="margin:0">
+            <div class="card-title-row">
+              <div class="card-title" style="margin:0">Assessment Fee</div>
+              {% if applicant.assessment and applicant.assessment.assessment_fee_confirmed_paid %}
+                <span class="chip chip-green" style="font-size:10px;padding:2px 8px">Paid</span>
+              {% else %}
+                <span class="chip" style="background:var(--bg-metric);color:var(--text-muted);border-color:var(--border);font-size:10px;padding:2px 8px">Cleared</span>
+              {% endif %}
+            </div>
+            {% if applicant.assessment and applicant.assessment.assessment_fee_confirmed_paid %}
+            <div style="padding:12px 0;font-size:12px;color:var(--text-secondary)">
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:var(--text-muted)">Method</span><span>{{ applicant.assessment.assessment_fee_method|default:"—" }}</span></div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:var(--text-muted)">Reference</span><span>{{ applicant.assessment.assessment_fee_reference|default:"—" }}</span></div>
+              <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Confirmed at</span><span>{{ applicant.assessment.assessment_fee_confirmed_at|date:"d M Y, H:i" }}</span></div>
+            </div>
+            {% else %}
+            <div style="padding:12px 0;font-size:12px;color:var(--text-muted)">Fee gate cleared for this stage.</div>
+            {% endif %}
+          </div>
+
+          {% if applicant.assessment %}
+          <div class="card" style="margin:0">
+            <div class="card-title-row">
+              <div class="card-title" style="margin:0">Assessment Result</div>
+              {% if applicant.assessment.result == 'recommended' %}
+                <span class="chip chip-green" style="font-size:10px;padding:2px 8px">Recommended</span>
+              {% elif applicant.assessment.result == 'needs_support' %}
+                <span class="chip" style="background:var(--hodari-gold-light);color:var(--amber);border-color:var(--hodari-gold);font-size:10px;padding:2px 8px">Needs support</span>
+              {% elif applicant.assessment.result == 'not_yet_ready' %}
+                <span class="chip" style="background:#FEF2F2;color:#DC2626;border-color:#FECACA;font-size:10px;padding:2px 8px">Not yet ready</span>
+              {% elif applicant.assessment.result %}
+                <span class="chip" style="background:var(--bg-metric);color:var(--text-muted);border-color:var(--border);font-size:10px;padding:2px 8px">{{ applicant.assessment.get_result_display }}</span>
+              {% else %}
+                <span class="chip" style="background:var(--bg-metric);color:var(--text-muted);border-color:var(--border);font-size:10px;padding:2px 8px">Pending</span>
+              {% endif %}
+            </div>
+            {% if applicant.assessment.teacher_comments %}
+            <div style="padding:12px 0;font-size:12px;color:var(--text-secondary)">
+              <div style="font-weight:600;color:var(--text-primary);margin-bottom:4px">Teacher comments</div>
+              <div>{{ applicant.assessment.teacher_comments }}</div>
+            </div>
+            {% endif %}
+            {% if not applicant.assessment.teacher_comments %}
+            <div style="padding:12px 0;font-size:12px;color:var(--text-muted)">No comments recorded yet.</div>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+      {% endif %}
+
+      {% if applicant.status == 'assessment_confirmed' %}
+      <div class="card">
+        <div class="card-title-row">
+          <div class="card-title" style="margin:0">Assessment Confirmed — Actions</div>
+          <span class="chip" style="background:#EFF6FF;color:#2563EB;border-color:#BFDBFE;font-size:10px;padding:2px 8px">Confirmed</span>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">The assessment fee has been confirmed and the assessment is scheduled. When the assessment is done, mark it complete below.</div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px">
+          <button type="button" onclick="confirmDeleteModal({title:'Mark Assessment Complete?',body:'Mark this assessment as completed?',detail:'This will move the applicant to Assessment Completed for report submission.',confirmText:'Confirm',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'assessment_completed'},{name:'reason',value:'Assessment completed — confirmed by Admin Officer.'}]})"
+            style="flex:1;min-width:140px;padding:12px 16px;font-size:13px;font-weight:700;color:#fff;background:#16A34A;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background 0.2s"
+            onmouseover="this.style.background='#15803D'" onmouseout="this.style.background='#16A34A'">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Mark Assessment Complete
+          </button>
+          <button type="button" onclick="confirmDeleteModal({title:'Withdraw Application?',body:'Withdraw this applicant?',detail:'This will move the applicant to Withdrawn status.',confirmText:'Withdraw',url:'{% url 'admissions:transition' applicant.id %}',type:'danger',extraData:[{name:'to_status',value:'withdrawn'},{name:'reason',value:'Application withdrawn.'}]})"
+            style="flex:1;min-width:120px;padding:12px 16px;font-size:13px;font-weight:700;color:#fff;background:#DC2626;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background 0.2s"
+            onmouseover="this.style.background='#B91C1C'" onmouseout="this.style.background='#DC2626'">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Withdraw
+          </button>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if applicant.status == 'assessment_completed' %}
+      <div class="card">
+        <div class="card-title-row">
+          <div class="card-title" style="margin:0">Assessment Done — Actions</div>
+          <span class="chip" style="background:#F0FDF4;color:#16A34A;border-color:#BBF7D0;font-size:10px;padding:2px 8px">Done</span>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">The assessment has been completed by the teacher. Submit the report or forward to HOS for review.</div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px">
+          <button type="button" onclick="confirmDeleteModal({title:'Forward to HOS?',body:'Forward this report to the Head of School for review?',detail:'This will move the applicant to HOS Review stage.',confirmText:'Forward',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'report_pending'},{name:'reason',value:'Assessment completed. Report forwarded to HOS.'}]})"
+            style="flex:1;min-width:140px;padding:12px 16px;font-size:13px;font-weight:700;color:#fff;background:#2563EB;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background 0.2s"
+            onmouseover="this.style.background='#1D4ED8'" onmouseout="this.style.background='#2563EB'">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            Forward to HOS Review
+          </button>
+          <button type="button" onclick="confirmDeleteModal({title:'Skip to HOS Decision?',body:'Skip the review and go directly to HOS Decision?',detail:'Move to the decision stage where you can Admit, Deny, Waitlist, or Conditionally admit.',confirmText:'Proceed',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'hos_decision'},{name:'reason',value:'Assessment completed — skipping to HOS Decision.'}]})"
+            style="flex:1;min-width:120px;padding:12px 16px;font-size:13px;font-weight:700;color:#fff;background:#7C3AED;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background 0.2s"
+            onmouseover="this.style.background='#6D28D9'" onmouseout="this.style.background='#7C3AED'">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Skip to Decision
+          </button>
+          <button type="button" onclick="confirmDeleteModal({title:'Mark Assessment Failed?',body:'Mark this assessment as failed?',detail:'This will allow the applicant to retry the assessment or be withdrawn.',confirmText:'Mark Failed',url:'{% url 'admissions:transition' applicant.id %}',type:'danger',extraData:[{name:'to_status',value:'assessment_failed'},{name:'reason',value:'Assessment did not meet requirements.'}]})"
+            style="flex:1;min-width:120px;padding:12px 16px;font-size:13px;font-weight:700;color:#fff;background:#DC2626;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background 0.2s"
+            onmouseover="this.style.background='#B91C1C'" onmouseout="this.style.background='#DC2626'">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Mark Failed
+          </button>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if applicant.status == 'assessment_failed' %}
+      <div class="card" style="">
+        <div class="card-title-row">
+          <div class="card-title" style="margin:0">Assessment Failed — Actions</div>
+          <span class="chip" style="background:#FEF2F2;color:#DC2626;border-color:#FECACA;font-size:10px;padding:2px 8px">Failed</span>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">The applicant did not meet the assessment requirements. Choose an action below.</div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px">
+          <button type="button" onclick="confirmDeleteModal({title:'Retry Assessment?',body:'Move this applicant back to Assessment Pending to schedule a new assessment?',detail:'This will allow you to schedule a new assessment date and notify the parent.',confirmText:'Retry',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'assessment_pending'},{name:'reason',value:'Assessment failed — retrying.'}]})"
+            style="flex:1;min-width:120px;padding:12px 16px;font-size:13px;font-weight:700;color:#fff;background:#2563EB;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background 0.2s"
+            onmouseover="this.style.background='#1D4ED8'" onmouseout="this.style.background='#2563EB'">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Retry Assessment
+          </button>
+          <button type="button" onclick="confirmDeleteModal({title:'Admit Anyway?',body:'Override the failed assessment and admit this applicant?',detail:'This will move the applicant directly to Admitted status, bypassing the assessment result.',confirmText:'Admit',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'admitted'},{name:'reason',value:'HOS override — admitted despite failed assessment.'}]})"
+            style="flex:1;min-width:120px;padding:12px 16px;font-size:13px;font-weight:700;color:#fff;background:#16A34A;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background 0.2s"
+            onmouseover="this.style.background='#15803D'" onmouseout="this.style.background='#16A34A'">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Admit Anyway
+          </button>
+          <button type="button" onclick="confirmDeleteModal({title:'Withdraw Application?',body:'Withdraw this applicant?',detail:'This will move the applicant to Withdrawn status.',confirmText:'Withdraw',url:'{% url 'admissions:transition' applicant.id %}',type:'danger',extraData:[{name:'to_status',value:'withdrawn'},{name:'reason',value:'Application withdrawn after failed assessment.'}]})"
+            style="flex:1;min-width:120px;padding:12px 16px;font-size:13px;font-weight:700;color:#fff;background:#DC2626;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background 0.2s"
+            onmouseover="this.style.background='#B91C1C'" onmouseout="this.style.background='#DC2626'">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Withdraw
+          </button>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if applicant.status == 'denied' %}
+      <div class="card" style="">
+        <div class="card-title-row">
+          <div class="card-title" style="margin:0">Application Denied</div>
+          <span class="chip" style="background:#FEF2F2;color:#DC2626;border-color:#FECACA;font-size:10px;padding:2px 8px">Denied</span>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">This application was denied. If this was a mistake, you can revert the decision.</div>
+        <div style="display:flex;gap:8px">
+          <button type="button" class="btn-primary" style="flex:1;background:#2563EB;border-color:#2563EB" onclick="confirmDeleteModal({title:'Reconsider Application?',body:'Revert this applicant to HOS Decision to review again?',detail:'This will move the applicant back to the HOS Decision stage for a new verdict.',confirmText:'Reconsider',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'hos_decision'},{name:'reason',value:'Reverting denied application for reconsideration.'}]})">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Reconsider
+          </button>
+          <button type="button" class="btn-secondary" style="flex:1;border-color:#DC2626;color:#DC2626" onclick="confirmDeleteModal({title:'Withdraw Application?',body:'Withdraw this applicant entirely?',detail:'This will move the applicant to Withdrawn status.',confirmText:'Withdraw',url:'{% url 'admissions:transition' applicant.id %}',type:'danger',extraData:[{name:'to_status',value:'withdrawn'},{name:'reason',value:'Denied application withdrawn.'}]})">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Withdraw
+          </button>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if applicant.status == 'withdrawn' %}
+      <div class="card" style="">
+        <div class="card-title-row">
+          <div class="card-title" style="margin:0">Application Withdrawn</div>
+          <span class="chip" style="background:#FEF2F2;color:#DC2626;border-color:#FECACA;font-size:10px;padding:2px 8px">Withdrawn</span>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">This application was withdrawn. You can reopen it to restart the process.</div>
+        <div style="display:flex;gap:8px">
+          <button type="button" class="btn-primary" style="flex:1;background:#2563EB;border-color:#2563EB" onclick="confirmDeleteModal({title:'Reopen Application?',body:'Reopen this applicant and restart from Inquiry Received?',detail:'This will move the applicant back to Inquiry Received to begin the admissions process again.',confirmText:'Reopen',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'inquiry_received'},{name:'reason',value:'Reopening withdrawn application.'}]})">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Reopen
+          </button>
+          <button type="button" class="btn-primary" style="flex:1;background:#7C3AED;border-color:#7C3AED" onclick="confirmDeleteModal({title:'Restart Assessment?',body:'Reopen and move directly to Assessment Pending?',detail:'This will skip the inquiry stage and allow scheduling a new assessment immediately.',confirmText:'Restart',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'assessment_pending'},{name:'reason',value:'Reopening withdrawn application directly to assessment.'}]})">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Restart at Assessment
+          </button>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if applicant.assessment %}
+      <div class="card" style="">
+        <div class="card-title-row">
+          <div class="card-title" style="margin:0">Assessment Report</div>
+        </div>
+        <div
+          hx-get="{% url 'admissions:assessment_result_edit' applicant.id %}"
+          hx-trigger="load"
+          hx-swap="innerHTML"
+        ></div>
+      </div>
+      {% endif %}
+
+      {% if applicant.assessment and applicant.status == 'report_pending' %}
+      <div class="card" style="">
+        <div class="card-title-row">
+          <div class="card-title" style="margin:0">Forward Report</div>
+          <span class="chip" style="background:var(--hodari-gold-light);color:var(--amber);border-color:var(--hodari-gold);font-size:10px;padding:2px 8px">Awaiting HOS review</span>
+        </div>
+        <button type="button" class="btn-primary" style="width:100%;background:var(--green);border-color:var(--green)" onclick="confirmDeleteModal({title:'Forward to HOS?',body:'Forward this report to the Head of School for review?',detail:'This will move the applicant to HOS Review stage.',confirmText:'Forward',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'hos_review'},{name:'reason',value:'Report forwarded to HOS for review.'}]})">Forward to HOS Review</button>
+      </div>
+      {% endif %}
+
+      {% if applicant.status == 'hos_review' %}
+      <div class="card" style="">
+        <div class="card-title-row">
+          <div class="card-title" style="margin:0">HOS Review</div>
+          <span class="chip" style="background:var(--hodari-gold-light);color:var(--amber);border-color:var(--hodari-gold);font-size:10px;padding:2px 8px">Under review</span>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">Review the assessment report above, write your review comments, then submit to proceed to decision.</div>
+        <div
+          id="hos-review-section"
+          hx-get="{% url 'admissions:hos_review_submit' applicant.id %}"
+          hx-trigger="load"
+          hx-swap="innerHTML"
+        ></div>
+      </div>
+      {% endif %}
+
+      {% if applicant.status == 'hos_decision' %}
+      <div class="card" style="">
+        <div class="card-title-row">
+          <div class="card-title" style="margin:0">HOS Decision</div>
+          <span class="chip" style="background:var(--hodari-gold-light);color:var(--amber);border-color:var(--hodari-gold);font-size:10px;padding:2px 8px">Awaiting decision</span>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">The HOD review is complete. Select a decision below to advance the applicant.</div>
+        <div
+          id="decision-section"
+          hx-get="{% url 'admissions:decision' applicant.id %}"
+          hx-trigger="load"
+          hx-swap="innerHTML"
+        ></div>
+      </div>
+      {% endif %}
+
+      {% if applicant.status == 'waitlisted' %}
+      <div class="card" style="">
+        <div class="card-title-row">
+          <div class="card-title" style="margin:0">HOS Decision</div>
+          <span class="chip" style="background:#EFF6FF;color:#2563EB;border-color:#BFDBFE;font-size:10px;padding:2px 8px">Waitlisted</span>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">This applicant is currently waitlisted. Select a decision below to advance or deny the application.</div>
+        <div
+          id="decision-section"
+          hx-get="{% url 'admissions:decision' applicant.id %}"
+          hx-trigger="load"
+          hx-swap="innerHTML"
+        ></div>
+      </div>
+      {% endif %}
+
+      <div class="card">
+        <div class="card-title-row">
+          <div class="card-title" style="margin:0">Enrolment</div>
+          {% if applicant.status == 'enrolled' %}
+            <span class="chip chip-green" style="font-size:10px;padding:2px 8px">Enrolled</span>
+          {% elif applicant.status == 'admitted' or applicant.status == 'conditional' %}
+            <span class="chip" style="background:var(--hodari-gold-light);color:var(--amber);border-color:var(--hodari-gold);font-size:10px;padding:2px 8px">Ready</span>
+          {% elif applicant.status == 'form_submitted' or applicant.status == 'invoice_generated' or applicant.status == 'invoice_paid' %}
+            <span class="chip" style="background:var(--hodari-gold-light);color:var(--amber);border-color:var(--hodari-gold);font-size:10px;padding:2px 8px">Processing</span>
+          {% elif applicant.status == 'flagged_for_review' %}
+            <span class="chip" style="background:#FEF2F2;color:#DC2626;border-color:#FECACA;font-size:10px;padding:2px 8px">Flagged</span>
+          {% else %}
+            <span class="chip" style="background:var(--bg-metric);color:var(--text-muted);border-color:var(--border);font-size:10px;padding:2px 8px">Locked</span>
+          {% endif %}
+        </div>
+        {% if applicant.status == 'flagged_for_review' %}
+        <div style="padding:14px 16px;background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#DC2626;color:#fff">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:600;color:#DC2626">Offer expired — flagged for HOS review</div>
+              <div style="font-size:11px;color:#DC2626;margin-top:2px">The 14-day offer window has passed without enrolment completion.</div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button type="button" class="btn-primary" style="flex:1;background:var(--green);border-color:var(--green)" onclick="confirmDeleteModal({title:'Approve Enrolment?',body:'Approve this flagged applicant for enrolment?',detail:'This will move the applicant back to Enrolled status.',confirmText:'Approve',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'enrolled'},{name:'reason',value:'HOS approved flagged applicant for enrolment.'}]})">Approve</button>
+          <button type="button" class="btn-secondary" style="flex:1;border-color:#DC2626;color:#DC2626" onclick="confirmDeleteModal({title:'Withdraw Application?',body:'Withdraw this applicant?',detail:'This will move the applicant to Withdrawn status.',confirmText:'Withdraw',url:'{% url 'admissions:transition' applicant.id %}',type:'danger',extraData:[{name:'to_status',value:'withdrawn'},{name:'reason',value:'HOS withdrew flagged applicant.'}]})">Withdraw</button>
+        </div>
+        {% else %}
+        {% if applicant.status == 'admitted' or applicant.status == 'conditional' %}
+        {% if not applicant.notes|has_parent_submission %}
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <button type="button" class="btn-primary" style="flex:1;background:#7C3AED;border-color:#7C3AED" onclick="document.getElementById('walkin-form-slot').innerHTML='<div style=\'text-align:center;padding:16px\'><svg width=\'18\' height=\'18\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'var(--hodari-blue)\' stroke-width=\'3\' style=\'animation:btn-spin 1s linear infinite\'><path d=\'M21 12a9 9 0 11-6.219-8.56\'/></svg></div>';htmx.ajax('GET','{% url 'admissions:walkin_form' applicant.id %}',{target:'#walkin-form-slot',swap:'innerHTML'})">Fill form at desk (walk-in)</button>
+        </div>
+        <div id="walkin-form-slot"></div>
+        {% endif %}
+        {% elif applicant.status == 'form_submitted' %}
+        <div style="padding:14px 16px;background:var(--hodari-blue-light);border:1px solid var(--hodari-blue-mid);border-radius:10px;margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--hodari-blue);color:#fff">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M7 8h10M7 12h6"/></svg>
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--hodari-blue)">Admission form submitted</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Generate the admission fee invoice and confirm payment at the desk.</div>
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn-primary" style="width:100%;background:var(--green);border-color:var(--green);margin-bottom:12px" onclick="confirmDeleteModal({title:'Generate Admission Invoice?',body:'Create the admission fee invoice and move to invoice_generated?',detail:'The invoice will be created and finance will be notified.',confirmText:'Generate',url:'{% url 'admissions:walkin_invoice' applicant.id %}',type:'info'})">Generate Invoice at Desk</button>
+        {% elif applicant.status == 'invoice_generated' %}
+        <div style="padding:14px 16px;background:var(--hodari-gold-light);border:1px solid var(--hodari-gold);border-radius:10px;margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--hodari-gold);color:#fff">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--amber)">Invoice sent to parent</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Confirm payment once the parent has completed the admission fee.</div>
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn-primary" style="width:100%;background:var(--green);border-color:var(--green);margin-bottom:12px" onclick="confirmDeleteModal({title:'Confirm Admission Fee Paid?',body:'Mark the admission fee as paid?',detail:'This will allow you to complete the enrolment process.',confirmText:'Confirm',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'invoice_paid'},{name:'reason',value:'Admission fee payment confirmed.'}]})">Confirm Payment Received</button>
+        {% elif applicant.status == 'invoice_paid' %}
+        <div style="padding:14px 16px;background:var(--green-bg);border:1px solid var(--green-bd);border-radius:10px;margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--green);color:#fff">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--green)">Payment confirmed</div>
+              <div style="font-size:11px;color:var(--green);margin-top:2px">All fees paid. Complete the enrolment below to create the student record.</div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+        <div
+          hx-get="{% url 'admissions:enrol' applicant.id %}"
+          hx-trigger="load"
+          hx-swap="innerHTML"
+        ></div>
+        {% endif %}
+      </div>
+
+      {% if applicant.status == 'enrolled' %}
+      <div class="card" style="">
+        <div class="card-title-row">
+          <div class="card-title" style="margin:0">Revert Enrollment</div>
+          <span class="chip" style="background:#FEF2F2;color:#DC2626;border-color:#FECACA;font-size:10px;padding:2px 8px">Archive student</span>
+        </div>
+        <div
+          id="revert-section"
+          hx-get="{% url 'admissions:revert' applicant.id %}"
+          hx-trigger="load"
+          hx-swap="innerHTML"
+        ></div>
+      </div>
+      {% endif %}
+
+      <div class="card" id="audit-log-section">
+        <div class="card-title-row" style="cursor:pointer" onclick="var el=document.getElementById('audit-log-body');el.style.display=el.style.display==='none'?'block':'none';this.querySelector('.audit-chevron').style.transform=el.style.display==='none'?'rotate(0deg)':'rotate(90deg)'">
+          <div class="card-title" style="margin:0;display:flex;align-items:center;gap:8px">
+            <span class="audit-chevron" style="display:inline-block;transition:transform 0.2s;font-size:10px;transform:rotate(0deg)">&#9654;</span>
+            Audit Log
+          </div>
+          <span class="chip" style="background:var(--bg-metric);color:var(--text-muted);border-color:var(--border);font-size:10px;padding:2px 8px">{{ timeline|length }} entries</span>
+        </div>
+        <div id="audit-log-body" style="display:none">
+          <div class="timeline">
+            {% for entry in timeline %}
+              <div class="tl-item">
+                <div class="tl-dot tl-dot-blue"></div>
+                <div class="tl-header">{{ entry.from_status }} &rarr; {{ entry.to_status }}</div>
+                <div class="tl-date">{{ entry.created_at|date:"d M Y, H:i" }} &middot; By {{ entry.actor.get_username }}</div>
+                {% if entry.reason %}
+                  <div class="tl-body">{{ entry.reason }}</div>
+                {% endif %}
+              </div>
+            {% empty %}
+              {% include '_partials/empty_state.html' with title='No timeline entries yet' desc='Timeline entries will appear here.' icon='doc' icon_color='grey' %}
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </main>
+  </div>
+
+  <!-- Edit Inquiry Modal -->
+  <div id="edit-inquiry-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:flex-start;padding-top:60px" onclick="if(event.target===this)this.style.display='none'">
+    <div id="edit-inquiry-modal-content" style="background:#fff;border-radius:12px;width:90%;max-width:680px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+      <div style="padding:40px;text-align:center;color:var(--text-muted);font-size:13px">Loading...</div>
+    </div>
+  </div>
+
+  <script src="{% static 'admissions/admissions-detail.js' %}"></script>
+{% endblock %}
+

@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Staff Directory — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Staff Management{% endblock %}
+{% block extra_head %}
+{% include "includes/hodari_print_styles.html" %}
+<style>
+  .print-only { display: none; }
+  @media print {
+    .print-only { display: block !important; }
+    .sidebar, .topbar, header, .hf2-actions, .btn-primary, .btn-secondary,
+    .hf-btn, .hf-btn-primary, .hf-btn-secondary, .hf-btn-danger,
+    form, .filter-bar, .no-print, .no-print-area, .print-hide,
+    .card-title-row, .hr-tab-bar, .sub-nav,
+    .chip-amber, .chip-blue { display: none !important; }
+    .main { margin-left: 0 !important; }
+    .content { padding: 0 !important; }
+    .card { border: none !important; box-shadow: none !important; padding: 0 !important; }
+    body { background: #fff !important; }
+    th:last-child, td:last-child { display: none !important; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "hr/_top_tabs.html" %}
+<!-- Print-only branded header -->
+<div class="print-only doc-container" style="max-width:900px;margin:0 auto 20px;background:#fff;padding:24px 28px;border:1px solid #DDE3EE;border-radius:12px">
+  {% include "includes/hodari_print_header.html" %}
+  <div style="height:1px;background:var(--border);margin:16px 0"></div>
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <div style="font-family:var(--font-display);font-size:18pt;font-weight:bold;color:var(--hodari-blue);text-transform:uppercase">Staff Directory</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Generated {% now "d M Y" %}</div>
+    </div>
+  </div>
+</div>
+<div class="card">
+  <div class="card-title-row" style="display:flex;justify-content:space-between;align-items:center">
+    <div class="card-title" style="margin:0">Staff Directory</div>
+    {% has_perm user "hr.add_staffprofile" as can_add %}
+    {% if can_add %}
+    <a href="{% url 'users:user_create' %}" class="btn-primary btn-sm" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+      Add New Staff
+    </a>
+    {% endif %}
+  </div>
+
+  {% if expiring_contracts %}
+  <div style="margin:16px 0;padding:14px 18px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;font-size:13px">
+    <strong>Contracts expiring within 60 days:</strong>
+    {% for s in expiring_contracts %}
+      <span style="margin-left:8px">{{ s.full_name }} ({{ s.contract_end_date|date:"d M Y" }})</span>{% if not forloop.last %} &middot;{% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <form method="get" class="hf2-toolbar" style="margin:20px 0">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <input name="q" type="text" class="hf2-input" placeholder="Search by name…" value="{{ request.GET.q }}" style="min-width:220px">
+      <select name="department" class="hf2-select">
+        <option value="">All Departments</option>
+        {% for val, label in department_choices %}
+          <option value="{{ val }}" {% if request.GET.department == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <select name="staff_category" class="hf2-select">
+        <option value="">All staff types</option>
+        <option value="teaching" {% if request.GET.staff_category == 'teaching' %}selected{% endif %}>Teaching</option>
+        <option value="non_teaching" {% if request.GET.staff_category == 'non_teaching' %}selected{% endif %}>Non-teaching</option>
+      </select>
+      <button type="submit" class="btn-primary btn-sm">Search</button>
+      <a href="{% url 'hr:staff_list' %}" class="btn-secondary btn-sm">Reset</a>
+    </div>
+  </form>
+
+  <div style="border-top:1px solid var(--border)">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="text-align:left;border-bottom:2px solid #F3F4F6">
+          <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Name</th>
+          <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Role/Title</th>
+          <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Department</th>
+          <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Type</th>
+          <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Contract</th>
+          <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Status</th>
+          <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for staff in staff_list %}
+        <tr style="border-bottom:1px solid #F3F4F6;font-size:13px">
+          <td style="padding:12px 8px;font-weight:600">{{ staff.full_name }}</td>
+          <td style="padding:12px 8px;color:var(--text-muted)">{{ staff.job_title }}</td>
+          <td style="padding:12px 8px">{{ staff.get_department_display }}</td>
+          <td style="padding:12px 8px;font-size:12px">{{ staff.get_staff_category_display }}</td>
+          <td style="padding:12px 8px;font-size:12px">
+            {% if staff.contract_end_date %}
+              {{ staff.contract_end_date|date:"d M Y" }}
+              {% if staff.contract_expiring_soon %}<span class="chip chip-amber" style="margin-left:4px;font-size:10px">Expiring</span>{% endif %}
+            {% else %}Ongoing{% endif %}
+          </td>
+          <td style="padding:12px 8px">
+            {% if staff.is_active %}
+              <span class="chip chip-green">Active</span>
+            {% else %}
+              <span class="chip chip-grey">Inactive</span>
+            {% endif %}
+            {% if staff.is_active and not staff.onboarding_completed %}
+              {% if staff.onboarding_step == 0 %}
+                <span class="chip chip-amber" style="font-size:10px;margin-top:4px;display:inline-flex">Setup Pending</span>
+              {% else %}
+                <span class="chip chip-blue" style="font-size:10px;margin-top:4px;display:inline-flex;background:#EFF6FF;color:#1E40AF">Onboarding {{ staff.onboarding_step }}/10</span>
+              {% endif %}
+            {% endif %}
+          </td>
+          <td style="padding:12px 8px;text-align:right">
+            <a href="{% url 'hr:staff_detail' staff.pk %}" class="btn-secondary btn-sm">Profile</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7">{% include '_partials/empty_state.html' with title='No staff records found' desc='Add your first staff member to get started.' icon='users' icon_color='blue' %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

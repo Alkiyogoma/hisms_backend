@@ -1,0 +1,93 @@
+{% load hodari_forms %}
+{% if messages %}
+  {% for message in messages %}
+    <div class="msg-toast {% if message.tags == 'error' %}msg-error{% else %}msg-success{% endif %}" style="margin-bottom:12px">
+      {{ message }}
+    </div>
+  {% endfor %}
+{% endif %}
+
+<div style="padding:20px 24px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+    <h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin:0">Edit Inquiry Details</h3>
+    <button onclick="document.getElementById('edit-inquiry-modal').style.display='none'" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:18px;padding:4px" title="Close">
+      &times;
+    </button>
+  </div>
+
+  <form
+    method="post"
+    action="{% url 'admissions:edit_inquiry' applicant.pk %}"
+    hx-post="{% url 'admissions:edit_inquiry' applicant.pk %}"
+    hx-target="#edit-inquiry-modal"
+    hx-swap="outerHTML"
+    style="display:flex;flex-direction:column;gap:16px"
+  >
+    {% csrf_token %}
+
+    <div style="font-size:13px;font-weight:700;color:var(--text-primary);padding-bottom:8px;border-bottom:1px solid var(--border)">
+      Parent / Guardian Details
+    </div>
+    <div class="hf2-grid-2">
+      {% field form.parent_full_name %}
+      {% field form.parent_phone %}
+      {% field form.parent_email %}
+      {% field form.parent_relationship %}
+      {% field form.parent_invoice_name %}
+    </div>
+
+    <div style="font-size:13px;font-weight:700;color:var(--text-primary);padding-bottom:8px;border-bottom:1px solid var(--border);margin-top:8px">
+      Student Details
+    </div>
+    <div class="hf2-grid-2">
+      {% field form.child_full_name %}
+      {% field form.child_date_of_birth %}
+      {% field form.applying_department %}
+      {% field form.grade_applying_for %}
+      {% field form.previous_school %}
+      <div id="previous-school-other-wrap" style="display:none;margin-top:-8px">
+        {% field form.previous_school_other %}
+      </div>
+    </div>
+
+    <div style="font-size:13px;font-weight:700;color:var(--text-primary);padding-bottom:8px;border-bottom:1px solid var(--border);margin-top:8px">
+      Inquiry Details
+    </div>
+    <div class="hf2-grid-2">
+      {% field form.inquiry_channel %}
+      {% field form.sibling_details %}
+      {% field form.target_enrollment_year %}
+      {% field form.target_enrollment_month %}
+    </div>
+    <div class="hf2-grid-1">
+      {% field form.notes span="full" rows="3" %}
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;padding-top:16px;border-top:1px solid var(--border)">
+      <button type="button" onclick="document.getElementById('edit-inquiry-modal').style.display='none'" class="btn-secondary">Cancel</button>
+      <button type="submit" class="btn-primary" style="position:relative">
+        <span class="htmx-indicator" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="animation:btn-spin 1s linear infinite"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
+        </span>
+        <span class="hx-hide-on-request">Save Changes</span>
+      </button>
+    </div>
+  </form>
+</div>
+
+<style>
+  .htmx-request .hx-hide-on-request { visibility: hidden; }
+</style>
+
+<script>
+  (function() {
+    var prevSelect = document.getElementById('id_previous_school');
+    var otherWrap = document.getElementById('previous-school-other-wrap');
+    if (prevSelect && otherWrap) {
+      prevSelect.addEventListener('change', function() {
+        otherWrap.style.display = this.value === '__other__' ? 'block' : 'none';
+      });
+      if (prevSelect.value === '__other__') otherWrap.style.display = 'block';
+    }
+  })();
+</script>

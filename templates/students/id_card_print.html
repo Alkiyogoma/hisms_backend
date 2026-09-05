@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student ID Card</title>
+    <style>
+        :root {
+            --hodari-blue: #023AA5;
+            --hodari-blue-dark: #012A7A;
+            --border: #f1f5f9;
+            --card-shadow: 0 10px 40px -10px rgba(30, 58, 138, 0.15);
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #f8fafc;
+            margin: 0;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .id-card-container {
+            background: #fff;
+            width: 380px;
+            height: auto;
+            min-height: 560px;
+            border-radius: 32px;
+            box-shadow: var(--card-shadow);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(255,255,255,0.8);
+        }
+        .header-section {
+            height: 160px;
+            background: linear-gradient(135deg, var(--hodari-blue) 0%, var(--hodari-blue-dark) 100%);
+            padding: 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .school-name {
+            font-size: 14px;
+            font-weight: 800;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin: 0;
+        }
+        .school-tagline {
+            font-size: 10px;
+            color: rgba(255,255,255,0.7);
+            margin-top: 4px;
+        }
+        .logo-img {
+            height: 48px;
+            width: auto;
+        }
+        .content-section {
+            flex: 1;
+            padding: 40px 32px 32px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .id-number-display {
+            font-size: 36px;
+            font-weight: 800;
+            letter-spacing: 0.1em;
+            color: #0f172a;
+            margin: 0 0 8px;
+            text-align: center;
+        }
+        .id-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            margin-bottom: 32px;
+        }
+        .qr-section {
+            background: #fff;
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+            border: 1px solid #f1f5f9;
+            margin-bottom: auto;
+        }
+        .qr-section img {
+            display: block;
+            width: 180px;
+            height: 180px;
+        }
+        .footer-section {
+            padding: 24px 32px;
+            background: #f8fafc;
+            border-top: 1px solid #f1f5f9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .contact-info {
+            font-size: 10px;
+            color: #94a3b8;
+            line-height: 1.5;
+        }
+        .print-controls {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 100;
+        }
+        .btn-print {
+            background: var(--hodari-blue);
+            color: #fff;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 16px;
+            font-weight: 700;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(30, 58, 138, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.2s;
+        }
+        .btn-print:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 30px rgba(30, 58, 138, 0.3);
+        }
+        @media print {
+            body { background: #fff; padding: 0; }
+            .print-controls { display: none; }
+            .id-card-container {
+                box-shadow: none;
+                border: 1px solid #e2e8f0;
+                margin: 40px auto;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% load static %}
+    <div class="print-controls">
+        <button class="btn-print" onclick="window.print()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+            Generate Print
+        </button>
+    </div>
+
+    <div class="id-card-container">
+        <div class="header-section">
+            <div>
+                <h1 class="school-name">{{ brand.school_name }}</h1>
+                <div class="school-tagline">{{ brand.tagline }}</div>
+            </div>
+            <img src="{% static 'branding/hodari-logo-white.png' %}" alt="Hodari Logo" class="logo-img">
+        </div>
+
+        <div class="content-section">
+            <p class="id-number-display">{{ student.admission_no }}</p>
+            <p class="id-label">Student ID Number</p>
+            <div class="qr-section">
+                <img src="{% url 'attendance:qr_student' student.id %}" alt="Scan to verify">
+            </div>
+        </div>
+
+        <div class="footer-section">
+            <div class="contact-info">
+                {{ brand.website }}<br>
+                {{ brand.address|truncatechars:40 }}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

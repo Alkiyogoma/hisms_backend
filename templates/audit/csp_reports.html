@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}CSP Reports — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Security — CSP Reports{% endblock %}
+{% block topbar_date %}{{ today_display }}{% endblock %}
+
+{% block content %}
+{% include "audit/_top_tabs.html" %}
+<div class="card">
+  <div class="card-title">CSP Violation Reports</div>
+  <div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;margin-top:-6px">Content Security Policy violations reported by browsers. Used for security monitoring.</div>
+
+  <div style="border-top:1px solid var(--border)">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="text-align:left;border-bottom:2px solid #F3F4F6">
+          <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Timestamp</th>
+          <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Blocked URI</th>
+          <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Violated Directive</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for report in reports %}
+        {% with desc=report.description|default:"{}" %}
+        {% with data=desc|slice:":500" %}
+        <tr style="border-bottom:1px solid #F3F4F6;font-size:13px">
+          <td style="padding:12px 8px;color:var(--text-muted);font-family:var(--font-mono);white-space:nowrap">{{ report.created_at|date:"d M Y, H:i" }}</td>
+          <td style="padding:12px 8px;font-family:var(--font-mono);font-size:12px;max-width:400px;overflow:hidden;text-overflow:ellipsis">{{ data|slice:":200" }}</td>
+          <td style="padding:12px 8px;color:var(--text-muted);font-size:12px">{{ report.description|default:"N/A" }}</td>
+        </tr>
+        {% endwith %}
+        {% endwith %}
+        {% empty %}
+        <tr>
+          <td colspan="3" style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with title='No CSP violations reported' desc='No Content Security Policy violations have been reported.' icon='check' icon_color='green' %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

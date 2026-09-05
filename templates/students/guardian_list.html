@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Guardians — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Guardian Directory{% endblock %}
+
+{% block extra_head %}
+{% include "includes/hodari_print_styles.html" %}
+<style>
+  /*  Grid View  */
+  .guardian-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 20px;
+  }
+  .guardian-card {
+    background: #fff; border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px; transition: all 0.2s ease; position: relative; overflow: hidden;
+    display: flex; flex-direction: column; min-height: 140px;
+  }
+  .guardian-card:hover {
+    border-color: var(--hodari-blue); box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+    transform: translateY(-2px);
+  }
+  .gc-avatar {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: linear-gradient(135deg, #023AA5, #1A56C4);
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 800; flex-shrink: 0;
+    border: 1px solid var(--border);
+  }
+  .gc-name {
+    font-size: 13px; font-weight: 700; color: #1E293B; margin: 0;
+    line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .gc-phone { font-size: 11px; color: #64748B; font-weight: 500; }
+  .gc-email { font-size: 11px; color: #94A3B8; }
+
+
+  /*  List View  */
+  .guardian-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+  .guardian-table th {
+    text-align: left; padding: 12px 16px; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);
+    border-bottom: 2px solid var(--border); font-weight: 700;
+  }
+  .guardian-table td { padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: middle; }
+  .guardian-table tr:hover td { background: var(--bg-page); }
+  .guardian-table tr:last-child td { border-bottom: none; }
+
+  /*  View Toggling  */
+  .view-mode-list .guardian-grid { display: none; }
+  .view-mode-grid .guardian-table-container { display: none; }
+
+  /*  Stats Bar  */
+  .stats-bar { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .stat-pill {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px; border-radius: 10px;
+    background: #fff; border: 1px solid var(--border);
+  }
+  .stat-pill .sp-val { font-size: 20px; font-weight: 800; color: #1E293B; }
+  .stat-pill .sp-lbl { font-size: 10px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  @media (max-width: 1200px) { .guardian-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 900px) { .guardian-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .guardian-grid { grid-template-columns: 1fr; } }
+
+  @media print {
+    .filter-bar, .no-print, .stats-bar, .guardian-table-container + div,
+    .hf-btn, .hf-btn-primary, .hf-btn-secondary, .hf-btn-danger,
+    .pagination, .btn-primary, .btn-secondary, .topbar, #sidebar, header,
+    .view-mode-grid, .view-mode-list { display: none !important; }
+    .print-only { display: block !important; }
+    body { background: #fff !important; }
+    .card { border: none !important; box-shadow: none !important; padding: 0 !important; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "students/_top_tabs.html" %}
+{% has_perm user "students.add_parentguardian" as can_add_guardian %}
+<!-- Print-only branded header -->
+<div class="print-only doc-container" style="max-width:900px;margin:0 auto 20px;background:#fff;padding:24px 28px;border:1px solid #DDE3EE;border-radius:12px">
+  {% include "includes/hodari_print_header.html" %}
+  <div style="height:1px;background:var(--border);margin:16px 0"></div>
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <div style="font-family:var(--font-display);font-size:18pt;font-weight:bold;color:var(--hodari-blue);text-transform:uppercase">Guardian Directory</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">{{ guardians|length }} guardian{{ guardians|length|pluralize }}</div>
+    </div>
+    <div style="text-align:right;font-size:12px;color:var(--text-muted)">
+      <div style="font-weight:700;color:var(--hodari-blue)">Generated {% now "d M Y" %}</div>
+    </div>
+  </div>
+</div>
+<div id="guardian-page-container" class="card view-mode-grid">
+
+  {#  Stats  #}
+  <div class="stats-bar">
+    <div class="stat-pill">
+      <div class="sp-val">{{ guardians.paginator.count|default:guardians|length }}</div>
+      <div class="sp-lbl">Total</div>
+    </div>
+    <div class="stat-pill">
+      <div class="sp-val" style="color:#16a34a">{{ guardians.count }}</div>
+      <div class="sp-lbl">On Page</div>
+    </div>
+  </div>
+
+  {#  Search  #}
+  <form method="get" class="no-print" style="display:flex; align-items:center; gap:10px; margin-bottom:4px; flex-wrap:wrap">
+    <div style="flex:1; min-width:240px; position:relative">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2.5" style="position:absolute; left:12px; top:50%; transform:translateY(-50%)"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input name="q" type="text" class="hf2-input" placeholder="Search by name, phone, or email…" value="{{ request.GET.q }}" style="padding-left:36px; height:38px">
+    </div>
+    <button type="submit" class="hf-btn hf-btn-primary" style="height:38px">Search</button>
+    {% if request.GET.q %}
+      <a href="{% url 'students:guardian_list' %}" class="hf-btn hf-btn-secondary" style="height:38px">Clear</a>
+    {% endif %}
+  </form>
+
+  <div class="guardian-grid">
+    {% for guardian in guardians %}
+    <div class="guardian-card" style="cursor:pointer" onclick="window.location='{% url 'students:guardian_detail' guardian.pk %}'">
+      {# Header: avatar + name + PDPA badge #}
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px">
+        <div class="gc-avatar">{{ guardian.full_name|slice:":1" }}</div>
+        <div style="flex:1; min-width:0">
+          <div class="gc-name">{{ guardian.full_name }}</div>
+          <div class="gc-phone">{{ guardian.phone }}</div>
+        </div>
+        {% if guardian.pdpa_consent_given %}
+          <span style="padding:2px 6px; border-radius:99px; font-size:9px; font-weight:700; background:#DCFCE7; color:#166534; flex-shrink:0">PDPA </span>
+        {% else %}
+          <span style="padding:2px 6px; border-radius:99px; font-size:9px; font-weight:700; background:#FEF2F2; color:#991B1B; flex-shrink:0">Pending</span>
+        {% endif %}
+      </div>
+
+      {# Email + Address (compact) #}
+      {% if guardian.email %}
+        <div class="gc-email" style="margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ guardian.email }}</div>
+      {% endif %}
+      {% if guardian.address %}
+        <div style="font-size:10px; color:#94A3B8; margin-bottom:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ guardian.address|truncatechars:40 }}</div>
+      {% endif %}
+
+      {# Language chip #}
+      {% if guardian.preferred_language %}
+        <div style="margin-bottom:8px">
+          <span style="padding:2px 6px; border-radius:4px; font-size:9px; font-weight:600; background:#F0F4FB; color:#1E40AF">{{ guardian.get_preferred_language_display }}</span>
+        </div>
+      {% endif %}
+
+      {# Spacer to push footer down #}
+      <div style="flex:1"></div>
+
+      {# Footer: student count + view link #}
+      <div style="display:flex; justify-content:space-between; align-items:center; padding-top:10px; border-top:1px solid #F1F5F9; margin-top:8px">
+        <span style="font-size:10px; color:#94A3B8; font-weight:600">
+          {{ guardian.studentguardian_set.count }} student{{ guardian.studentguardian_set.count|pluralize }}
+        </span>
+        <div style="display:flex;align-items:center;gap:8px">
+              {% has_perm user "students.change_parentguardian" as can_change_guardian %}
+              {% if guardian.user and can_change_guardian %}
+          <a href="{% url 'users:impersonate_start' guardian.user.pk %}" title="View as Parent" onclick="event.stopPropagation()" style="width:26px;height:26px;border-radius:6px;background:#EEF4FF;display:flex;align-items:center;justify-content:center;text-decoration:none;transition:background .15s" onmouseover="this.style.background='#DBEAFE'" onmouseout="this.style.background='#EEF4FF'">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#023AA5" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </a>
+          {% endif %}
+          <span style="font-size:11px; font-weight:700; color:var(--hodari-blue)">View →</span>
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    <div style="grid-column:1/-1">
+      {% if request.GET.q %}
+        {% include '_partials/empty_state.html' with title='No guardians match search' desc='Try adjusting your search or clear the search.' icon='search' icon_color='grey' %}
+      {% else %}
+        {% include '_partials/empty_state.html' with title='No guardians found' desc='Get started by adding a guardian to the system.' icon='users' icon_color='blue' %}
+        {% if can_add_guardian %}
+        <div style="text-align:center;margin-top:12px"><a href="{% url 'students:guardian_create' %}" class="btn-primary" style="display:inline-flex;align-items:center;gap:6px">Add Guardian</a></div>
+        {% endif %}
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="guardian-table-container" style="overflow-x:auto">
+    <table class="guardian-table">
+      <thead>
+        <tr>
+          <th>Guardian Name</th>
+          <th>Phone</th>
+          <th>Email</th>
+          <th>Address</th>
+          <th>Students</th>
+          <th>PDPA</th>
+          <th style="text-align:right">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for guardian in guardians %}
+        <tr>
+          <td>
+            <div style="display:flex; align-items:center; gap:12px">
+              <div style="width:36px; height:36px; border-radius:50%; background:var(--hodari-blue-light); color:var(--hodari-blue); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; flex-shrink:0">
+                {{ guardian.full_name|slice:":1" }}
+              </div>
+              <div>
+                <div style="font-weight:600; color:var(--text-primary)">{{ guardian.full_name }}</div>
+                {% if guardian.preferred_language %}<div style="font-size:11px; color:var(--text-muted)">{{ guardian.get_preferred_language_display }}</div>{% endif %}
+              </div>
+            </div>
+          </td>
+          <td style="font-weight:500">{{ guardian.phone }}</td>
+          <td style="color:var(--text-secondary)">{{ guardian.email|default:"N/A" }}</td>
+          <td style="color:var(--text-secondary); max-width:180px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ guardian.address|default:"N/A"|truncatechars:30 }}</td>
+          <td>
+            <span style="background:var(--hodari-blue-light); color:var(--hodari-blue); padding:2px 8px; border-radius:99px; font-size:11px; font-weight:700">
+              {{ guardian.studentguardian_set.count }}
+            </span>
+          </td>
+          <td>
+            {% if guardian.pdpa_consent_given %}
+              <span style="padding:2px 8px; border-radius:99px; font-size:10px; font-weight:700; background:#DCFCE7; color:#166534">Consented</span>
+            {% else %}
+              <span style="padding:2px 8px; border-radius:99px; font-size:10px; font-weight:700; background:#FEF2F2; color:#991B1B">Pending</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right">
+            <div style="display:flex;gap:6px;justify-content:flex-end">
+{% has_perm user "students.view_parentguardian" as can_view_guardian %}
+          {% if guardian.user and can_view_guardian %}
+              <a href="{% url 'users:impersonate_start' guardian.user.pk %}" title="View as Parent" class="hf-btn hf-btn-secondary" style="padding:6px 10px;font-size:12px">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </a>
+              {% endif %}
+              <a href="{% url 'students:guardian_detail' guardian.pk %}" class="hf-btn hf-btn-secondary" style="padding:6px 14px; font-size:12px">View Profile</a>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7">
+            {% if request.GET.q %}
+              {% include '_partials/empty_state.html' with title='No guardians match search' desc='Try adjusting your search or clear the search.' icon='search' icon_color='grey' %}
+            {% else %}
+              {% include '_partials/empty_state.html' with title='No guardians found' desc='Get started by adding a guardian to the system.' icon='users' icon_color='blue' %}
+              {% if can_add_guardian %}
+              <div style="text-align:center;margin-top:12px"><a href="{% url 'students:guardian_create' %}" class="btn-primary" style="display:inline-flex;align-items:center;gap:6px">Add Guardian</a></div>
+              {% endif %}
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {#  Pagination  #}
+  {% if is_paginated %}
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; padding-top:16px; border-top:1px solid var(--border)">
+    <div style="font-size:13px; color:var(--text-muted)">
+      Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }}
+    </div>
+    <div style="display:flex; gap:8px">
+      {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}&q={{ request.GET.q }}" class="hf-btn hf-btn-secondary" style="font-size:12px">← Previous</a>
+      {% endif %}
+      <div style="padding:6px 12px; font-size:13px; font-weight:700; background:var(--hodari-blue-light); color:var(--hodari-blue); border-radius:6px">
+        {{ page_obj.number }} / {{ paginator.num_pages }}
+      </div>
+      {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}&q={{ request.GET.q }}" class="hf-btn hf-btn-secondary" style="font-size:12px">Next →</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+  function setView(mode) {
+    const container = document.getElementById('guardian-page-container');
+    const btnGrid = document.getElementById('btn-grid');
+    const btnList = document.getElementById('btn-list');
+
+    if (mode === 'grid') {
+      container.classList.remove('view-mode-list');
+      container.classList.add('view-mode-grid');
+      btnGrid.classList.add('active');
+      btnList.classList.remove('active');
+    } else {
+      container.classList.remove('view-mode-grid');
+      container.classList.add('view-mode-list');
+      btnList.classList.add('active');
+      btnGrid.classList.remove('active');
+    }
+    localStorage.setItem('guardian_view_mode', mode);
+  }
+
+  // Load saved preference
+  const savedMode = localStorage.getItem('guardian_view_mode');
+  if (savedMode) {
+    setView(savedMode);
+  }
+</script>
+{% endblock %}

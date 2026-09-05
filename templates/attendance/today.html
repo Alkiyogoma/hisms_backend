@@ -1,0 +1,636 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Daily Attendance — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Daily Attendance{% endblock %}
+{% block extra_head %}
+{% include "includes/hodari_print_styles.html" %}
+<link rel="manifest" href="{% url 'attendance:pwa_manifest' %}">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Attendance">
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('{% url "attendance:pwa_sw" %}', {scope: '/attendance/pwa/'});
+  });
+}
+</script>
+<style>
+  @media print {
+    .section-hdr { display: none !important; }
+  }
+</style>
+{% endblock %}
+
+{% load hodari_forms %}
+{% block content %}
+<!-- Print-only branded header -->
+<div class="print-only doc-container" style="max-width:900px;margin:0 auto 20px;background:#fff;padding:24px 28px;border:1px solid #DDE3EE;border-radius:12px">
+  {% include "includes/hodari_print_header.html" %}
+  <div style="height:1px;background:var(--border);margin:16px 0"></div>
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <div style="font-family:var(--font-display);font-size:18pt;font-weight:bold;color:var(--hodari-blue);text-transform:uppercase">Daily Attendance</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">{{ today|date:"l, d M Y" }}</div>
+    </div>
+  </div>
+</div>
+<div class="section-hdr">
+  <span class="section-title">Daily attendance</span>
+  <div style="display:flex; gap:10px; align-items:center" class="print-hide">
+    <span class="chip chip-blue">85% Attendance Threshold</span>
+    <button onclick="window.print()" class="hf-btn hf-btn-secondary" style="font-size:12px">
+      <svg style="width:14px; height:14px; vertical-align:middle; margin-right:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z"/></svg>
+      Print Roster
+    </button>
+  </div>
+</div>
+<p class="print-hide" style="margin:-6px 0 12px;font-size:13px;color:var(--text-muted)">Attendance records are automatically populated from mobile app check-in/check-out events. This view displays attendance data for reporting and monitoring purposes only.</p>
+
+<!-- Summary Metrics Grid -->
+{% include "attendance/_metrics.html" %}
+
+<!-- Filter Bar (full width, above chart) -->
+<div class="card print-hide" style="margin-bottom:12px; padding:12px 16px">
+  <form id="attendance-filters-form" method="get" style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;">
+    <div style="flex:0 0 180px; min-width:140px">
+      <label class="hf-label" style="font-size:12px; margin-bottom:2px; display:block">Attendance Date</label>
+      <input id="attendance-date" type="date" name="date" class="hf-input" value="{{ date|date:'Y-m-d' }}" style="height:34px; font-size:13px">
+    </div>
+    <div style="flex:0 0 200px; min-width:150px">
+      <label class="hf-label" style="font-size:12px; margin-bottom:2px; display:block">Select Class / Grade</label>
+      {{ filter_form.class_name }}
+    </div>
+    <div style="display:flex; gap:6px; align-items:center; padding-bottom:1px;">
+      <button type="button" id="attendance-reset" class="hf-btn hf-btn-secondary" style="height:34px; display:inline-flex; align-items:center; font-size:13px; padding:0 14px">Reset</button>
+      <span style="font-size:11px; color:var(--text-muted); white-space:nowrap">Filters apply automatically.</span>
+    </div>
+  </form>
+</div>
+
+<!-- Status Comparison Chart (full width below filters) -->
+<div id="attendance-status-chart" class="card print-hide" style="margin-bottom:16px; padding:20px 0 0 0; overflow:hidden;">
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin:0 24px 16px 24px;">
+    <div>
+      <div style="font-size:15px; font-weight:700; color:var(--text-primary); letter-spacing:-0.2px">Status Comparison</div>
+      <div style="font-size:12px; color:var(--text-muted); margin-top:2px">Last 5 school days for filtered results</div>
+    </div>
+    <div id="status-chart-legend" style="display:flex; gap:16px; flex-wrap:wrap"></div>
+  </div>
+  <div style="position:relative; width:100%; min-height:220px; padding:8px 0 0 0; background: linear-gradient(180deg, #fafbfd 0%, #ffffff 100%); border-radius:0 0 12px 12px; border:1px solid #eef0f4; border-top:none;">
+    <svg id="attendance-status-svg" viewBox="0 0 600 220" preserveAspectRatio="none" style="width:100%; height:220px; overflow:visible; display:block;">
+      <defs>
+        <linearGradient id="grad-present" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#1B7B34" stop-opacity="0.2"/>
+          <stop offset="100%" stop-color="#1B7B34" stop-opacity="0.02"/>
+        </linearGradient>
+        <linearGradient id="grad-late" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.25"/>
+          <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.02"/>
+        </linearGradient>
+        <linearGradient id="grad-excused" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#6366f1" stop-opacity="0.2"/>
+          <stop offset="100%" stop-color="#6366f1" stop-opacity="0.02"/>
+        </linearGradient>
+        <linearGradient id="grad-absent" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#ef4444" stop-opacity="0.2"/>
+          <stop offset="100%" stop-color="#ef4444" stop-opacity="0.02"/>
+        </linearGradient>
+        <filter id="dot-shadow" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.15"/>
+        </filter>
+      </defs>
+      <!-- Grid, labels, lines drawn by JS -->
+    </svg>
+    <div id="chart-tooltip" style="display:none; position:absolute; pointer-events:none; background:#1e293b; color:#fff; font-size:12px; padding:8px 12px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); z-index:100; white-space:nowrap; line-height:1.5; transition: opacity 0.15s ease;"></div>
+  </div>
+  {{ status_chart|json_script:"attendance-status-data" }}
+</div>
+
+<!-- Roster Table -->
+<div class="card" style="padding:0; overflow:hidden">
+  <table class="h-table">
+    <thead>
+        <tr>
+          <th style="width:40px"></th>
+          <th>Student Information</th>
+          <th>Admission No.</th>
+          <th>Term Rate</th>
+          <th>Status</th>
+          <th style="text-align:right">
+            <div style="display:inline-flex; align-items:center; gap:8px; justify-content:flex-end">
+            <button id="week-prev" class="hf-btn hf-btn-outline" title="Previous week" style="height:32px; padding:6px 8px; font-size:16px; line-height:1">&#8249;</button>
+            <span id="weekly-label" style="font-weight:600; color:var(--text); cursor:pointer; white-space:nowrap">Weekly</span>
+            <button id="week-next" class="hf-btn hf-btn-outline" title="Next week" style="height:32px; padding:6px 8px; font-size:16px; line-height:1">&#8250;</button>
+            </div>
+          </th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+        <tr id="att-row-{{ row.student.id }}">
+          {% include "attendance/_tr_content.html" with student=row.student entry=row.entry date=date statuses=statuses can_correct=can_correct attendance_rate=row.attendance_rate is_below_threshold=row.is_below_threshold weekly_bars=row.weekly_bars %}
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="6">{% include '_partials/empty_state.html' with title='No students loaded' desc='Select a date and class above to view attendance records.' icon='users' icon_color='grey' %}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% has_perm user "attendance.add_attendanceentry" as can_take_attendance %}
+{% if can_take_attendance and not class_name %}
+  <div class="queue-item qi-amber" style="margin-top:20px">
+    <div class="qi-body">
+      <div class="qi-label">Class selection required</div>
+      <div class="qi-sub">As a teacher, please select your assigned class to load the attendance roster.</div>
+    </div>
+  </div>
+{% elif class_name and not auto_selected_subject and can_take_attendance %}
+  <div class="queue-item qi-blue" style="margin-top:20px">
+    <div class="qi-body">
+      <div class="qi-label">{{ class_name }}</div>
+      <div class="qi-sub">Attendance class auto-selected from your assigned classes.</div>
+    </div>
+  </div>
+{% elif auto_selected_subject %}
+  <div class="queue-item qi-blue" style="margin-top:20px">
+    <div class="qi-body">
+      <div class="qi-label">{{ class_name }} — {{ auto_selected_subject }}</div>
+      <div class="qi-sub">Attendance class auto-selected from your current timetable period.</div>
+    </div>
+  </div>
+{% endif %}
+
+<div style="margin-top:20px;padding:8px 0;text-align:center;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted)">
+  <a href="{% url 'attendance:pwa_download' %}" style="color:var(--text-muted);text-decoration:none">Download Attendance App</a>
+</div>
+
+<script>
+// Week navigation using AJAX: update roster tbody without full-page refresh
+(function(){
+  function toDateInputString(d){
+    var yyyy = d.getFullYear();
+    var mm = String(d.getMonth()+1).padStart(2,'0');
+    var dd = String(d.getDate()).padStart(2,'0');
+    return yyyy + '-' + mm + '-' + dd;
+  }
+
+  function getMonday(d){
+    var date = new Date(d);
+    var day = date.getDay();
+    var diff = date.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(date.setDate(diff));
+  }
+
+  var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function formatWeekLabel(monday){
+    var friday = new Date(monday);
+    friday.setDate(friday.getDate() + 4);
+    var mDay = monday.getDate();
+    var fDay = friday.getDate();
+    var mMonth = monthNames[monday.getMonth()];
+    var fMonth = monthNames[friday.getMonth()];
+    if(mMonth === fMonth){
+      return mDay + ' \u2013 ' + fDay + ' ' + mMonth;
+    }
+    return mDay + ' ' + mMonth + ' \u2013 ' + fDay + ' ' + fMonth;
+  }
+  function updateWeekLabel(){
+    if(!weeklyLabel) return;
+    var current = dateInput.value ? new Date(dateInput.value) : new Date();
+    var monday = getMonday(current);
+    weeklyLabel.textContent = formatWeekLabel(monday);
+  }
+
+  var form = document.getElementById('attendance-filters-form');
+  var dateInput = document.getElementById('attendance-date');
+  var prevBtn = document.getElementById('week-prev');
+  var nextBtn = document.getElementById('week-next');
+  var weeklyLabel = document.getElementById('weekly-label');
+  var resetBtn = document.getElementById('attendance-reset');
+  var tbody = document.querySelector('.h-table tbody');
+  var classSelect = document.querySelector('select[name="class_name"]');
+
+  if(!form || !dateInput || !tbody) return;
+
+  var today = new Date();
+
+  form.addEventListener('submit', function(event){
+    event.preventDefault();
+    fetchAndReplace();
+  });
+
+  resetBtn && resetBtn.addEventListener('click', function(){
+    dateInput.value = toDateInputString(today);
+    if(classSelect){
+      classSelect.value = '';
+    }
+    fetchAndReplace();
+    fetchTrend();
+  });
+
+  function serializeForm(f){
+    var params = new URLSearchParams(new FormData(f));
+    return params.toString();
+  }
+
+  function updateNextButtonState(){
+    var current = dateInput.value ? new Date(dateInput.value) : new Date();
+    var monday = getMonday(current);
+    var nextMonday = new Date(monday);
+    nextMonday.setDate(nextMonday.getDate() + 7);
+    if(nextMonday > today){
+      nextBtn.setAttribute('disabled','disabled');
+      nextBtn.style.opacity = 0.4;
+    } else {
+      nextBtn.removeAttribute('disabled');
+      nextBtn.style.opacity = '';
+    }
+  }
+
+  function fetchAndReplace(){
+    var url = window.location.pathname + '?' + serializeForm(form);
+    fetch(url, { method: 'GET', headers: { 'X-Requested-With':'XMLHttpRequest' } })
+      .then(function(resp){ return resp.text(); })
+      .then(function(html){
+        try {
+          var parser = new DOMParser();
+          var doc = parser.parseFromString(html, 'text/html');
+          var newTbody = doc.querySelector('.h-table tbody') || doc.querySelector('tbody');
+          if(newTbody){
+            tbody.innerHTML = newTbody.innerHTML;
+          }
+          // Preserve the top metrics block to avoid flicker on AJAX updates.
+          // Metrics are updated separately by HTMX triggers; do not replace here.
+          var statusChart = document.getElementById('attendance-status-chart');
+          var newStatusChart = doc.getElementById('attendance-status-chart');
+          if(newStatusChart && statusChart){
+            statusChart.outerHTML = newStatusChart.outerHTML;
+            statusChart = document.getElementById('attendance-status-chart');
+          }
+          updateNextButtonState();
+          drawStatusChart();
+        } catch (e){
+          console.error('AJAX roster: parse error', e);
+        }
+      }).catch(function(err){
+        console.error('Failed to load roster via AJAX', err);
+        // fallback to full submit
+        form.submit();
+      });
+  }
+
+  prevBtn && prevBtn.addEventListener('click', function(){
+    var current = dateInput.value ? new Date(dateInput.value) : new Date();
+    var monday = getMonday(current);
+    monday.setDate(monday.getDate() - 7);
+    dateInput.value = toDateInputString(monday);
+    updateWeekLabel();
+    fetchAndReplace();
+  });
+
+  nextBtn && nextBtn.addEventListener('click', function(){
+    if(nextBtn.hasAttribute('disabled')) return;
+    var current = dateInput.value ? new Date(dateInput.value) : new Date();
+    var monday = getMonday(current);
+    monday.setDate(monday.getDate() + 7);
+    // clamp to today
+    if(monday > today) monday = today;
+    dateInput.value = toDateInputString(monday);
+    updateWeekLabel();
+    fetchAndReplace();
+  });
+
+  // update button state + week label on manual date change
+  dateInput.addEventListener('change', function(){
+    updateNextButtonState();
+    updateWeekLabel();
+  });
+
+  // initialize
+  updateNextButtonState();
+  updateWeekLabel();
+
+  // Click weekly label -> load current week (this week's Monday)
+  weeklyLabel && weeklyLabel.addEventListener('click', function(){
+    var monday = getMonday(today);
+    if(monday > today) monday = today;
+    dateInput.value = toDateInputString(monday);
+    updateWeekLabel();
+    fetchAndReplace();
+    fetchTrend();
+  });
+
+  // Bind class select change to update roster and trend
+  if(classSelect){
+    classSelect.addEventListener('change', function(){
+      fetchAndReplace();
+      fetchTrend();
+    });
+  }
+
+  // On date input change also refresh roster and trend
+  dateInput.addEventListener('change', function(){
+    updateNextButtonState();
+    fetchAndReplace();
+    fetchTrend();
+  });
+
+  // Trend fetching and drawing
+  function fetchTrend(){
+    var params = new URLSearchParams();
+    var cls = classSelect ? classSelect.value : '';
+    if(cls) params.set('class_name', cls);
+    params.set('days', 7);
+    var url = '/attendance/api/reports/trend-analysis/?' + params.toString();
+    fetch(url, { credentials: 'same-origin' })
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        if(data && data.weekly_trends){
+          drawTrend(data.weekly_trends.map(function(w){ return w.rate; }));
+        } else {
+          drawTrend([]);
+        }
+      }).catch(function(){ drawTrend([]); });
+  }
+
+  function drawTrend(values){
+    var container = document.getElementById('attendance-trend-spark');
+    if(!container) return;
+    var svg = container.querySelector('svg');
+    if(!svg) return;
+    var w = svg.viewBox.baseVal.width || svg.clientWidth || 300;
+    var h = svg.viewBox.baseVal.height || svg.clientHeight || 64;
+    var pointsLine = '';
+    var pointsFill = '';
+    var pad = 6;
+    var n = values.length || 1;
+    for(var i=0;i<n;i++){
+      var x = (i/(Math.max(n-1,1))) * (w - pad*2) + pad;
+      var v = values[i] != null ? values[i] : 0;
+      var y = h - pad - (v/100) * (h - pad*2);
+      pointsLine += x+','+y+' ';
+      pointsFill += x+','+y+' ';
+    }
+    if(pointsFill){
+      var firstX = (0/(Math.max(n-1,1))) * (w - pad*2) + pad;
+      pointsFill = firstX+','+(h-pad)+' '+ pointsFill + ( ( (n-1)/(Math.max(n-1,1)) ) * (w - pad*2) + pad) +','+(h-pad);
+    }
+    var lineEl = svg.querySelector('.trend-line');
+    var fillEl = svg.querySelector('.trend-fill');
+    if(lineEl) lineEl.setAttribute('points', pointsLine.trim());
+    if(fillEl) fillEl.setAttribute('points', pointsFill.trim());
+  }
+
+  function getStatusChartData(){
+    var script = document.getElementById('attendance-status-data');
+    if(!script) return [];
+    try {
+      return JSON.parse(script.textContent || '[]');
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function drawStatusChart(){
+    var data = getStatusChartData();
+    var svg = document.getElementById('attendance-status-svg');
+    if(!svg || !data.length) return;
+
+    var W = 600, H = 220;
+    var padL = 48, padR = 24, padT = 20, padB = 36;
+    var chartW = W - padL - padR;
+    var chartH = H - padT - padB;
+
+    var allVals = [];
+    data.forEach(function(d){ allVals.push(d.present, d.late, d.excused, d.absent); });
+    var rawMax = Math.max.apply(null, allVals);
+    var maxVal = rawMax <= 0 ? 1 : Math.ceil(rawMax * 1.2);
+    // nice y-axis ticks
+    var yStep = Math.max(1, Math.ceil(maxVal / 5));
+    maxVal = yStep * 5;
+
+    var n = data.length;
+    var yBottom = padT + chartH;
+    function xPos(i){ return padL + (n > 1 ? (i / (n - 1)) * chartW : chartW / 2); }
+    function yPos(v){ return yBottom - 6 - ((v / maxVal) * (chartH - 10)); }
+
+    // --- helper: build smooth SVG path with cubic beziers ---
+    function smoothPath(key){
+      var pts = data.map(function(d, i){ return { x: xPos(i), y: yPos(d[key]) }; });
+      if(pts.length < 2) return '';
+      var d = 'M' + pts[0].x + ',' + pts[0].y;
+      for(var i = 0; i < pts.length - 1; i++){
+        var p0 = pts[Math.max(i - 1, 0)];
+        var p1 = pts[i];
+        var p2 = pts[i + 1];
+        var p3 = pts[Math.min(i + 2, pts.length - 1)];
+        var tension = 0.3;
+        var cp1x = p1.x + (p2.x - p0.x) * tension;
+        var cp1y = p1.y + (p2.y - p0.y) * tension;
+        var cp2x = p2.x - (p3.x - p1.x) * tension;
+        var cp2y = p2.y - (p3.y - p1.y) * tension;
+        d += ' C' + cp1x + ',' + cp1y + ' ' + cp2x + ',' + cp2y + ' ' + p2.x + ',' + p2.y;
+      }
+      return d;
+    }
+    function areaPath(key){
+      var line = smoothPath(key);
+      if(!line) return '';
+      var lastX = xPos(n - 1);
+      var firstX = xPos(0);
+      var floorY = yBottom - 6;
+      return line + ' L' + lastX + ',' + floorY + ' L' + firstX + ',' + floorY + ' Z';
+    }
+
+    // --- clear SVG defs + content (keep defs) ---
+    var defs = svg.querySelector('defs');
+    svg.innerHTML = '';
+    if(defs) svg.appendChild(defs);
+
+    var series = [
+      { key: 'present', color: '#1B7B34', gradId: 'grad-present', label: 'Present' },
+      { key: 'late',    color: '#f59e0b', gradId: 'grad-late',    label: 'Late' },
+      { key: 'excused', color: '#6366f1', gradId: 'grad-excused', label: 'Excused' },
+      { key: 'absent',  color: '#ef4444', gradId: 'grad-absent',  label: 'Absent' }
+    ];
+
+    // --- horizontal grid + y-axis labels ---
+    for(var t = 0; t <= 5; t++){
+      var yy = yPos(t * yStep);
+      var gridLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      gridLine.setAttribute('x1', padL); gridLine.setAttribute('y1', yy);
+      gridLine.setAttribute('x2', padL + chartW); gridLine.setAttribute('y2', yy);
+      gridLine.setAttribute('stroke', t === 0 ? '#e2e8f0' : '#f1f5f9');
+      gridLine.setAttribute('stroke-width', t === 0 ? '1' : '1');
+      if(t > 0) gridLine.setAttribute('stroke-dasharray', '4,3');
+      svg.appendChild(gridLine);
+
+      var yLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      yLabel.setAttribute('x', padL - 10); yLabel.setAttribute('y', yy + 4);
+      yLabel.setAttribute('text-anchor', 'end');
+      yLabel.setAttribute('font-size', '11'); yLabel.setAttribute('fill', '#94a3b8');
+      yLabel.setAttribute('font-family', 'system-ui, sans-serif');
+      yLabel.textContent = t * yStep;
+      svg.appendChild(yLabel);
+    }
+
+    // --- x-axis labels ---
+    data.forEach(function(d, i){
+      var xPosVal = xPos(i);
+      var xLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      xLabel.setAttribute('x', xPosVal); xLabel.setAttribute('y', H - 8);
+      xLabel.setAttribute('text-anchor', 'middle');
+      xLabel.setAttribute('font-size', '12'); xLabel.setAttribute('font-weight', '600');
+      xLabel.setAttribute('fill', '#64748b');
+      xLabel.setAttribute('font-family', 'system-ui, sans-serif');
+      xLabel.textContent = d.label;
+      svg.appendChild(xLabel);
+    });
+
+    // --- area fills + lines + dots for each series ---
+    series.forEach(function(s){
+      // area fill
+      var area = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      area.setAttribute('d', areaPath(s.key));
+      area.setAttribute('fill', 'url(#' + s.gradId + ')');
+      area.setAttribute('opacity', '0');
+      svg.appendChild(area);
+      // animate in
+      setTimeout(function(){ area.style.transition = 'opacity 0.6s ease'; area.setAttribute('opacity', '1'); }, 100);
+
+      // smooth line
+      var line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      line.setAttribute('d', smoothPath(s.key));
+      line.setAttribute('fill', 'none');
+      line.setAttribute('stroke', s.color);
+      line.setAttribute('stroke-width', '2.5');
+      line.setAttribute('stroke-linecap', 'round');
+      line.setAttribute('stroke-linejoin', 'round');
+      // animate stroke
+      svg.appendChild(line);
+      try {
+        var len = line.getTotalLength ? line.getTotalLength() : 0;
+        if(len > 0){ line.style.strokeDasharray = len; line.style.strokeDashoffset = len; setTimeout(function(){ line.style.transition = 'stroke-dashoffset 0.8s ease'; line.style.strokeDashoffset = '0'; }, 50); }
+      } catch(e){} // fallback: no animation if getTotalLength fails
+
+      // dots
+      data.forEach(function(d, i){
+        var cx = xPos(i), cy = yPos(d[s.key]);
+        var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', cx); circle.setAttribute('cy', cy);
+        circle.setAttribute('r', '0'); circle.setAttribute('fill', '#fff');
+        circle.setAttribute('stroke', s.color); circle.setAttribute('stroke-width', '2.5');
+        circle.setAttribute('filter', 'url(#dot-shadow)');
+        circle.style.transition = 'r 0.3s ease';
+        svg.appendChild(circle);
+        // animate in
+        setTimeout(function(){ circle.setAttribute('r', '4'); }, 200 + i * 80);
+
+        // hover: enlarge dot + show tooltip
+        circle.addEventListener('mouseenter', function(evt){
+          circle.setAttribute('r', '6'); circle.setAttribute('stroke-width', '3');
+          showChartTooltip(evt, d, s, i);
+        });
+        circle.addEventListener('mouseleave', function(){
+          circle.setAttribute('r', '4'); circle.setAttribute('stroke-width', '2.5');
+          hideChartTooltip();
+        });
+        circle.addEventListener('mousemove', function(evt){
+          moveChartTooltip(evt);
+        });
+      });
+    });
+
+    // --- Legend ---
+    var legendEl = document.getElementById('status-chart-legend');
+    if(legendEl){
+      legendEl.innerHTML = series.map(function(s){
+        return '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#475569;font-weight:500;">'
+          + '<span style="width:10px;height:10px;border-radius:50%;background:' + s.color + ';display:inline-block;box-shadow:0 0 0 2px ' + s.color + '22"></span>'
+          + s.label + '</span>';
+      }).join('');
+    }
+  }
+
+  function getTooltip(){ return document.getElementById('chart-tooltip'); }
+  function showChartTooltip(evt, datum, series, idx){
+    var tt = getTooltip(); if(!tt) return;
+    var lines = '<span style="font-weight:700;margin-bottom:2px">\u2022 ' + series.label + '</span>';
+    lines += '<br><span style="opacity:0.85">Day: ' + datum.label + '</span>';
+    lines += '<br><span style="opacity:0.85">Count: <b>' + datum[series.key] + '</b></span>';
+    tt.innerHTML = lines;
+    tt.style.display = 'block';
+    moveChartTooltip(evt);
+  }
+  function moveChartTooltip(evt){
+    var tt = getTooltip(); if(!tt) return;
+    var container = tt.parentElement;
+    var rect = container.getBoundingClientRect();
+    var x = evt.clientX - rect.left + 12;
+    var y = evt.clientY - rect.top - 10;
+    // keep inside container
+    var tw = tt.offsetWidth || 120;
+    if(x + tw > rect.width - 8) x = x - tw - 24;
+    if(y < 4) y = 4;
+    tt.style.left = x + 'px';
+    tt.style.top = y + 'px';
+    tt.style.opacity = '1';
+  }
+  function hideChartTooltip(){
+    var tt = getTooltip(); if(!tt) return;
+    tt.style.opacity = '0';
+    setTimeout(function(){ tt.style.display = 'none'; }, 200);
+  }
+
+  // initial trend load
+  fetchTrend();
+  drawStatusChart();
+})();
+</script>
+
+<style>
+/* Hide any metrics block rendered inside the filter card (preserve top metrics). */
+.card.print-hide .metrics {
+  display: none !important;
+}
+
+@media print {
+  /* Hide unnecessary elements for print */
+  .print-hide,
+  .no-print-area,
+  .sidebar,
+  .topbar,
+  #toast-container,
+  .queue-item,
+  .metrics,
+  .section-hdr,
+  a[href*="download"],
+  a[href*="app"] {
+    display: none !important;
+  }
+  
+  /* Hide the Mark Attendance column in every row */
+  .h-table th:last-child,
+  .h-table td:last-child {
+    display: none !important;
+  }
+
+  /* Optimize layout for printing */
+  body {
+    background: #fff !important;
+  }
+  .card {
+    box-shadow: none !important;
+    border: 1px solid #e2e8f0 !important;
+    margin-bottom: 20px !important;
+  }
+  .main-content {
+    margin-left: 0 !important;
+    padding: 0 !important;
+  }
+}
+</style>
+{% endblock %}

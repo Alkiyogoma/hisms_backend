@@ -1,0 +1,628 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% load hodari_forms %}
+{% block title %}Teacher Class Assignment — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Class Assignment{% endblock %}
+
+{% block extra_head %}
+<style>
+  /*  Layout  */
+  .assign-layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 24px;
+    align-items: start;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  @media (max-width: 900px) {
+    .assign-layout { grid-template-columns: 1fr; }
+  }
+
+  /*  Form card  */
+  .assign-card {
+    background: #fff;
+    border: 1.5px solid #E8EDF5;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .assign-card-header {
+    background: linear-gradient(135deg, var(--hodari-blue) 0%, #1A237E 100%);
+    padding: 22px 28px;
+    color: #fff;
+  }
+  .assign-card-header h1 {
+    font-size: 18px;
+    font-weight: 800;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .assign-card-header p {
+    font-size: 12px;
+    color: rgba(255,255,255,0.65);
+    margin: 4px 0 0 0;
+    font-weight: 500;
+  }
+  .assign-card-body {
+    padding: 28px;
+  }
+
+  /*  Section + divider  */
+  .assign-section {
+    margin-bottom: 24px;
+  }
+  .assign-section:last-child { margin-bottom: 0; }
+  .assign-section-title {
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--hodari-blue);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .assign-section-title svg { width: 15px; height: 15px; flex-shrink: 0; }
+  .assign-divider {
+    height: 1px;
+    background: #E8EDF5;
+    margin: 24px 0;
+  }
+
+  /*  Form controls  */
+  .assign-select-wrap { max-width: 380px; }
+  .assign-select-wrap select.hf2-select { width: 100%; }
+  .assign-checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: #FAFBFC;
+    border: 1.5px solid #E8EDF5;
+    border-radius: 10px;
+    transition: all 0.2s;
+  }
+  .assign-checkbox-row:hover { background: #F0F4FB; border-color: #BFCFE9; }
+  .assign-checkbox-row input[type="checkbox"] {
+    width: 18px !important;
+    height: 18px !important;
+    min-width: 18px !important;
+    appearance: auto !important;
+    -webkit-appearance: checkbox !important;
+    accent-color: var(--hodari-blue) !important;
+    margin: 0 !important;
+    cursor: pointer !important;
+  }
+  .assign-checkbox-row label {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--text-primary);
+    cursor: pointer;
+    margin: 0;
+    flex: 1;
+  }
+  .assign-checkbox-row .cb-count {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+    background: #E8EDF5;
+    padding: 2px 8px;
+    border-radius: 99px;
+    flex-shrink: 0;
+  }
+
+  /*  Checkbox scroll lists  */
+  .scroll-list-wrap {
+    border: 1.5px solid #D1D9E8;
+    border-radius: 10px;
+    background: #fff;
+    max-height: 240px;
+    overflow-y: auto;
+    padding: 6px;
+  }
+  .scroll-list-wrap ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .scroll-list-wrap li {
+    display: flex;
+    align-items: center;
+    padding: 7px 10px;
+    border-radius: 8px;
+    transition: background 0.15s;
+  }
+  .scroll-list-wrap li:hover { background: #F1F5F9; }
+  .scroll-list-wrap li label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    cursor: pointer;
+    margin: 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+  .scroll-list-wrap li input[type="checkbox"] {
+    width: 17px !important;
+    height: 17px !important;
+    min-width: 17px !important;
+    appearance: auto !important;
+    -webkit-appearance: checkbox !important;
+    accent-color: var(--hodari-blue) !important;
+    margin: 0 !important;
+    cursor: pointer !important;
+  }
+
+  /*  Dept filter pills  */
+  .dept-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .dept-pill {
+    padding: 5px 14px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1.5px solid #D1D9E8;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: var(--font-ui);
+    color: #64748B;
+  }
+  .dept-pill:hover { border-color: var(--hodari-blue); color: var(--hodari-blue); background: #F0F4FB; }
+  .dept-pill.active { background: var(--hodari-blue); border-color: var(--hodari-blue); color: #fff; }
+
+  /*  Selection summary bar  */
+  .sel-summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: #F0F4FB;
+    border: 1px solid #BFCFE9;
+    border-radius: 10px;
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .sel-summary strong { color: var(--hodari-blue); }
+
+  /*  Action row  */
+  .assign-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 28px;
+    padding-top: 24px;
+    border-top: 1px solid #E8EDF5;
+  }
+  .assign-actions .btn-primary { flex: 1; }
+  .assign-actions .btn-secondary { flex: 0 0 auto; min-width: 120px; text-align: center; }
+
+  /*  Sidebar cards  */
+  .sb-card {
+    background: #fff;
+    border: 1.5px solid #E8EDF5;
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .sb-card:last-child { margin-bottom: 0; }
+  .sb-card-title {
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--hodari-blue);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 14px;
+  }
+  .sb-teacher-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--hodari-blue);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 800;
+    flex-shrink: 0;
+    border: 3px solid #EEF4FF;
+    overflow: hidden;
+  }
+  .sb-teacher-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .load-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid #F1F5F9;
+    font-size: 12px;
+  }
+  .load-item:last-child { border-bottom: none; }
+  .load-item .chip {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 99px;
+    background: #EEF4FF;
+    color: var(--hodari-blue);
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .load-item .subj-list { color: #64748B; font-size: 11px; }
+
+  /*  Non-field errors  */
+  .error-summary {
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    color: #991B1B;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 12px;
+    margin-bottom: 16px;
+  }
+  .error-summary ul { margin: 6px 0 0 16px; padding: 0; }
+  .error-summary li { margin-bottom: 2px; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "hr/_top_tabs.html" %}
+<div class="assign-layout">
+  <!--  MAIN FORM  -->
+  <div class="assign-card">
+    <div class="assign-card-header">
+      <h1>Assign Teacher to Class</h1>
+      <p>Map a teacher to multiple classes and subjects for a given term.</p>
+    </div>
+
+    <form method="post" class="assign-card-body">
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="error-summary">
+          <strong>Please correct the following errors:</strong>
+          <ul>
+            {% for err in form.non_field_errors %}<li>{{ err }}</li>{% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
+      <!-- Teacher & Term Selection -->
+      <div class="assign-section">
+        <div class="assign-section-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Teacher &amp; Term
+        </div>
+        <div class="assign-select-wrap" style="margin-bottom:12px">
+          <label class="hf2-label">Teacher <span class="hf2-req">*</span></label>
+          {{ form.teacher }}
+          {% for err in form.teacher.errors %}<p style="color:#DC2626;font-size:11px;margin:4px 0 0 0">{{ err }}</p>{% endfor %}
+        </div>
+        <div class="assign-select-wrap">
+          <label class="hf2-label">Term <span class="hf2-req">*</span></label>
+          {{ form.term }}
+          {% for err in form.term.errors %}<p style="color:#DC2626;font-size:11px;margin:4px 0 0 0">{{ err }}</p>{% endfor %}
+        </div>
+      </div>
+
+      <div class="assign-divider"></div>
+
+      <!-- Class Selection -->
+      <div class="assign-section">
+        <div class="assign-section-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          Assigned Classes <span class="hf2-req">*</span>
+        </div>
+        <p style="font-size:11px;color:#94A3B8;margin:0 0 10px 0">Select one or more classes to assign this teacher to. Subjects below will be filtered based on selection.</p>
+
+        <!-- Department filter pills -->
+        <div class="dept-pills" id="deptPills">
+          <button type="button" class="dept-pill active" data-dept="all">All</button>
+          <button type="button" class="dept-pill" data-dept="ECD">ECD</button>
+          <button type="button" class="dept-pill" data-dept="PRIMARY">Primary</button>
+          <button type="button" class="dept-pill" data-dept="LOWER_SECONDARY">Lower Secondary</button>
+        </div>
+
+        <div class="scroll-list-wrap" id="classScrollWrap">
+          <ul class="clean-check-list" id="assigned-classes-list">
+            {% for choice_val, choice_label in form.assigned_classes.field.choices %}
+              <li data-class-id="{{ choice_val }}" style="display:list-item">
+                <label>
+                  <input type="checkbox" name="assigned_classes" value="{{ choice_val }}"
+                    {% if choice_val in form.assigned_classes.value %}checked{% endif %}>
+                  <span>{{ choice_label }}</span>
+                </label>
+              </li>
+            {% empty %}
+              <li style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px">No classes available</li>
+            {% endfor %}
+          </ul>
+        </div>
+
+        <div class="sel-summary" id="classSummary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <span><strong id="classCount">0</strong> class<span id="classPlural">es</span> selected</span>
+        </div>
+        {% for err in form.assigned_classes.errors %}<p style="color:#DC2626;font-size:11px;margin:8px 0 0 0">{{ err }}</p>{% endfor %}
+      </div>
+
+      <div class="assign-divider"></div>
+
+      <!-- Subject Selection -->
+      <div class="assign-section">
+        <div class="assign-section-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          Subjects Taught <span class="hf2-req">*</span>
+        </div>
+        <p style="font-size:11px;color:#94A3B8;margin:0 0 10px 0">
+          Subjects are dynamically filtered by the classes selected above.
+          <span id="subjectFilterHint">Select at least one class to see relevant subjects.</span>
+        </p>
+
+        <div class="scroll-list-wrap" id="subjectScrollWrap">
+          <ul class="clean-check-list" id="subjects-list">
+            {% for choice_val, choice_label in form.subjects_taught.field.choices %}
+              <li data-subject-name="{{ choice_val }}" style="display:list-item">
+                <label>
+                  <input type="checkbox" name="subjects_taught" value="{{ choice_val }}"
+                    {% if choice_val in form.subjects_taught.value %}checked{% endif %}>
+                  <span>{{ choice_label }}</span>
+                </label>
+              </li>
+            {% empty %}
+              <li style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px">No subjects available</li>
+            {% endfor %}
+          </ul>
+        </div>
+
+        <div class="sel-summary" id="subjectSummary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <span><strong id="subjectCount">0</strong> subject<span id="subjectPlural">s</span> selected</span>
+        </div>
+        {% for err in form.subjects_taught.errors %}<p style="color:#DC2626;font-size:11px;margin:8px 0 0 0">{{ err }}</p>{% endfor %}
+      </div>
+
+      <div class="assign-divider"></div>
+
+      <!-- Class Teacher Toggle -->
+      <div class="assign-section">
+        <div class="assign-checkbox-row" style="max-width:380px">
+          {{ form.is_class_teacher }}
+          <label for="{{ form.is_class_teacher.id_for_label }}">
+            Class Teacher
+            <span style="display:block;font-size:11px;font-weight:400;color:#94A3B8;margin-top:1px">
+              Mark as the class teacher for all selected classes
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="assign-actions">
+        <a href="{% if selected_teacher %}{% url 'hr:staff_detail' selected_teacher.pk %}{% else %}{% url 'hr:staff_list' %}{% endif %}" class="btn-secondary" style="text-decoration:none;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13.5px">Cancel</a>
+        {% has_perm user "hr.change_teacherclassassignment" as can_edit %}
+        {% if can_edit %}
+        <button type="submit" class="btn-primary" style="display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:14px;min-height:44px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Save Assignments
+        </button>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <!--  SIDEBAR  -->
+  <div>
+    {% if selected_teacher %}
+    <div class="sb-card">
+      <div class="sb-card-title">Staff Summary</div>
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+        <div class="sb-teacher-avatar">
+          {% if selected_teacher.user.profile_picture %}
+            <img src="{{ selected_teacher.user.profile_picture.url }}">
+          {% else %}
+            {{ selected_teacher.full_name|slice:":1" }}
+          {% endif %}
+        </div>
+        <div>
+          <div style="font-weight:700;color:var(--text-primary);font-size:14px">{{ selected_teacher.full_name }}</div>
+          <div style="font-size:11px;color:var(--text-muted)">{{ selected_teacher.job_title }} &middot; {{ selected_teacher.get_department_display }}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:1px">{{ selected_teacher.contact_email|default:selected_teacher.user.email }}</div>
+        </div>
+      </div>
+      <div style="background:#F8FAFC;border-radius:10px;padding:14px">
+        <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px">Current Load</div>
+        {% if current_assignments %}
+          <div style="display:flex;flex-direction:column;gap:4px">
+            {% for ass in current_assignments %}
+              <div class="load-item">
+                <span class="chip">{{ ass.grade_class.name }}</span>
+                <span class="subj-list">{{ ass.subjects_taught|join:", "|truncatewords:8 }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          {% include '_partials/empty_state.html' with title='No active assignments' desc='Assign classes and subjects below.' icon='doc' icon_color='grey' %}
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if not selected_teacher %}
+    <div class="sb-card" style="text-align:center;padding:32px 20px">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5" stroke-linecap="round" style="margin-bottom:12px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <div style="font-size:13px;font-weight:600;color:#94A3B8">Select a teacher to begin</div>
+      <div style="font-size:11px;color:#CBD5E1;margin-top:4px">Use the teacher dropdown above</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  //  Parse assignment metadata 
+  var ASSIGNMENT_META = {{ assignment_meta_json|safe }};
+  if (!ASSIGNMENT_META) ASSIGNMENT_META = { classes: [], teacher_depts: {} };
+  var classById = {};
+  if (ASSIGNMENT_META.classes) {
+    ASSIGNMENT_META.classes.forEach(function(c) { classById[String(c.id)] = c; });
+  }
+  var teacherDepts = ASSIGNMENT_META.teacher_depts || {};
+
+  //  DOM refs 
+  var teacherSelect = document.querySelector('select[name="teacher"]');
+  var classList = document.getElementById('assigned-classes-list');
+  var subjectList = document.getElementById('subjects-list');
+  var classCountEl = document.getElementById('classCount');
+  var classPluralEl = document.getElementById('classPlural');
+  var subjectCountEl = document.getElementById('subjectCount');
+  var subjectPluralEl = document.getElementById('subjectPlural');
+  var subjectHint = document.getElementById('subjectFilterHint');
+  var deptPills = document.querySelectorAll('.dept-pill');
+
+  //  Get teacher department from StaffProfile by user ID
+  function getTeacherDept() {
+    if (!teacherSelect) return 'all';
+    var userId = teacherSelect.value;
+    if (!userId) return 'all';
+    return teacherDepts[userId] || 'all';
+  }
+
+  //  Helpers 
+  function selectedClassIds() {
+    if (!classList) return [];
+    return Array.from(classList.querySelectorAll('input[name="assigned_classes"]:checked')).map(function(el) { return el.value; });
+  }
+
+  function countChecked(container) {
+    return container ? container.querySelectorAll('input[type="checkbox"]:checked').length : 0;
+  }
+
+  function updateClassCount() {
+    var count = countChecked(classList);
+    if (classCountEl) classCountEl.textContent = count;
+    if (classPluralEl) classPluralEl.textContent = count === 1 ? '' : 'es';
+  }
+
+  function updateSubjectCount() {
+    var count = countChecked(subjectList);
+    if (subjectCountEl) subjectCountEl.textContent = count;
+    if (subjectPluralEl) subjectPluralEl.textContent = count === 1 ? '' : 's';
+  }
+
+  //  Filter subjects based on selected classes 
+  function filterSubjects() {
+    if (!subjectList) return;
+    var ids = selectedClassIds();
+    var allowed = new Set();
+    ids.forEach(function(id) {
+      var meta = classById[id];
+      if (meta && meta.subject_names) {
+        meta.subject_names.forEach(function(s) { allowed.add(s); });
+      }
+    });
+    var restrict = ids.length > 0;
+
+    subjectList.querySelectorAll('li[data-subject-name]').forEach(function(li) {
+      var name = li.getAttribute('data-subject-name');
+      var show = !restrict || allowed.has(name);
+      li.style.display = show ? '' : 'none';
+      if (!show) {
+        var cb = li.querySelector('input');
+        if (cb) cb.checked = false;
+      }
+    });
+
+    if (subjectHint) {
+      subjectHint.textContent = restrict
+        ? 'Showing subjects available in selected classes.'
+        : 'Select at least one class to see relevant subjects.';
+    }
+    updateSubjectCount();
+  }
+
+  //  Filter classes by department 
+  function filterClassesByDept(dept) {
+    if (!classList) return;
+    classList.querySelectorAll('li[data-class-id]').forEach(function(li) {
+      var cid = li.getAttribute('data-class-id');
+      var meta = classById[cid];
+      var show = dept === 'all' || (meta && meta.department === dept);
+      li.style.display = show ? '' : 'none';
+      if (!show) {
+        var cb = li.querySelector('input');
+        if (cb) cb.checked = false;
+      }
+    });
+    updateClassCount();
+    filterSubjects();
+  }
+
+  //  Activate the department pill that matches the teacher's department
+  function activateDeptForTeacher() {
+    var dept = getTeacherDept();
+    if (dept === 'all') return;
+
+    // Find the matching pill and click it
+    var found = false;
+    deptPills.forEach(function(pill) {
+      if (pill.getAttribute('data-dept') === dept) {
+        deptPills.forEach(function(p) { p.classList.remove('active'); });
+        pill.classList.add('active');
+        filterClassesByDept(dept);
+        found = true;
+      }
+    });
+    if (!found) {
+      // Default to all if no match
+      filterClassesByDept('all');
+    }
+  }
+
+  //  Dept pill switching 
+  deptPills.forEach(function(pill) {
+    pill.addEventListener('click', function() {
+      deptPills.forEach(function(p) { p.classList.remove('active'); });
+      this.classList.add('active');
+      filterClassesByDept(this.getAttribute('data-dept'));
+    });
+  });
+
+  //  Event: teacher dropdown change → auto-filter by department
+  if (teacherSelect) {
+    teacherSelect.addEventListener('change', function() {
+      activateDeptForTeacher();
+    });
+  }
+
+  //  Event: class checkbox change → re-filter subjects 
+  if (classList) {
+    classList.addEventListener('change', function() {
+      updateClassCount();
+      filterSubjects();
+    });
+  }
+
+  //  Event: subject checkbox change → update count 
+  if (subjectList) {
+    subjectList.addEventListener('change', updateSubjectCount);
+  }
+
+  //  Initialise — auto-filter based on pre-selected teacher
+  activateDeptForTeacher();
+  updateClassCount();
+  filterSubjects();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ school_name }} — Admission Inquiry</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#17337A;--gold:#F2B21C;--ink:#171A21;--muted:#5C6575;--line:#DCE1EB;--paper:#F2F4F8;--white:#fff;--red:#B3261E;--r:10px}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:'Archivo',system-ui,sans-serif;font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+h1,h2,h3,.serif{font-family:'Newsreader',Georgia,serif;font-weight:500;letter-spacing:-.01em}
+.head{background:var(--white);border-bottom:1px solid var(--line)}
+.head-in{max-width:720px;margin:0 auto;padding:16px 20px 0;display:flex;align-items:center;gap:14px}
+.mark{width:38px;height:38px;flex:0 0 auto}
+.wordmark{font-family:'Newsreader',Georgia,serif;font-size:15px;line-height:1.05;color:#58595B;letter-spacing:.04em;text-transform:uppercase}
+.wordmark b{display:block;font-weight:400}
+.head-spacer{flex:1}
+.rule{max-width:720px;margin:14px auto 0;padding:0 20px}
+.rule i{display:block;height:3px;background:var(--navy);border-radius:2px}
+.rail{max-width:720px;margin:0 auto;padding:14px 20px 0;display:flex;gap:3px}
+.rail span{flex:1;height:4px;background:var(--line);border-radius:2px;transition:background .3s}
+.rail span.done{background:var(--navy)}
+.rail span.now{background:var(--gold)}
+.railtxt{max-width:720px;margin:0 auto;padding:8px 20px 16px;display:flex;justify-content:space-between;font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+.app{max-width:720px;margin:0 auto;padding:24px 20px 140px}
+.panel{background:var(--white);border:1px solid var(--line);border-radius:var(--r);padding:30px 32px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--navy);font-weight:700;margin:0 0 8px}
+h1.step-t{font-size:29px;margin:0 0 8px}
+.lede{color:var(--muted);margin:0 0 26px;max-width:56ch}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px}
+.f{display:flex;flex-direction:column;gap:5px}
+.f.wide{grid-column:1/-1}
+label{font-size:12.5px;font-weight:600;color:#3B4453;letter-spacing:.01em}
+label .opt{font-weight:400;color:#98A0AE}
+input[type=text],input[type=email],input[type=tel],input[type=date],select,textarea{font-family:inherit;font-size:14.5px;color:var(--ink);background:var(--white);border:1px solid var(--line);border-radius:7px;padding:9px 11px;width:100%}
+textarea{resize:vertical;min-height:74px}
+input:focus,select:focus,textarea:focus{border-color:#1B3A8F;outline:2px solid #E7ECF7;outline-offset:0}
+input.bad,select.bad,textarea.bad{border-color:var(--red);background:#FDF6F6}
+.hint{font-size:12px;color:var(--muted)}
+.err{font-size:12px;color:var(--red);font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--white)}
+.seg button{border:0;background:none;padding:8px 15px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer}
+.seg button.on{background:var(--navy);color:#fff}
+.nav{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.97);border-top:1px solid var(--line);backdrop-filter:blur(6px);z-index:40}
+.nav-in{max-width:720px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:12px}
+.nav .tag{flex:1;font-size:13px;font-family:'Newsreader',Georgia,serif;font-style:italic;color:var(--muted)}
+.btn{border:0;border-radius:8px;padding:11px 22px;font-weight:600;cursor:pointer;font-size:14.5px}
+.btn.p{background:var(--navy);color:#fff}
+.btn.p:hover{background:#1B3A8F}
+.btn.s{background:#fff;color:var(--navy);border:1px solid var(--line)}
+.btn.s:hover{border-color:var(--navy)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:86px;background:var(--ink);color:#fff;padding:11px 17px;border-radius:8px;font-size:13px;z-index:60;opacity:0;transition:opacity .25s;pointer-events:none;max-width:88vw;text-align:center}
+.toast.on{opacity:1}
+.done-mark{display:flex;align-items:center;gap:12px;background:#FDF3DC;border:1px solid #EBD79B;border-radius:9px;padding:15px 18px;margin-bottom:24px}
+.done-mark .ic{width:30px;height:30px;border-radius:50%;background:var(--gold);display:grid;place-items:center;flex:0 0 auto;font-weight:700;color:#3D2E00}
+.done-mark div b{display:block;font-size:14.5px}
+.done-mark div span{font-size:13px;color:#6B5104}
+@media(max-width:600px){.grid{grid-template-columns:1fr}.panel{padding:22px 18px}}
+@media print{.head,.rule,.rail,.railtxt,.nav{display:none!important}.app{padding:0!important}.panel{border:0!important;padding:20px!important;box-shadow:none!important}}
+</style>
+</head>
+<body>
+
+<div class="head">
+  <div class="head-in">
+    <svg class="mark" viewBox="0 0 48 48"><path d="M4 12a8 8 0 0 1 8-8h9v17H4z" fill="#1B3A8F"/><circle cx="35.5" cy="12.5" r="8.5" fill="#F2B21C"/><path d="M21 27v17h-9a8 8 0 0 1-8-8V27z" fill="#1B3A8F"/><path d="M27 27h17v9a8 8 0 0 1-8 8h-9z" fill="#1B3A8F"/></svg>
+    <div class="wordmark"><b>Hodari</b><b>Christian</b><b>School</b></div>
+    <div class="head-spacer"></div>
+  </div>
+  <div class="rule"><i></i></div>
+  <div class="titleband" style="max-width:720px;margin:0 auto;padding:14px 20px 0;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+    <h2 style="margin:0;font-size:22px;letter-spacing:-.015em">Inquiry Form</h2>
+    <span style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:#fff;background:var(--navy);padding:3px 9px;border-radius:4px">Academic year {{ academic_year }}</span>
+  </div>
+  <div class="rail" id="rail"></div>
+  <div class="railtxt"><span id="stepname"></span><span class="of" id="stepof"></span></div>
+</div>
+
+<div class="app">
+  <main class="panel" id="panel" tabindex="-1"></main>
+</div>
+
+<div class="nav"><div class="nav-in">
+  <button class="btn s" id="back">Back</button>
+  <div class="tag">"The courage to stand out"</div>
+  <button class="btn p" id="next">Next</button>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var CSRF = '{{ csrf_token }}';
+var SUBMIT_URL = '{% url "admissions:parent_inquiry" %}';
+
+var ECD = ['Pre-KG','Kindergarten','Preschool','ABC'];
+var GRADES = ECD.concat(Array.from({length:9},function(_,i){return 'Grade '+(i+1)}));
+
+var STEPS = ['Child Information','Parent Information','Appointment'];
+var STEPS_LABELS = ["Child's information","Parent and guardian details","Preferred meeting date"];
+
+var S = {
+  step: 0,
+  child: {name:'',dob:'',gender:'',school:'',grade:'Grade 1',currentGrade:''},
+  parent: {name:'',phone:'',email:'',relationship:''},
+  appointment: {date:'',time:'',notes:''},
+  enrollmentYear:'',
+  enrollmentMonth:''
+};
+
+function get(path){ return path.split('.').reduce(function(o,k){ return o && o[k]; }, S) || ''; }
+function set(path,val){ var ks=path.split('.');var last=ks.pop();ks.reduce(function(o,k){return o[k];},S)[last]=val; }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]}); }
+
+function field(label,path,opts){
+  opts=opts||{};var v=get(path);var id='f_'+path.replace(/[^\w]/g,'_');var ctl;
+  if(opts.options){ctl='<select id="'+id+'" data-path="'+path+'"><option value="">Select\u2026</option>'+opts.options.map(function(o){return '<option'+(o===v?' selected':'')+'>'+esc(o)+'</option>'}).join('')+'</select>';}
+  else if(opts.area){ctl='<textarea id="'+id+'" data-path="'+path+'" placeholder="'+esc(opts.ph||'')+'"'+(opts.rows?' rows="'+opts.rows+'"':'')+'>'+esc(v)+'</textarea>';}
+  else if(opts.radio){ctl='<div class="seg" data-seg="'+path+'">'+opts.radio.map(function(r){return '<button type="button" data-val="'+r[0]+'" class="'+(v===r[0]?'on':'')+'">'+esc(r[1])+'</button>'}).join('')+'</div>';}
+  else{ctl='<input id="'+id+'" type="'+(opts.type||'text')+'" data-path="'+path+'" value="'+esc(v)+'" placeholder="'+esc(opts.ph||'')+'">';}
+  return '<div class="f'+(opts.span?' wide':'')+'"><label for="'+id+'">'+esc(label)+(opts.opt?' <span class="opt">optional</span>':'')+'</label>'+ctl+'<div class="err" data-err="'+path+'" hidden></div></div>';
+}
+
+var toastT;
+function toast(msg){var el=document.getElementById('toast');el.textContent=msg;el.classList.add('on');clearTimeout(toastT);toastT=setTimeout(function(){el.classList.remove('on')},3800);}
+
+function stepChild(){
+  return '<p class="eyebrow">Inquiry \u00b7 Step 1 of 3</p><h1 class="step-t">Child\u2019s Information</h1>'+
+  '<p class="lede">Tell us about the child you would like to enrol at Hodari Christian School.</p>'+
+  '<div class="grid">'+
+    field('Name of the Child','child.name',{ph:'As it appears on the birth certificate',span:true})+
+    field('Date of Birth','child.dob',{type:'date'})+
+    '<div class="f"><label>Gender</label><div class="seg" data-seg="child.gender"><button type="button" data-val="Female" class="'+(S.child.gender==='Female'?'on':'')+'">Female</button><button type="button" data-val="Male" class="'+(S.child.gender==='Male'?'on':'')+'">Male</button></div></div>'+
+    field('Current School Attending','child.school',{ph:'Write "None" if this is the first school',span:true})+
+    field('Applying For','child.grade',{options:GRADES})+
+    field('Current Grade','child.currentGrade',{ph:'e.g. Grade 2'})+
+  '</div>';
+}
+
+function stepParent(){
+  return '<p class="eyebrow">Inquiry \u00b7 Step 2 of 3</p><h1 class="step-t">Parent / Guardian Information</h1>'+
+  '<p class="lede">The first contact listed receives all invoices, reports and school notices.</p>'+
+  '<div class="grid">'+
+    field('Full Name','parent.name',{span:true})+
+    field('Relationship to Student','parent.relationship',{options:['Mother','Father','Legal guardian','Other']})+
+    field('Phone Number','parent.phone',{type:'tel',ph:'+255 7XX XXX XXX'})+
+    field('Email Address','parent.email',{type:'email'})+
+  '</div>';
+}
+
+function stepAppointment(){
+  var now=new Date();var years=[];for(var y=now.getFullYear();y<now.getFullYear()+4;y++)years.push(String(y));
+  var months=[['1','January'],['2','February'],['3','March'],['4','April'],['5','May'],['6','June'],['7','July'],['8','August'],['9','September'],['10','October'],['11','November'],['12','December']];
+  return '<p class="eyebrow">Inquiry \u00b7 Step 3 of 3</p><h1 class="step-t">Appointment</h1>'+
+  '<p class="lede">Our Head of School reviews each inquiry personally. Pick a preferred date and time for the meeting.</p>'+
+  '<div class="grid">'+
+    field('Preferred Date','appointment.date',{type:'date'})+
+    field('Preferred Time','appointment.time',{type:'time'})+
+  '</div>'+
+  '<div class="grid" style="margin-top:16px">'+
+    field('When do you want to enroll? Year','enrollmentYear',{options:years})+
+    field('Month','enrollmentMonth',{options:months.map(function(m){return m[1]})})+
+  '</div>'+
+  '<div class="grid" style="margin-top:16px">'+
+    field('Notes','appointment.notes',{area:true,span:true,ph:'Anything else you would like us to know',rows:3,opt:true})+
+  '</div>';
+}
+
+var RENDER = [stepChild, stepParent, stepAppointment];
+
+function validate(){
+  document.querySelectorAll('[data-err]').forEach(function(e){e.hidden=true;e.textContent=''});
+  document.querySelectorAll('.bad').forEach(function(e){e.classList.remove('bad')});
+  var first=null;var rules=[];
+  if(S.step===0){rules=[['child.name','Enter the child\u2019s full name'],['child.dob','Enter the date of birth']];}
+  if(S.step===1){rules=[['parent.name','Enter the parent\u2019s name'],['parent.phone','Enter a phone number']];}
+  rules.forEach(function(r){
+    if(!String(get(r[0])).trim()){
+      var box=document.querySelector('[data-err="'+r[0]+'"]');
+      var inp=document.querySelector('[data-path="'+r[0]+'"]');
+      if(box){box.hidden=false;box.textContent=r[1]}
+      if(inp){inp.classList.add('bad');if(!first)first=inp}
+    }
+  });
+  if(first){first.focus();first.scrollIntoView({block:'center',behavior:'smooth'});return false;}
+  return true;
+}
+
+function render(){
+  document.getElementById('panel').innerHTML=RENDER[S.step]();
+  document.getElementById('rail').innerHTML=STEPS.map(function(_,i){return '<span class="'+(i<S.step?'done':i===S.step?'now':'')+'"></span>'}).join('');
+  document.getElementById('stepname').textContent=STEPS_LABELS[S.step];
+  document.getElementById('stepof').textContent='Step '+(S.step+1)+' of '+STEPS.length;
+  document.getElementById('next').textContent=S.step===2?'Submit':'Next';
+  document.getElementById('back').style.visibility=S.step===0?'hidden':'visible';
+  window.scrollTo({top:0,behavior:'smooth'});
+  document.getElementById('panel').focus({preventScroll:true});
+}
+
+document.addEventListener('input',function(e){
+  var t=e.target;if(t.dataset.path){set(t.dataset.path,t.value);t.classList.remove('bad');var err=document.querySelector('[data-err="'+t.dataset.path+'"]');if(err)err.hidden=true;}
+});
+document.addEventListener('change',function(e){
+  var t=e.target;
+  if(t.dataset.path&&(t.type==='checkbox'||t.tagName==='SELECT'||t.type==='date'||t.type==='time')){
+    set(t.dataset.path,t.value);
+    if(t.parentElement.dataset.seg){
+      t.parentElement.querySelectorAll('button').forEach(function(b){b.classList.remove('on')});
+      t.target.classList.add('on');
+    }
+  }
+});
+document.addEventListener('click',function(e){
+  var b=e.target.closest('button[data-val]');
+  if(b){
+    var seg=b.parentElement;if(seg.dataset.seg){set(seg.dataset.seg,b.dataset.val);seg.querySelectorAll('button').forEach(function(x){x.classList.remove('on')});b.classList.add('on');}
+  }
+});
+
+document.getElementById('next').onclick=function(){
+  if(S.step===2){
+    if(!validate())return;
+    document.getElementById('next').disabled=true;
+    document.getElementById('next').textContent='Submitting...';
+    fetch(SUBMIT_URL,{
+      method:'POST',
+      headers:{'X-CSRFToken':CSRF,'Content-Type':'application/x-www-form-urlencoded'},
+      body:'action=parent_submit&data='+encodeURIComponent(JSON.stringify(S))
+    }).then(function(r){return r.json()}).then(function(d){
+      if(d.ok){
+        document.getElementById('panel').innerHTML=
+          '<div class="done-mark"><div class="ic">\u2713</div><div><b>Inquiry submitted</b>'+
+          '<span>Your reference number is <strong>'+esc(d.ref)+'</strong>. We will be in touch within 48 hours.</span></div></div>'+
+          '<p style="color:var(--muted);font-size:14px">Thank you for your interest in Hodari Christian School. Our Head of School will review your inquiry and contact you to confirm the meeting.</p>'+
+          '<p style="color:var(--muted);font-size:13px;margin-top:16px"><strong>Reference:</strong> '+esc(d.ref)+'</p>';
+        document.querySelector('.nav').style.display='none';
+        document.getElementById('rail').innerHTML=STEPS.map(function(){return '<span class="done"></span>'}).join('');
+        document.getElementById('stepname').textContent='Complete';
+        document.getElementById('stepof').textContent='';
+        setTimeout(function(){ window.location.href = '/'; }, 3000);
+      } else {
+        document.getElementById('next').disabled=false;
+        document.getElementById('next').textContent='Submit';
+        toast(d.error||'Something went wrong. Please try again.');
+      }
+    }).catch(function(){
+      document.getElementById('next').disabled=false;
+      document.getElementById('next').textContent='Submit';
+      toast('Network error. Please check your connection and try again.');
+    });
+    return;
+  }
+  if(!validate())return;
+  S.step++;render();
+};
+document.getElementById('back').onclick=function(){if(S.step>0){S.step--;render();}};
+
+render();
+</script>
+</body>
+</html>

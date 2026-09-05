@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}PTC - Subject Comments{% endblock %}
+
+{% block extra_head %}
+<style>
+  .cmt-grid { display:grid; grid-template-columns: 280px 1fr; gap:20px; align-items:start; }
+  .sidebar-card { background:#fff; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .sidebar-hdr { padding:12px 16px; background:var(--hodari-blue); color:#fff; font-size:13px; font-weight:700; display:flex; align-items:center; gap:8px; }
+  .sidebar-list { max-height:calc(100vh - 220px); overflow-y:auto; }
+  .s-item { display:flex; align-items:center; gap:10px; padding:10px 16px; cursor:pointer; border-bottom:1px solid #F0F4FB; transition:background .1s; }
+  .s-item:hover { background:#F7F9FC; }
+  .s-item.active { background:var(--hodari-blue-pale,#E8EEF9); border-left:3px solid var(--hodari-blue); }
+  .s-avatar { width:32px; height:32px; border-radius:50%; background:var(--hodari-blue-pale,#E8EEF9); color:var(--hodari-blue); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0; }
+  .s-name { flex:1; font-size:13px; font-weight:600; color:var(--text-primary); }
+  .s-class { font-size:10px; color:var(--text-muted); }
+  .s-status { font-size:10px; font-weight:700; padding:1px 8px; border-radius:99px; }
+  .s-done { background:#E8F5EC; color:#1B7B34; }
+  .s-pending { background:#FEF2F2; color:#9B1C1C; }
+  .content-card { background:#fff; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .content-hdr { padding:14px 20px; background:var(--hodari-blue); color:#fff; display:flex; align-items:center; gap:12px; }
+  .content-hdr h3 { margin:0; font-size:15px; font-weight:700; }
+  .content-hdr .sub { font-size:11px; opacity:.75; }
+  .cmt-row { padding:16px 20px; border-bottom:1px solid #F0F4FB; }
+  .cmt-label { display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--hodari-blue); margin-bottom:4px; }
+  .cmt-textarea { width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:6px; font-size:13px; font-family:inherit; resize:vertical; box-sizing:border-box; }
+  .cmt-textarea:focus { outline:none; border-color:var(--hodari-blue); box-shadow:0 0 0 3px rgba(26,86,196,.1); }
+  .char-hint { font-size:10px; color:var(--text-muted); margin-top:2px; }
+  @media (max-width:768px) { .cmt-grid { grid-template-columns:1fr; } .sidebar-list { max-height:200px; } }
+</style>
+{% endblock %}
+
+{% block topbar_greeting %}
+<h1 class="topbar-title">Subject Comments</h1>
+{% endblock %}
+
+{% block content %}
+{% include "ptc/_top_tabs.html" %}
+<div style="max-width:1100px;margin:0 auto">
+
+  {% if message %}
+  <div style="background:var(--hodari-blue-pale);border:1px solid #BFCFE9;border-radius:10px;padding:16px 20px;font-size:13px;color:var(--hodari-blue)">{{ message }}</div>
+  {% endif %}
+
+  {% if not is_window_open and ptc_window %}
+  <div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;padding:14px 20px;font-size:13px;color:#92550A;margin-bottom:16px">
+    <strong>Window Closed.</strong> The comment entry window is currently closed. You can view existing comments but cannot edit them.
+  </div>
+  {% endif %}
+
+  {% if students_data %}
+
+  <form method="post" id="commentForm">
+    {% csrf_token %}
+    <div class="cmt-grid">
+      <!-- Sidebar: student list -->
+      <div class="sidebar-card">
+        <div class="sidebar-hdr">
+          <span>Students</span>
+          <span style="margin-left:auto;font-size:11px;opacity:.8" id="completionBadge">{{ complete_count }}/{{ total_students }}</span>
+        </div>
+        <div class="sidebar-list" id="studentSidebar">
+          {% for item in students_data %}
+          <div class="s-item {% if forloop.first %}active{% endif %}" data-id="{{ item.student.id }}" onclick="selectStudent(this)">
+            <div class="s-avatar">{{ item.student.first_name|slice:":1" }}{{ item.student.last_name|slice:":1" }}</div>
+            <div style="flex:1;min-width:0">
+              <div class="s-name">{{ item.student.first_name }} {{ item.student.last_name|first }}.</div>
+              <div class="s-class">{{ item.student.class_name }}</div>
+            </div>
+            <span class="s-status {% if item.is_complete %}s-done{% else %}s-pending{% endif %}">
+              {% if item.is_complete %}Done{% else %}Pending{% endif %}
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Main panel: populated by JS -->
+      <div>
+        <div class="content-card" id="studentContent">
+          <div class="content-hdr">
+            <h3 id="contentName">Select a student</h3>
+            <span class="sub" id="contentMeta"></span>
+            <span style="margin-left:auto;font-size:12px;opacity:.85" id="contentStatus"></span>
+          </div>
+          <div id="contentRows"></div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:14px;justify-content:space-between">
+          <button type="button" class="hf-btn" id="prevBtn" onclick="prevStudent()" style="padding:8px 18px;font-size:13px">Previous</button>
+          {% if is_window_open %}
+          <button type="submit" style="padding:8px 24px;border-radius:7px;font-size:13px;font-weight:600;background:var(--hodari-blue);color:#fff;border:none;cursor:pointer">
+            Save All Comments
+          </button>
+          {% endif %}
+          <button type="button" class="hf-btn hf-btn-primary" id="nextBtn" onclick="nextStudent()" style="padding:8px 18px;font-size:13px">Next</button>
+        </div>
+      </div>
+    </div>
+    <div id="hiddenInputs"></div>
+  </form>
+  {% elif not message %}
+  <div style="padding:20px">
+    {% include '_partials/empty_state.html' with icon='users' icon_color='grey' title='No students found' desc='No students found for your assigned subjects and classes.' %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+var SUBJECTS = {{ teacher_subjects_json|safe }};
+var DATA = {{ comments_json|safe }};
+var isOpen = {{ is_window_open|yesno:"true,false" }};
+var activeId = null;
+
+function renderStudent(id) {
+  var d = DATA.find(function(x) { return x.id == id; });
+  if (!d) return;
+  activeId = id;
+  document.getElementById('contentName').textContent = d.first + ' ' + d.last;
+  document.getElementById('contentMeta').textContent = d.class + ' | ' + d.adm;
+  document.getElementById('contentStatus').textContent = d.ok ? 'All comments entered' : 'Incomplete';
+  var rowsHtml = '';
+  for (var i = 0; i < SUBJECTS.length; i++) {
+    var subj = SUBJECTS[i];
+    var slug = subj.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    var val = d.comments[subj] || '';
+    rowsHtml += '<div class="cmt-row">';
+    rowsHtml += '<label class="cmt-label">' + subj + '</label>';
+    rowsHtml += '<textarea name="comment_' + id + '_' + slug + '" rows="3" class="cmt-textarea"';
+    if (!isOpen) rowsHtml += ' readonly style="background:#F7F9FC;color:var(--text-muted)"';
+    rowsHtml += ' placeholder="Enter your comment (recommended min 30 characters)...">' + val + '</textarea>';
+    if (isOpen) {
+      rowsHtml += '<div class="char-hint"></div>';
+    } else {
+      rowsHtml += '<div class="char-hint" style="color:#1B7B34">' + (val ? val.length + ' chars' : '') + '</div>';
+    }
+    rowsHtml += '</div>';
+  }
+  document.getElementById('contentRows').innerHTML = rowsHtml;
+
+  // Attach char-hint listeners
+  if (isOpen) {
+    document.querySelectorAll('#contentRows textarea').forEach(function(ta) {
+      var hint = ta.parentNode.querySelector('.char-hint');
+      if (!hint) return;
+      function update() {
+        var len = ta.value.length;
+        if (len === 0) {
+          hint.textContent = '';
+        } else if (len < 30) {
+          hint.textContent = (30 - len) + ' more chars recommended';
+          hint.style.color = '#92550A';
+        } else {
+          hint.textContent = len + ' chars';
+          hint.style.color = '#1B7B34';
+        }
+      }
+      ta.addEventListener('input', update);
+      update();
+    });
+  }
+}
+
+function selectStudent(el) {
+  document.querySelectorAll('.s-item').forEach(function(s) { s.classList.remove('active'); });
+  el.classList.add('active');
+  renderStudent(el.getAttribute('data-id'));
+}
+
+function nextStudent() {
+  var active = document.querySelector('.s-item.active');
+  var next = active ? active.nextElementSibling : null;
+  if (next) selectStudent(next);
+}
+
+function prevStudent() {
+  var active = document.querySelector('.s-item.active');
+  var prev = active ? active.previousElementSibling : null;
+  if (prev) selectStudent(prev);
+}
+
+function updateSidebar() {
+  document.querySelectorAll('.s-item').forEach(function(item) {
+    var sid = item.getAttribute('data-id');
+    var d = DATA.find(function(x) { return x.id == sid; });
+    if (!d) return;
+    var allDone = true;
+    for (var i = 0; i < SUBJECTS.length; i++) {
+      var ta = document.querySelector('textarea[name="comment_' + sid + '_' + SUBJECTS[i].toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '"]');
+      if (!ta || !ta.value.trim()) { allDone = false; break; }
+    }
+    d.ok = allDone;
+    var status = item.querySelector('.s-status');
+    if (allDone) { status.className = 's-status s-done'; status.textContent = 'Done'; }
+    else { status.className = 's-status s-pending'; status.textContent = '-'; }
+  });
+  var done = DATA.filter(function(x) { return x.ok; }).length;
+  document.getElementById('completionBadge').textContent = done + '/' + DATA.length;
+  if (activeId) {
+    var ad = DATA.find(function(x) { return x.id == activeId; });
+    document.getElementById('contentStatus').textContent = ad && ad.ok ? 'All comments entered' : 'Incomplete';
+  }
+}
+
+// Listen for input changes to update sidebar status
+document.addEventListener('input', function(e) {
+  if (e.target.matches('#contentRows textarea')) {
+    updateSidebar();
+  }
+});
+
+// Init: show first student
+document.addEventListener('DOMContentLoaded', function() {
+  if (DATA.length > 0) renderStudent(DATA[0].id);
+});
+</script>
+{% endblock %}

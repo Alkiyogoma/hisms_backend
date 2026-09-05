@@ -1,0 +1,476 @@
+<!-- Step info banner -->
+<div class="ob-step-info">
+  <div class="info-icon">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      {% if step == 1 %}<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+      {% elif step == 2 %}<rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+      {% elif step == 3 %}<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+      {% elif step == 4 %}<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+      {% elif step == 5 %}<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+      {% endif %}
+    </svg>
+  </div>
+  <div class="info-text">
+    <strong>{{ step_label }}</strong>
+    {% if step == 1 %}Enter personal details, contact information, and emergency contacts.
+    {% elif step == 2 %}Set employment type, department, job details, and system access.
+    {% elif step == 3 %}Configure salary components, banking details, and statutory registrations.
+    {% elif step == 4 %}Upload or verify qualifications and professional documents.
+    {% elif step == 5 %}Confirm induction checklist and finalize onboarding.
+    {% endif %}
+  </div>
+</div>
+
+{% if checklist_items and step != 5 %}
+<div class="ob-section-label">Checklist Items</div>
+<ul class="ob-checklist">
+  {% for item in checklist_items %}
+  <li>
+    <div class="ck-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <div>
+      {{ item.item_name }}
+      {% if item.description %}<span class="ck-desc">{{ item.description }}</span>{% endif %}
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<div class="ob-card" style="margin-top: {% if checklist_items %}20px{% else %}0{% endif %};">
+  <form id="stepForm" method="post" action="" enctype="multipart/form-data">
+    {% csrf_token %}
+    <input type="hidden" name="step" value="{{ step }}">
+
+    {# ===== STEP 1: Personal + Emergency ===== #}
+    {% if step == 1 %}
+    <div class="ob-photo-upload">
+      <div class="ob-photo-preview" id="photoPreview">
+        {% if staff.user.profile_picture %}
+          <img src="{{ staff.user.profile_picture.url }}" alt="{{ staff.full_name }}">
+        {% else %}
+          <span class="ob-photo-initials">{{ staff.full_name|slice:":1"|upper }}</span>
+        {% endif %}
+      </div>
+      <div class="ob-photo-fields">
+        <label class="ob-photo-label">Profile Photo</label>
+        <p class="ob-photo-hint">Upload a passport size photo (JPG, PNG, or WebP).</p>
+        <input type="file" name="profile_picture" id="profilePictureInput" class="ob-input" accept=".jpg,.jpeg,.png,.gif,.webp,image/*">
+      </div>
+    </div>
+    <div class="ob-form-row">
+      <div class="ob-form-group"><label>Full Name</label><input type="text" name="full_name" class="ob-input" value="{{ staff.full_name }}" required></div>
+      <div class="ob-form-group"><label>Date of Birth</label><input type="date" name="date_of_birth" class="ob-input" value="{{ staff.date_of_birth|date:'Y-m-d'|default:'' }}"></div>
+    </div>
+    <div class="ob-form-row">
+      <div class="ob-form-group"><label>Gender</label><select name="gender" class="ob-select"><option value="">Select gender...</option><option value="male" {% if staff.gender == 'male' %}selected{% endif %}>Male</option><option value="female" {% if staff.gender == 'female' %}selected{% endif %}>Female</option><option value="other" {% if staff.gender == 'other' %}selected{% endif %}>Other</option></select></div>
+      <div class="ob-form-group"><label>Nationality</label><input type="text" name="nationality" class="ob-input" value="{{ staff.nationality }}" placeholder="e.g. Tanzanian"></div>
+    </div>
+    <div class="ob-form-row">
+      <div class="ob-form-group"><label>Marital Status</label><select name="marital_status" class="ob-select"><option value="">Select status...</option><option value="single" {% if staff.marital_status == 'single' %}selected{% endif %}>Single</option><option value="married" {% if staff.marital_status == 'married' %}selected{% endif %}>Married</option><option value="divorced" {% if staff.marital_status == 'divorced' %}selected{% endif %}>Divorced</option><option value="widowed" {% if staff.marital_status == 'widowed' %}selected{% endif %}>Widowed</option></select></div>
+      <div class="ob-form-group"><label>Contact Phone</label><input type="text" name="contact_phone" class="ob-input" value="{{ staff.contact_phone }}" placeholder="+255 7XX XXX XXX"></div>
+    </div>
+    <div class="ob-form-row">
+      <div class="ob-form-group"><label>Contact Email</label><input type="email" name="contact_email" class="ob-input" value="{{ staff.contact_email }}" placeholder="staff@email.com"></div>
+    </div>
+
+    <div class="ob-section-label" style="margin-top:24px;">Emergency Contact</div>
+    <div class="ob-form-row">
+      <div class="ob-form-group"><label>Name</label><input type="text" name="emergency_contact_name" class="ob-input" value="{{ staff.emergency_contact_name }}" placeholder="Full name"></div>
+      <div class="ob-form-group"><label>Phone</label><input type="text" name="emergency_contact_phone" class="ob-input" value="{{ staff.emergency_contact_phone }}" placeholder="+255 7XX XXX XXX"></div>
+    </div>
+    <div class="ob-form-row">
+      <div class="ob-form-group"><label>Relationship</label><select name="emergency_contact_relationship" class="ob-select"><option value="">Select relationship...</option><option value="Spouse" {% if staff.emergency_contact_relationship == 'Spouse' %}selected{% endif %}>Spouse</option><option value="Parent" {% if staff.emergency_contact_relationship == 'Parent' %}selected{% endif %}>Parent</option><option value="Sibling" {% if staff.emergency_contact_relationship == 'Sibling' %}selected{% endif %}>Sibling</option><option value="Child" {% if staff.emergency_contact_relationship == 'Child' %}selected{% endif %}>Child</option><option value="Friend" {% if staff.emergency_contact_relationship == 'Friend' %}selected{% endif %}>Friend</option><option value="Other" {% if staff.emergency_contact_relationship == 'Other' %}selected{% endif %}>Other</option></select></div>
+    </div>
+
+    {# ===== STEP 2: Employment + System Access ===== #}
+    {% elif step == 2 %}
+    <div class="ob-section-label" style="margin-top:0;">Employment Details</div>
+    <div class="ob-form-row">
+      <div class="ob-form-group"><label>Job Title</label><input type="text" name="job_title" class="ob-input" value="{{ staff.job_title }}" placeholder="e.g. Mathematics Teacher" required></div>
+      <div class="ob-form-group"><label>Department</label><select name="department" class="ob-select" required><option value="">Select department...</option>{% for code, label in departments %}<option value="{{ code }}" {% if staff.department == code %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+    </div>
+    <div class="ob-form-row">
+      <div class="ob-form-group"><label>Staff Category</label><select name="staff_category" class="ob-select"><option value="teaching" {% if staff.staff_category == 'teaching' %}selected{% endif %}>Teaching</option><option value="non_teaching" {% if staff.staff_category == 'non_teaching' %}selected{% endif %}>Non-Teaching</option></select></div>
+      <div class="ob-form-group"><label>Employment Type</label><select name="employment_type" class="ob-select"><option value="permanent" {% if staff.employment_type == 'permanent' %}selected{% endif %}>Permanent</option><option value="contract" {% if staff.employment_type == 'contract' %}selected{% endif %}>Contract</option><option value="temporary" {% if staff.employment_type == 'temporary' %}selected{% endif %}>Temporary</option><option value="probation" {% if staff.employment_type == 'probation' %}selected{% endif %}>Probation</option><option value="intern" {% if staff.employment_type == 'intern' %}selected{% endif %}>Intern</option></select></div>
+    </div>
+    <div class="ob-form-row">
+      <div class="ob-form-group"><label>Start Date</label><input type="date" name="employment_start_date" class="ob-input" value="{{ staff.employment_start_date|date:'Y-m-d'|default:'' }}" required></div>
+      <div class="ob-form-group"><label>Probation End</label><input type="date" name="probation_end_date" class="ob-input" value="{{ staff.probation_end_date|date:'Y-m-d'|default:'' }}"></div>
+    </div>
+    <div class="ob-form-row">
+      <div class="ob-form-group"><label>Years Exp</label><input type="number" name="years_of_experience" class="ob-input" value="{{ staff.years_of_experience }}" min="0"></div>
+      <div class="ob-form-group"><label>Qualification</label><input type="text" name="highest_qualification" class="ob-input" value="{{ staff.highest_qualification }}" placeholder="e.g. B.Ed"></div>
+    </div>
+
+    <div class="ob-section-label" style="margin-top:24px;">System Access</div>
+    <div class="ob-form-row">
+      <div class="ob-form-group">
+        <label>System Role</label>
+        <select name="access_role" class="ob-select">
+          {% for code, label in role_choices %}
+          <option value="{{ code }}" {% if staff.user.role == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="ob-form-group">
+        <label>Account Active</label>
+        <select name="access_is_active" class="ob-select">
+          <option value="True" {% if staff.user.is_active %}selected{% endif %}>Yes</option>
+          <option value="False" {% if not staff.user.is_active %}selected{% endif %}>No</option>
+        </select>
+      </div>
+    </div>
+    <div class="ob-form-group">
+      <label>System Access Confirmed</label>
+      <select name="system_account_created" class="ob-select">
+        <option value="yes">Yes, account is active and accessible</option>
+        <option value="no">Not yet, pending</option>
+      </select>
+    </div>
+    <div class="ob-form-group">
+      <label>Reason for Role Change</label>
+      <textarea name="role_change_reason" rows="2" class="ob-input" placeholder="Required only when the system role is changed">{{ request.POST.role_change_reason|default:'' }}</textarea>
+    </div>
+
+    {# ===== STEP 3: Salary + Banking + Statutory ===== #}
+    {% elif step == 3 %}
+    <div class="ob-section-label" style="margin-top:0;">Salary Components</div>
+    <div class="ob-form-row-3">
+      <div class="ob-form-group"><label>Basic Salary (TZS)</label><input type="number" name="basic_salary" class="ob-input" value="{{ staff.basic_salary }}" step="0.01" min="0" required></div>
+      <div class="ob-form-group"><label>Housing Allowance (TZS)</label><input type="number" name="housing_allowance" class="ob-input" value="{{ staff.housing_allowance }}" step="0.01" min="0"></div>
+      <div class="ob-form-group"><label>Transport Allowance (TZS)</label><input type="number" name="transport_allowance" class="ob-input" value="{{ staff.transport_allowance }}" step="0.01" min="0"></div>
+    </div>
+    <div class="ob-form-row">
+      <div class="ob-form-group"><label>Medical Allowance (TZS)</label><input type="number" name="medical_allowance" class="ob-input" value="{{ staff.medical_allowance }}" step="0.01" min="0"></div>
+      <div class="ob-form-group"><label>Other Allowances (TZS)</label><input type="number" name="other_allowances" class="ob-input" value="{{ staff.other_allowances }}" step="0.01" min="0"></div>
+    </div>
+    <div class="ob-section-label">Banking Details</div>
+    <div class="ob-form-row">
+      <div class="ob-form-group"><label>Bank Name</label><input type="text" name="bank_name" class="ob-input" value="{{ staff.bank_name }}" placeholder="e.g. CRDB Bank"></div>
+      <div class="ob-form-group"><label>Account Number</label><input type="text" name="bank_account_number" class="ob-input" value="{{ staff.bank_account_number }}"></div>
+    </div>
+    <div class="ob-form-row">
+      <div class="ob-form-group"><label>Branch</label><input type="text" name="bank_branch" class="ob-input" value="{{ staff.bank_branch }}" placeholder="e.g. DSM Main Branch"></div>
+      <div class="ob-form-group"></div>
+    </div>
+
+    <div class="ob-section-label" style="margin-top:24px;">Statutory Registrations</div>
+    <div class="ob-form-row">
+      <div class="ob-form-group"><label>NSSF Number</label><input type="text" name="nssf_number" class="ob-input" value="{{ staff.nssf_number }}" placeholder="NSSF registration number"></div>
+      <div class="ob-form-group"><label>TIN Number</label><input type="text" name="tin_number" class="ob-input" value="{{ staff.tin_number }}" placeholder="Tax Identification Number"></div>
+    </div>
+    <div class="ob-form-row">
+      <div class="ob-form-group"><label>HESLB Loan Number</label><input type="text" name="heslb_loan_number" class="ob-input" value="{{ staff.heslb_loan_number }}" placeholder="If applicable"></div>
+      <div class="ob-form-group"><label>NHIF Number</label><input type="text" name="nhif_number" class="ob-input" value="{{ staff.nhif_number }}" placeholder="NHIF registration number"></div>
+    </div>
+
+    {# ===== STEP 4: Documents ===== #}
+    {% elif step == 4 %}
+    <div class="ob-section-label" style="margin-top:0;">Upload Documents</div>
+
+    {% for field_name, doc_type, label in document_upload_fields %}
+    <div class="ob-form-group" style="margin-bottom:14px;">
+      <label style="font-weight:500;font-size:13px;">{{ label }}</label>
+      <div class="doc-input-row" style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+        <label for="doc-{{ field_name }}" class="doc-drop-label" style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px dashed #CBD5E1;border-radius:8px;cursor:pointer;background:#F8FAFC;transition:all .2s;font-size:13px;color:var(--text-muted);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span class="doc-drop-text">Click to select {{ label|lower }}</span>
+        </label>
+        <input type="file" id="doc-{{ field_name }}" name="{{ field_name }}" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx" class="ob-doc-input" style="display:none;" onchange="handleDocInput(this, '{{ field_name }}')">
+      </div>
+      <div class="doc-file-info" id="doc-info-{{ field_name }}" style="display:none;margin-top:6px;padding:8px 10px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:6px;font-size:12px;color:#166534;">
+        <span id="doc-info-text-{{ field_name }}"></span>
+        <button type="button" onclick="previewDocFile('{{ field_name }}')" style="background:#E8EEF9;color:#023AA5;border:none;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;margin-left:6px;">Preview</button>
+        <button type="button" class="doc-remove-btn" id="doc-remove-{{ field_name }}" onclick="removeDocFile('{{ field_name }}')" style="background:#FEF2F2;color:#DC2626;border:none;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;margin-left:4px;">Remove</button>
+      </div>
+    </div>
+    {% endfor %}
+
+    <div class="ob-form-group" style="margin-top:16px;">
+      <label>Notes</label>
+      <textarea name="documents_notes" class="ob-input" rows="2" placeholder="Notes about submitted documents..."></textarea>
+    </div>
+
+    {% if staff_documents %}
+    <div class="ob-section-label" style="margin-top:24px;">Previously Uploaded Documents</div>
+    {% for doc in staff_documents %}
+    <div class="file-item" style="flex-direction:column;align-items:stretch;background:#fff;border:1px solid var(--ob-border);border-radius:8px;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;gap:12px;width:100%;padding:10px 14px;">
+        <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{% if '.pdf' in doc.file.name %}#DC2626{% elif '.jpg' in doc.file.name or '.jpeg' in doc.file.name or '.png' in doc.file.name or '.gif' in doc.file.name or '.webp' in doc.file.name %}#16A34A{% else %}#2563EB{% endif %}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+          <div style="min-width:0;">
+            <div style="font-size:13px;font-weight:600;color:var(--ob-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ doc.name }}</div>
+            <div style="font-size:11px;color:var(--ob-text-m);display:flex;gap:8px;align-items:center;">
+              <span style="background:var(--ob-surface);padding:1px 6px;border-radius:4px;font-weight:600">{{ doc.get_document_type_display }}</span>
+              <span>{{ doc.created_at|date:"d M Y" }}</span>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+          <button type="button" onclick="toggleDocPreview(this)" data-att-id="{{ doc.pk }}" data-file-url="{{ doc.file.url }}" data-file-name="{{ doc.file.name }}" class="ob-btn-sm" style="background:var(--ob-blue-pale);color:var(--ob-blue);border:none;padding:5px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">Preview</button>
+          <a href="{% url 'hr:staff_document_download' doc.pk %}" class="ob-btn-sm" style="background:#F0FDF4;color:#16A34A;border:none;padding:5px 10px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:4px;">Download</a>
+          <button type="button" onclick="deleteDocAttachment({{ doc.pk }}, '{{ doc.name|escapejs }}')" class="ob-btn-sm" style="background:#FEF2F2;color:#DC2626;border:none;padding:5px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">Remove</button>
+        </div>
+      </div>
+      <div class="edit-preview-container" id="ep-{{ doc.pk }}"></div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <script>
+    function handleDocInput(input, fieldName) {
+      var file = input.files[0];
+      if (!file) return;
+      var ext = file.name.split('.').pop().toLowerCase();
+      var allowed = ['pdf','doc','docx','jpg','jpeg','png','gif','webp'];
+      var info = document.getElementById('doc-info-' + fieldName);
+      var infoText = document.getElementById('doc-info-text-' + fieldName);
+      var label = input.previousElementSibling;
+      if (allowed.indexOf(ext) === -1) {
+        info.style.display = 'block';
+        info.style.background = '#FEF2F2'; info.style.borderColor = '#FECACA'; info.style.color = '#991B1B';
+        infoText.innerHTML = '"' + ext + '" is not allowed. Use PDF, JPG, PNG, DOC, or DOCX.';
+        input.value = '';
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        info.style.display = 'block';
+        info.style.background = '#FEF2F2'; info.style.borderColor = '#FECACA'; info.style.color = '#991B1B';
+        infoText.innerHTML = (file.size / (1024*1024)).toFixed(1) + ' MB exceeds 10 MB limit.';
+        input.value = '';
+        return;
+      }
+      var sz = file.size > 1024*1024 ? (file.size/(1024*1024)).toFixed(1)+' MB' : (file.size/1024).toFixed(1)+' KB';
+      var ic = ext==='pdf' ? '#DC2626' : (['jpg','jpeg','png','gif','webp'].indexOf(ext)!==-1 ? '#16A34A' : '#2563EB');
+      info.style.display = 'block';
+      info.style.background = '#F0FDF4'; info.style.borderColor = '#BBF7D0'; info.style.color = '#166534';
+      infoText.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="'+ic+'" stroke-width="2" style="vertical-align:-2px"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg> ' + file.name + ' <span style="color:#94A3B8;margin-left:4px;">' + sz + '</span>';
+      if (label) label.style.display = 'none';
+    }
+
+    function removeDocFile(fieldName) {
+      var input = document.getElementById('doc-' + fieldName);
+      var info = document.getElementById('doc-info-' + fieldName);
+      var label = input.previousElementSibling;
+      input.value = '';
+      info.style.display = 'none';
+      if (label) label.style.display = 'flex';
+    }
+
+    function previewDocFile(fieldName) {
+      var input = document.getElementById('doc-' + fieldName);
+      var file = input.files[0];
+      if (!file) return;
+      var ext = file.name.split('.').pop().toLowerCase();
+      var url = URL.createObjectURL(file);
+      openDocModal(url, file.name, ext);
+    }
+
+    function openDocModal(url, name, ext) {
+      var overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+      var box = document.createElement('div');
+      box.style.cssText = 'background:#fff;border-radius:12px;max-width:95vw;max-height:92vh;width:900px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 25px 50px rgba(0,0,0,0.25);';
+      var hdr = document.createElement('div');
+      hdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #E2E8F0;';
+      hdr.innerHTML = '<span style="font-size:14px;font-weight:700;color:#1A1A2E;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + name + '</span>';
+      var closeBtn = document.createElement('button');
+      closeBtn.textContent = '\u00d7';
+      closeBtn.style.cssText = 'background:none;border:none;font-size:24px;cursor:pointer;color:#64748B;padding:4px 8px;line-height:1;flex-shrink:0;';
+      closeBtn.onclick = function() { document.body.removeChild(overlay); };
+      hdr.appendChild(closeBtn);
+      box.appendChild(hdr);
+      var body = document.createElement('div');
+      body.style.cssText = 'flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;background:#F8FAFC;';
+      if (ext === 'pdf') {
+        var iframe = document.createElement('iframe');
+        iframe.src = url; iframe.style.cssText = 'width:100%;height:100%;min-height:500px;border:none;';
+        body.appendChild(iframe);
+      } else if (['jpg','jpeg','png','gif','webp','svg'].indexOf(ext) !== -1) {
+        var img = document.createElement('img');
+        img.src = url; img.alt = name;
+        img.style.cssText = 'max-width:100%;max-height:80vh;object-fit:contain;';
+        body.appendChild(img);
+      } else {
+        body.innerHTML = '<div style="text-align:center;padding:40px;color:#94A3B8;"><p style="margin-bottom:12px;">Preview not available for this file type.</p><a href="' + url + '" download style="color:#023AA5;font-weight:700;">Download file</a></div>';
+      }
+      box.appendChild(body);
+      overlay.appendChild(box);
+      overlay.addEventListener('click', function(e) { if (e.target === overlay) document.body.removeChild(overlay); });
+      document.body.appendChild(overlay);
+    }
+
+    function deleteDocAttachment(attId, filename) {
+      if (!confirm('Remove ' + filename + '?')) return;
+      var form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '/hr/document/' + attId + '/delete/';
+      var csrf = document.createElement('input');
+      csrf.type = 'hidden'; csrf.name = 'csrfmiddlewaretoken';
+      csrf.value = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+      form.appendChild(csrf);
+      form.style.display = 'none';
+      document.body.appendChild(form);
+      form.submit();
+    }
+
+    function toggleDocPreview(btn) {
+      var id = btn.getAttribute('data-att-id');
+      var fileUrl = btn.getAttribute('data-file-url');
+      var fileName = btn.getAttribute('data-file-name');
+      var container = document.getElementById('ep-' + id);
+      if (!container) return;
+      if (container.classList.contains('open')) {
+        container.classList.remove('open'); container.innerHTML = '';
+        btn.textContent = 'Preview';
+        return;
+      }
+      var ext = fileName.split('.').pop().toLowerCase();
+      var fullUrl = window.location.origin + encodeURI(fileUrl);
+      container.classList.add('open');
+      btn.textContent = 'Close';
+      if (ext === 'pdf') {
+        container.innerHTML = '<iframe src="'+fullUrl+'" loading="lazy"></iframe>';
+      } else if (['jpg','jpeg','png','gif','webp','svg'].indexOf(ext) !== -1) {
+        container.innerHTML = '<img src="'+fullUrl+'" alt="'+fileName+'" loading="lazy">';
+      } else {
+        container.innerHTML = '<div style="padding:16px;text-align:center;color:#94A3B8;font-size:12px">Preview not available. <a href="'+fullUrl+'" download style="color:var(--ob-blue);font-weight:700">Download file</a></div>';
+      }
+    }
+    </script>
+    <style>
+      .doc-drop-label:hover{border-color:var(--ob-blue)!important;background:var(--ob-blue-pale)!important}
+      .edit-preview-container{display:none;border-radius:8px;overflow:hidden;border:1px solid var(--ob-border);margin-top:8px}
+      .edit-preview-container.open{display:block}
+      .edit-preview-container iframe{width:100%;height:400px;border:none}
+      .edit-preview-container img{width:100%;max-height:400px;object-fit:contain}
+    </style>
+
+    {# ===== STEP 5: Induction + Completion ===== #}
+    {% elif step == 5 %}
+
+    {# Completion Summary #}
+    <div class="ob-step-summary" style="margin-bottom:24px;">
+      <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      <h3>Confirmation & Completion</h3>
+      <p>Review all information is complete. Click <strong>"Complete Onboarding"</strong> to finalize the onboarding process for <strong>{{ staff.full_name }}</strong>.</p>
+      <p style="margin-top:8px; font-size:12px; color:var(--ob-text-m);">All {{ total_steps }} steps will be marked as completed.</p>
+    </div>
+
+    {# Summary Metrics #}
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
+      <div style="padding:14px 16px;border:1px solid var(--ob-border);border-radius:8px;background:var(--ob-card);">
+        <div style="font-size:12px;color:var(--ob-text-m);margin-bottom:4px;">Documents Uploaded</div>
+        <div style="font-size:20px;font-weight:700;color:var(--ob-text);">{{ doc_count|default:"0" }}</div>
+      </div>
+      <div style="padding:14px 16px;border:1px solid var(--ob-border);border-radius:8px;background:var(--ob-card);">
+        <div style="font-size:12px;color:var(--ob-text-m);margin-bottom:4px;">Class Assignments</div>
+        <div style="font-size:20px;font-weight:700;color:var(--ob-text);">{{ assignment_count|default:"0" }}</div>
+      </div>
+      <div style="padding:14px 16px;border:1px solid var(--ob-border);border-radius:8px;background:{% if induction_done == induction_total and induction_total > 0 %}#F0FDF4{% else %}var(--ob-card){% endif %};">
+        <div style="font-size:12px;color:var(--ob-text-m);margin-bottom:4px;">Induction Checklist</div>
+        <div style="font-size:20px;font-weight:700;color:{% if induction_done == induction_total and induction_total > 0 %}#16A34A{% else %}var(--ob-text){% endif %};">{{ induction_done|default:"0" }} / {{ induction_total|default:"0" }}</div>
+      </div>
+      <div style="padding:14px 16px;border:1px solid var(--ob-border);border-radius:8px;background:var(--ob-card);">
+        <div style="font-size:12px;color:var(--ob-text-m);margin-bottom:4px;">Emergency Contact</div>
+        <div style="font-size:20px;font-weight:700;color:var(--ob-text);">{% if staff.emergency_contact_name %}Set{% else %}—{% endif %}</div>
+      </div>
+    </div>
+
+    {# Induction Checklist #}
+    {% if checklist_items %}
+    <div style="padding:16px 18px;background:#F8FAFC;border:1px solid var(--ob-border);border-radius:10px;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:600;color:var(--ob-text-m);text-transform:uppercase;letter-spacing:0.05em;">Induction Checklist</div>
+        <span id="inductionProgress" style="font-size:12px;font-weight:600;color:var(--ob-blue);"></span>
+      </div>
+      <ul style="list-style:none;padding:0;margin:0;">
+        {% for item in checklist_items %}
+        <li style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--ob-border);border-radius:8px;margin-bottom:6px;background:{% if item.is_completed_item %}#F0FDF4{% else %}#fff{% endif %};">
+          <input type="checkbox" name="induction_item_{{ item.pk }}" value="1" {% if item.is_completed_item %}checked{% endif %} style="width:16px;height:16px;accent-color:#16A34A;cursor:pointer;flex-shrink:0;" class="induction-cb" data-item-id="{{ item.pk }}">
+          <div style="flex:1;font-size:13px;color:var(--ob-text);">{{ item.item_name }}</div>
+          {% if item.is_completed_item %}
+          <span style="font-size:11px;color:#16A34A;font-weight:600;">Done</span>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      <div id="inductionCompleteMsg" style="display:none;margin-top:10px;padding:8px 12px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:6px;color:#166534;font-size:12px;font-weight:500;">
+        All induction checklist items completed.
+      </div>
+    </div>
+    {% endif %}
+
+    <script>
+    (function(){
+      var cbs = document.querySelectorAll('.induction-cb');
+      var prog = document.getElementById('inductionProgress');
+      var msg = document.getElementById('inductionCompleteMsg');
+      function updateProgress(){
+        var total = cbs.length, done = 0;
+        cbs.forEach(function(cb){ if(cb.checked) done++; });
+        if(prog) prog.textContent = done + ' / ' + total + ' completed';
+        if(msg) msg.style.display = (total > 0 && done === total) ? 'block' : 'none';
+        cbs.forEach(function(cb){
+          var li = cb.closest('li');
+          if(li) li.style.background = cb.checked ? '#F0FDF4' : '#fff';
+        });
+      }
+      cbs.forEach(function(cb){ cb.addEventListener('change', updateProgress); });
+      updateProgress();
+    })();
+    </script>
+    {% endif %}
+
+    {# ===== Form Actions (inside form) ===== #}
+    <div class="ob-actions">
+      {% if step > 1 %}
+      <a href="?tab={{ step|add:'-1' }}" class="ob-btn-secondary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Previous
+      </a>
+      {% else %}
+      <div></div>
+      {% endif %}
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="ob-btn-secondary" onclick="document.getElementById('save-action').value='exit';document.getElementById('stepForm').submit();">
+          Save & Exit
+        </button>
+        {% if step == 5 %}
+        <button type="submit" class="ob-btn-complete ob-save-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          Complete Onboarding
+        </button>
+        {% else %}
+        <button type="submit" class="ob-btn-primary ob-save-btn">
+          Save and Continue
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+        {% endif %}
+      </div>
+    </div>
+    <input type="hidden" id="save-action" name="save_action" value="continue">
+    <input type="hidden" id="target-tab" name="target_tab" value="">
+  </form>
+</div>
+
+{% if step == 1 %}
+<script>
+(function () {
+  var input = document.getElementById('profilePictureInput');
+  var preview = document.getElementById('photoPreview');
+  if (!input || !preview) return;
+  input.addEventListener('change', function () {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      preview.innerHTML = '<img src="' + e.target.result + '" alt="Preview">';
+    };
+    reader.readAsDataURL(file);
+  });
+})();
+</script>
+{% endif %}

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Weekly Focus Compliance — {{ brand.school_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">ECD Weekly Focus Compliance</h1>
+    <p class="page-subtitle">Week {{ current_week }} &middot; {{ today_date }}</p>
+  </div>
+  <a href="{% url 'communications:weekly_focus_list' %}" class="btn-secondary">Back to List</a>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px">
+  <div class="card" style="padding:20px;text-align:center">
+    <p style="font-size:28px;font-weight:700;color:var(--hodari-blue)">{{ submitted_count }}</p>
+    <p style="font-size:13px;color:var(--text-muted)">Submitted</p>
+  </div>
+  <div class="card" style="padding:20px;text-align:center">
+    <p style="font-size:28px;font-weight:700;color:#dc2626">{{ total_count|add:"-submitted_count" }}</p>
+    <p style="font-size:13px;color:var(--text-muted)">Not Yet Submitted</p>
+  </div>
+  <div class="card" style="padding:20px;text-align:center">
+    <p style="font-size:28px;font-weight:700;color:{% if compliance_rate > 75 %}#16a34a{% elif compliance_rate > 50 %}#ca8a04{% else %}#dc2626{% endif %}">{{ compliance_rate }}%</p>
+    <p style="font-size:13px;color:var(--text-muted)">Compliance Rate</p>
+  </div>
+</div>
+
+<div class="card" style="padding:0">
+  <table class="h-table">
+    <thead>
+      <tr>
+        <th style="text-align:left">Teacher</th>
+        <th style="text-align:center">Status</th>
+        <th style="text-align:left">Theme</th>
+        <th style="text-align:left">Class</th>
+        <th style="text-align:left">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in compliance_rows %}
+        <tr>
+          <td>{{ row.teacher.get_full_name|default:row.teacher.username }}</td>
+          <td style="text-align:center">
+            {% if row.entry %}
+              {% if row.entry.status == "approved" %}
+                <span class="badge badge-green">Approved</span>
+              {% elif row.entry.status == "rejected" %}
+                <span class="badge badge-red">Rejected</span>
+              {% elif row.entry.status == "submitted" %}
+                <span class="badge badge-yellow">Pending Review</span>
+              {% else %}
+                <span class="badge badge-grey">Draft</span>
+              {% endif %}
+            {% else %}
+              <span class="badge badge-grey">Pending</span>
+            {% endif %}
+          </td>
+          <td>{{ row.entry.theme|default:"—" }}</td>
+          <td>{{ row.entry.class_name|default:"—" }}</td>
+          <td>
+            {% if row.entry and row.entry.status == "submitted" %}
+              <a href="{% url 'communications:weekly_focus_list' %}" class="btn-secondary" style="padding:4px 10px;font-size:11px">Review</a>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

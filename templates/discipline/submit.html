@@ -1,0 +1,500 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% load static hodari_forms role_tags %}
+{% block title %}Disciplinary Form — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Disciplinary Form{% endblock %}
+{% block topbar_date %}{{ today_date }}{% endblock %}
+
+{% block content %}
+{% include "discipline/_top_tabs.html" %}
+<style>
+  .field-error { color:#dc2626; font-size:12px; margin-top:4px; display:block; }
+  .hf2-group.has-error .hf2-select,
+  .hf2-group.has-error .hf2-input,
+  .hf2-group.has-error .hf2-textarea { border-color:#dc2626; box-shadow:0 0 0 2px rgba(220,38,38,0.12); }
+  .disc-header { background: linear-gradient(135deg, #023AA5 0%, #1A56C4 100%); color: #fff; padding: 20px 28px; border-radius: 12px 12px 0 0; }
+  .disc-header-row { display: flex; justify-content: space-between; align-items: flex-start; }
+  .disc-school-name { font-family: var(--font-display, 'Merriweather', serif); font-size: 17px; font-weight: 700; }
+  .disc-tagline { font-size: 11px; opacity: 0.75; font-style: italic; margin-top: 2px; }
+  .disc-meta { text-align: right; font-size: 12px; opacity: 0.85; }
+</style>
+<div style="max-width:1200px;margin:auto">
+  <div style="display:flex;gap:24px">
+    <!-- Main Form Column -->
+    <div style="flex:1;min-width:0">
+      <div class="card" style="padding:0;overflow:hidden">
+        <div class="disc-header">
+          <div class="disc-header-row">
+            <div>
+              <div class="disc-school-name">{{ brand.school_name|default:"School Name" }}</div>
+              <div class="disc-tagline">Disciplinary Incident Report</div>
+            </div>
+            <div class="disc-meta">
+              <div>{{ today_date }}</div>
+              <div style="margin-top:4px;font-size:11px;opacity:0.7">New Incident</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding:20px 28px">
+        <div class="card-title-row">
+          <div class="card-title">Disciplinary Form</div>
+          <div style="display:flex;gap:12px">
+            <a href="{% url 'discipline:list' %}" class="btn-secondary btn-sm">← Back to List</a>
+          </div>
+        </div>
+
+        <form method="post" id="discipline-form" style="margin-top:16px">
+          {% csrf_token %}
+
+          <!-- Stepper -->
+          <div style="display:flex;gap:10px;align-items:center;margin:10px 0 18px;flex-wrap:wrap">
+            <span class="chip chip-blue" id="step-chip-1">1. Context</span>
+            <span class="chip chip-grey" id="step-chip-2">2. Type of Incident</span>
+            <span class="chip chip-grey" id="step-chip-3">3. Description & Action</span>
+            <span class="chip chip-grey" id="step-chip-4">4. Parent Contact</span>
+            <span class="chip chip-grey" id="step-chip-5">5. Review</span>
+            <span style="margin-left:auto;font-size:12px;color:var(--text-muted)" id="step-hint">Step 1 of 5</span>
+          </div>
+
+          <!-- STEP 1: CONTEXT -->
+          <div class="hf2-section" data-step="1">
+            <div class="hf2-section-title">Incident Context</div>
+            <div class="hf2-grid-2">
+              <div class="hf2-group">
+                <label class="hf2-label">Select Class</label>
+                <select name="class_filter" class="hf2-select" id="class-filter-select">
+                  <option value="">All classes...</option>
+                  {% for cls in available_classes %}
+                    <option value="{{ cls }}">{{ cls }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="hf2-group">
+                <label class="hf2-label">Date of Incident</label>
+                <input type="date" name="incident_date" class="hf2-input hf2-date" value="{{ today_date_iso }}" required>
+              </div>
+            </div>
+            <div class="hf2-grid-2" style="margin-top:16px">
+              <div class="hf2-group">
+                <label class="hf2-label">Student *</label>
+                <select name="student" class="hf2-select" id="student-select" required>
+                  <option value="">Select student...</option>
+                  {% for s in students %}
+                    <option value="{{ s.id }}" data-class="{{ s.class_name }}">{{ s.first_name }} {{ s.last_name }} ({{ s.class_name }})</option>
+                  {% endfor %}
+                </select>
+                {% if form.student.errors %}<span class="field-error">{{ form.student.errors.0 }}</span>{% endif %}
+                <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Select a class above to filter students</div>
+              </div>
+              <div class="hf2-group">
+                <label class="hf2-label">Time of Incident</label>
+                <input type="time" name="time_of_incident" class="hf2-input hf2-time">
+              </div>
+            </div>
+            <div class="hf2-grid-2" style="margin-top:16px">
+              <div class="hf2-group">
+                <label class="hf2-label">Location of Incident</label>
+                <select name="location" class="hf2-select" id="location-select" onchange="toggleOtherLocation(this)">
+                  <option value="">Select location...</option>
+                  <option value="Classroom">Classroom</option>
+                  <option value="Playground">Playground</option>
+                  <option value="Hallway">Hallway</option>
+                  <option value="Cafeteria">Cafeteria</option>
+                  <option value="Library">Library</option>
+                  <option value="Sports Field">Sports Field</option>
+                  <option value="Assembly Hall">Assembly Hall</option>
+                  <option value="Bus Area">Bus Area</option>
+                  <option value="Off-campus">Off-campus</option>
+                  <option value="__other__">Other (please specify)</option>
+                </select>
+                <input type="text" name="location_other" class="hf2-input" id="location-other" placeholder="Enter location..." style="display:none;margin-top:6px">
+              </div>
+              <div class="hf2-group" style="display:flex;align-items:flex-end">
+                <label class="hf2-check-label" style="margin-bottom:12px">
+                  <input type="checkbox" name="previous_incidents" class="hf2-checkbox">
+                  <span>Previous incidents on record?</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 2: TYPE OF INCIDENT -->
+          <div class="hf2-section" data-step="2" style="display:none">
+            <div class="hf2-section-title">Type of Incident (Tick all that apply)</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+              <!-- Level 1 -->
+              <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+                <div style="background:#16a34a;color:white;padding:8px 12px;font-size:12px;font-weight:700">LEVEL 1 - MINOR (Teacher)</div>
+                <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
+                  {% for item in "Talking out of turn,Homework not done,Lateness to class,Uniform untidy,Minor disruption,Mild disrespect,Left class no perm"|split:"," %}
+                    <label class="hf2-check-label" style="font-size:12px">
+                      <input type="checkbox" name="level_1" value="{{ item }}" class="hf2-checkbox severity-trigger" data-severity="low">
+                      <span>{{ item }}</span>
+                    </label>
+                  {% endfor %}
+                </div>
+              </div>
+              <!-- Level 2 -->
+              <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+                <div style="background:#2563eb;color:white;padding:8px 12px;font-size:12px;font-weight:700">LEVEL 2 - MODERATE (Tchr + HOD)</div>
+                <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
+                  {% for item in "Repeated Level 1,Rudeness to staff,Verbal bullying,Cheating/Dishonesty,Minor property damage,Lying to staff,Unkind rumours"|split:"," %}
+                    <label class="hf2-check-label" style="font-size:12px">
+                      <input type="checkbox" name="level_2" value="{{ item }}" class="hf2-checkbox severity-trigger" data-severity="medium">
+                      <span>{{ item }}</span>
+                    </label>
+                  {% endfor %}
+                </div>
+              </div>
+              <!-- Level 3 -->
+              <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+                <div style="background:#d97706;color:white;padding:8px 12px;font-size:12px;font-weight:700">LEVEL 3 - SERIOUS (HOD + HOS)</div>
+                <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
+                  {% for item in "Persistent bullying,Physical aggression,Theft,Deliberate vandalism,Prohibited items,Sustained defiance,Inappropriate lang"|split:"," %}
+                    <label class="hf2-check-label" style="font-size:12px">
+                      <input type="checkbox" name="level_3" value="{{ item }}" class="hf2-checkbox severity-trigger" data-severity="high">
+                      <span>{{ item }}</span>
+                    </label>
+                  {% endfor %}
+                </div>
+              </div>
+              <!-- Level 4 -->
+              <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+                <div style="background:#dc2626;color:white;padding:8px 12px;font-size:12px;font-weight:700">LEVEL 4 - SEVERE (HOS ONLY)</div>
+                <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
+                  {% for item in "Assault w/ injury,Sexual harassment,Possess weapons,Possess substances,Threatening staff,Serious theft/fraud,Repeat Level 3"|split:"," %}
+                    <label class="hf2-check-label" style="font-size:12px">
+                      <input type="checkbox" name="level_4" value="{{ item }}" class="hf2-checkbox severity-trigger" data-severity="critical">
+                      <span>{{ item }}</span>
+                    </label>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+            <div class="hf2-group" style="margin-top:16px">
+               <label class="hf2-label">Selected Severity (Auto-calculated)</label>
+               <select name="severity" id="severity-select" class="hf2-select" readonly style="background:#f8fafc">
+                  {% for val, lbl in severity_choices %}
+                    <option value="{{ val }}" {% if val == 'low' %}selected{% endif %}>{{ lbl }}</option>
+                  {% endfor %}
+               </select>
+               {% if form.severity.errors %}<span class="field-error">{{ form.severity.errors.0 }}</span>{% endif %}
+               <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Severity is auto-calculated based on the highest level selected above.</div>
+            </div>
+          </div>
+
+          <!-- STEP 3: DESCRIPTION & ACTION -->
+          <div class="hf2-section" data-step="3" style="display:none">
+            <div class="hf2-section-title">Incident Description & Action Taken</div>
+            <div class="hf2-group">
+              <label class="hf2-label">Brief Factual Description *</label>
+              <textarea name="summary" class="hf2-textarea" rows="4" placeholder="Describe what happened clearly and factually..." required></textarea>
+              {% if form.summary.errors %}<span class="field-error">{{ form.summary.errors.0 }}</span>{% endif %}
+            </div>
+            <div style="margin-top:20px">
+              <label class="hf2-label" style="margin-bottom:12px">Immediate Action Taken (Tick all that apply)</label>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                {% for item in "Verbal redirect,Reflection task,Merit deduction,Privilege withdrawal,Apology letter,Community service,Restorative circle,Purposeful detention,Formal written warning,Referred to HOD,Referred to HOS,In-School Suspension,Out-of-School Suspension,Parent Shadow Day"|split:"," %}
+                  <label class="hf2-check-label" style="font-size:12px">
+                    <input type="checkbox" name="actions_detailed" value="{{ item }}" class="hf2-checkbox">
+                    <span>{{ item }}</span>
+                  </label>
+                {% endfor %}
+              </div>
+            </div>
+            <div class="hf2-group" style="margin-top:16px">
+              <label class="hf2-label">Additional Action Details</label>
+              <textarea name="action_taken" class="hf2-textarea" rows="2" placeholder="Any other notes on actions taken..."></textarea>
+              {% if form.action_taken.errors %}<span class="field-error">{{ form.action_taken.errors.0 }}</span>{% endif %}
+            </div>
+          </div>
+
+          <!-- STEP 4: PARENT CONTACT -->
+          <div class="hf2-section" data-step="4" style="display:none">
+            <div class="hf2-section-title">Parent Contact & Follow-up</div>
+            <div class="hf2-grid-1">
+              <div class="hf2-group hf2-check-group">
+                <label class="hf2-check-label">
+                  <input type="checkbox" name="parent_contacted" class="hf2-checkbox" id="parent_contacted">
+                  <span>Parent Contacted?</span>
+                </label>
+              </div>
+              <div id="parent_contact_details" style="display:none;margin-top:16px">
+                <div class="hf2-grid-2">
+                  <div class="hf2-group">
+                    <label class="hf2-label">Contact Date</label>
+                    <input type="date" name="parent_contact_date" class="hf2-input hf2-date">
+                  </div>
+                  <div class="hf2-group">
+                    <label class="hf2-label">Contact Time</label>
+                    <input type="time" name="parent_contact_time" class="hf2-input hf2-time">
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="hf2-grid-1" style="margin-top:24px;padding-top:20px;border-top:1px dashed #e2e8f0">
+              <div class="hf2-group hf2-check-group">
+                <label class="hf2-check-label">
+                  <input type="checkbox" name="follow_up_required" class="hf2-checkbox" id="follow_up_required">
+                  <span>Follow-up Required?</span>
+                </label>
+              </div>
+              <div id="follow_up_details" style="display:none;margin-top:16px">
+                <div class="hf2-group">
+                  <label class="hf2-label">Follow-up Date</label>
+                  <input type="date" name="follow_up_date" class="hf2-input hf2-date">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 5: REVIEW -->
+          <div class="hf2-section" data-step="5" style="display:none">
+            <div class="hf2-section-title">Final Review</div>
+            <div style="font-size:13px;color:var(--text-muted);margin-bottom:10px">
+              Please verify all details before submitting the incident record.
+            </div>
+            <div class="card" style="padding:20px;border:1px solid var(--border);border-radius:12px;background:#fff;box-shadow:0 4px 12px rgba(0,0,0,0.03)">
+              <div id="review-summary" style="font-size:13px;line-height:1.6;color:var(--text-primary)"></div>
+            </div>
+          </div>
+
+          <div class="hf2-actions" style="margin-top:20px">
+            <a href="{% url 'discipline:list' %}" class="hf-btn hf-btn-secondary" style="margin-right:auto;text-decoration:none">Cancel</a>
+            <button type="button" class="hf-btn hf-btn-secondary" id="btn-back" style="display:none">Back</button>
+            <button type="button" class="hf-btn hf-btn-primary" id="btn-next">Next</button>
+            {% has_perm user "discipline.add_disciplineincident" as can_submit %}
+            {% if can_submit %}
+            <button type="submit" class="hf-btn hf-btn-primary" id="btn-submit" style="display:none">Submit Incident Report</button>
+            {% endif %}
+          </div>
+        </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Sidebar -->
+    <div style="width:350px;flex-shrink:0">
+      <div class="card" style="padding:16px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--text-muted);text-transform:uppercase">Guidelines</div>
+        <div style="font-size:12px;color:#475569;line-height:1.6">
+          <p style="margin:0 0 8px"><strong>Be factual</strong> &middot; Describe what was observed or reported, not assumptions.</p>
+          <p style="margin:0 0 8px"><strong>Be specific</strong> &middot; Include times, locations, and any witnesses.</p>
+          <p style="margin:0 0 8px"><strong>Severity</strong> is auto-calculated from the incident levels selected.</p>
+          <p style="margin:0"><strong>Critical incidents</strong> should be reported directly to the Head of School.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleOtherLocation(sel) {
+  var other = document.getElementById('location-other');
+  if (sel.value === '__other__') {
+    other.style.display = '';
+    other.setAttribute('required', '');
+  } else {
+    other.style.display = 'none';
+    other.removeAttribute('required');
+  }
+}
+document.addEventListener('DOMContentLoaded', function() {
+  const classFilterSelect = document.getElementById('class-filter-select');
+  const studentSelect = document.getElementById('student-select');
+  const parentContacted = document.getElementById('parent_contacted');
+  const parentContactDetails = document.getElementById('parent_contact_details');
+  const followUpRequired = document.getElementById('follow_up_required');
+  const followUpDetails = document.getElementById('follow_up_details');
+
+  const form = document.getElementById('discipline-form');
+  const steps = Array.from(document.querySelectorAll('[data-step]'));
+  const btnBack = document.getElementById('btn-back');
+  const btnNext = document.getElementById('btn-next');
+  const btnSubmit = document.getElementById('btn-submit');
+  const stepHint = document.getElementById('step-hint');
+  const reviewSummary = document.getElementById('review-summary');
+  let currentStep = 1;
+
+  const severitySelect = document.getElementById('severity-select');
+  const severityTriggers = document.querySelectorAll('.severity-trigger');
+
+  // Class filter: narrow student dropdown by selected class
+  if (classFilterSelect) {
+    classFilterSelect.addEventListener('change', function() {
+      var selectedClass = this.value;
+      var options = studentSelect.querySelectorAll('option[data-class]');
+      options.forEach(function(opt) {
+        opt.style.display = (!selectedClass || opt.dataset.class === selectedClass) ? '' : 'none';
+      });
+      studentSelect.value = '';
+    });
+  }
+
+  // Auto-calculate severity based on highest level checked
+  function updateSeverity() {
+    const severityMap = { 'low': 1, 'medium': 2, 'high': 3, 'critical': 4 };
+    const reverseMap = { 1: 'low', 2: 'medium', 3: 'high', 4: 'critical' };
+    let highestLevel = 1;
+    severityTriggers.forEach(trigger => {
+      if (trigger.checked) {
+        const level = severityMap[trigger.dataset.severity];
+        if (level > highestLevel) highestLevel = level;
+      }
+    });
+    severitySelect.value = reverseMap[highestLevel];
+  }
+  severityTriggers.forEach(trigger => {
+    trigger.addEventListener('change', updateSeverity);
+  });
+
+  function setChip(step, active) {
+    const el = document.getElementById(`step-chip-${step}`);
+    if (!el) return;
+    el.classList.remove('chip-blue', 'chip-grey');
+    el.classList.add(active ? 'chip-blue' : 'chip-grey');
+  }
+
+  function escapeHtml(text) {
+    if (text === null || text === undefined) return '-';
+    return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function showStep(n) {
+    currentStep = n;
+    steps.forEach(s => { s.style.display = (Number(s.dataset.step) === n) ? 'block' : 'none'; });
+    for (let i = 1; i <= 5; i++) setChip(i, i === n);
+    stepHint.textContent = `Step ${n} of 5`;
+
+    btnBack.style.display = n === 1 ? 'none' : 'inline-flex';
+    btnNext.style.display = n === 5 ? 'none' : 'inline-flex';
+    btnSubmit.style.display = n === 5 ? 'inline-flex' : 'none';
+
+    if (n === 5) {
+      try {
+        var studentOpt = studentSelect && studentSelect.selectedIndex >= 0 ? studentSelect.options[studentSelect.selectedIndex] : null;
+        var studentText = studentOpt ? studentOpt.text : '-';
+
+        var dateEl = document.querySelector('#discipline-form [name="incident_date"]');
+        var timeEl = document.querySelector('#discipline-form [name="time_of_incident"]');
+        var locEl = document.querySelector('#discipline-form [name="location"]');
+        var locOtherEl = document.getElementById('location-other');
+        var summaryEl = document.querySelector('#discipline-form [name="summary"]');
+
+        var obsDate = (dateEl && dateEl.value) ? dateEl.value : '-';
+        var timeVal = (timeEl && timeEl.value) ? timeEl.value : '-';
+        var locVal = '-';
+        if (locEl) {
+          locVal = locEl.value === '__other__' ? (locOtherEl && locOtherEl.value ? locOtherEl.value : '-') : (locEl.selectedIndex >= 0 ? locEl.options[locEl.selectedIndex].text : '-');
+        }
+        var severityText = '-';
+        var severityVal = 'low';
+        if (severitySelect && severitySelect.selectedIndex >= 0) {
+          severityText = severitySelect.options[severitySelect.selectedIndex].text;
+          severityVal = severitySelect.value || 'low';
+        }
+        var details = (summaryEl && summaryEl.value) ? summaryEl.value : '';
+
+        var incidentsChecked = [];
+        document.querySelectorAll('.severity-trigger:checked').forEach(function(i) { if (i.value) incidentsChecked.push(i.value); });
+
+        var actionsChecked = [];
+        document.querySelectorAll('input[name="actions_detailed"]:checked').forEach(function(a) { if (a.value) actionsChecked.push(a.value); });
+
+        var sevClass = severityVal === 'critical' ? 'chip-red' : severityVal === 'high' ? 'chip-amber' : 'chip-blue';
+
+        var html = '<div style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 16px">';
+        html += '<div><div style="font-size:11px;color:#8492A6;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Student</div>';
+        html += '<div style="font-weight:700;color:#023AA5">' + escapeHtml(studentText) + '</div></div>';
+        html += '<div><div style="font-size:11px;color:#8492A6;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Date &amp; Time</div>';
+        html += '<div style="font-weight:600">' + escapeHtml(obsDate) + ' at ' + escapeHtml(timeVal) + '</div></div></div>';
+
+        html += '<div style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px">';
+        html += '<div><div style="font-size:11px;color:#8492A6;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Location</div>';
+        html += '<div>' + escapeHtml(locVal) + '</div></div>';
+        html += '<div><div style="font-size:11px;color:#8492A6;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Severity</div>';
+        html += '<span class="chip ' + sevClass + '">' + escapeHtml(severityText) + '</span></div></div>';
+
+        html += '<div style="border-top: 1px solid #DDE3EE; padding-top: 16px; margin-top: 16px">';
+        html += '<div style="font-weight:700; margin-bottom:8px; font-size:14px">Incident Types</div>';
+        html += '<div style="display:flex; flex-wrap:wrap; gap:6px">';
+        if (incidentsChecked.length > 0) {
+          incidentsChecked.forEach(function(item) {
+            html += '<span style="background:#f1f5f9; padding:4px 10px; border-radius:6px; font-size:12px; border:1px solid #e2e8f0">' + escapeHtml(item) + '</span>';
+          });
+        } else {
+          html += '<span style="color:#8492A6;font-style:italic">None selected</span>';
+        }
+        html += '</div></div>';
+
+        html += '<div style="margin-top: 16px">';
+        html += '<div style="font-weight:700; margin-bottom:8px; font-size:14px">Factual Description</div>';
+        html += '<div style="background:#F8FAFC; padding:14px; border-radius:10px; border:1px solid #DDE3EE; white-space:pre-wrap; font-size:13px">' + escapeHtml(details) + '</div></div>';
+
+        html += '<div style="margin-top: 16px">';
+        html += '<div style="font-weight:700; margin-bottom:8px; font-size:14px">Actions Taken</div>';
+        html += '<div style="display:flex; flex-wrap:wrap; gap:6px">';
+        if (actionsChecked.length > 0) {
+          actionsChecked.forEach(function(item) {
+            html += '<span style="background:#ecfdf5; color:#065f46; padding:4px 10px; border-radius:6px; font-size:12px; border:1px solid #a7f3d0">' + escapeHtml(item) + '</span>';
+          });
+        } else {
+          html += '<span style="color:#8492A6;font-style:italic">None recorded</span>';
+        }
+        html += '</div></div>';
+
+        reviewSummary.innerHTML = html;
+      } catch (e) {
+        reviewSummary.innerHTML = '<div style="color:#dc2626">Error loading preview. Please check all fields.</div>';
+      }
+    }
+  }
+
+  function stepValid(n) {
+    const scope = document.querySelector(`[data-step="${n}"]`);
+    if (!scope) return true;
+    const required = Array.from(scope.querySelectorAll('[required]'));
+    for (const el of required) {
+      if (el.disabled) continue;
+      if (el.tagName === 'SELECT' && !el.value) return false;
+      if ((el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') && !String(el.value || '').trim()) return false;
+    }
+    return true;
+  }
+
+  btnNext.addEventListener('click', function() {
+    if (!stepValid(currentStep)) {
+      alert('Please complete the required fields before proceeding.');
+      return;
+    }
+    showStep(Math.min(5, currentStep + 1));
+  });
+  btnBack.addEventListener('click', function() {
+    showStep(Math.max(1, currentStep - 1));
+  });
+
+  form.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && currentStep !== 5) {
+      e.preventDefault();
+    }
+  });
+
+  showStep(1);
+
+  // Highlight form groups with errors
+  document.querySelectorAll('.field-error').forEach(function(errEl) {
+    var group = errEl.closest('.hf2-group');
+    if (group) group.classList.add('has-error');
+  });
+
+  // Auto-navigate to first step that has errors
+  var firstErrorStep = 0;
+  for (var si = 1; si <= 5; si++) {
+    var sec = document.querySelector('[data-step="' + si + '"]');
+    if (sec && sec.querySelector('.field-error')) { firstErrorStep = si; break; }
+  }
+  if (firstErrorStep > 1) showStep(firstErrorStep);
+});
+</script>
+{% endblock %}

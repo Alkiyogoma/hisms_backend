@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Weekly Focus — {{ brand.school_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .wf-rendered {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+  }
+  .wf-rendered p { margin: 0 0 6px; }
+  .wf-rendered p:last-child { margin-bottom: 0; }
+  .wf-rendered ul, .wf-rendered ol { margin: 4px 0; padding-left: 20px; }
+  .wf-rendered li { margin-bottom: 3px; }
+  .wf-rendered li:last-child { margin-bottom: 0; }
+  .wf-rendered strong, .wf-rendered b { color: var(--text-primary); }
+  .review-feedback { margin-top: 10px; padding: 10px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; font-size: 12px; color: #991b1b; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">ECD Weekly Focus</h1>
+    <p class="page-subtitle">{{ today_date }}</p>
+  </div>
+  <div style="display:flex;gap:10px">
+    <a href="{% url 'communications:weekly_focus_submit' %}" class="btn-primary">+ Submit Weekly Focus</a>
+    <a href="{% url 'communications:weekly_focus_compliance' %}" class="btn-secondary">Compliance</a>
+  </div>
+</div>
+
+{% if is_hod and pending_count > 0 %}
+<div class="card" style="padding:16px;margin-bottom:20px;background:#fffbeb;border:1px solid #fde68a">
+  <p style="font-size:14px;font-weight:600;color:#92400e">{{ pending_count }} submission(s) pending review</p>
+</div>
+{% endif %}
+
+{% if entries %}
+  <div style="display:flex;flex-direction:column;gap:12px">
+    {% for entry in entries %}
+      <div class="card" style="padding:20px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+          <div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;flex-wrap:wrap">
+              <span class="badge badge-blue">{{ entry.class_name }}</span>
+              <span style="font-size:12px;color:var(--text-muted)">Week {{ entry.week_number }} &middot; {{ entry.academic_year }}</span>
+              {% if entry.status == "approved" %}
+                <span class="badge badge-green">Approved</span>
+              {% elif entry.status == "rejected" %}
+                <span class="badge badge-red">Rejected</span>
+              {% elif entry.status == "submitted" %}
+                <span class="badge badge-yellow">Pending Review</span>
+              {% else %}
+                <span class="badge badge-grey">Draft</span>
+              {% endif %}
+            </div>
+            <h3 style="margin:0;font-size:15px;color:var(--text-primary)">{{ entry.theme }}</h3>
+            <p style="margin:6px 0 0;font-size:13px;color:var(--text-muted)">By {{ entry.teacher.get_full_name|default:entry.teacher.username }}</p>
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);text-align:right">
+            {% if entry.published_at %}Published {{ entry.published_at|date:"d M Y H:i" }}{% endif %}
+            {% if entry.submitted_at and not entry.published_at %}
+              Submitted {{ entry.submitted_at|date:"d M Y H:i" }}{% endif %}
+          </div>
+        </div>
+
+        <div style="margin-top:14px;font-size:13px;color:var(--text-secondary);border-top:1px solid var(--border);padding-top:12px">
+          <p style="font-weight:600;margin-bottom:4px;color:var(--text-primary)">Planned Activities</p>
+          <div class="wf-rendered">{{ entry.planned_activities|safe }}</div>
+          {% if entry.items_to_bring %}
+            <p style="font-weight:600;margin:12px 0 4px;color:var(--text-primary)">Items to Bring / Prepare</p>
+            <div class="wf-rendered">{{ entry.items_to_bring|safe }}</div>
+          {% endif %}
+          {% if entry.reviewer_feedback %}
+            <div class="review-feedback"><strong>Reviewer Feedback:</strong> {{ entry.reviewer_feedback }}</div>
+          {% endif %}
+        </div>
+
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;align-items:center">
+          {% if is_hod and entry.status == "submitted" %}
+            <form method="post" action="{% url 'communications:weekly_focus_review' pk=entry.pk %}" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              {% csrf_token %}
+              <input type="text" name="feedback" placeholder="Feedback (required for rejection)" style="padding:6px 10px;font-size:12px;border:1.5px solid var(--border);border-radius:6px;width:220px">
+              <button type="submit" name="decision" value="approve" class="btn-primary" style="padding:6px 14px;font-size:12px">Approve</button>
+              <button type="submit" name="decision" value="reject" class="btn-secondary" style="padding:6px 14px;font-size:12px;color:#dc2626;border-color:#fecaca">Reject</button>
+            </form>
+          {% elif entry.status == "draft" or entry.status == "rejected" %}
+            <a href="{% url 'communications:weekly_focus_edit' pk=entry.pk %}" class="btn-secondary" style="padding:6px 14px;font-size:12px">Edit</a>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  {% include '_partials/empty_state.html' with title='No weekly focus entries yet' desc='Submit your first weekly focus to get started.' icon='doc' icon_color='blue' action_url='../submit/' action_text="Submit This Week's Focus" action_btn='true' %}
+{% endif %}
+{% endblock %}

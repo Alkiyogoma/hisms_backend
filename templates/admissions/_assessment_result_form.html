@@ -1,0 +1,103 @@
+
+{% if applicant.assessment.result %}
+<div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--green-bg);border:1px solid var(--green-bd);border-radius:10px;margin-bottom:12px">
+  <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--green);color:#fff">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+  </div>
+  <div style="flex:1;min-width:0">
+    <div style="font-size:13px;font-weight:600;color:var(--green)">Result submitted. Result: {{ applicant.assessment.get_result_display }}</div>
+  </div>
+</div>
+{% else %}
+<div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--hodari-gold-light);border:1px solid var(--hodari-gold);border-radius:10px;margin-bottom:12px">
+  <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--hodari-gold);color:#fff">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+  </div>
+  <div style="flex:1;min-width:0">
+    <div style="font-size:13px;font-weight:600;color:var(--amber)">Awaiting result</div>
+    <div style="font-size:11px;color:var(--amber);margin-top:2px">Teacher should complete the assessment report in the Tasks area.</div>
+  </div>
+</div>
+{% endif %}
+
+{% if assessment_data %}
+<style>
+  .ar-tbl{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px}
+  .ar-tbl th{text-align:left;padding:6px 8px;background:var(--hodari-blue);color:#fff;font-weight:600;font-size:11px}
+  .ar-tbl th:nth-child(2),.ar-tbl th:nth-child(3){text-align:center}
+  .ar-tbl td{padding:5px 8px;border-bottom:1px solid var(--border)}
+  .ar-tbl td:nth-child(2),.ar-tbl td:nth-child(3){text-align:center}
+  .ar-tbl tr:nth-child(even){background:var(--bg-metric)}
+  .ar-tbl tr.avg-row{background:#eef2ff !important;border-top:2px solid var(--hodari-blue)}
+  .ar-tbl tr.avg-row td{font-weight:700;color:var(--hodari-blue)}
+  .ar-sec{font-size:12px;font-weight:700;color:var(--hodari-blue);margin:10px 0 4px;padding:4px 8px;background:var(--hodari-blue-light);border-radius:4px}
+  .ar-g{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:var(--hodari-blue);color:#fff}
+  .ar-traits{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:8px}
+  .ar-trait{display:flex;align-items:center;gap:6px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:11px}
+  .ar-tg{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;background:var(--hodari-blue);color:#fff}
+</style>
+
+<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">
+  <strong>Teacher:</strong> {{ assessment_data.teacher_name|default:"—" }} &middot; <strong>Date:</strong> {{ assessment_data.report_date|default:"—" }}
+</div>
+
+<div class="ar-sec">End of Term Test</div>
+<table class="ar-tbl">
+  <thead><tr><th>Subject</th><th>Percentage</th><th>Grade</th><th>Remarks</th></tr></thead>
+  <tbody>
+    {% for item in eot_subjects %}
+    <tr{% if item.is_avg %} class="avg-row"{% endif %}>
+      <td style="font-weight:600">{{ item.label }}</td>
+      <td>{{ item.pct|default:"—" }}{% if item.pct %}%{% endif %}</td>
+      <td>{% if item.grade %}<span class="ar-g">{{ item.grade }}</span>{% else %}&mdash;{% endif %}</td>
+      <td style="color:var(--text-muted)">{{ item.remark|default:"—" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="ar-sec">Cambridge Progressive Test</div>
+<table class="ar-tbl">
+  <thead><tr><th>Subject</th><th>Percentage</th><th>Grade</th><th>Remarks</th></tr></thead>
+  <tbody>
+    {% for item in cam_subjects %}
+    <tr{% if item.is_avg %} class="avg-row"{% endif %}>
+      <td style="font-weight:600">{{ item.label }}</td>
+      <td>{{ item.pct|default:"—" }}{% if item.pct %}%{% endif %}</td>
+      <td>{% if item.grade %}<span class="ar-g">{{ item.grade }}</span>{% else %}&mdash;{% endif %}</td>
+      <td style="color:var(--text-muted)">{{ item.remark|default:"—" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="ar-sec">General Traits</div>
+{% for cat in trait_categories %}
+<div style="font-size:11px;font-weight:700;color:var(--text-primary);margin-bottom:3px">{{ cat.label }}</div>
+<div class="ar-traits">
+  {% for item in cat.traits %}
+  <div class="ar-trait">
+    <span class="ar-tg">{{ item.value|default:"—" }}</span>
+    <span>{{ item.label }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endfor %}
+
+<div class="ar-sec">Supervisor's Comment</div>
+<div style="font-size:12px;color:var(--text-secondary);padding:8px 10px;background:var(--bg-metric);border-radius:6px;white-space:pre-wrap;margin-bottom:8px">{{ assessment_data.teacher_comments|default:"—" }}</div>
+
+{% if assessment_data.parent_facing_comments %}
+<div class="ar-sec">Feedback for Parent</div>
+<div style="font-size:12px;color:var(--text-secondary);padding:8px 10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;white-space:pre-wrap;margin-bottom:8px">{{ assessment_data.parent_facing_comments }}</div>
+{% endif %}
+
+{% else %}
+<div style="padding:12px;background:var(--bg-metric);border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text-muted)">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+    <span style="font-weight:600;color:var(--text-secondary)">No assessment report submitted yet</span>
+  </div>
+  <span>The teacher has not submitted the assessment report. Reports are filled in the Tasks area.</span>
+</div>
+{% endif %}

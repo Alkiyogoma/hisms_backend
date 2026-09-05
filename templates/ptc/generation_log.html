@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}PTC Generation Log{% endblock %}
+
+{% block topbar_greeting %}
+<h1 class="topbar-title">PTC Generation Log</h1>
+{% endblock %}
+
+{% block content %}
+{% include "ptc/_top_tabs.html" %}
+<div style="max-width:1000px;margin:0 auto">
+
+  <div class="page-hdr">
+    <h2>PTC Generation Log</h2>
+    <p>Read-only log of which students have had their PTC screen opened, by whom, and when.</p>
+  </div>
+
+  <div class="card" style="padding:14px 20px;margin-bottom:16px">
+    <form method="get" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+      <div>
+        <label class="hf-label">Date From</label>
+        <input type="date" name="date_from" value="{{ date_from }}" class="hf-input" style="width:150px">
+      </div>
+      <div>
+        <label class="hf-label">Date To</label>
+        <input type="date" name="date_to" value="{{ date_to }}" class="hf-input" style="width:150px">
+      </div>
+      <div>
+        <label class="hf-label">Class Teacher</label>
+        <select name="teacher" class="hf-select" style="min-width:180px">
+          <option value="">All Teachers</option>
+          {% for t in class_teachers %}
+          <option value="{{ t.id }}" {% if teacher_filter == t.id|stringformat:"d" %}selected{% endif %}>{{ t.get_full_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="hf-btn hf-btn-primary">Filter</button>
+    </form>
+  </div>
+
+  {% if logs %}
+  <div class="card" style="padding:0;overflow:hidden">
+    <table class="h-table">
+      <thead>
+        <tr>
+          <th>Student</th>
+          <th>Class</th>
+          <th>Opened By</th>
+          <th>Date &amp; Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td style="font-weight:600">{{ log.student.get_full_name }}</td>
+          <td style="color:var(--text-secondary)">{{ log.student.class_name }}</td>
+          <td>{{ log.class_teacher.get_full_name }}</td>
+          <td style="color:var(--text-secondary);font-variant-numeric:tabular-nums">{{ log.opened_at|date:"d M Y H:i" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card" style="padding:20px">
+    {% include '_partials/empty_state.html' with icon='doc' icon_color='grey' title='No PTC generation logs found' desc='Logs will appear once teachers open PTC screens.' %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

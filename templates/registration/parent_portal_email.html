@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f2f5;padding:32px 16px">
+<tr><td align="center">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
+
+  <!-- Header with logo -->
+  <tr><td style="background:linear-gradient(135deg,#023AA5 0%,#0152c7 100%);padding:32px 24px;text-align:center">
+    <img src="{{ site_url }}{{ static_url }}branding/hodari-logo-white.png" alt="{{ school_name }}" style="height:96px;margin-bottom:8px" />
+    <p style="color:#C8A951;margin:0;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;font-weight:500">Parent Portal Account</p>
+  </td></tr>
+
+  <!-- Body -->
+  <tr><td style="padding:32px 24px">
+    <p style="color:#1f2937;font-size:15px;line-height:1.6;margin:0 0 8px">Dear <strong>{{ guardian_name }}</strong>,</p>
+    <p style="color:#6b7280;font-size:14px;line-height:1.6;margin:0 0 24px">Your parent portal account has been created. You can now access your child's attendance records, report cards, invoices, and school communications.</p>
+
+    <!-- Credentials card (matches app card style) -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #e5e7eb;border-radius:8px;margin:0 0 20px">
+      <tr><td style="padding:20px">
+        <p style="color:#6b7280;font-size:11px;margin:0 0 6px;text-transform:uppercase;letter-spacing:1px;font-weight:600">Username</p>
+        <p style="color:#023AA5;font-size:16px;font-weight:600;margin:0 0 20px;font-family:'SF Mono',Monaco,Consolas,monospace">{{ username }}</p>
+        <p style="color:#6b7280;font-size:11px;margin:0 0 6px;text-transform:uppercase;letter-spacing:1px;font-weight:600">Temporary Password</p>
+        <div style="background:#f8f9fc;border:1px solid #e5e7eb;border-radius:6px;padding:10px 14px;display:inline-block">
+          <p style="color:#dc2626;font-size:16px;font-weight:600;margin:0;font-family:'SF Mono',Monaco,Consolas,monospace;letter-spacing:0.5px">{{ temp_password }}</p>
+        </div>
+      </td></tr>
+    </table>
+
+    <!-- Warning card (matches app info card style) -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #fde68a;border-left:3px solid #f59e0b;border-radius:8px;margin:0 0 24px">
+      <tr><td style="padding:14px 16px">
+        <p style="color:#92400e;font-size:13px;line-height:1.5;margin:0">&#9888;&#65039; You will be required to change your password on first login.</p>
+      </td></tr>
+    </table>
+
+    <!-- CTA Button -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px">
+      <tr><td align="center">
+        <a href="{{ login_url }}" style="display:inline-block;background:#023AA5;color:#ffffff;text-decoration:none;padding:14px 0;border-radius:8px;font-size:15px;font-weight:600;width:100%;box-sizing:border-box;text-align:center">Access Parent Portal</a>
+      </td></tr>
+    </table>
+  </td></tr>
+
+  <!-- Footer -->
+  <tr><td style="padding:20px 24px;border-top:1px solid #f0f2f5;text-align:center">
+    <p style="color:#9ca3af;font-size:12px;margin:0 0 4px">If you did not expect this email, please contact the school administrator.</p>
+    <p style="color:#9ca3af;font-size:11px;margin:0">&copy; {{ school_name }}</p>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>

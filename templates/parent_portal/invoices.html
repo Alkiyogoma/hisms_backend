@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Parent Portal - Fees & Invoices{% endblock %}
+
+{% block content %}
+<div class="section-hdr">
+  <span class="section-title">Fees & Invoices</span>
+  <span class="chip chip-blue">Payment History</span>
+</div>
+
+{% if children|length > 1 %}
+<div class="sub-nav" style="margin-bottom:16px">
+  {% for child in children %}
+  <a href="?student={{ child.id }}" class="sub-tab {% if selected_student and selected_student.id == child.id %}active{% endif %}">{{ child.get_full_name }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if selected_student %}
+<!-- Summary Card -->
+<div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff);margin-bottom:16px;cursor:default;flex-direction:row;align-items:center;justify-content:space-between">
+  <div>
+    <div class="mc-lbl-row"><span class="mc-lbl">{{ selected_student.get_full_name }}</span></div>
+    <div class="mc-sub" style="color:#5A697D;margin-top:2px">{{ selected_student.class_name }}</div>
+  </div>
+  <div style="text-align:right">
+    <div class="mc-val" style="color:{% if total_outstanding > 0 %}#DC2626{% else %}#059669{% endif %}">TZS {{ total_outstanding|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:{% if total_outstanding > 0 %}#DC2626{% else %}#059669{% endif %};text-align:right">Outstanding</div>
+  </div>
+</div>
+
+<!-- Invoices -->
+<div class="card" style="padding:0;overflow:hidden">
+  {% if invoices %}
+  {% for inv in invoices %}
+  <div style="padding:12px 16px;border-bottom:1px solid var(--border)">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600">{{ inv.invoice_number|default:"N/A" }}</div>
+        <div style="font-size:11px;color:var(--text-muted)">{{ inv.term.name|default:"N/A" }}
+          {% if inv.due_date %}&middot; Due {{ inv.due_date|date:"d M Y" }}{% endif %}
+        </div>
+      </div>
+      <div>
+        {% if inv.status == invoice_statuses.PAID %}
+        <span class="chip chip-green">Paid</span>
+        {% elif inv.status == invoice_statuses.PARTIAL %}
+        <span class="chip chip-amber">Partial</span>
+        {% elif inv.status == invoice_statuses.OVERDUE %}
+        <span class="chip chip-red">Overdue</span>
+        {% else %}
+        <span class="chip chip-grey">Unpaid</span>
+        {% endif %}
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+      <div style="text-align:center;padding:4px;background:#F8FAFC;border-radius:4px">
+        <div style="font-size:9px;color:var(--text-muted)">Due</div>
+        <div style="font-size:11px;font-weight:600">{{ inv.total_due|floatformat:0 }}</div>
+      </div>
+      <div style="text-align:center;padding:4px;background:#F8FAFC;border-radius:4px">
+        <div style="font-size:9px;color:var(--text-muted)">Paid</div>
+        <div style="font-size:11px;font-weight:600;color:#16a34a">{{ inv.total_paid|floatformat:0 }}</div>
+      </div>
+      <div style="text-align:center;padding:4px;background:#F8FAFC;border-radius:4px">
+        <div style="font-size:9px;color:var(--text-muted)">Balance</div>
+        <div style="font-size:11px;font-weight:700;{% if inv.balance > 0 %}color:#dc2626{% else %}color:#16a34a{% endif %}">{{ inv.balance|floatformat:0 }}</div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div style="padding:40px;text-align:center">
+    {% include '_partials/empty_state.html' with title='No Invoices' desc='No fee invoices are available for this student yet.' icon='doc' icon_color='grey' %}
+  </div>
+  {% endif %}
+</div>
+
+{% else %}
+<div class="card" style="padding:40px;text-align:center">
+  {% include '_partials/empty_state.html' with title='No Children Found' desc='No students are linked to your parent account.' icon='users' icon_color='blue' %}
+</div>
+{% endif %}
+{% endblock %}

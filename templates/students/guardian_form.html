@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}Add Guardian — {{ brand.school_name }}{% endblock %}
+
+{% block topbar_greeting %}Parent / Guardian Management{% endblock %}
+
+{% block content %}
+{% include "students/_top_tabs.html" %}
+<div class="page-hdr">
+  <h1 style="font-family:Merriweather,serif; font-size:24px; color:#1A1A2E">Add New Guardian</h1>
+  <p>Create a standalone guardian record. You can link students to this record later.</p>
+</div>
+
+{% has_perm user "students.add_parentguardian" as can_create %}
+{% if can_create %}
+<div class="card" style="max-width:800px; margin:24px 0">
+  <form method="post">
+    {% csrf_token %}
+    
+    <div class="form-section">
+      <div class="form-section-title">Contact Information</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Full Name*</label>
+          <input type="text" name="full_name" class="form-input" required placeholder="e.g. Mary Jane">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Primary Phone*</label>
+          <input type="text" name="phone" class="form-input" required placeholder="e.g. +255 767 000 000">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Secondary Phone</label>
+          <input type="text" name="secondary_phone" class="form-input" placeholder="e.g. +255 743 000 000">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input type="email" name="email" class="form-input" placeholder="e.g. parent@example.com">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">Link to Student <span style="color:#8492A6; font-weight:400">(optional)</span></div>
+      <div class="form-group">
+        <label class="form-label">Search for Student</label>
+        <div style="position:relative">
+          <input type="text" class="form-input" id="studentSearch" placeholder="Type name or admission number..." autocomplete="off">
+          <div id="studentResults" style="position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid #DDE3EE; border-radius:8px; box-shadow:0 10px 20px rgba(0,0,0,0.1); display:none; z-index:100; margin-top:4px; max-height:250px; overflow-y:auto"></div>
+        </div>
+        <div id="selectedStudent" style="margin-top:8px; padding:10px 12px; background:#F0F4FB; border:1px solid #023AA5; border-radius:8px; font-size:13px; display:none; align-items:center; justify-content:space-between">
+          <span id="selStudentName"></span>
+          <button type="button" onclick="clearStudent()" style="background:none; border:none; color:#8492A6; cursor:pointer; font-size:12px">Change</button>
+        </div>
+      </div>
+      <input type="hidden" name="student_id" id="studentId">
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">Billing & Preferences</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Preferred Invoice Name</label>
+          <input type="text" name="preferred_invoice_name" class="form-input" placeholder="e.g. The Jane Family">
+          <p class="form-help">Name to appear on all school invoices.</p>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Preferred Language</label>
+          <select name="preferred_language" class="form-select">
+            <option value="en">English</option>
+            <option value="sw">Swahili</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:16px">
+        <label class="form-label">Physical Address</label>
+        <textarea name="address" class="form-input" rows="2" placeholder="Street, Area, City..."></textarea>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px">
+      <div style="padding:14px; background:#EEF4FF; border:1px solid #B6C9F5; border-radius:8px">
+        <label style="display:flex; align-items:flex-start; gap:8px; font-size:13px; cursor:pointer">
+          <input type="checkbox" name="portal_access" id="portal_access" style="width:18px; height:18px; accent-color:var(--green); margin-top:1px">
+          <span><strong>Portal Access</strong> — create a login account for this guardian</span>
+        </label>
+      </div>
+      <div style="padding:14px; background:#FEF3C7; border:1px solid #FCD34D; border-radius:8px">
+        <label style="display:flex; align-items:flex-start; gap:8px; font-size:13px; cursor:pointer">
+          <input type="checkbox" name="pdpa_consent_given" id="pdpa" style="width:18px; height:18px; accent-color:var(--green); margin-top:1px">
+          <span><strong>PDPA Consent</strong> (required)</span>
+        </label>
+        <div style="display:flex; gap:16px; margin-top:8px; margin-left:26px">
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer">
+            <input type="radio" name="pdpa_consent_method" value="in_person" style="accent-color:var(--green)">
+            In-person
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer">
+            <input type="radio" name="pdpa_consent_method" value="digital" style="accent-color:var(--green)">
+            Digital
+          </label>
+        </div>
+        <div style="margin-top:8px; margin-left:26px; display:flex; align-items:center; gap:8px; font-size:12px">
+          <span>Consent statement version*</span>
+          <input type="text" name="pdpa_consent_version" id="pdpa_version" placeholder="e.g. v1.0" required style="flex:1; padding:6px 8px; border:1px solid var(--border); border-radius:6px">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <a href="{% url 'students:guardian_list' %}" class="btn-secondary">Cancel</a>
+      <button type="submit" class="btn-primary" style="padding:10px 24px">Create Guardian Record</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+<script>
+const studentInput = document.getElementById('studentSearch');
+const studentResults = document.getElementById('studentResults');
+const studentIdInput = document.getElementById('studentId');
+const selectedStudentDiv = document.getElementById('selectedStudent');
+
+let debounce;
+studentInput.addEventListener('input', () => {
+  clearTimeout(debounce);
+  debounce = setTimeout(() => {
+    const q = studentInput.value.trim();
+    if (q.length < 2) { studentResults.style.display = 'none'; return; }
+    fetch(`{% url 'students:api_search' %}?q=${encodeURIComponent(q)}`)
+      .then(r => r.json())
+      .then(data => {
+        studentResults.innerHTML = '';
+        const list = data.students || [];
+        if (list.length === 0) {
+          studentResults.innerHTML = '<div style="padding:12px;color:#8492A6;font-size:13px">No students found.</div>';
+        } else {
+          list.forEach(s => {
+            const item = document.createElement('div');
+            item.style.cssText = 'padding:10px 12px;cursor:pointer;border-bottom:1px solid #F3F4F6;font-size:13px';
+            item.innerHTML = `<strong>${s.full_name}</strong> <span style="color:#8492A6">${s.admission_no} · ${s.class_name}</span>`;
+            item.onclick = () => selectStudent(s);
+            item.onmouseover = () => item.style.background = '#F7F9FC';
+            item.onmouseout = () => item.style.background = '#fff';
+            studentResults.appendChild(item);
+          });
+        }
+        studentResults.style.display = 'block';
+      });
+  }, 300);
+});
+
+function selectStudent(s) {
+  studentIdInput.value = s.id;
+  document.getElementById('selStudentName').textContent = s.full_name + ' — ' + s.admission_no;
+  studentInput.value = '';
+  studentResults.style.display = 'none';
+  studentInput.parentElement.style.display = 'none';
+  selectedStudentDiv.style.display = 'flex';
+}
+function clearStudent() {
+  studentIdInput.value = '';
+  selectedStudentDiv.style.display = 'none';
+  studentInput.parentElement.style.display = 'block';
+}
+document.addEventListener('click', e => {
+  if (!studentResults.contains(e.target) && e.target !== studentInput) studentResults.style.display = 'none';
+});
+</script>
+{% endblock %}

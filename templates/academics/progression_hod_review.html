@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}HOD Progression Review - {{ brand.school_name }}{% endblock %}
+{% block content %}
+{% include "academics/_top_tabs.html" %}
+
+<div class="section-hdr">
+    <div style="display:flex;align-items:center;gap:12px">
+        <span class="section-title">HOD Progression Review</span>
+        <span class="chip chip-blue">{{ config|yesno:"Reviewing,Select a Cycle" }}</span>
+    </div>
+</div>
+
+<form method="get" style="display:flex;gap:16px;align-items:center;margin-bottom:20px;flex-wrap:wrap">
+    <select name="config_id" style="padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:200px">
+        <option value="">— Choose Cycle —</option>
+        {% for c in configs %}
+        <option value="{{ c.pk }}" {% if selected_config_id|stringformat:"s" == c.pk|stringformat:"s" %}selected{% endif %}>
+            {{ c.academic_year_from }} → {{ c.academic_year_to }}
+        </option>
+        {% endfor %}
+    </select>
+    <input type="text" name="q" placeholder="Search (min 2 chars)..." value="{{ search_q }}" minlength="2" style="padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:220px">
+    <select name="class" style="padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:150px">
+        <option value="">All Classes</option>
+        {% for cls in class_list %}
+        <option value="{{ cls }}" {% if filter_class == cls %}selected{% endif %}>{{ cls }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="hf-btn hf-btn-primary">Load</button>
+</form>
+
+{% if config %}
+    <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+            <span>{{ config.academic_year_from }} → {{ config.academic_year_to }}</span>
+            {% if cases_page %}
+            <span style="font-size:12px;color:var(--text-muted)">Select cases below, then click:</span>
+            {% endif %}
+        </div>
+
+        {% if cases_page %}
+        <button type="button" class="hf-btn hf-btn-success"
+          onclick="confirmDeleteModal({title:'Bulk Approve?',body:'Approve <strong>promote</strong> for all selected cases?',detail:'This will mark the selected student cases as approved by HOD.',confirmText:'Bulk Approve',url:'{% url 'academics:progression_hod_bulk_approve' %}',type:'info',extraData:[{name:'config_id',value:'{{ config.pk }}'}]})">
+          Bulk Approve Selected
+        </button>
+
+        <div class="trow" style="background:var(--bg-page);border-radius:8px;margin-bottom:12px;font-weight:700;color:var(--text-secondary);font-size:11px;text-transform:uppercase;letter-spacing:0.05em">
+            <div style="flex:0 0 36px;text-align:center">✓</div>
+            <div style="flex:2">Student</div>
+            <div style="flex:1;text-align:center">Avg</div>
+            <div style="flex:1;text-align:center">Att</div>
+            <div style="flex:1;text-align:center">System</div>
+            <div style="flex:1;text-align:center">Status</div>
+            <div style="flex:2;text-align:center">Action</div>
+        </div>
+        {% for case in cases_page %}
+        <div class="trow">
+            <div style="flex:0 0 36px;text-align:center;display:flex;align-items:center;justify-content:center">
+                {% if case.system_suggested_outcome == 'promote' and case.status == 'pending_hod_review' %}
+                <input type="checkbox" name="case_ids" value="{{ case.pk }}" form="bulk-approve-form">
+                {% else %}
+                <input type="checkbox" name="case_ids" value="{{ case.pk }}" form="bulk-approve-form" disabled style="opacity:0.3">
+                {% endif %}
+            </div>
+            <div style="flex:2">
+                <div class="trow-name">{{ case.student.get_full_name }}</div>
+                <div class="trow-sub">{{ case.student.admission_no }} · {{ case.student.class_name }}</div>
+                {% if case.hos_return_comment and case.status == 'pending_hod_review' %}
+                <div style="margin-top:4px;font-size:11px;color:#991b1b;background:#fee2e2;padding:4px 8px;border-radius:4px">
+                    <strong>HOS returned:</strong> {{ case.hos_return_comment }}
+                </div>
+                {% endif %}
+                {% if case.hod_recommendation and case.status == 'pending_hod_review' %}
+                <div style="margin-top:2px;font-size:11px;color:var(--text-muted)">
+                    <em>Previous recommendation: {{ case.get_hod_recommendation_display }}</em>
+                </div>
+                {% endif %}
+            </div>
+            <div style="flex:1;text-align:center;display:flex;align-items:center;justify-content:center">
+                {% if case.calculated_average is not None %}{{ case.calculated_average }}%{% else %}—{% endif %}
+            </div>
+            <div style="flex:1;text-align:center;display:flex;align-items:center;justify-content:center">
+                {% if case.calculated_attendance_rate is not None %}{{ case.calculated_attendance_rate }}%{% else %}—{% endif %}
+            </div>
+            <div style="flex:1;text-align:center;display:flex;align-items:center;justify-content:center">
+                {% if case.system_suggested_outcome %}
+                <span class="chip {% if case.system_suggested_outcome == 'promote' %}chip-green{% elif case.system_suggested_outcome == 'retain' %}chip-grey{% elif case.system_suggested_outcome == 'graduate' %}chip-blue{% else %}chip-yellow{% endif %}">
+                    {{ case.get_system_suggested_outcome_display }}
+                </span>
+                {% else %}—{% endif %}
+            </div>
+            <div style="flex:1;text-align:center;display:flex;align-items:center;justify-content:center">
+                <span class="chip {% if case.status == 'calculated' %}chip-grey{% elif case.status == 'pending_hod_review' %}chip-yellow{% elif case.status == 'pending_hos_decision' %}chip-blue{% else %}chip-green{% endif %}">
+                    {{ case.get_status_display }}
+                </span>
+            </div>
+            <div style="flex:2;text-align:center;display:flex;align-items:center;justify-content:center;gap:8px">
+                {% if case.status == 'calculated' or case.status == 'pending_hod_review' %}
+                <form method="post" action="{% url 'academics:progression_hod_review_action' case.pk %}" style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:center">
+                    {% csrf_token %}
+                    <select name="recommendation" required style="padding:4px 8px;border:1px solid #d1d5db;border-radius:4px;font-size:12px">
+                        <option value="">—</option>
+                        {% for val, label in ProgressionOutcome.choices %}
+                        <option value="{{ val }}" {% if val == case.system_suggested_outcome %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="text" name="override_reason" placeholder="Override reason" style="padding:4px 8px;border:1px solid #d1d5db;border-radius:4px;font-size:12px;width:120px">
+                    <button type="submit" class="btn-small" style="background:#dbeafe;color:#1e40af;border:none;cursor:pointer">Submit</button>
+                </form>
+                {% elif case.status == 'pending_hos_decision' %}
+                <span style="font-size:12px;font-weight:600;color:var(--text-secondary)">HOD: {{ case.get_hod_recommendation_display }}</span>
+                {% elif case.status == 'finalized' %}
+                <span style="font-size:12px;font-weight:600;color:var(--text-secondary)">Final: {{ case.get_hos_decision_display }}</span>
+                {% else %}
+                <span style="color:var(--text-muted);font-size:12px">—</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+
+    {# Pagination #}
+    {% if cases_page.paginator.num_pages > 1 %}
+    <div style="display:flex;justify-content:center;gap:8px;padding:16px 0 0;border-top:1px solid var(--border-color);margin-top:12px">
+        {% if cases_page.has_previous %}
+        <a href="?config_id={{ config.pk }}&page={{ cases_page.previous_page_number }}&q={{ search_q }}&class={{ filter_class }}" class="btn-small" style="text-decoration:none">← Previous</a>
+        {% endif %}
+        <span style="padding:4px 12px;font-size:13px;color:var(--text-secondary)">
+            Page {{ cases_page.number }} of {{ cases_page.paginator.num_pages }} ({{ total_count }} total)
+        </span>
+        {% if cases_page.has_next %}
+        <a href="?config_id={{ config.pk }}&page={{ cases_page.next_page_number }}&q={{ search_q }}&class={{ filter_class }}" class="btn-small" style="text-decoration:none">Next →</a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    {% include '_partials/empty_state.html' with title='No cases found' desc='No progression cases found for the selected cycle.' icon='inbox' icon_color='grey' %}
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

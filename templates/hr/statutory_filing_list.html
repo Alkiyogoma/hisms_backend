@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+{% load role_tags %}
+
+{% block title %}Statutory Filings — {{ brand.school_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  :root {
+    --hodari-blue: #023AA5; --hodari-blue-dark: #012880; --hodari-blue-mid: #1A56C4;
+    --hodari-blue-light: #E8EEF9; --hodari-blue-pale: #F0F4FB;
+    --hodari-gold: #FBBC05;
+    --bg-page: #F2F5FA; --bg-card: #FFFFFF;
+    --text-primary: #1A1A2E; --text-secondary: #474747; --text-muted: #8492A6;
+    --border: #DDE3EE; --border-strong: #B8C4D8;
+    --green: #1B7B34; --green-bg: #E8F5EC; --green-bd: #B7DFBF;
+    --amber: #92550A; --amber-bg: #FEF3C7; --amber-bd: #FCD34D;
+    --red: #9B1C1C; --red-bg: #FEF2F2; --red-bd: #FECACA;
+    --blue-st: #023AA5; --blue-st-bg: #E8EEF9; --blue-st-bd: #93C5FD;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Roboto', sans-serif; background: var(--bg-page); color: var(--text-primary); }
+  .statutory-page { padding: 24px 28px; max-width: 1200px; margin: 0 auto; }
+  .section-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); font-weight: 500; margin-bottom: 12px; }
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 24px; }
+  .filter-bar { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; }
+  .filter-bar select { padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { background: var(--bg-page); font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
+  tbody td { padding: 12px; font-size: 13px; border-bottom: 1px solid var(--border); }
+  tbody tr:hover { background: var(--hodari-blue-pale); }
+  .badge-pill { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 11px; font-weight: 500; }
+  .badge-pill.green { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-bd); }
+  .badge-pill.amber { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-bd); }
+  .badge-pill.blue { background: var(--blue-st-bg); color: var(--blue-st); border: 1px solid var(--blue-st-bd); }
+  .badge-pill.muted { background: var(--bg-page); color: var(--text-muted); border: 1px solid var(--border); }
+  .btn-primary { background: var(--hodari-blue); color: #fff; border: none; padding: 8px 18px; border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: none; }
+  .btn-primary:hover { background: var(--hodari-blue-dark); }
+  .btn-secondary { background: #fff; color: var(--hodari-blue); border: 1px solid var(--border-strong); padding: 8px 18px; border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-secondary:hover { border-color: var(--hodari-blue); }
+  .btn-sm { padding: 5px 12px; font-size: 12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "hr/_top_tabs.html" %}
+<div class="statutory-page">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+    <div>
+      <h1 style="font-family:'Merriweather',serif;font-size:22px;font-weight:700;color:var(--text-primary);margin-bottom:4px;">Statutory Filings</h1>
+      <p style="font-size:13px;color:var(--text-muted);">NSSF, PAYE, HESLB & NHIF compliance filings</p>
+    </div>
+  </div>
+
+  <!-- Summary cards -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:24px;">
+    {% for ftype, flabel in filing_types %}
+    <div class="card" style="padding:12px 16px;">
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">{{ flabel }}</div>
+      <div style="font-family:'Roboto Mono',monospace;font-size:18px;font-weight:500;margin-top:4px;">
+        {% with count_var=ftype|add:"_count" %}
+        {% with pending_var=ftype|add:"_pending" %}
+        {{ count }} filings
+        {% endwith %}
+        {% endwith %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Filter -->
+  <div class="card">
+    <form method="GET" class="filter-bar">
+      <select name="type">
+        <option value="">All Types</option>
+        {% for code, label in filing_types %}
+        <option value="{{ code }}" {% if selected_type == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn-primary btn-sm">Filter</button>
+      <a href="{% url 'hr:statutory_filing_list' %}" class="btn-secondary btn-sm">Clear</a>
+    </form>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Period</th>
+          <th>Employee</th>
+          <th>Employer</th>
+          <th>Total</th>
+          <th>Status</th>
+          <th>Due Date</th>
+          <th>Reference</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for filing in filings %}
+        <tr>
+          <td><strong>{{ filing.get_filing_type_display }}</strong></td>
+          <td>{{ filing.period_name }}</td>
+          <td style="font-family:'Roboto Mono',monospace;">TZS {{ filing.employee_contribution|floatformat:0|intcomma }}</td>
+          <td style="font-family:'Roboto Mono',monospace;">TZS {{ filing.employer_contribution|floatformat:0|intcomma }}</td>
+          <td style="font-family:'Roboto Mono',monospace;font-weight:500;">TZS {{ filing.total_amount|floatformat:0|intcomma }}</td>
+          <td>
+            {% if filing.status == 'submitted' %}
+            <span class="badge-pill green">{{ filing.get_status_display }}</span>
+            {% elif filing.status == 'confirmed' %}
+            <span class="badge-pill blue">{{ filing.get_status_display }}</span>
+            {% else %}
+            <span class="badge-pill amber">{{ filing.get_status_display }}</span>
+            {% endif %}
+          </td>
+          <td>{{ filing.due_date|date:"d M Y"|default:"N/A" }}</td>
+          <td>{{ filing.reference_number|default:"N/A" }}</td>
+          <td>
+            {% has_perm user "hr.change_statutoryfiling" as can_submit_filing %}
+            {% if filing.status == 'draft' and can_submit_filing %}
+            <form method="POST" action="{% url 'hr:statutory_filing_submit' filing.pk %}" style="display:inline;">
+              {% csrf_token %}
+              <input type="text" name="reference_number" placeholder="Reference #" style="width:100px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;">
+              <button type="submit" class="btn-primary btn-sm">Submit</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="9">{% include '_partials/empty_state.html' with title='No statutory filings' desc='Generate from an approved payroll run.' icon='doc' icon_color='grey' %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

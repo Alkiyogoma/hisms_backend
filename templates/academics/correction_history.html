@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Score Correction History — {{ brand.school_name }}{% endblock %}
+
+{% block content %}
+<div class="section-hdr">
+  <div class="section-title">Score Correction Audit History</div>
+</div>
+
+<div class="card">
+  <div class="card-body" style="padding:0">
+    <table style="width:100%; border-collapse: collapse;">
+      <thead>
+        <tr style="background:#F9FAFB; border-bottom: 1px solid #DDE3EE;">
+          <th style="padding:12px 16px; text-align:left; font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; width:180px">Date & Time</th>
+          <th style="padding:12px 16px; text-align:left; font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; width:150px">Performed By</th>
+          <th style="padding:12px 16px; text-align:left; font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase">Description</th>
+          <th style="padding:12px 16px; text-align:center; font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; width:120px">Before</th>
+          <th style="padding:12px 16px; text-align:center; font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; width:120px">After</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr style="border-bottom: 1px solid #DDE3EE;">
+          <td style="padding:14px 16px; font-size:13px; color:var(--text-secondary)">
+            {{ log.created_at|date:"d M Y" }}<br>
+            <small style="color:var(--text-muted)">{{ log.created_at|time:"H:i" }}</small>
+          </td>
+          <td style="padding:14px 16px; font-size:13px; font-weight:600">
+            {{ log.actor.get_full_name|default:log.actor.username }}
+          </td>
+          <td style="padding:14px 16px; font-size:13px">
+            {{ log.description }}
+          </td>
+          <td style="padding:14px 16px; text-align:center">
+            {% if log.before_snapshot.value %}
+              <span class="chip chip-grey" style="font-family:var(--font-mono)">{{ log.before_snapshot.value }}</span>
+            {% else %}
+              <span style="color:var(--text-muted);font-style:italic">N/A</span>
+            {% endif %}
+          </td>
+          <td style="padding:14px 16px; text-align:center">
+            {% if log.after_snapshot.value %}
+              <span class="chip chip-green" style="font-family:var(--font-mono)">{{ log.after_snapshot.value }}</span>
+            {% else %}
+              <span style="color:var(--text-muted);font-style:italic">N/A</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5">{% include '_partials/empty_state.html' with title='No score corrections' desc='Score correction records will appear here.' icon='doc' icon_color='grey' %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

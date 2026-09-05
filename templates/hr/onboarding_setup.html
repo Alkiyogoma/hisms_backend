@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Start Onboarding: {{ staff.full_name }} — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Start Onboarding{% endblock %}
+
+{% block extra_head %}
+{% include "hr/_onboarding_styles.html" %}
+{% endblock %}
+
+{% block content %}
+{% include "hr/_top_tabs.html" %}
+<div class="ob-page">
+  {% include "hr/_onboarding_sidebar.html" with sidebar_readonly=True total_steps=total_steps %}
+
+  <div class="ob-setup-panel">
+    <div class="ob-setup-card">
+      <h1>Start Onboarding</h1>
+      <p>
+        This begins a 5-step onboarding process for <strong>{{ staff.full_name }}</strong>.
+        Each step collects specific information about the staff member.
+      </p>
+
+      {% if already_started %}
+      <div class="ob-notice">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>Onboarding is already in progress. Continue from the current step.</span>
+      </div>
+      {% endif %}
+
+      <div class="ob-setup-actions">
+        <a href="{% url 'users:user_list' %}" class="ob-btn-secondary">Cancel</a>
+        <form method="post" style="display:inline;margin:0">
+          {% csrf_token %}
+          <button type="submit" class="ob-btn-primary">
+            {% if already_started %}Continue Onboarding{% else %}Start Onboarding{% endif %}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

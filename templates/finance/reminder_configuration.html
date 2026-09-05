@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% load hodari_forms %}
+{% block title %}Reminder Configuration &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Reminder Configuration{% endblock %}
+{% block topbar_date %}{{ today|date:"d F Y" }}{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+  <div>
+    <h1 style="font-size:20px;font-weight:700;margin:0;color:var(--text-primary)">Auto Reminder Configuration</h1>
+    <p style="margin:3px 0 0;font-size:12.5px;color:var(--text-muted)">Configure automated fee reminder schedules, templates, and escalation rules</p>
+  </div>
+  <a href="{% url 'finance:overdue_accounts' %}" class="btn btn-secondary btn-sm">&larr; Overdue Accounts</a>
+</div>
+
+<div class="card">
+  {% has_perm user "finance.change_reminderconfiguration" as can_edit %}
+  {% if can_edit %}
+  <form method="post">
+    {% csrf_token %}
+
+    <!-- Section: Enable/Disable -->
+    <div class="section-hdr" style="margin-top:0"><span class="section-title">General Settings</span></div>
+    <div style="display:flex;align-items:center;gap:12px;padding:8px 0;margin-bottom:12px">
+      <label class="hf2-toggle" style="position:relative;display:inline-flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" name="is_active" {% if config.is_active %}checked{% endif %} style="width:18px;height:18px;accent-color:var(--hodari-blue)">
+        <span style="font-weight:600;font-size:13px">Enable auto-reminder system</span>
+      </label>
+      <span style="font-size:12px;color:var(--text-muted)">When enabled, the system will automatically send fee reminders based on the schedule below.</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Reminder Frequency</label>
+        <select name="reminder_frequency" class="hf2-select" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px">
+          <option value="daily" {% if config.reminder_frequency == 'daily' %}selected{% endif %}>Daily</option>
+          <option value="weekly" {% if config.reminder_frequency == 'weekly' %}selected{% endif %}>Weekly</option>
+          <option value="every_3_days" {% if config.reminder_frequency == 'every_3_days' %}selected{% endif %}>Every 3 Days</option>
+          <option value="custom" {% if config.reminder_frequency == 'custom' %}selected{% endif %}>Custom Schedule</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Reminder Channel</label>
+        <select name="reminder_type" class="hf2-select" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px">
+          <option value="email" {% if config.reminder_type == 'email' %}selected{% endif %}>Email</option>
+          <option value="sms" {% if config.reminder_type == 'sms' %}selected{% endif %}>SMS</option>
+          <option value="both" {% if config.reminder_type == 'both' %}selected{% endif %}>Both Email &amp; SMS</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Section: Schedule -->
+    <div class="section-hdr"><span class="section-title">Reminder Schedule (Days After Due Date)</span></div>
+    <p style="font-size:12px;color:var(--text-muted);margin:4px 0 12px">Configure how many days after the due date each reminder should be sent.</p>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px">
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">First Reminder</label>
+        <input type="number" name="first_reminder_days" value="{{ config.first_reminder_days }}" min="1" max="90" class="hf2-input" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px">
+        <span style="font-size:11px;color:var(--text-muted)">days after due date</span>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Second Reminder</label>
+        <input type="number" name="second_reminder_days" value="{{ config.second_reminder_days }}" min="1" max="90" class="hf2-input" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px">
+        <span style="font-size:11px;color:var(--text-muted)">days after due date</span>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Final Reminder</label>
+        <input type="number" name="final_reminder_days" value="{{ config.final_reminder_days }}" min="1" max="180" class="hf2-input" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px">
+        <span style="font-size:11px;color:var(--text-muted)">days after due date</span>
+      </div>
+    </div>
+
+    <!-- Section: Templates -->
+    <div class="section-hdr"><span class="section-title">Message Templates</span></div>
+    <p style="font-size:12px;color:var(--text-muted);margin:4px 0 12px">Use placeholders: <code>{% templatetag openvariable %}student_name{% templatetag closevariable %}</code>, <code>{% templatetag openvariable %}balance{% templatetag closevariable %}</code>, <code>{% templatetag openvariable %}due_date{% templatetag closevariable %}</code>, <code>{% templatetag openvariable %}days_overdue{% templatetag closevariable %}</code></p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Email Template</label>
+        <textarea name="reminder_template_email" rows="6" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12.5px;font-family:var(--font-mono);resize:vertical">{% if config.reminder_template_email %}{{ config.reminder_template_email }}{% else %}Dear Parent/Guardian,
+
+This is a reminder that the fee balance for {{student_name}} (TZS {{balance}}) is now {{days_overdue}} days overdue (due date: {{due_date}}).
+
+Please arrange payment at your earliest convenience.
+
+Thank you,
+{{ brand.school_name }}{% endif %}</textarea>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">SMS Template</label>
+        <textarea name="reminder_template_sms" rows="6" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12.5px;font-family:var(--font-mono);resize:vertical">{% if config.reminder_template_sms %}{{ config.reminder_template_sms }}{% else %}{{ brand.school_name }}: Fee reminder for {{student_name}}. Balance TZS {{balance}} is {{days_overdue}} days overdue. Pay at school office or via bank. Thank you.{% endif %}</textarea>
+      </div>
+    </div>
+
+    <!-- Section: Escalation -->
+    <div class="section-hdr"><span class="section-title">Escalation</span></div>
+    <div style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:12px;padding:8px 0">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" name="auto_escalate_to_hos" {% if config.auto_escalate_to_hos %}checked{% endif %} style="width:18px;height:18px;accent-color:var(--hodari-blue)">
+          <span style="font-weight:500;font-size:13px">Auto-escalate to Head of School</span>
+        </label>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:8px">
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary)">Escalate after</label>
+        <input type="number" name="escalation_days" value="{{ config.escalation_days }}" min="1" max="365" style="width:80px;padding:6px 8px;border:1px solid var(--border);border-radius:6px">
+        <span style="font-size:12px;color:var(--text-muted)">days past due date</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;padding:8px 0;margin-top:4px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" name="notify_finance_officer" {% if config.notify_finance_officer %}checked{% endif %} style="width:18px;height:18px;accent-color:var(--hodari-blue)">
+          <span style="font-weight:500;font-size:13px">Notify Finance Officer when reminders are sent</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Save Button -->
+    <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:16px;border-top:1px solid var(--border)">
+      <a href="{% url 'finance:overdue_accounts' %}" class="btn btn-secondary btn-sm">Cancel</a>
+      <button type="submit" class="btn btn-sm" style="background:var(--hodari-blue);color:#fff;padding:9px 24px;border-radius:6px;font-size:13px;font-weight:500;border:none;cursor:pointer">Save Configuration</button>
+    </div>
+  </form>
+  {% endif %}
+</div>
+
+{% endblock %}

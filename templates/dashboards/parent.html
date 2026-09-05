@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Parent Portal &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Good {% if hour < 12 %}morning{% elif hour < 17 %}afternoon{% else %}evening{% endif %}, {{ user.get_full_name|default:user.username }}{% endblock %}
+{% block topbar_date %}{{ today_display }} &middot; {{ term_label }}{% endblock %}
+{% block topbar_badges %}
+  {% if unread_notifs > 0 %}
+    <div class="topbar-badge badge-blue"><span class="badge-dot"></span>{{ unread_notifs }} unread notification{{ unread_notifs|pluralize }}</div>
+  {% endif %}
+{% endblock %}
+{% block content %}
+<div class="section-hdr">
+  <span class="section-title">Parent Portal</span>
+  <span class="chip chip-blue">Parent</span>
+</div>
+
+{% if not children %}
+  <div class="card" style="text-align:center;padding:40px">
+    {% include '_partials/empty_state.html' with title='No children linked' desc='Please contact the Admin Office to link your children to this account.' icon='users' icon_color='blue' %}
+  </div>
+{% else %}
+
+<div class="metrics">
+  {% for child in children %}
+    <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
+      <div class="mc-lbl-row"><span class="mc-lbl">{{ child.first_name }} {{ child.last_name }}</span></div>
+      <div class="mc-val" style="color:#023AA5;font-size:24px">{{ child.class_name }}</div>
+      <div class="mc-sub" style="color:#5A697D">{{ child.admission_no }}</div>
+    </div>
+  {% endfor %}
+  <div class="metric-compact" style="background:linear-gradient(135deg,{% if outstanding_balance > 0 %}#FFF8ED{% else %}#EEF9F0{% endif %},#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Outstanding balance</span></div>
+    <div class="mc-val" style="color:{% if outstanding_balance > 0 %}#B45309{% else %}#059669{% endif %}">{{ outstanding_balance|floatformat:0 }}<span class="mc-currency" style="margin-left:4px;vertical-align:middle">TZS</span></div>
+    <div class="mc-sub" style="color:{% if outstanding_balance > 0 %}#B45309{% else %}#059669{% endif %}">
+      {% if outstanding_balance > 0 %}Payment due{% else %}All paid up{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-title-row">
+      <span class="card-title" style="margin-bottom:0">Attendance today</span>
+    </div>
+    {% for entry in attendance_today %}
+      <div class="trow">
+        <div>
+          <div class="trow-name">{{ entry.student.first_name }} {{ entry.student.last_name }}</div>
+          <div class="trow-sub">{{ entry.date }} &middot; {{ entry.class_name }}</div>
+        </div>
+        <span class="trow-right">
+          <span class="chip {% if entry.status == 'present' %}chip-green{% elif entry.status == 'absent' %}chip-red{% elif entry.status == 'late' %}chip-amber{% else %}chip-blue{% endif %}">{{ entry.get_status_display }}</span>
+        </span>
+      </div>
+    {% empty %}
+      <div style="padding:24px;text-align:center">{% include '_partials/empty_state.html' with title='No attendance recorded today' desc='Attendance will appear here once marked.' icon='calendar' icon_color='grey' %}</div>
+    {% endfor %}
+    <div style="margin-top:8px"><a href="{% url 'attendance:parent' %}" class="section-link" style="font-size:12px">Attendance calendar →</a></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title-row">
+      <span class="card-title" style="margin-bottom:0">Notifications</span>
+      {% if unread_notifs > 0 %}
+      <form method="post" action="{% url 'communications:mark_all_read' %}" style="margin:0">{% csrf_token %}
+        <button type="submit" class="section-link" style="font-size:11px;background:none;border:none;cursor:pointer;padding:0">Mark all read →</button>
+      </form>
+      {% endif %}
+    </div>
+    {% for notif in recent_notifs %}
+      <div class="trow {% if not notif.is_read %}{% endif %}" style="{% if not notif.is_read %}background:var(--blue-st-bg);border-radius:8px{% endif %}">
+        <div style="flex:1">
+          <div class="trow-name" style="{% if not notif.is_read %}font-weight:600{% endif %}">{{ notif.title }}</div>
+          <div class="trow-sub">{{ notif.body|truncatechars:80 }} &middot; {{ notif.created_at|date:"d M Y" }}</div>
+        </div>
+        {% if not notif.is_read %}
+          <form method="post" action="/communications/mark-read/{{ notif.pk }}/" style="margin:0">{% csrf_token %}
+            <button type="submit" style="background:none;border:none;font-size:11px;color:var(--text-secondary);cursor:pointer">Mark read</button>
+          </form>
+        {% endif %}
+      </div>
+    {% empty %}
+      <div style="padding:24px;text-align:center">{% include '_partials/empty_state.html' with title='No notifications' desc='You have no notifications at this time.' icon='inbox' icon_color='grey' %}</div>
+    {% endfor %}
+    <div style="margin-top:8px"><a href="/communications/" class="section-link" style="font-size:12px">All notifications →</a></div>
+  </div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:0">
+  <div class="card-title">Quick links</div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap">
+    <a href="{% url 'academics:parent_reports' %}" style="background:#023AA5;color:white;border-radius:7px;padding:8px 16px;font-size:13px;text-decoration:none;font-family:var(--font-ui)">Academic reports →</a>
+    <a href="{% url 'finance:parent_invoices' %}" style="background:var(--card-bg);border:1px solid var(--border);color:var(--text-primary);border-radius:7px;padding:8px 16px;font-size:13px;text-decoration:none;font-family:var(--font-ui)">Fee invoices →</a>
+    <a href="{% url 'attendance:parent' %}" style="background:var(--card-bg);border:1px solid var(--border);color:var(--text-primary);border-radius:7px;padding:8px 16px;font-size:13px;text-decoration:none;font-family:var(--font-ui)">Attendance →</a>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}

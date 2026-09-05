@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Create Academic Year{% endblock %}
+{% block content %}
+<div style="max-width:700px;margin:0 auto;padding:24px">
+  <h2 style="font-size:22px;font-weight:700;color:#1a202c;margin-bottom:20px">Create Academic Year</h2>
+  
+  <form method="post" style="background:#fff;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+    {% csrf_token %}
+    
+    <div style="margin-bottom:16px">
+      <label style="display:block;font-size:13px;font-weight:600;color:#4a5568;margin-bottom:4px">Year Name</label>
+      {{ form.name }}
+      {% if form.name.errors %}
+        <p style="color:#e53e3e;font-size:12px;margin-top:4px">{{ form.name.errors.0 }}</p>
+      {% endif %}
+    </div>
+    
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div>
+        <label style="display:block;font-size:13px;font-weight:600;color:#4a5568;margin-bottom:4px">Start Date</label>
+        <input type="date" name="start_date" value="{{ form.start_date.value|date:'Y-m-d'|default:'' }}" class="hf-input" required>
+        {% if form.start_date.errors %}
+          <p style="color:#e53e3e;font-size:12px;margin-top:4px">{{ form.start_date.errors.0 }}</p>
+        {% endif %}
+      </div>
+      <div>
+        <label style="display:block;font-size:13px;font-weight:600;color:#4a5568;margin-bottom:4px">End Date</label>
+        <input type="date" name="end_date" value="{{ form.end_date.value|date:'Y-m-d'|default:'' }}" class="hf-input" required>
+        {% if form.end_date.errors %}
+          <p style="color:#e53e3e;font-size:12px;margin-top:4px">{{ form.end_date.errors.0 }}</p>
+        {% endif %}
+      </div>
+    </div>
+    
+    <div style="margin-bottom:16px">
+      <label style="display:block;font-size:13px;font-weight:600;color:#4a5568;margin-bottom:4px">Number of Terms</label>
+      {{ form.number_of_terms }}
+    </div>
+    
+    <div style="margin-bottom:20px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        {{ form.is_current }}
+        <span style="font-size:13px;font-weight:600;color:#4a5568">Set as Current Year</span>
+      </label>
+      <p style="font-size:12px;color:#718096;margin-top:4px">The current year determines which terms are active.</p>
+    </div>
+    
+    <div style="display:flex;gap:12px;justify-content:flex-end">
+      <a href="{% url 'academics:terms' %}" style="padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;color:#4a5568;background:#f7fafc;border:1px solid #e2e8f0;text-decoration:none">Cancel</a>
+      <button type="submit" style="padding:10px 24px;border-radius:8px;font-size:14px;font-weight:600;color:#fff;background:#023AA5;border:none;cursor:pointer">Create Year</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

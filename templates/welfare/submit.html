@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% load hodari_forms role_tags %}
+{% block title %}{{ page_title|default:"Student Welfare" }} &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}{{ page_title|default:"Student Welfare" }}{% endblock %}
+
+{% block content %}
+{% include "welfare/_top_tabs.html" %}
+<div class="card" style="max-width:720px;margin:auto">
+  <div class="card-title-row">
+    <div class="card-title">{{ page_title|default:"Student Welfare" }}</div>
+    <div style="display:flex;gap:12px">
+      {% if is_ecd_welfare %}
+      <a href="{% url 'welfare:list_ecd' %}" class="btn-secondary btn-sm">← Back to List</a>
+      {% else %}
+      <a href="{% url 'welfare:list_primary' %}" class="btn-secondary btn-sm">← Back to List</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <form method="post" style="margin-top:20px">
+    {% csrf_token %}
+
+    <div class="hf2-section">
+      <div class="hf2-section-title">Observation Details</div>
+
+      <div class="hf2-grid-2">
+        <div class="hf2-group">
+          <label class="hf2-label">Select Class</label>
+          <select name="class_filter" class="hf2-select" id="class-filter-select">
+            <option value="">All classes...</option>
+            {% for cls in available_classes %}
+              <option value="{{ cls }}">{{ cls }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="hf2-group">
+          <label class="hf2-label">Date of Observation *</label>
+          <input type="date" name="observation_date" class="hf2-input hf2-date" value="{{ today_date_iso }}" min="{{ yesterday_iso }}" max="{{ today_date_iso }}" required>
+        </div>
+      </div>
+
+      <div class="hf2-grid-2" style="margin-top:16px">
+        <div class="hf2-group">
+          <label class="hf2-label">Child Name *</label>
+          <select name="student" class="hf2-select" id="student-select" required>
+            <option value="">Select student...</option>
+            {% for s in students %}
+              <option value="{{ s.id }}" data-class="{{ s.class_name }}">{{ s.first_name }} {{ s.last_name }} ({{ s.class_name }})</option>
+            {% endfor %}
+          </select>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Select a class above to filter students</div>
+        </div>
+        <div class="hf2-group">
+          <label class="hf2-label">Concern Type *</label>
+          <select name="concern_type" class="hf2-select" id="concern-type-select" required>
+            {% for val, lbl in concern_type_choices %}
+              <option value="{{ val }}" {% if val == 'behavioral' %}selected{% endif %}>{{ lbl }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="hf2-group" id="other-concern-group" style="display:none;margin-top:12px">
+        <label class="hf2-label">Please describe the concern *</label>
+        <textarea name="other_concern_description" id="other-concern-input" class="hf2-textarea" rows="2" placeholder="Describe the nature of the concern in detail..."></textarea>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Provide a clear description of the concern not covered by the existing categories.</div>
+      </div>
+
+      <div class="hf2-group" style="margin-top:16px">
+        <label class="hf2-label">Severity</label>
+        <select name="severity" class="hf2-select">
+          {% for val, lbl in severity_choices %}
+            <option value="{{ val }}" {% if val == 'low' %}selected{% endif %}>{{ lbl }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="hf2-group" style="margin-top:16px">
+        <label class="hf2-label">What was observed? *</label>
+        <textarea name="observation_text" class="hf2-textarea" rows="4" placeholder="Describe what happened clearly..." required></textarea>
+      </div>
+
+      <div class="hf2-group" style="margin-top:16px">
+        <label class="hf2-label">Action taken today</label>
+        <textarea name="action_taken" class="hf2-textarea" rows="3" placeholder="What action was taken? (spoke to child, contacted parent, etc.)"></textarea>
+      </div>
+    </div>
+
+    <div class="hf2-section" style="margin-top:24px">
+      <div class="hf2-section-title">Parent Contact & Follow-up</div>
+
+      <div class="hf2-check-group">
+        <label class="hf2-check-label">
+          <input type="checkbox" name="parent_contacted" class="hf2-checkbox" id="parent_contacted">
+          <span>Parent Contacted?</span>
+        </label>
+      </div>
+      <div id="parent_contact_details" style="display:none;margin-top:12px">
+        <div class="hf2-grid-2">
+          <div class="hf2-group">
+            <label class="hf2-label">Contact Date</label>
+            <input type="date" name="parent_contact_date" class="hf2-input hf2-date">
+          </div>
+          <div class="hf2-group">
+            <label class="hf2-label">Contact Time</label>
+            <input type="time" name="parent_contact_time" class="hf2-input hf2-time">
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:20px;padding-top:16px;border-top:1px dashed #e2e8f0">
+        <div class="hf2-check-group">
+          <label class="hf2-check-label">
+            <input type="checkbox" name="follow_up_required" class="hf2-checkbox" id="follow_up_required">
+            <span>Follow-up Required?</span>
+          </label>
+        </div>
+        <div id="follow_up_details" style="display:none;margin-top:12px">
+          <div class="hf2-group">
+            <label class="hf2-label">Follow-up Date</label>
+            <input type="date" name="follow_up_date" class="hf2-input hf2-date">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hf2-actions" style="margin-top:28px">
+      {% if is_ecd_welfare %}
+      <a href="{% url 'welfare:list_ecd' %}" class="hf-btn hf-btn-secondary" style="margin-right:auto;text-decoration:none">Cancel</a>
+      {% else %}
+      <a href="{% url 'welfare:list_primary' %}" class="hf-btn hf-btn-secondary" style="margin-right:auto;text-decoration:none">Cancel</a>
+      {% endif %}
+      {% has_perm user "welfare.add_welfareobservation" as can_submit %}
+      {% if can_submit %}
+      <button type="submit" class="hf-btn hf-btn-primary">Submit Observation</button>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const classFilterSelect = document.getElementById('class-filter-select');
+  const studentSelect = document.getElementById('student-select');
+  const parentContacted = document.getElementById('parent_contacted');
+  const parentContactDetails = document.getElementById('parent_contact_details');
+  const followUpRequired = document.getElementById('follow_up_required');
+  const followUpDetails = document.getElementById('follow_up_details');
+  const concernTypeSelect = document.getElementById('concern-type-select');
+  const otherConcernGroup = document.getElementById('other-concern-group');
+  const otherConcernInput = document.getElementById('other-concern-input');
+
+  // Toggle "Other" concern description
+  function toggleOtherConcern() {
+    const isOther = concernTypeSelect.value === 'other';
+    otherConcernGroup.style.display = isOther ? 'block' : 'none';
+    otherConcernInput.required = isOther;
+    if (!isOther) otherConcernInput.value = '';
+  }
+  concernTypeSelect.addEventListener('change', toggleOtherConcern);
+  toggleOtherConcern();
+
+  // Toggle parent contact fields
+  parentContacted.addEventListener('change', function() {
+    parentContactDetails.style.display = this.checked ? 'block' : 'none';
+    if (this.checked) {
+      const today = new Date().toISOString().split('T')[0];
+      document.querySelector('input[name="parent_contact_date"]').value = today;
+      document.querySelector('input[name="parent_contact_time"]').value = new Date().toTimeString().slice(0,5);
+    }
+  });
+
+  // Toggle follow-up fields
+  followUpRequired.addEventListener('change', function() {
+    followUpDetails.style.display = this.checked ? 'block' : 'none';
+  });
+
+  // Class filter: narrow student dropdown by selected class
+  classFilterSelect.addEventListener('change', function() {
+    const selectedClass = this.value;
+    const options = studentSelect.querySelectorAll('option[data-class]');
+    options.forEach(function(opt) {
+      opt.style.display = (!selectedClass || opt.dataset.class === selectedClass) ? '' : 'none';
+    });
+    studentSelect.value = '';
+  });
+});
+</script>
+{% endblock %}

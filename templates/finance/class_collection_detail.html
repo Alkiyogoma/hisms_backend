@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}{{ class_name }} Collection &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}{{ class_name }}{% endblock %}
+{% block topbar_date %}{{ today_date }} &middot; {{ current_term.name|default:"No active term" }}{% endblock %}
+
+{% block content %}
+{% include "finance/_top_tabs.html" %}
+
+<!-- Navigation breadcrumb -->
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:13px">
+  <a href="{% url 'finance:dashboard' %}" style="color:var(--hodari-blue);text-decoration:none;font-weight:500">Dashboard</a>
+  <span style="color:var(--text-muted)">/</span>
+  <span style="color:var(--text-secondary);font-weight:500">{{ class_name }}</span>
+</div>
+
+<!-- Page header -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+  <div>
+    <h1 style="font-family:var(--font-display);font-size:20px;font-weight:700;color:var(--text-primary);margin:0">{{ class_name }}</h1>
+    <p style="font-size:13px;color:var(--text-muted);margin:4px 0 0 0">{{ current_term.name|default:"All time" }} &middot; {{ invoice_count }} invoice{{ invoice_count|pluralize }}</p>
+  </div>
+  <div style="display:flex;gap:8px">
+    <a href="{% url 'finance:report_csv_export' %}?type=collection_report{% if current_term.pk %}&term={{ current_term.pk }}{% endif %}"
+       class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center;gap:4px" download>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      CSV
+    </a>
+    <a href="{% url 'finance:financial_reports' %}?type=collection_report" class="btn btn-secondary btn-sm" style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;font-size:12px">
+      Full collection report &rarr;
+    </a>
+  </div>
+</div>
+
+<!-- Summary cards -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px">
+  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Total billed</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val">{{ total_billed|floatformat:0 }}</div>
+    <div class="mc-sub">{{ current_term.name|default:"Current term" }}</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#ECFDF5,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Total received</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#059669">{{ total_received|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#059669">{{ collection_rate }}% collected</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#FEF2F2,#fff)">
+    <div class="mc-lbl-row">
+      <span class="mc-lbl">Outstanding</span>
+      <span class="mc-currency">TZS</span>
+    </div>
+    <div class="mc-val" style="color:#DC2626">{{ total_outstanding|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:#DC2626">{{ students|length }} student{{ students|length|pluralize }}</div>
+  </div>
+</div>
+
+<!-- Student breakdown table -->
+<div class="card">
+  <div class="card-title-row">
+    <span class="card-title" style="margin-bottom:0">Students in {{ class_name }}</span>
+    <span class="chip chip-blue">{{ students|length }} student{{ students|length|pluralize }}</span>
+  </div>
+
+  {% if students %}
+  <div style="overflow-x:auto">
+    <table class="h-table">
+      <thead>
+        <tr>
+          <th style="min-width:180px">Student</th>
+          <th>Admission No.</th>
+          <th style="text-align:right">Total billed</th>
+          <th style="text-align:right">Paid</th>
+          <th style="text-align:right">Balance</th>
+          <th style="text-align:center">Status</th>
+          <th style="text-align:center">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in students %}
+        <tr>
+          <td>
+            <div style="font-weight:600;color:var(--text-primary)">{{ s.student.first_name }} {{ s.student.last_name }}</div>
+          </td>
+          <td style="color:var(--text-muted);font-size:12px;font-family:var(--font-mono)">
+            {{ s.student.admission_no|default:"N/A" }}
+          </td>
+          <td style="text-align:right;font-weight:600;font-family:var(--font-mono);font-size:13px">
+            {{ s.total_billed|floatformat:0 }}
+          </td>
+          <td style="text-align:right;font-weight:600;font-family:var(--font-mono);font-size:13px;color:var(--green)">
+            {{ s.total_paid|floatformat:0 }}
+          </td>
+          <td style="text-align:right;font-weight:700;font-family:var(--font-mono);font-size:13px;{% if s.balance > 0 %}color:#DC2626{% else %}color:var(--green){% endif %}">
+            {{ s.balance|floatformat:0 }}
+          </td>
+          <td style="text-align:center">
+            {% if s.balance <= 0 %}
+            <span class="chip chip-green">Paid</span>
+            {% elif s.total_paid > 0 %}
+            <span class="chip chip-amber">Partial</span>
+            {% else %}
+            <span class="chip chip-red">Unpaid</span>
+            {% endif %}
+          </td>
+          <td style="text-align:center">
+            <div style="display:flex;gap:4px;justify-content:center">
+              {% with s.invoices.0 as first_inv %}
+              <a href="{% url 'finance:invoice_detail' first_inv.invoice.pk %}" class="btn btn-secondary btn-sm" style="padding:3px 8px;font-size:11px">View</a>
+              {% endwith %}
+              <a href="{% url 'finance:student_statement' student_id=s.student.id %}" class="btn btn-secondary btn-sm" style="padding:3px 8px;font-size:11px">Statement</a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="padding:32px 20px;text-align:center">
+    {% include '_partials/empty_state.html' with title='No invoices found' desc='No invoices have been created for this class this term.' icon='inbox' icon_color='grey' %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- Back link -->
+<div style="margin-top:16px">
+  <a href="{% url 'finance:dashboard' %}" style="color:var(--hodari-blue);font-size:13px;font-weight:500;text-decoration:none">
+    &larr; Back to Dashboard
+  </a>
+</div>
+{% endblock %}

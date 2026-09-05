@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}{% if is_edit %}Edit{% else %}New{% endif %} Break Config — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}ECD Break Times{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:600px; margin:0 auto">
+  <div class="card-title">{% if is_edit %}Edit{% else %}New{% endif %} Break Configuration</div>
+  <div style="font-size:13px; color:var(--text-muted); margin-bottom:20px; margin-top:-6px">
+    Configure snack, lunch, and nap times for ECD classes.
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="hf2-section">
+      <div class="hf2-section-title">Class</div>
+      <div class="hf2-form-group">
+        <label class="hf2-label">Class Name</label>
+        <input type="text" name="class_name" class="hf2-input" required
+          value="{% if break_config %}{{ break_config.class_name }}{% endif %}"
+          placeholder="e.g. Pre-K, Kindergarten, Grade 1">
+      </div>
+    </div>
+
+    <div class="hf2-section">
+      <div class="hf2-section-title">Snack Break</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px">
+        <div class="hf2-form-group">
+          <label class="hf2-label">Start Time</label>
+          <input type="time" name="snack_break_start" class="hf2-input" required
+            value="{% if break_config %}{{ break_config.snack_break_start|time:'H:i' }}{% else %}09:30{% endif %}">
+        </div>
+        <div class="hf2-form-group">
+          <label class="hf2-label">End Time</label>
+          <input type="time" name="snack_break_end" class="hf2-input" required
+            value="{% if break_config %}{{ break_config.snack_break_end|time:'H:i' }}{% else %}10:00{% endif %}">
+        </div>
+      </div>
+    </div>
+
+    <div class="hf2-section">
+      <div class="hf2-section-title">Lunch Break</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px">
+        <div class="hf2-form-group">
+          <label class="hf2-label">Start Time</label>
+          <input type="time" name="lunch_break_start" class="hf2-input" required
+            value="{% if break_config %}{{ break_config.lunch_break_start|time:'H:i' }}{% else %}12:00{% endif %}">
+        </div>
+        <div class="hf2-form-group">
+          <label class="hf2-label">End Time</label>
+          <input type="time" name="lunch_break_end" class="hf2-input" required
+            value="{% if break_config %}{{ break_config.lunch_break_end|time:'H:i' }}{% else %}13:00{% endif %}">
+        </div>
+      </div>
+    </div>
+
+    <div class="hf2-section">
+      <div class="hf2-section-title">Nap Time (Optional)</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px">
+        <div class="hf2-form-group">
+          <label class="hf2-label">Start Time</label>
+          <input type="time" name="nap_time_start" class="hf2-input"
+            value="{% if break_config and break_config.nap_time_start %}{{ break_config.nap_time_start|time:'H:i' }}{% endif %}">
+        </div>
+        <div class="hf2-form-group">
+          <label class="hf2-label">End Time</label>
+          <input type="time" name="nap_time_end" class="hf2-input"
+            value="{% if break_config and break_config.nap_time_end %}{{ break_config.nap_time_end|time:'H:i' }}{% endif %}">
+        </div>
+      </div>
+      <div style="font-size:11px; color:var(--text-muted); margin-top:4px">Leave blank if this class does not have nap time.</div>
+    </div>
+
+    <div class="hf2-actions">
+      <a href="{% url 'timetable:break_config_list' %}" class="hf-btn hf-btn-secondary" style="margin-right:auto">Cancel</a>
+      <button type="submit" class="hf-btn hf-btn-primary">
+        {% if is_edit %}Save Changes{% else %}Create Configuration{% endif %}
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
