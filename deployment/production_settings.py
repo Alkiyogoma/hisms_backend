@@ -139,9 +139,9 @@ CSRF_COOKIE_HTTPONLY = True
 CSRF_TRUSTED_ORIGINS = [
     "https://connect.hodari.ac.tz",
     "http://connect.hodari.ac.tz",
-    "https://hodari.elimcoregroup.com",
-    "https://hodari.elimcoregroup.com:8443",
-    "http://hodari.elimcoregroup.com",
+    "https://hodari.nguzo.co.tz",
+    "https://hodari.nguzo.co.tz:8443",
+    "http://hodari.nguzo.co.tz",
 ]
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
@@ -155,8 +155,8 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
     "https://connect.hodari.ac.tz",
     "http://connect.hodari.ac.tz",
-    "https://hodari.elimcoregroup.com",
-    "http://hodari.elimcoregroup.com",
+    "https://hodari.nguzo.co.tz",
+    "http://hodari.nguzo.co.tz",
 ]
 CORS_ALLOW_CREDENTIALS = True
 

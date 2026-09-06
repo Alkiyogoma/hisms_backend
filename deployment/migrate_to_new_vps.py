@@ -88,7 +88,7 @@ def write_env(client):
     step("Writing .env file...")
     env = """DJANGO_SECRET_KEY=hodari-pr0d-s3cr3t-k3y-2026-elimcore!
 DJANGO_DEBUG=0
-DJANGO_ALLOWED_HOSTS=connect.hodari.ac.tz,hodari.elimcoregroup.com,187.7.21.133,localhost,127.0.0.1
+DJANGO_ALLOWED_HOSTS=connect.hodari.ac.tz,hodari.nguzo.co.tz,187.7.21.133,localhost,127.0.0.1
 DJANGO_USE_SQLITE=0
 POSTGRES_DB=hisms_prod
 POSTGRES_USER=hodari_user
@@ -105,7 +105,7 @@ CELERY_TIMEZONE=Africa/Nairobi
 CELERY_ENABLE_UTC=1
 CHANNELS_REDIS_URL=redis://localhost:6379/2
 CORS_ALLOW_ALL_ORIGINS=False
-CORS_ALLOWED_ORIGINS=https://connect.hodari.ac.tz,https://hodari.elimcoregroup.com
+CORS_ALLOWED_ORIGINS=https://connect.hodari.ac.tz,https://hodari.nguzo.co.tz
 EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
 DEFAULT_FROM_EMAIL=noreply@connect.hodari.ac.tz
 SESSION_IDLE_TIMEOUT=1800

@@ -413,12 +413,10 @@
           {% field form.job_title %}
           {% field form.employee_id hint="Auto-generated if left blank" %}
         </div>
-        <div class="form-grid-3" style="margin-top:4px">
+        <div class="form-grid-2" style="margin-top:4px">
           {% field form.employment_type %}
           {% field form.employment_start_date %}
           {% field form.probation_end_date %}
-        </div>
-        <div style="max-width:400px; margin-top:8px">
           {% field form.contract_end_date hint="Leave blank if permanent. Used for renewal reminders." %}
         </div>
       </div>
@@ -479,12 +477,10 @@
         <p style="font-size:13px; color:#64748B; margin:0 0 20px 0; line-height:1.5">
           Statutory registration numbers for tax, pension, and health insurance.
         </p>
-        <div class="form-grid-3">
+        <div class="form-grid-2">
           {% field form.nssf_number %}
           {% field form.tin_number %}
           {% field form.nhif_number %}
-        </div>
-        <div class="form-grid-2" style="margin-top:8px">
           {% field form.confirmation_date %}
         </div>
       </div>

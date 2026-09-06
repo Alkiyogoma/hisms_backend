@@ -202,7 +202,7 @@ class SchoolSettings(TimeStampedModel):
     # PWA (Attendance PWA)
     pwa_domain = models.URLField(
         max_length=255,
-        default="https://hodari.elimcoregroup.com:8443",
+        default="https://hodari.nguzo.co.tz:8443",
         help_text="Base URL for the Attendance PWA app. Change this when the domain changes.",
     )
     pwa_version = models.PositiveIntegerField(

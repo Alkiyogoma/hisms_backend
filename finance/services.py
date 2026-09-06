@@ -170,7 +170,7 @@ def generate_term_invoices(term, actor) -> dict:
                 "invoice_number": invoice.invoice_number,
                 "term_name": term.name,
                 "school_name": school_name,
-                "portal_url": str(getattr(_django_settings, "SITE_URL", "https://hodari.elimcoregroup.com:8443")) + "/parent/",
+                "portal_url": str(getattr(_django_settings, "SITE_URL", "https://hodari.nguzo.co.tz:8443")) + "/parent/",
             }
             db_sent = send_dynamic_email(
                 template_type="invoice_generated",
@@ -333,7 +333,7 @@ def generate_midterm_invoices(term, actor) -> dict:
                 "term_name": term.name,
                 "weeks_label": weeks_label,
                 "school_name": school_name,
-                "portal_url": str(getattr(_django_settings, "SITE_URL", "https://hodari.elimcoregroup.com:8443")) + "/parent/",
+                "portal_url": str(getattr(_django_settings, "SITE_URL", "https://hodari.nguzo.co.tz:8443")) + "/parent/",
             }
             db_sent = send_dynamic_email(
                 template_type="invoice_generated",
@@ -417,7 +417,7 @@ def check_overdue_invoices() -> int:
                     "due_date": str(inv.due_date) if inv.due_date else "N/A",
                     "invoice_number": inv.invoice_number or f"INV-{inv.pk}",
                     "school_name": school_name,
-                    "portal_url": str(getattr(_django_settings, "SITE_URL", "https://hodari.elimcoregroup.com:8443")) + "/parent/",
+                    "portal_url": str(getattr(_django_settings, "SITE_URL", "https://hodari.nguzo.co.tz:8443")) + "/parent/",
                 }
                 db_sent = send_dynamic_email(
                     template_type="fee_reminder",

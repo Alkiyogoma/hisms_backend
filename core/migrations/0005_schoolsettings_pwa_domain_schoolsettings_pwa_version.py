@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='schoolsettings',
             name='pwa_domain',
-            field=models.URLField(default='https://hodari.elimcoregroup.com:8443', help_text='Base URL for the Attendance PWA app. Change this when the domain changes.', max_length=255),
+            field=models.URLField(default='https://hodari.nguzo.co.tz:8443', help_text='Base URL for the Attendance PWA app. Change this when the domain changes.', max_length=255),
         ),
         migrations.AddField(
             model_name='schoolsettings',

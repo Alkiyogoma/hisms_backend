@@ -3,6 +3,7 @@
 Django-based school management system for Hodari Christian School.
 
 ## Features
+
 - Admissions pipeline with workflow stages
 - Student management
 - Academic tracking (lesson plans, report cards, progression)
@@ -15,6 +16,7 @@ Django-based school management system for Hodari Christian School.
 - Parent portal
 
 ## Tech Stack
+
 - Python / Django 5.x
 - PostgreSQL
 - Redis
@@ -23,7 +25,9 @@ Django-based school management system for Hodari Christian School.
 - Gunicorn + Nginx
 
 ## Deployment
-- **Test**: `hodari.elimcoregroup.com:8443`
+
+- **Test**: `hodari.nguzo.co.tz:8443`
 - **Live**: `connect.hodari.ac.tz:8444`
 - Deploy script: `python deployment/deploy.py --env test|live`
+
 # hisms_backend

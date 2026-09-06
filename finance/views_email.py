@@ -102,7 +102,7 @@ class SendInvoiceEmailView(RoleRequiredMixin, View):
 
             due_date_str = invoice.due_date.strftime('%d %B %Y') if invoice.due_date else "N/A"
 
-            site_url = getattr(settings, "SITE_URL", "https://hodari.elimcoregroup.com:8443")
+            site_url = getattr(settings, "SITE_URL", "https://hodari.nguzo.co.tz:8443")
             portal_url = site_url + "/parent/"
 
             line_items = []
