@@ -15,7 +15,7 @@ migration** in detail and then walks through the full server setup.
                     ┌─────────────────────────────────────────┐
    Internet ──443──▶│  Nginx  (TLS termination, static/media)   │
                     └───────────────┬───────────────────────────┘
-                                    │ proxy_pass 127.0.0.1:8007
+                                    │ proxy_pass 127.0.0.1:8008
                           ┌─────────▼──────────┐
                           │ Gunicorn (WSGI)     │  systemd: hodari.service
                           │ config.wsgi         │
@@ -31,7 +31,7 @@ migration** in detail and then walks through the full server setup.
 
 | Component        | Role                                    | systemd unit                |
 |------------------|-----------------------------------------|-----------------------------|
-| Gunicorn         | WSGI app server, binds `127.0.0.1:8007` | `hodari.service`            |
+| Gunicorn         | WSGI app server, binds `127.0.0.1:8008` | `hodari.service`            |
 | Nginx            | Reverse proxy, TLS, static/media        | `nginx`                     |
 | PostgreSQL       | Primary database                        | `postgresql`                |
 | Redis            | Celery broker/result, cache, Channels   | `redis-server`              |
@@ -47,8 +47,8 @@ Reference units and configs already live in `deployment/`:
 | Setting        | Value                              |
 |----------------|------------------------------------|
 | App user       | `hodari`                           |
-| Project path   | `/opt/hodari/hisms_backend`        |
-| Virtualenv     | `/opt/hodari/venv`                 |
+| Project path   | `/var/www/hodari/hisms_backend`        |
+| Virtualenv     | `/var/www/hodari/venv`                 |
 | Domain         | `connect.example.com`              |
 | DB name / user | `hodari` / `hodari_user`           |
 
@@ -144,9 +144,9 @@ sudo systemctl enable --now postgresql redis-server nginx
 Create the application user and directories:
 
 ```bash
-sudo useradd --system --create-home --home-dir /opt/hodari --shell /bin/bash hodari
-sudo mkdir -p /opt/hodari /var/log/hodari /var/backups/hodari /var/run/hodari
-sudo chown -R hodari:hodari /opt/hodari /var/log/hodari /var/backups/hodari /var/run/hodari
+sudo useradd --system --create-home --home-dir /var/www/hodari --shell /bin/bash hodari
+sudo mkdir -p /var/www/hodari /var/log/hodari /var/backups/hodari /var/run/hodari
+sudo chown -R hodari:hodari /var/www/hodari /var/log/hodari /var/backups/hodari /var/run/hodari
 ```
 
 ---
@@ -158,7 +158,7 @@ Run as the `postgres` OS user. **Replace the password** with a strong secret.
 ```bash
 sudo -u postgres psql <<'SQL'
 CREATE DATABASE hodari;
-CREATE USER hodari_user WITH PASSWORD 'CHANGE_ME_STRONG_PASSWORD';
+CREATE USER hodari_user WITH PASSWORD 'Hodari20SCHOOL26';
 
 -- Django-recommended session defaults
 ALTER ROLE hodari_user SET client_encoding TO 'utf8';
@@ -184,7 +184,7 @@ Local connections use PostgreSQL's `peer`/`md5` auth on `localhost`; no
 `127.0.0.1` with a password. Verify:
 
 ```bash
-PGPASSWORD='CHANGE_ME_STRONG_PASSWORD' psql -h 127.0.0.1 -U hodari_user -d hodari -c '\conninfo'
+PGPASSWORD='Hodari20SCHOOL26' psql -h 127.0.0.1 -U hodari_user -d hodari -c '\conninfo'
 ```
 
 > **Local development shortcut:** on your own machine it's fine to use the
@@ -197,24 +197,24 @@ PGPASSWORD='CHANGE_ME_STRONG_PASSWORD' psql -h 127.0.0.1 -U hodari_user -d hodar
 
 ```bash
 sudo -u hodari -i          # become the app user
-cd /opt/hodari
+cd /var/www/hodari
 
 # Clone (or rsync/scp your project) so the app lives at:
-#   /opt/hodari/hisms_backend
+#   /var/www/hodari/hisms_backend
 git clone <YOUR_REPO_URL> hisms_backend
-# — or — copy an existing checkout up with: rsync -av ./ hodari@server:/opt/hodari/hisms_backend/
+# — or — copy an existing checkout up with: rsync -av ./ hodari@server:/var/www/hodari/hisms_backend/
 
-python3 -m venv /opt/hodari/venv
-source /opt/hodari/venv/bin/activate
+python3 -m venv /var/www/hodari/venv
+source /var/www/hodari/venv/bin/activate
 pip install --upgrade pip
-pip install -r /opt/hodari/hisms_backend/requirements.txt
+pip install -r /var/www/hodari/hisms_backend/requirements.txt
 ```
 
 ---
 
 ## 6. Create the production `.env`
 
-Create `/opt/hodari/hisms_backend/.env`. Generate a fresh secret key:
+Create `/var/www/hodari/hisms_backend/.env`. Generate a fresh secret key:
 
 ```bash
 python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
@@ -263,7 +263,7 @@ BACKUP_RETENTION_DAYS=30
 Lock down the file (it holds secrets):
 
 ```bash
-chmod 600 /opt/hodari/hisms_backend/.env
+chmod 600 /var/www/hodari/hisms_backend/.env
 ```
 
 > With `DJANGO_DEBUG=0`, `settings.py` enforces `SECURE_SSL_REDIRECT`, HSTS,
@@ -278,8 +278,8 @@ This is the database-migration step. The project has migrations across ~16
 apps (academics, admissions, attendance, finance, hr, users, etc.).
 
 ```bash
-cd /opt/hodari/hisms_backend
-source /opt/hodari/venv/bin/activate
+cd /var/www/hodari/hisms_backend
+source /var/www/hodari/venv/bin/activate
 
 # 1. Sanity-check config against the DB
 python manage.py check --deploy
@@ -309,7 +309,7 @@ Notes:
 **Quick smoke test** before wiring up systemd:
 
 ```bash
-gunicorn config.wsgi:application --bind 127.0.0.1:8007
+gunicorn config.wsgi:application --bind 127.0.0.1:8008
 # Ctrl-C after confirming it boots without errors
 ```
 
@@ -318,12 +318,12 @@ gunicorn config.wsgi:application --bind 127.0.0.1:8007
 ## 8. Configure the systemd services
 
 Copy the reference units from `deployment/` into systemd. They already assume
-the `hodari` user, `/opt/hodari` paths, and `config.wsgi` / Celery app `config`.
+the `hodari` user, `/var/www/hodari` paths, and `config.wsgi` / Celery app `config`.
 
 ```bash
-sudo cp /opt/hodari/hisms_backend/deployment/hodari.service            /etc/systemd/system/
-sudo cp /opt/hodari/hisms_backend/deployment/hodari-celery.service     /etc/systemd/system/
-sudo cp /opt/hodari/hisms_backend/deployment/hodari-celery-beat.service /etc/systemd/system/
+sudo cp /var/www/hodari/hisms_backend/deployment/hodari.service            /etc/systemd/system/
+sudo cp /var/www/hodari/hisms_backend/deployment/hodari-celery.service     /etc/systemd/system/
+sudo cp /var/www/hodari/hisms_backend/deployment/hodari-celery-beat.service /etc/systemd/system/
 
 sudo systemctl daemon-reload
 sudo systemctl enable --now hodari hodari-celery hodari-celery-beat
@@ -334,7 +334,7 @@ sudo journalctl -u hodari -n 50 --no-pager
 ```
 
 Gunicorn (see [`gunicorn_config.py`](gunicorn_config.py)) binds
-`127.0.0.1:8007`, runs `cpu_count()*2+1` sync workers, logs to
+`127.0.0.1:8008`, runs `cpu_count()*2+1` sync workers, logs to
 `/var/log/hodari/`, and drops to the `hodari` user. Make sure
 `/var/log/hodari` is writable by `hodari` (done in Section 3).
 
@@ -352,7 +352,7 @@ with other projects on the same server:
 | `8070` | HTTP app (always works, even before a cert exists) |
 | `8443` | HTTPS app (enabled once certbot has issued the cert) |
 
-It proxies to `127.0.0.1:8007`, serves `/static/` and `/media/`, applies rate
+It proxies to `127.0.0.1:8008`, serves `/static/` and `/media/`, applies rate
 limiting (`hodari_general` 30r/s, `hodari_login` 5r/m), security headers, and a
 WebSocket (`/ws/`) location for Django Channels.
 
@@ -362,7 +362,7 @@ The file ships with `server_name connect.hodari.ac.tz`. Change every occurrence
 to your domain if different:
 
 ```bash
-sudo cp /opt/hodari/hisms_backend/deployment/nginx_hodari.conf \
+sudo cp /var/www/hodari/hisms_backend/deployment/nginx_hodari.conf \
         /etc/nginx/sites-available/hodari
 
 # Replace the domain if yours differs from connect.hodari.ac.tz
@@ -437,7 +437,7 @@ curl -I http://connect.example.com:8070/
 curl -I https://connect.example.com:8443/
 
 # DB connectivity from Django
-cd /opt/hodari/hisms_backend && source /opt/hodari/venv/bin/activate
+cd /var/www/hodari/hisms_backend && source /var/www/hodari/venv/bin/activate
 python manage.py dbshell -c '\dt' | head
 
 # Celery worker sees the broker
@@ -452,8 +452,8 @@ Then log in to `https://connect.example.com:8443/admin/` with the superuser.
 
 ```bash
 sudo -u hodari -i
-cd /opt/hodari/hisms_backend
-source /opt/hodari/venv/bin/activate
+cd /var/www/hodari/hisms_backend
+source /var/www/hodari/venv/bin/activate
 
 git pull                                   # or rsync new code
 pip install -r requirements.txt            # if deps changed
@@ -495,9 +495,9 @@ non-interactively.)
 |---------|--------------------|
 | App uses SQLite, not Postgres | `POSTGRES_PASSWORD` empty or `POSTGRES_HOST` is `localhost` with no password → set both; keep `DJANGO_USE_SQLITE=0`. |
 | Infinite HTTPS redirect loop | Nginx not sending `X-Forwarded-Proto https`; add it to the proxy block. |
-| `502 Bad Gateway` | Gunicorn down or wrong bind — `journalctl -u hodari`; confirm it listens on `127.0.0.1:8007`. |
+| `502 Bad Gateway` | Gunicorn down or wrong bind — `journalctl -u hodari`; confirm it listens on `127.0.0.1:8008`. |
 | CSRF verification failed | Add the domain to `CSRF_TRUSTED_ORIGINS` (with `https://`) in `.env`. |
-| Static files 404 | Run `collectstatic`; check Nginx `alias` path matches `STATIC_ROOT` (`/opt/hodari/hisms_backend/staticfiles/`). |
+| Static files 404 | Run `collectstatic`; check Nginx `alias` path matches `STATIC_ROOT` (`/var/www/hodari/hisms_backend/staticfiles/`). |
 | WeasyPrint / PDF errors | Install the Pango/Cairo libs from Section 3. |
 | Celery tasks never run | Worker/beat not started, or Redis broker URL wrong — `celery -A config inspect ping`. |
 | `permission denied for schema public` | Run the PG15+ `GRANT ALL ON SCHEMA public` from Section 4. |

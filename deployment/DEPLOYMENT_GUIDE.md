@@ -5,7 +5,7 @@
 - **Domain:** connect.hodari.ac.tz
 - **Port:** 8070 (HTTP) / 8443 (HTTPS)
 - **Database:** PostgreSQL (`hisms_prod`)
-- **App Server:** Gunicorn (port 8007 internal → Nginx 8070/8443)
+- **App Server:** Gunicorn (port 8008 internal → Nginx 8070/8443)
 - **Cache/Queue:** Redis + Celery
 
 ---
@@ -21,8 +21,8 @@ ssh root@187.7.21.133
 # Download and run setup
 cd /opt 2>/dev/null || cd /root
 # Upload setup_vps.sh first, then:
-chmod +x /opt/hodari/hisms_backend/deployment/setup_vps.sh
-/opt/hodari/hisms_backend/deployment/setup_vps.sh
+chmod +x /var/www/hodari/hisms_backend/deployment/setup_vps.sh
+/var/www/hodari/hisms_backend/deployment/setup_vps.sh
 ```
 
 ### Step 2: Deploy from Windows
@@ -73,7 +73,7 @@ Database is created automatically:
 - **Password:** H0d@r1_Pr0d_2026! (change in production!)
 
 ### 4. Environment Variables
-Production `.env` is created at `/opt/hodari/hisms_backend/.env`
+Production `.env` is created at `/var/www/hodari/hisms_backend/.env`
 Key settings:
 - `DJANGO_DEBUG=0` (production mode)
 - `DJANGO_ALLOWED_HOSTS=connect.hodari.ac.tz,...`
@@ -81,7 +81,7 @@ Key settings:
 
 ### 5. Services
 Three systemd services run:
-- **hodari** - Gunicorn (Django app on port 8007)
+- **hodari** - Gunicorn (Django app on port 8008)
 - **hodari-celery** - Celery worker (background tasks)
 - **hodari-celery-beat** - Celery beat (scheduled tasks)
 
@@ -97,8 +97,8 @@ Auto-renewal is configured via systemd timer.
 ## Port Configuration (No Interference)
 
 The HODARI deployment uses:
-- **Port 8070** - HTTP (Nginx) → Gunicorn on 127.0.0.1:8007
-- **Port 8443** - HTTPS (Nginx) → Gunicorn on 127.0.0.1:8007
+- **Port 8070** - HTTP (Nginx) → Gunicorn on 127.0.0.1:8008
+- **Port 8443** - HTTPS (Nginx) → Gunicorn on 127.0.0.1:8008
 
 Other Django projects on the server remain unaffected because:
 1. Each project binds to a different port
@@ -168,11 +168,11 @@ sudo systemctl restart nginx           # Web server
 ### Database Backup
 ```bash
 # Manual backup
-cd /opt/hodari/hisms_backend
-/opt/hodari/venv/bin/python manage.py dumpdata --natural-foreign --natural-primary > /var/backups/hodari/backup_$(date +%Y%m%d).json
+cd /var/www/hodari/hisms_backend
+/var/www/hodari/venv/bin/python manage.py dumpdata --natural-foreign --natural-primary > /var/backups/hodari/backup_$(date +%Y%m%d).json
 
 # Restore
-/opt/hodari/venv/bin/python manage.py loaddata /var/backups/hodari/backup_20260611.json
+/var/www/hodari/venv/bin/python manage.py loaddata /var/backups/hodari/backup_20260611.json
 ```
 
 ### Check Service Status
@@ -212,7 +212,7 @@ sudo systemctl status postgresql
 psql -h localhost -U hodari_user -d hisms_prod
 
 # Check .env settings
-cat /opt/hodari/hisms_backend/.env
+cat /var/www/hodari/hisms_backend/.env
 ```
 
 ### SSL certificate issues
@@ -261,7 +261,7 @@ sudo systemctl restart hodari hodari-celery
 ## File Structure on VPS
 
 ```
-/opt/hodari/
+/var/www/hodari/
 ├── hisms_backend/          # Django project
 │   ├── config/             # Settings, URLs, WSGI/ASGI
 │   ├── academics/          # Academic module
@@ -299,5 +299,5 @@ sudo systemctl restart hodari hodari-celery
 For issues, check:
 1. Service logs: `sudo journalctl -u hodari -n 50`
 2. Nginx logs: `/var/log/nginx/error.log`
-3. Django checks: `cd /opt/hodari/hisms_backend && /opt/hodari/venv/bin/python manage.py check`
-4. Database: `cd /opt/hodari/hisms_backend && /opt/hodari/venv/bin/python manage.py dbshell`
+3. Django checks: `cd /var/www/hodari/hisms_backend && /var/www/hodari/venv/bin/python manage.py check`
+4. Database: `cd /var/www/hodari/hisms_backend && /var/www/hodari/venv/bin/python manage.py dbshell`

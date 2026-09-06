@@ -6,7 +6,7 @@ import multiprocessing
 import os
 
 # Bind to localhost — Nginx proxies to this from port 8070
-bind = "127.0.0.1:8007"
+bind = "127.0.0.1:8008"
 
 # Workers: 2-4 per CPU core is typical for a Django app
 workers = multiprocessing.cpu_count() * 2 + 1
