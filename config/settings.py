@@ -345,6 +345,11 @@ ATTENDANCE_ALERT_THRESHOLD = float(os.getenv('ATTENDANCE_ALERT_THRESHOLD', '0.85
 # Empty default = fail-closed: endpoint rejects all requests if unset
 ATTENDANCE_WEBHOOK_SECRET = os.getenv("ATTENDANCE_WEBHOOK_SECRET", "")
 
+# Bearer token for the Laravel <-> Django attendance webhook (attendance/webhook_views.py).
+# Empty default = fail-closed: in production the webhook rejects all requests until set.
+# Generate a strong value, e.g.: python -c "import secrets; print(secrets.token_urlsafe(48))"
+WEBHOOK_API_TOKEN = os.getenv("WEBHOOK_API_TOKEN", "")
+
 # Password reset token expires after 1 hour (FRD AUTH-RESET-001)
 PASSWORD_RESET_TIMEOUT = 3600
 
