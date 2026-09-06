@@ -1,0 +1,8 @@
+{% comment %}
+  Empty state. Props: title (required), desc, icon (doc|check|users|calendar|search|alert|inbox),
+  icon_color (blue|green|amber|grey), action_url, action_text.
+  Thin Cotton wrapper around the shared _partials/empty_state.html.
+  Usage: <c-empty-state title="No students found" desc="Try adjusting filters." icon="search" />
+{% endcomment %}
+<c-vars title="" desc="" icon="inbox" icon_color="blue" action_url="" action_text="" />
+{% include "_partials/empty_state.html" with title=title desc=desc icon=icon icon_color=icon_color action_url=action_url action_text=action_text %}

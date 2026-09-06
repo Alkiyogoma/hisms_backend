@@ -19,6 +19,34 @@ from students.services import generate_admission_number
 from users.models import UserRole
 
 
+def _parse_inquiry_notes(applicant):
+    """Return the applicant's ``notes`` JSON as a dict (empty dict if not JSON).
+
+    Staff/public inquiries store structured data in ``notes``:
+    ``{submitted_via, gender, current_grade, inquiry_notes, additional_parents}``.
+    """
+    import json
+    raw = getattr(applicant, "notes", None)
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw) if isinstance(raw, str) else raw
+    except (ValueError, TypeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _extract_additional_parents(applicant):
+    """Return the list of additional parents/guardians stored on an applicant.
+
+    Captured on the new-inquiry form and persisted in the applicant's ``notes``
+    JSON as ``additional_parents`` (a list of dicts with full_name / relationship
+    / phone / email). Returns an empty list when absent or unparseable.
+    """
+    extras = _parse_inquiry_notes(applicant).get("additional_parents") or []
+    return [e for e in extras if isinstance(e, dict)]
+
+
 def _next_consent_version(current_version):
     """Return the next consent version after `current_version`.
 
@@ -930,6 +958,40 @@ def complete_enrolment(*, applicant: Applicant, actor, override_duplicate: bool 
         student=student, guardian=guardian,
         defaults={"relationship": rel_value, "is_primary": True}
     )
+
+    # Link any additional parents / guardians captured on the inquiry form.
+    # These are stored in the applicant's notes JSON as `additional_parents`;
+    # each becomes a non-primary guardian on the student record.
+    for extra in _extract_additional_parents(applicant):
+        extra_phone = (extra.get("phone") or "").strip()
+        extra_email = (extra.get("email") or "").strip().lower()
+        extra_name = (extra.get("full_name") or "").strip()
+        if not (extra_phone or extra_email or extra_name):
+            continue
+
+        extra_guardian = None
+        if extra_phone:
+            extra_guardian = ParentGuardian.objects.filter(phone=extra_phone).first()
+        if not extra_guardian and extra_email:
+            extra_guardian = ParentGuardian.objects.filter(email__iexact=extra_email).first()
+        if not extra_guardian:
+            extra_guardian = ParentGuardian.objects.create(
+                phone=extra_phone,
+                full_name=extra_name,
+                email=extra_email,
+            )
+
+        # Don't duplicate the primary guardian if the extra points to the same person.
+        if extra_guardian.pk == guardian.pk:
+            continue
+
+        extra_rel = (extra.get("relationship") or "").strip().lower()
+        if extra_rel not in valid_rels:
+            extra_rel = GuardianRelationship.GUARDIAN
+        StudentGuardian.objects.get_or_create(
+            student=student, guardian=extra_guardian,
+            defaults={"relationship": extra_rel, "is_primary": False}
+        )
 
     # FR-PARENT-001: Auto-create parent User account for portal access
     if guardian and not guardian.user:

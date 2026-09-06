@@ -3,12 +3,14 @@ from core.views import (
     DashboardRouterView, SchoolSettingsUpdateView,
     SeedDatabaseView, SessionCheckView, SessionExtendView,
     BulkImportView, BulkImportTemplateView, BulkImportUploadView, BulkImportConfirmView,
+    StyleGuideView,
 )
 
 app_name = "core"
 
 urlpatterns = [
     path("", DashboardRouterView.as_view(), name="dashboard"),
+    path("styleguide/", StyleGuideView.as_view(), name="styleguide"),
     path("settings/", SchoolSettingsUpdateView.as_view(), name="school_settings"),
     path("settings/bulk-import/", BulkImportView.as_view(), name="bulk_import"),
     path("settings/bulk-import/template/", BulkImportTemplateView.as_view(), name="bulk_import_template"),

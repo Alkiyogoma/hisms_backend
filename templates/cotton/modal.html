@@ -1,0 +1,33 @@
+{% comment %}
+  Centered modal dialog. Use for add / edit / view instead of a whole new page.
+  Props:
+    id        DOM id (required for a static modal opened via data-hui-open)
+    title     header title
+    subtitle  optional muted subtitle
+    size      '' (default 560px) | sm | lg | xl
+  Slots:
+    default   modal body
+    footer    optional footer (action buttons)
+  Static usage:
+    <c-button data-hui-open="addStudent">Add student</c-button>
+    <c-modal id="addStudent" title="Add student">
+      <form …>…</form>
+      <c-slot name="footer">
+        <c-button variant="secondary" data-hui-close>Cancel</c-button>
+        <c-button type="submit" form="…">Save</c-button>
+      </c-slot>
+    </c-modal>
+  Dynamic (htmx) usage: return this fragment from a view into #hui-modal-root;
+  it auto-opens on swap.
+{% endcomment %}
+<c-vars id="" title="" subtitle="" size="" />
+<div class="modal{% if size %} modal-{{ size }}{% endif %}"{% if id %} id="{{ id }}"{% endif %} role="dialog" aria-modal="true" {{ attrs }}>
+  <div class="modal-panel">
+    <div class="modal-header">
+      <div class="modal-title">{{ title }}{% if subtitle %}<div class="modal-title-sub">{{ subtitle }}</div>{% endif %}</div>
+      <button type="button" class="modal-close" data-hui-close aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">{{ slot }}</div>
+    {% if footer %}<div class="modal-footer">{{ footer }}</div>{% endif %}
+  </div>
+</div>

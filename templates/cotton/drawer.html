@@ -1,0 +1,23 @@
+{% comment %}
+  Right-side slide-in drawer. Use for longer add / edit forms or detail panels.
+  Props:
+    id        DOM id (required for a static drawer opened via data-hui-open)
+    title     header title
+    subtitle  optional muted subtitle
+    size      '' (default 480px) | sm | lg
+  Slots:
+    default   drawer body
+    footer    optional sticky footer (action buttons)
+  Usage mirrors <c-modal>; open with data-hui-open="<id>".
+{% endcomment %}
+<c-vars id="" title="" subtitle="" size="" />
+<div class="drawer-scrim"{% if id %} id="{{ id }}"{% endif %} {{ attrs }}>
+  <div class="drawer{% if size %} drawer-{{ size }}{% endif %}" role="dialog" aria-modal="true">
+    <div class="drawer-header">
+      <div class="drawer-title">{{ title }}{% if subtitle %}<div class="drawer-title-sub">{{ subtitle }}</div>{% endif %}</div>
+      <button type="button" class="drawer-close" data-hui-close aria-label="Close">&times;</button>
+    </div>
+    <div class="drawer-body">{{ slot }}</div>
+    {% if footer %}<div class="drawer-footer">{{ footer }}</div>{% endif %}
+  </div>
+</div>

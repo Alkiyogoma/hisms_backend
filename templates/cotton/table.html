@@ -1,0 +1,20 @@
+{% comment %}
+  Data table — horizontal-scroll-safe wrapper around .h-table.
+  Slots:
+    head     the <th> cells for the header row
+    default  the <tr> body rows
+  Usage:
+    <c-table>
+      <c-slot name="head"><th>Name</th><th class="col-num">Amount</th><th class="col-actions"></th></c-slot>
+      {% for row in rows %}
+        <tr><td>{{ row.name }}</td><td class="col-num">{{ row.amount }}</td>
+            <td class="col-actions"><c-button size="sm" variant="secondary">View</c-button></td></tr>
+      {% endfor %}
+    </c-table>
+{% endcomment %}
+<div class="table-wrap">
+  <table class="h-table" {{ attrs }}>
+    {% if head %}<thead><tr>{{ head }}</tr></thead>{% endif %}
+    <tbody>{{ slot }}</tbody>
+  </table>
+</div>

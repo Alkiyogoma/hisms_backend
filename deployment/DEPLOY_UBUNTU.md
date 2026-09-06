@@ -25,7 +25,7 @@ migration** in detail and then walks through the full server setup.
              ▼                      ▼                        ▼
       ┌────────────┐        ┌──────────────┐        ┌────────────────┐
       │ PostgreSQL │        │    Redis     │        │  Celery worker │
-      │  (hisms)   │        │ broker/cache │        │  + celery beat │
+      │  (hodari)  │        │ broker/cache │        │  + celery beat │
       └────────────┘        └──────────────┘        └────────────────┘
 ```
 
@@ -50,7 +50,10 @@ Reference units and configs already live in `deployment/`:
 | Project path   | `/opt/hodari/hisms_backend`        |
 | Virtualenv     | `/opt/hodari/venv`                 |
 | Domain         | `connect.example.com`              |
-| DB name / user | `hisms` / `hisms`                  |
+| DB name / user | `hodari` / `hodari_user`           |
+
+> **Updating an existing live server to the `hodari` DB?** Follow the focused
+> [LIVE_UPDATE_RUNBOOK.md](LIVE_UPDATE_RUNBOOK.md) instead of this full guide.
 
 ---
 
@@ -154,15 +157,15 @@ Run as the `postgres` OS user. **Replace the password** with a strong secret.
 
 ```bash
 sudo -u postgres psql <<'SQL'
-CREATE DATABASE hisms;
-CREATE USER hisms WITH PASSWORD 'CHANGE_ME_STRONG_PASSWORD';
+CREATE DATABASE hodari;
+CREATE USER hodari_user WITH PASSWORD 'CHANGE_ME_STRONG_PASSWORD';
 
 -- Django-recommended session defaults
-ALTER ROLE hisms SET client_encoding TO 'utf8';
-ALTER ROLE hisms SET default_transaction_isolation TO 'read committed';
-ALTER ROLE hisms SET timezone TO 'UTC';
+ALTER ROLE hodari_user SET client_encoding TO 'utf8';
+ALTER ROLE hodari_user SET default_transaction_isolation TO 'read committed';
+ALTER ROLE hodari_user SET timezone TO 'UTC';
 
-GRANT ALL PRIVILEGES ON DATABASE hisms TO hisms;
+GRANT ALL PRIVILEGES ON DATABASE hodari TO hodari_user;
 SQL
 ```
 
@@ -170,9 +173,9 @@ On **PostgreSQL 15+** the `public` schema is locked down by default, so also
 grant schema rights (connect to the new DB first):
 
 ```bash
-sudo -u postgres psql -d hisms <<'SQL'
-GRANT ALL ON SCHEMA public TO hisms;
-ALTER DATABASE hisms OWNER TO hisms;
+sudo -u postgres psql -d hodari <<'SQL'
+GRANT ALL ON SCHEMA public TO hodari_user;
+ALTER DATABASE hodari OWNER TO hodari_user;
 SQL
 ```
 
@@ -181,8 +184,12 @@ Local connections use PostgreSQL's `peer`/`md5` auth on `localhost`; no
 `127.0.0.1` with a password. Verify:
 
 ```bash
-PGPASSWORD='CHANGE_ME_STRONG_PASSWORD' psql -h 127.0.0.1 -U hisms -d hisms -c '\conninfo'
+PGPASSWORD='CHANGE_ME_STRONG_PASSWORD' psql -h 127.0.0.1 -U hodari_user -d hodari -c '\conninfo'
 ```
+
+> **Local development shortcut:** on your own machine it's fine to use the
+> built-in `postgres` superuser (`POSTGRES_USER=postgres`), but never on a
+> public server — live must use a dedicated role like `hodari_user` above.
 
 ---
 
@@ -223,8 +230,8 @@ CSRF_TRUSTED_ORIGINS=https://connect.example.com:8443
 
 # --- Database (PostgreSQL) ---
 DJANGO_USE_SQLITE=0
-POSTGRES_DB=hisms
-POSTGRES_USER=hisms
+POSTGRES_DB=hodari
+POSTGRES_USER=hodari_user
 POSTGRES_PASSWORD=CHANGE_ME_STRONG_PASSWORD
 POSTGRES_HOST=127.0.0.1
 POSTGRES_PORT=5432
@@ -465,16 +472,16 @@ sudo systemctl restart hodari hodari-celery hodari-celery-beat
 
 ```bash
 # Backup (compressed custom format)
-pg_dump -h 127.0.0.1 -U hisms -Fc hisms > /var/backups/hodari/hisms_$(date +%F).dump
+pg_dump -h 127.0.0.1 -U hodari_user -Fc hodari > /var/backups/hodari/hodari_$(date +%F).dump
 
 # Restore into a fresh DB
-pg_restore -h 127.0.0.1 -U hisms -d hisms --clean --if-exists /var/backups/hodari/hisms_YYYY-MM-DD.dump
+pg_restore -h 127.0.0.1 -U hodari_user -d hodari --clean --if-exists /var/backups/hodari/hodari_YYYY-MM-DD.dump
 ```
 
 Automate a nightly dump with cron (as the `hodari` user):
 
 ```cron
-0 2 * * * pg_dump -h 127.0.0.1 -U hisms -Fc hisms > /var/backups/hodari/hisms_$(date +\%F).dump && find /var/backups/hodari -name '*.dump' -mtime +30 -delete
+0 2 * * * pg_dump -h 127.0.0.1 -U hodari_user -Fc hodari > /var/backups/hodari/hodari_$(date +\%F).dump && find /var/backups/hodari -name '*.dump' -mtime +30 -delete
 ```
 
 (Put the DB password in `~/.pgpass` — `chmod 600` — so cron runs

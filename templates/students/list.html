@@ -7,86 +7,43 @@
 {% block extra_head %}
 {% include "includes/hodari_print_styles.html" %}
 <style>
-  .filter-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    padding: 20px;
-    background: var(--bg-page);
-    border-radius: 10px;
-    margin: 20px 0;
-    align-items: flex-end;
-  }
-  .filter-group { display: flex; flex-direction: column; gap: 6px; }
-  .filter-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
-  
-  .student-table { width: 100%; border-collapse: separate; border-spacing: 0; }
-  .student-table th { 
-    text-align: left; padding: 12px 16px; font-size: 11px; 
-    text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);
-    border-bottom: 2px solid var(--border); font-weight: 700;
-  }
-  .student-table td { padding: 14px 16px; border-bottom: 1px solid var(--border); font-size: 13.5px; vertical-align: middle; }
-  .student-table tr:hover td { background: var(--bg-page); }
-  .student-table tr:last-child td { border-bottom: none; }
-  
-  .avatar-circle {
-    width: 36px; height: 36px; border-radius: 50%; background: var(--hodari-blue-light);
-    color: var(--hodari-blue); display: flex; align-items: center; justify-content: center;
-    font-weight: 700; font-size: 14px; flex-shrink: 0;
-  }
-  
-  .count-badge {
-    background: var(--hodari-blue); color: #fff; padding: 2px 8px; 
-    border-radius: 99px; font-size: 12px; font-weight: 700; margin-left: 8px;
-  }
+  /* Page-specific layout only — shared primitives (buttons, table, pagination,
+     filter-bar, chips) come from hodari.css + hodari-components.css. */
+  .avatar-circle { width:36px; height:36px; border-radius:50%; background:var(--hodari-blue-light);
+    color:var(--hodari-blue); display:flex; align-items:center; justify-content:center;
+    font-weight:700; font-size:14px; flex-shrink:0; overflow:hidden; }
+  .avatar-circle img { width:100%; height:100%; object-fit:cover; }
+  .count-badge { background:var(--hodari-blue); color:#fff; padding:2px 8px; border-radius:99px;
+    font-size:12px; font-weight:700; margin-left:8px; }
 
-  /* Grid View Styles */
-  .view-controls { display: flex; gap: 4px; background: var(--bg-page); padding: 4px; border-radius: 8px; border: 1px solid var(--border); }
-  .view-btn { 
-    padding: 6px 12px; border-radius: 6px; border: none; background: transparent; 
-    color: var(--text-muted); cursor: pointer; font-size: 12px; font-weight: 600;
-    display: flex; align-items: center; gap: 6px; transition: all 0.2s;
-  }
-  .view-btn.active { background: var(--hodari-blue); color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+  /* Grid view */
+  .student-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-top:20px; }
+  .student-card { background:#fff; border:1px solid var(--border); border-radius:12px; padding:16px;
+    transition:all .2s ease; display:flex; flex-direction:column; min-height:160px; }
+  .student-card:hover { border-color:var(--hodari-blue); box-shadow:0 8px 20px rgba(0,0,0,.06); transform:translateY(-2px); }
+  .card-avatar { width:44px; height:44px; border-radius:10px; background:var(--hodari-blue-light);
+    color:var(--hodari-blue); display:flex; align-items:center; justify-content:center;
+    font-weight:700; font-size:16px; border:1px solid var(--border); overflow:hidden; }
+  .card-avatar img { width:100%; height:100%; object-fit:cover; }
+  .card-name { font-weight:700; color:var(--text-primary); font-size:13.5px; margin-bottom:2px; }
+  .card-admission { font-family:var(--font-mono); font-size:10.5px; color:var(--text-muted); }
+  .card-class { font-size:12px; font-weight:600; color:var(--text-secondary); }
 
-  .student-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 24px; }
-  .student-card { 
-    background: #fff; border: 1px solid var(--border); border-radius: 12px; 
-    padding: 16px; transition: all 0.2s ease; 
-    display: flex; flex-direction: column; min-height: 160px;
-  }
-  .student-card:hover { border-color: var(--hodari-blue); box-shadow: 0 8px 20px rgba(0,0,0,0.06); transform: translateY(-2px); }
-  
-  .card-avatar { 
-    width: 44px; height: 44px; border-radius: 10px; background: var(--hodari-blue-light);
-    color: var(--hodari-blue); display: flex; align-items: center; justify-content: center;
-    font-weight: 700; font-size: 16px; border: 1px solid var(--border);
-  }
-  .card-name { font-weight: 700; color: var(--text-primary); font-size: 13.5px; margin-bottom: 2px; }
-  .card-admission { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); }
-  .card-class { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+  /* View toggle mechanics */
+  .view-mode-list .student-grid { display:none; }
+  .view-mode-grid .results-table-container { display:none; }
 
-  /* View Toggling Logic */
-  .view-mode-list .student-grid { display: none; }
-  .view-mode-grid .results-table-container { display: none; }
-  
   @media print {
-    .sidebar, .topbar, header, .filter-bar, .view-controls, .pagination,
-    .btn-primary, .btn-secondary, .btn-danger, .hf-btn, .hf-btn-primary, .hf-btn-secondary, .hf-btn-danger,
-    .no-print, .no-print-area, .print-hide,
-    .metrics, .stats-bar, .section-hdr, .count-badge, .card-title-row,
-    form, .view-mode-grid, .view-mode-list { display: none !important; }
-    .print-only { display: block !important; }
-    body { background: #fff !important; }
-    .card { border: none !important; box-shadow: none !important; padding: 0 !important; }
-    .student-table th, .student-table td { padding: 8px 12px !important; font-size: 12px !important; }
+    .view-mode-grid, .view-mode-list, .filter-bar { display:block !important; }
+    .student-grid, .toolbar, .filter-bar, .pagination { display:none !important; }
+    .print-only { display:block !important; }
   }
 </style>
 {% endblock %}
 
 {% block content %}
 {% include "students/_top_tabs.html" %}
+
 <!-- Print-only branded header -->
 <div class="print-only doc-container" style="max-width:900px;margin:0 auto 20px;background:#fff;padding:24px 28px;border:1px solid #DDE3EE;border-radius:12px">
   {% include "includes/hodari_print_header.html" %}
@@ -101,10 +58,11 @@
     </div>
   </div>
 </div>
+
 <div id="student-page-container" class="card view-mode-list">
 
-  {# Summary Stats #}
-  <div class="metrics" style="margin-top:20px;margin-bottom:20px">
+  {# Summary stats #}
+  <div class="metrics" style="margin-top:4px;margin-bottom:20px">
     {% include '_partials/stat_card.html' with label='Total Students' value=summary.total variant='blue' link='?' %}
     {% include '_partials/stat_card.html' with label='Boys (Male)' value=summary.male variant='blue' link='?gender=male' %}
     {% include '_partials/stat_card.html' with label='Girls (Female)' value=summary.female variant='blue' link='?gender=female' %}
@@ -119,148 +77,103 @@
   </div>
   <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">
     {% for religion, count in summary.religions.items %}
-      <div style="background:#f0fdf4;border:1px solid #dcfce7;padding:4px 12px;border-radius:6px;font-size:12px;display:flex;gap:8px;align-items:center">
-        <span style="font-weight:600;color:#166534">{{ religion|title }}</span>
-        <span style="color:#15803d;font-weight:700;font-family:monospace">{{ count }}</span>
-      </div>
+      <c-badge variant="green">{{ religion|title }} · {{ count }}</c-badge>
     {% endfor %}
   </div>
   {% endif %}
 
-  {# Advanced Filters #}
-  <form method="get" class="filter-bar">
-    <div class="filter-group" style="flex: 2; min-width: 250px;">
-      <span class="filter-label">Search</span>
+  {# Filters #}
+  <form method="get" class="filter-bar" style="background:var(--bg-page);padding:16px;border-radius:10px;margin-bottom:18px">
+    <div class="filter-field" style="flex:2;min-width:250px">
+      <label>Search</label>
       <input name="q" type="text" class="hf2-input" id="student-search-input" placeholder="Name or admission no…" value="{{ request.GET.q }}" autocomplete="off" data-search-url="{% url 'students:api_search' %}" data-include-archived="{% if request.GET.include_archived == '1' %}1{% else %}0{% endif %}">
     </div>
-    
-    <div class="filter-group" style="flex: 1; min-width: 140px;">
-      <span class="filter-label">Department</span>
+    <div class="filter-field" style="flex:1;min-width:140px">
+      <label>Department</label>
       <select name="department" class="hf2-select">
         <option value="">All Departments</option>
-        {% for val, lbl in departments %}
-          <option value="{{ val }}" {% if request.GET.department == val %}selected{% endif %}>{{ lbl }}</option>
-        {% endfor %}
+        {% for val, lbl in departments %}<option value="{{ val }}" {% if request.GET.department == val %}selected{% endif %}>{{ lbl }}</option>{% endfor %}
       </select>
     </div>
-
-    <div class="filter-group" style="flex: 1; min-width: 140px;">
-      <span class="filter-label">Class</span>
+    <div class="filter-field" style="flex:1;min-width:140px">
+      <label>Class</label>
       <select name="class_name" class="hf2-select">
         <option value="">All Classes</option>
-        {% for cls in classes %}
-          <option value="{{ cls }}" {% if request.GET.class_name == cls %}selected{% endif %}>{{ cls }}</option>
-        {% endfor %}
+        {% for cls in classes %}<option value="{{ cls }}" {% if request.GET.class_name == cls %}selected{% endif %}>{{ cls }}</option>{% endfor %}
       </select>
     </div>
-
-    <div class="filter-group" style="flex: 0.8; min-width: 120px;">
-      <span class="filter-label">Status</span>
+    <div class="filter-field" style="flex:.8;min-width:120px">
+      <label>Status</label>
       <select name="status" class="hf2-select">
         <option value="">All Status</option>
-        {% for val, lbl in statuses %}
-          <option value="{{ val }}" {% if request.GET.status == val %}selected{% endif %}>{{ lbl }}</option>
-        {% endfor %}
+        {% for val, lbl in statuses %}<option value="{{ val }}" {% if request.GET.status == val %}selected{% endif %}>{{ lbl }}</option>{% endfor %}
       </select>
     </div>
-
-    <div class="filter-group" style="flex: 1; min-width: 140px;">
-      <span class="filter-label">Academic Year</span>
+    <div class="filter-field" style="flex:1;min-width:140px">
+      <label>Academic Year</label>
       <select name="academic_year" class="hf2-select">
         <option value="">All Years</option>
-        {% for ay in academic_years %}
-          <option value="{{ ay.id }}" {% if request.GET.academic_year == ay.id|stringformat:"d" %}selected{% endif %}>
-            {{ ay.name }}{% if ay.is_current %} (Current){% endif %}
-          </option>
-        {% endfor %}
+        {% for ay in academic_years %}<option value="{{ ay.id }}" {% if request.GET.academic_year == ay.id|stringformat:"d" %}selected{% endif %}>{{ ay.name }}{% if ay.is_current %} (Current){% endif %}</option>{% endfor %}
       </select>
     </div>
-
-    <div class="filter-group" style="flex: 0.8; min-width: 100px;">
-      <span class="filter-label">Archived</span>
+    <div class="filter-field" style="flex:.8;min-width:120px">
+      <label>Archived</label>
       <input type="hidden" name="include_archived" id="include-archived-input" value="{{ request.GET.include_archived|default:'0' }}">
-      <button type="button" id="archived-pill"
-        onclick="toggleArchived()"
-        style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; padding:8px 14px; border-radius:8px; font-size:12px; font-weight:700; font-family:var(--font-ui); border:1.5px solid; transition:all .15s ease; background:{% if request.GET.include_archived == '1' %}#E8F5EC{% else %}#fff{% endif %}; color:{% if request.GET.include_archived == '1' %}#1B7B34{% else %}#94A3B8{% endif %}; border-color:{% if request.GET.include_archived == '1' %}#A7F3D0{% else %}#E2E8F0{% endif %}">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 4H3"/><path d="M8 2v2h8V2"/><path d="M19 4l-1 16H6L5 4"/></svg>
+      <c-button type="button" variant="secondary" id="archived-pill" onclick="toggleArchived()">
+        <c-slot name="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 4H3"/><path d="M8 2v2h8V2"/><path d="M19 4l-1 16H6L5 4"/></svg></c-slot>
         {% if request.GET.include_archived == '1' %}Showing archived{% else %}Include archived{% endif %}
-      </button>
-      <script>
-        function toggleArchived() {
-          var input = document.getElementById('include-archived-input');
-          var btn = document.getElementById('archived-pill');
-          var isActive = input.value === '1';
-          input.value = isActive ? '0' : '1';
-          btn.style.background = isActive ? '#fff' : '#E8F5EC';
-          btn.style.color = isActive ? '#94A3B8' : '#1B7B34';
-          btn.style.borderColor = isActive ? '#E2E8F0' : '#A7F3D0';
-          btn.innerHTML = isActive
-            ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 4H3"/><path d="M8 2v2h8V2"/><path d="M19 4l-1 16H6L5 4"/></svg> Include archived'
-            : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 4H3"/><path d="M8 2v2h8V2"/><path d="M19 4l-1 16H6L5 4"/></svg> Showing archived';
-          // Submit the form to reload with new filter
-          btn.closest('form').submit();
-        }
-      </script>
+      </c-button>
     </div>
-
-    <div style="display:flex; gap:8px">
-      <button type="submit" id="filter-apply-btn" class="btn-primary" style="padding: 10px 20px;">Apply</button>
-      <a href="{% url 'students:list' %}" class="btn-secondary" style="padding: 10px 16px; text-decoration:none">Reset</a>
+    <div class="toolbar-group">
+      <c-button type="submit" variant="primary" id="filter-apply-btn">Apply</c-button>
+      <c-button variant="secondary" href="{% url 'students:list' %}">Reset</c-button>
     </div>
-
     {% has_perm user "students.add_student" as can_add_student %}
     {% if request.GET.class_name and can_add_student %}
     <div style="margin-left:auto">
-      <button type="button" class="btn-secondary" style="padding: 10px 16px; border: 1px dashed var(--hodari-blue); color: var(--hodari-blue)"
+      <c-button variant="secondary"
         onclick="confirmDeleteModal({title:'Bulk Generate IDs?',body:'Generate IDs for all students in <strong>{{ request.GET.class_name }}</strong> who do not have a valid ADM-YYYY-XXX format?',detail:'Existing valid IDs will NOT be changed.',confirmText:'Generate IDs',url:'{% url 'students:bulk_generate_ids' %}',type:'info',extraData:[{name:'class_name',value:'{{ request.GET.class_name }}'}]})">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        <c-slot name="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></c-slot>
         Bulk Generate IDs
-      </button>
+      </c-button>
     </div>
     {% endif %}
   </form>
 
-  {# Results Grid (Default) #}
+  {# Results — grid (toggle) #}
   <div class="student-grid">
     {% for student in students %}
     <div class="student-card">
-      <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px">
-        <div class="card-avatar" style="overflow:hidden; padding:0">
-          {% if student.photo %}
-            <img src="{{ student.photo.url }}" style="width:100%; height:100%; object-fit:cover">
-          {% else %}
-            {{ student.first_name|slice:":1" }}{{ student.last_name|slice:":1" }}
-          {% endif %}
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <div class="card-avatar">
+          {% if student.photo %}<img src="{{ student.photo.url }}">{% else %}{{ student.first_name|slice:":1" }}{{ student.last_name|slice:":1" }}{% endif %}
         </div>
-        <div style="flex:1; min-width:0">
-          <div class="card-name" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ student.first_name }} {{ student.last_name }}</div>
+        <div style="flex:1;min-width:0">
+          <div class="card-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ student.first_name }} {{ student.last_name }}</div>
           <div class="card-admission">{{ student.admission_no }}</div>
         </div>
       </div>
-      
-      <div style="padding-top:12px; border-top:1px solid #f1f5f9; margin-top:auto">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px">
+      <div style="padding-top:12px;border-top:1px solid #f1f5f9;margin-top:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <div class="card-class">{{ student.class_name }}</div>
-          <div style="display:flex; gap:4px; align-items:center">
-            {% if student.is_archived %}<span class="chip chip-grey" style="font-size:10px; padding:2px 6px; background:#F1F5F9; color:#64748B">Archived</span>{% endif %}
-            <span class="chip {% if student.status == 'active' %}chip-green{% elif student.status == 'suspended' %}chip-amber{% elif student.status == 'withdrawn' %}chip-red{% else %}chip-grey{% endif %}" style="font-size:10px; padding:2px 8px">
-              {{ student.get_status_display }}
-            </span>
+          <div style="display:flex;gap:4px;align-items:center">
+            {% if student.is_archived %}<c-badge variant="grey">Archived</c-badge>{% endif %}
+            <c-badge variant="{% if student.status == 'active' %}green{% elif student.status == 'suspended' %}amber{% elif student.status == 'withdrawn' %}red{% else %}grey{% endif %}">{{ student.get_status_display }}</c-badge>
           </div>
         </div>
-        <a href="{% url 'students:detail' student.pk %}" class="btn-secondary btn-sm" style="width:100%; justify-content:center; padding:8px">View Profile</a>
+        <c-button variant="secondary" size="sm" href="{% url 'students:detail' student.pk %}" style="width:100%">View Profile</c-button>
       </div>
     </div>
     {% empty %}
-    <div id="empty-grid-state" style="grid-column: 1 / -1;">
+    <div id="empty-grid-state" style="grid-column:1 / -1">
       {% include '_partials/empty_state.html' with title='No student records yet' desc='Enroll students via the Admissions Pipeline or Bulk Import.' icon='users' action_url='/admissions/' action_text='Admissions Pipeline' %}
     </div>
     {% endfor %}
   </div>
 
-  {# Results Table #}
-  <div class="results-table-container" style="overflow-x:auto">
-    <table class="student-table">
+  {# Results — table (default) #}
+  <div class="results-table-container table-wrap">
+    <table class="h-table">
       <thead>
         <tr>
           <th>Admission</th>
@@ -268,43 +181,35 @@
           <th>Grade / Class</th>
           <th>Gender</th>
           <th>Status</th>
-          <th class="no-print-area" style="text-align:right">Action</th>
+          <th class="col-actions no-print-area">Action</th>
         </tr>
       </thead>
       <tbody>
         {% for student in students %}
         <tr>
-          <td style="color:var(--text-muted); font-family:var(--font-mono); font-size:12px">{{ student.admission_no }}</td>
+          <td style="color:var(--text-muted);font-family:var(--font-mono);font-size:12px">{{ student.admission_no }}</td>
           <td>
-            <div style="display:flex; align-items:center; gap:12px">
-              <div class="avatar-circle" style="overflow:hidden; padding:0">
-                {% if student.photo %}
-                  <img src="{{ student.photo.url }}" style="width:100%; height:100%; object-fit:cover">
-                {% else %}
-                  {{ student.first_name|slice:":1" }}{{ student.last_name|slice:":1" }}
-                {% endif %}
-              </div>
+            <div style="display:flex;align-items:center;gap:12px">
+              <div class="avatar-circle">{% if student.photo %}<img src="{{ student.photo.url }}">{% else %}{{ student.first_name|slice:":1" }}{{ student.last_name|slice:":1" }}{% endif %}</div>
               <div>
-                <div style="font-weight:600; color:var(--text-primary)">{{ student.first_name }} {{ student.last_name }}</div>
-                {% if student.preferred_name %}<div style="font-size:11px; color:var(--text-muted)">"{{ student.preferred_name }}"</div>{% endif %}
+                <div style="font-weight:600;color:var(--text-primary)">{{ student.first_name }} {{ student.last_name }}</div>
+                {% if student.preferred_name %}<div style="font-size:11px;color:var(--text-muted)">"{{ student.preferred_name }}"</div>{% endif %}
               </div>
             </div>
           </td>
           <td>
             <div style="font-weight:500">{{ student.class_name }}</div>
-            {% if student.stream_name %}<div style="font-size:11px; color:var(--text-muted)">Stream: {{ student.stream_name }}</div>{% endif %}
+            {% if student.stream_name %}<div style="font-size:11px;color:var(--text-muted)">Stream: {{ student.stream_name }}</div>{% endif %}
           </td>
           <td style="text-transform:capitalize">{{ student.gender|default:"N/A" }}</td>
           <td>
-            <div style="display:flex; gap:4px; align-items:center">
-              {% if student.is_archived %}<span class="chip chip-grey" style="font-size:10px; padding:2px 6px; background:#F1F5F9; color:#64748B">Archived</span>{% endif %}
-              <span class="chip {% if student.status == 'active' %}chip-green{% elif student.status == 'suspended' %}chip-amber{% elif student.status == 'withdrawn' %}chip-red{% else %}chip-grey{% endif %}">
-                {{ student.get_status_display }}
-              </span>
+            <div style="display:flex;gap:4px;align-items:center">
+              {% if student.is_archived %}<c-badge variant="grey">Archived</c-badge>{% endif %}
+              <c-badge variant="{% if student.status == 'active' %}green{% elif student.status == 'suspended' %}amber{% elif student.status == 'withdrawn' %}red{% else %}grey{% endif %}">{{ student.get_status_display }}</c-badge>
             </div>
           </td>
-          <td class="no-print-area" style="text-align:right">
-            <a href="{% url 'students:detail' student.pk %}" class="btn-secondary btn-sm" style="padding:6px 14px">View Profile</a>
+          <td class="col-actions no-print-area">
+            <c-button variant="secondary" size="sm" href="{% url 'students:detail' student.pk %}">View Profile</c-button>
           </td>
         </tr>
         {% empty %}
@@ -316,27 +221,8 @@
     </table>
   </div>
 
-  {# Pagination #}
-  {% if is_paginated %}
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-top:24px; padding-top:16px; border-top:1px solid var(--border)">
-    <div style="font-size:13px; color:var(--text-muted)">
-      Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} students
-    </div>
-    <div style="display:flex; gap:8px">
-      {% if page_obj.has_previous %}
-        <a href="?page={{ page_obj.previous_page_number }}&q={{ request.GET.q }}&class_name={{ request.GET.class_name }}&status={{ request.GET.status }}&department={{ request.GET.department }}&academic_year={{ request.GET.academic_year }}&include_archived={{ request.GET.include_archived }}" class="btn-secondary btn-sm">&larr; Previous</a>
-      {% endif %}
-      
-      <div style="padding:6px 12px; font-size:13px; font-weight:600; background:var(--hodari-blue-light); color:var(--hodari-blue); border-radius:6px">
-        {{ page_obj.number }} / {{ paginator.num_pages }}
-      </div>
-      
-      {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}&q={{ request.GET.q }}&class_name={{ request.GET.class_name }}&status={{ request.GET.status }}&department={{ request.GET.department }}&academic_year={{ request.GET.academic_year }}&include_archived={{ request.GET.include_archived }}" class="btn-secondary btn-sm">Next &rarr;</a>
-      {% endif %}
-    </div>
-  </div>
-  {% endif %}
+  {# Pagination — canonical #}
+  <c-pagination :page_obj="page_obj" label="students" />
 </div>
 
 <script>
@@ -344,156 +230,101 @@
     const container = document.getElementById('student-page-container');
     const btnGrid = document.getElementById('btn-grid');
     const btnList = document.getElementById('btn-list');
-    
     if (mode === 'grid') {
-      container.classList.remove('view-mode-list');
-      container.classList.add('view-mode-grid');
-      btnGrid.classList.add('active');
-      btnList.classList.remove('active');
+      container.classList.remove('view-mode-list'); container.classList.add('view-mode-grid');
+      btnGrid && btnGrid.classList.add('active'); btnList && btnList.classList.remove('active');
     } else {
-      container.classList.remove('view-mode-grid');
-      container.classList.add('view-mode-list');
-      btnList.classList.add('active');
-      btnGrid.classList.remove('active');
+      container.classList.remove('view-mode-grid'); container.classList.add('view-mode-list');
+      btnList && btnList.classList.add('active'); btnGrid && btnGrid.classList.remove('active');
     }
     localStorage.setItem('student_view_mode', mode);
   }
+  setView(localStorage.getItem('student_view_mode') || 'list');
 
-  // Load preference
-  const savedMode = localStorage.getItem('student_view_mode') || 'list';
-  setView(savedMode);
+  function toggleArchived() {
+    var input = document.getElementById('include-archived-input');
+    input.value = input.value === '1' ? '0' : '1';
+    input.closest('form').submit();
+  }
 
   // ── Real-time AJAX search with debounce ──────────────────────────────
   (function() {
     const searchInput = document.getElementById('student-search-input');
     if (!searchInput) return;
-
     const searchUrl = searchInput.getAttribute('data-search-url');
     const gridContainer = document.querySelector('.student-grid');
-    const tableBody = document.querySelector('.student-table tbody');
+    const tableBody = document.querySelector('.h-table tbody');
     const countBadge = document.querySelector('.count-badge');
     let searchTimeout = null;
 
-    function renderEmptySearch(msg) {
-      const emptyHtml = '<div style="grid-column: 1 / -1; padding:60px; text-align:center;">' +
-        '<div style="color:var(--text-muted); font-size:16px; margin-bottom:8px">' +
-        msg +
-        '</div></div>';
-      gridContainer.innerHTML = emptyHtml;
-      tableBody.innerHTML = '<tr><td colspan="6" style="padding:60px; text-align:center;">' +
-        '<div style="color:var(--text-muted); font-size:16px; margin-bottom:8px">' +
-        msg +
-        '</div></td></tr>';
+    function escapeHtml(str) { if (!str) return ''; const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+    function statusChip(s) {
+      const v = s.status === 'active' ? 'green' : s.status === 'suspended' ? 'amber' : s.status === 'withdrawn' ? 'red' : 'grey';
+      return '<span class="chip chip-' + v + '">' + escapeHtml(s.status_display) + '</span>';
+    }
+    function archivedChip(s) { return s.is_archived ? '<span class="chip chip-grey">Archived</span>' : ''; }
+    function avatar(s, cls) {
+      const initials = (s.first_name.charAt(0) + s.last_name.charAt(0)).toUpperCase();
+      return '<div class="' + cls + '">' + (s.photo_url ? '<img src="' + s.photo_url + '">' : initials) + '</div>';
     }
 
     function renderStudentCard(s) {
-      const initials = (s.first_name.charAt(0) + s.last_name.charAt(0)).toUpperCase();
-      const avatarHtml = s.photo_url
-        ? '<img src="' + s.photo_url + '" style="width:100%; height:100%; object-fit:cover">'
-        : initials;
-      const statusClass = s.status === 'active' ? 'chip-green'
-        : s.status === 'suspended' ? 'chip-amber'
-        : s.status === 'withdrawn' ? 'chip-red'
-        : 'chip-grey';
-      const archivedBadge = s.is_archived
-        ? '<span class="chip chip-grey" style="font-size:10px; padding:2px 6px; background:#F1F5F9; color:#64748B">Archived</span>'
-        : '';
       return '<div class="student-card">' +
-        '<div style="display:flex; align-items:center; gap:12px; margin-bottom:12px">' +
-        '<div class="card-avatar" style="overflow:hidden; padding:0">' + avatarHtml + '</div>' +
-        '<div style="flex:1; min-width:0">' +
-        '<div class="card-name" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis">' +
-        escapeHtml(s.first_name) + ' ' + escapeHtml(s.last_name) +
-        '</div>' +
-        '<div class="card-admission">' + escapeHtml(s.admission_no) + '</div>' +
-        '</div></div>' +
-        '<div style="padding-top:12px; border-top:1px solid #f1f5f9; margin-top:auto">' +
-        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px">' +
+        '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">' + avatar(s, 'card-avatar') +
+        '<div style="flex:1;min-width:0"><div class="card-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' +
+        escapeHtml(s.first_name) + ' ' + escapeHtml(s.last_name) + '</div>' +
+        '<div class="card-admission">' + escapeHtml(s.admission_no) + '</div></div></div>' +
+        '<div style="padding-top:12px;border-top:1px solid #f1f5f9;margin-top:auto">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
         '<div class="card-class">' + escapeHtml(s.class_name) + '</div>' +
-        '<div style="display:flex; gap:4px; align-items:center">' + archivedBadge +
-        '<span class="chip ' + statusClass + '" style="font-size:10px; padding:2px 8px">' +
-        escapeHtml(s.status_display) + '</span></div></div>' +
-        '<a href="/students/' + s.id + '/" class="btn-secondary btn-sm" style="width:100%; justify-content:center; padding:8px">View Profile</a>' +
+        '<div style="display:flex;gap:4px;align-items:center">' + archivedChip(s) + statusChip(s) + '</div></div>' +
+        '<a href="/students/' + s.id + '/" class="btn btn-secondary btn-sm" style="width:100%">View Profile</a>' +
         '</div></div>';
     }
 
     function renderStudentRow(s) {
-      const initials = (s.first_name.charAt(0) + s.last_name.charAt(0)).toUpperCase();
-      const avatarHtml = s.photo_url
-        ? '<img src="' + s.photo_url + '" style="width:100%; height:100%; object-fit:cover">'
-        : initials;
-      const statusClass = s.status === 'active' ? 'chip-green'
-        : s.status === 'suspended' ? 'chip-amber'
-        : s.status === 'withdrawn' ? 'chip-red'
-        : 'chip-grey';
-      const archivedBadge = s.is_archived
-        ? '<span class="chip chip-grey" style="font-size:10px; padding:2px 6px; background:#F1F5F9; color:#64748B">Archived</span>'
-        : '';
-      var preferredHtml = s.preferred_name
-        ? '<div style="font-size:11px; color:var(--text-muted)">"' + escapeHtml(s.preferred_name) + '"</div>'
-        : '';
-      var streamHtml = s.stream_name
-        ? '<div style="font-size:11px; color:var(--text-muted)">Stream: ' + escapeHtml(s.stream_name) + '</div>'
-        : '';
+      var preferred = s.preferred_name ? '<div style="font-size:11px;color:var(--text-muted)">"' + escapeHtml(s.preferred_name) + '"</div>' : '';
+      var stream = s.stream_name ? '<div style="font-size:11px;color:var(--text-muted)">Stream: ' + escapeHtml(s.stream_name) + '</div>' : '';
       return '<tr>' +
-        '<td style="color:var(--text-muted); font-family:var(--font-mono); font-size:12px">' + escapeHtml(s.admission_no) + '</td>' +
-        '<td><div style="display:flex; align-items:center; gap:12px">' +
-        '<div class="avatar-circle" style="overflow:hidden; padding:0">' + avatarHtml + '</div>' +
-        '<div><div style="font-weight:600; color:var(--text-primary)">' +
-        escapeHtml(s.first_name) + ' ' + escapeHtml(s.last_name) +
-        '</div>' + preferredHtml + '</div></div></td>' +
-        '<td><div style="font-weight:500">' + escapeHtml(s.class_name) + '</div>' + streamHtml + '</td>' +
+        '<td style="color:var(--text-muted);font-family:var(--font-mono);font-size:12px">' + escapeHtml(s.admission_no) + '</td>' +
+        '<td><div style="display:flex;align-items:center;gap:12px">' + avatar(s, 'avatar-circle') +
+        '<div><div style="font-weight:600;color:var(--text-primary)">' + escapeHtml(s.first_name) + ' ' + escapeHtml(s.last_name) + '</div>' + preferred + '</div></div></td>' +
+        '<td><div style="font-weight:500">' + escapeHtml(s.class_name) + '</div>' + stream + '</td>' +
         '<td style="text-transform:capitalize">' + escapeHtml(s.gender || 'N/A') + '</td>' +
-        '<td><div style="display:flex; gap:4px; align-items:center">' + archivedBadge +
-        '<span class="chip ' + statusClass + '">' + escapeHtml(s.status_display) + '</span></div></td>' +
-        '<td style="text-align:right"><a href="/students/' + s.id + '/" class="btn-secondary btn-sm" style="padding:6px 14px">View Profile</a></td>' +
+        '<td><div style="display:flex;gap:4px;align-items:center">' + archivedChip(s) + statusChip(s) + '</div></td>' +
+        '<td class="col-actions no-print-area"><a href="/students/' + s.id + '/" class="btn btn-secondary btn-sm">View Profile</a></td>' +
         '</tr>';
     }
 
-    function escapeHtml(str) {
-      if (!str) return '';
-      const div = document.createElement('div');
-      div.textContent = str;
-      return div.innerHTML;
+    function renderEmpty(msg) {
+      var block = '<div style="padding:60px;text-align:center;color:var(--text-muted);font-size:15px">' + msg + '</div>';
+      gridContainer.innerHTML = '<div style="grid-column:1 / -1">' + block + '</div>';
+      tableBody.innerHTML = '<tr><td colspan="6">' + block + '</td></tr>';
     }
 
     function doSearch(q) {
       var includeArchived = searchInput.getAttribute('data-include-archived') === '1';
-      var url = searchUrl + '?q=' + encodeURIComponent(q);
-      if (includeArchived) url += '&include_archived=1';
-      fetch(url)
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (countBadge) countBadge.textContent = data.count;
-          if (data.count === 0) {
-            renderEmptySearch('No students found matching your search.');
-          } else {
-            gridContainer.innerHTML = data.students.map(renderStudentCard).join('');
-            tableBody.innerHTML = data.students.map(renderStudentRow).join('');
-          }
-        })
-        .catch(function() {
-          // Silent fail — fall back to page reload behavior
-        });
+      var url = searchUrl + '?q=' + encodeURIComponent(q) + (includeArchived ? '&include_archived=1' : '');
+      fetch(url).then(function(r){ return r.json(); }).then(function(data) {
+        if (countBadge) countBadge.textContent = data.count;
+        if (data.count === 0) { renderEmpty('No students found matching your search.'); }
+        else {
+          gridContainer.innerHTML = data.students.map(renderStudentCard).join('');
+          tableBody.innerHTML = data.students.map(renderStudentRow).join('');
+        }
+      }).catch(function(){});
     }
 
     searchInput.addEventListener('input', function() {
       clearTimeout(searchTimeout);
       var q = this.value.trim();
-
       if (q.length === 0) {
-        // Clear search — reload preserving other filter params
-        var searchParams = new URLSearchParams(window.location.search);
-        searchParams.delete('q');
-        var newUrl = window.location.pathname + (searchParams.toString() ? '?' + searchParams.toString() : '');
-        window.location.href = newUrl;
+        var params = new URLSearchParams(window.location.search); params.delete('q');
+        window.location.href = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
         return;
       }
-
-      if (q.length < 2) {
-        return;
-      }
-      searchTimeout = setTimeout(function() { doSearch(q); }, 300);
+      if (q.length < 2) return;
+      searchTimeout = setTimeout(function(){ doSearch(q); }, 300);
     });
   })();
 </script>

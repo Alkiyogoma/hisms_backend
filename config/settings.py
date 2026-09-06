@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "corsheaders",
     "django_celery_beat",
+    "django_cotton",
     # Project apps
     "core",
     "users",
@@ -77,12 +78,17 @@ TEMPLATES = [
         "OPTIONS": {
             "loaders": [
                 ("django.template.loaders.cached.Loader", [
+                    "django_cotton.cotton_loader.Loader",
                     "django.template.loaders.filesystem.Loader",
                     "django.template.loaders.app_directories.Loader",
                 ]),
             ] if not DEBUG else [
+                "django_cotton.cotton_loader.Loader",
                 "django.template.loaders.filesystem.Loader",
                 "django.template.loaders.app_directories.Loader",
+            ],
+            "builtins": [
+                "django_cotton.templatetags.cotton",
             ],
             "context_processors": [
                 "django.template.context_processors.request",

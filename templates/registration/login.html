@@ -58,6 +58,8 @@
       width: 100%; height: 100%;
       object-fit: cover;
     }
+    .hero-slide { opacity: 0; transition: opacity 1.2s ease-in-out; }
+    .hero-slide.active { opacity: 1; }
     .login-left-overlay {
       position: absolute; inset: 0;
       background: linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.55) 70%, rgba(0,0,0,0.75) 100%);
@@ -325,17 +327,13 @@
 
   {# ── LEFT PANEL ── #}
   <section class="login-left">
-    <div class="login-left-bg">
-      {% if brand.login_staff_hero_image %}
-        <img id="staffHero" src="{{ brand.login_staff_hero_image.url }}" alt="" style="transition:opacity .4s">
-      {% else %}
-        <img id="staffHero" src="{% static 'branding/hodari_school_logo.jpg' %}" alt="" style="transition:opacity .4s">
-      {% endif %}
-      {% if brand.login_parent_hero_image %}
-        <img id="parentHero" src="{{ brand.login_parent_hero_image.url }}" alt="" style="opacity:0;transition:opacity .4s">
-      {% else %}
-        <img id="parentHero" src="{% static 'branding/hodari_school_logo.jpg' %}" alt="" style="opacity:0;transition:opacity .4s">
-      {% endif %}
+    <div class="login-left-bg" id="heroSlideshow">
+      <img class="hero-slide active" src="{% static 'images/kid.jpg' %}" alt="">
+      <img class="hero-slide" src="{% static 'images/kid1.jpg' %}" alt="">
+      <img class="hero-slide" src="{% static 'images/kid2.jpg' %}" alt="">
+      <img class="hero-slide" src="{% static 'images/kid3.jpg' %}" alt="">
+      <img class="hero-slide" src="{% static 'images/kid4.jpg' %}" alt="">
+      <img class="hero-slide" src="{% static 'images/kig5.jpg' %}" alt="">
       <div class="login-left-overlay"></div>
     </div>
     <div class="login-left-content">
@@ -466,11 +464,6 @@ function switchTab(tab) {
   document.querySelectorAll('.login-tab-panel').forEach(function(p) { p.classList.remove('active'); });
   document.getElementById('tab-' + tab).classList.add('active');
   document.getElementById('panel-' + tab).classList.add('active');
-  // Swap hero images
-  var staffImg = document.getElementById('staffHero');
-  var parentImg = document.getElementById('parentHero');
-  if (tab === 'staff') { staffImg.style.opacity = '1'; parentImg.style.opacity = '0'; }
-  else { staffImg.style.opacity = '0'; parentImg.style.opacity = '1'; }
   // Focus first input of the new tab
   var firstInput = document.querySelector('#panel-' + tab + ' .field-input');
   if (firstInput) firstInput.focus();
@@ -545,5 +538,19 @@ document.getElementById('staffForm').addEventListener('submit', function() {
 });
 </script>
 
+<script>
+  // Left-panel hero slideshow — cross-fades through the static kid images.
+  (function () {
+    var slides = document.querySelectorAll('#heroSlideshow .hero-slide');
+    if (slides.length < 2) return;
+    var i = 0;
+    setInterval(function () {
+      slides[i].classList.remove('active');
+      i = (i + 1) % slides.length;
+      slides[i].classList.add('active');
+    }, 5000);
+  })();
+</script>
+<script src="{% static 'branding/password-toggle.js' %}?v=1.0" defer></script>
 </body>
 </html>

@@ -1,6 +1,7 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,35 +9,109 @@
   <link rel="icon" type="image/x-icon" href="{% static 'branding/favicon.ico' %}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Merriweather:wght@700&family=Roboto+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
-  <link rel="stylesheet" href="{% static 'branding/hodari.css' %}?v=1.5">
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Merriweather:wght@700&family=Roboto+Mono:wght@400;500&display=swap"
+    media="print" onload="this.media='all'">
+  <link rel="stylesheet" href="{% static 'branding/hodari.css' %}?v=1.6">
   <link rel="stylesheet" href="{% static 'branding/hodari-forms.css' %}?v=1.2">
+  <link rel="stylesheet" href="{% static 'branding/hodari-components.css' %}?v=1.0">
   <style>
     /* Global print styles */
-    @page { size: A4; margin: 15mm; }
+    @page {
+      size: A4;
+      margin: 15mm;
+    }
+
     @media print {
+
       /* Hide all web UI chrome */
-      .sidebar, .topbar, header, .toaster-container, .toast, .sub-nav, .hf2-actions,
-      .btn-primary, .btn-secondary, .btn-danger, .hf-btn, .hf-btn-primary, .hf-btn-secondary, .hf-btn-danger,
-      form, .filter-bar, .filter-row, .view-controls, .pagination,
-      .view-as-banner, #desktopWarning, #viewAsBanner, .messages-container, .message,
-      .metrics, .stats-bar, .section-hdr, .count-badge, .card-title-row,
-      .no-print, .no-print-area, .print-hide, .hr-tab-bar, .back-link,
-      .status-btn-group, .nav-tabs, .welfare-tabs, .queue-item,
-      .staff-actions, .onboard-progress, .chip-onboarding, .chip-expiring,
-      .hf2-toolbar, .legend, .view-toggle, .week-nav, .bulk-delete-bar, #bulkDeleteBar,
-      .tt-slot a[title="Edit slot"], .tt-slot button[title="Delete slot"],
-      .slot-select, .info-bar,
-      [style*="display:flex"][style*="justify-content:space-between"] { display: none !important; }
+      .sidebar,
+      .topbar,
+      header,
+      .toaster-container,
+      .toast,
+      .sub-nav,
+      .hf2-actions,
+      .btn-primary,
+      .btn-secondary,
+      .btn-danger,
+      .hf-btn,
+      .hf-btn-primary,
+      .hf-btn-secondary,
+      .hf-btn-danger,
+      form,
+      .filter-bar,
+      .filter-row,
+      .view-controls,
+      .pagination,
+      .view-as-banner,
+      #desktopWarning,
+      #viewAsBanner,
+      .messages-container,
+      .message,
+      .metrics,
+      .stats-bar,
+      .section-hdr,
+      .count-badge,
+      .card-title-row,
+      .no-print,
+      .no-print-area,
+      .print-hide,
+      .hr-tab-bar,
+      .back-link,
+      .status-btn-group,
+      .nav-tabs,
+      .welfare-tabs,
+      .queue-item,
+      .staff-actions,
+      .onboard-progress,
+      .chip-onboarding,
+      .chip-expiring,
+      .hf2-toolbar,
+      .legend,
+      .view-toggle,
+      .week-nav,
+      .bulk-delete-bar,
+      #bulkDeleteBar,
+      .tt-slot a[title="Edit slot"],
+      .tt-slot button[title="Delete slot"],
+      .slot-select,
+      .info-bar,
+      [style*="display:flex"][style*="justify-content:space-between"] {
+        display: none !important;
+      }
+
       /* Layout reset */
-      .main { margin-left: 0 !important; }
-      .content { padding: 0 !important; }
-      .card { border: none !important; box-shadow: none !important; padding: 0 !important; }
-      body { background: white !important; }
+      .main {
+        margin-left: 0 !important;
+      }
+
+      .content {
+        padding: 0 !important;
+      }
+
+      .card {
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+      }
+
+      body {
+        background: white !important;
+      }
+
       /* Strip all chip/badge/pill/tag colors to plain text */
-      .chip, .badge, .pill, .tag, .stat-pill, .lp-badge, .grade-chip,
-      span[style*="border-radius:99"], span[style*="border-radius: 99"],
-      span[style*="background:"], span[style*="background :"] {
+      .chip,
+      .badge,
+      .pill,
+      .tag,
+      .stat-pill,
+      .lp-badge,
+      .grade-chip,
+      span[style*="border-radius:99"],
+      span[style*="border-radius: 99"],
+      span[style*="background:"],
+      span[style*="background :"] {
         background: transparent !important;
         color: #333 !important;
         border: 1px solid #ccc !important;
@@ -44,290 +119,526 @@
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
+
       /* Table print rules */
-      table { width: 100% !important; border-collapse: collapse !important; font-size: 11px !important; }
-      th, td { padding: 6px 8px !important; border: 1px solid #ddd !important; }
-      th { background: #f0f0f0 !important; font-weight: 700 !important; text-transform: uppercase !important; font-size: 9px !important; letter-spacing: 0.05em !important; }
-      tr { page-break-inside: avoid !important; }
+      table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        font-size: 11px !important;
+      }
+
+      th,
+      td {
+        padding: 6px 8px !important;
+        border: 1px solid #ddd !important;
+      }
+
+      th {
+        background: #f0f0f0 !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        font-size: 9px !important;
+        letter-spacing: 0.05em !important;
+      }
+
+      tr {
+        page-break-inside: avoid !important;
+      }
+
       /* Page breaks */
-      h1, h2, h3 { page-break-after: avoid !important; }
-      .doc-container { page-break-inside: avoid !important; }
+      h1,
+      h2,
+      h3 {
+        page-break-after: avoid !important;
+      }
+
+      .doc-container {
+        page-break-inside: avoid !important;
+      }
     }
-    
-    .toaster-container { position: fixed; top: 24px; right: 24px; z-index: 10000; display: flex; flex-direction: column; gap: 12px; pointer-events: none; }
-    .toast { background: #fff; border-radius: 12px; padding: 14px 20px; box-shadow: 0 10px 30px rgba(2,58,165,0.12); color: var(--text-primary); font-size: 13.5px; font-weight: 600; min-width: 320px; max-width: 480px; pointer-events: auto; animation: toast-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; display: flex; align-items: center; gap: 12px; border: 1px solid var(--border); border-left: 4px solid var(--hodari-blue); }
-    .toast.success { border-left-color: var(--green); }
-    .toast.error { border-left-color: #DC2626; }
-    .toast.warning { border-left-color: var(--hodari-gold); }
-    .toast.hide { animation: toast-out 0.3s ease-in forwards; }
-    @keyframes toast-in { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-    @keyframes toast-out { from { transform: translateX(0); opacity: 1; } to { transform: translateX(40px); opacity: 0; } }
-    .toast-icon { flex-shrink: 0; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border-radius: 6px; }
-    .toast.success .toast-icon { background: var(--green-bg); color: var(--green); }
-    .toast.error .toast-icon { background: var(--red-bg); color: #DC2626; }
-    .toast.warning .toast-icon { background: #FFF7ED; color: #9A3412; }
-    
-    .htmx-indicator { display: none; }
-    .htmx-request .htmx-indicator { display: inline-block; }
-    .htmx-request.htmx-indicator { display: inline-block; }
-    
+
+    .toaster-container {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      pointer-events: none;
+    }
+
+    .toast {
+      background: #fff;
+      border-radius: 12px;
+      padding: 14px 20px;
+      box-shadow: 0 10px 30px rgba(2, 58, 165, 0.12);
+      color: var(--text-primary);
+      font-size: 13.5px;
+      font-weight: 600;
+      min-width: 320px;
+      max-width: 480px;
+      pointer-events: auto;
+      animation: toast-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--hodari-blue);
+    }
+
+    .toast.success {
+      border-left-color: var(--green);
+    }
+
+    .toast.error {
+      border-left-color: #DC2626;
+    }
+
+    .toast.warning {
+      border-left-color: var(--hodari-gold);
+    }
+
+    .toast.hide {
+      animation: toast-out 0.3s ease-in forwards;
+    }
+
+    @keyframes toast-in {
+      from {
+        transform: translateX(40px);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes toast-out {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+
+      to {
+        transform: translateX(40px);
+        opacity: 0;
+      }
+    }
+
+    .toast-icon {
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+    }
+
+    .toast.success .toast-icon {
+      background: var(--green-bg);
+      color: var(--green);
+    }
+
+    .toast.error .toast-icon {
+      background: var(--red-bg);
+      color: #DC2626;
+    }
+
+    .toast.warning .toast-icon {
+      background: #FFF7ED;
+      color: #9A3412;
+    }
+
+    .htmx-indicator {
+      display: none;
+    }
+
+    .htmx-request .htmx-indicator {
+      display: inline-block;
+    }
+
+    .htmx-request.htmx-indicator {
+      display: inline-block;
+    }
+
     /* Button loading state */
-    .btn-loading { position: relative; color: transparent !important; pointer-events: none; }
-    .btn-loading::after { content: ''; position: absolute; width: 16px; height: 16px; top: calc(50% - 8px); left: calc(50% - 8px); border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: btn-spin 0.6s linear infinite; }
-    @keyframes btn-spin { to { transform: rotate(360deg); } }
+    .btn-loading {
+      position: relative;
+      color: transparent !important;
+      pointer-events: none;
+    }
+
+    .btn-loading::after {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      top: calc(50% - 8px);
+      left: calc(50% - 8px);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: btn-spin 0.6s linear infinite;
+    }
+
+    @keyframes btn-spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
   </style>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" media="print" onload="this.media='all'" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" media="print"
+    onload="this.media='all'" crossorigin="anonymous">
   <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" media="print" onload="this.media='all'">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" media="print"
+    onload="this.media='all'">
   <script src="https://cdn.jsdelivr.net/npm/flatpickr" defer></script>
   {% block extra_head %}{% endblock %}
 </head>
+
 <body>
-<!-- NFR-BROWSER-003: Desktop minimum width warning for non-parent portals -->
-<div id="desktopWarning" style="display:none;position:fixed;inset:0;z-index:100000;background:#fff;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px">
-  <div style="width:64px;height:64px;border-radius:50%;background:#EEF4FF;display:flex;align-items:center;justify-content:center;margin-bottom:20px">
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#023AA5" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-  </div>
-  <h2 style="font-size:20px;font-weight:700;color:#1A1A2E;margin:0 0 8px">Desktop Required</h2>
-  <p style="font-size:14px;color:#5A697D;margin:0 0 24px;max-width:380px;line-height:1.5">This portal is designed for desktop use. Please access on a device with a screen width of at least 1024px.</p>
-  <a href="/attendance/pwa/app/" style="display:inline-flex;align-items:center;gap:8px;padding:14px 32px;background:#023AA5;color:#fff;font-size:16px;font-weight:600;border-radius:12px;text-decoration:none;width:280px;justify-content:center;margin-bottom:12px">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-    Open Attendance App
-  </a>
-  <button id="installAppBtn" onclick="window.pwaInstallPrompt && window.pwaInstallPrompt.prompt()" style="display:inline-flex;align-items:center;gap:8px;padding:14px 32px;background:#16A34A;color:#fff;font-size:16px;font-weight:600;border-radius:12px;border:none;cursor:pointer;width:280px;justify-content:center">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-    Install App
-  </button>
-</div>
-<script>
-(function(){
-  var path = window.location.pathname;
-  var isMobileOk = path.indexOf('/parent/') === 0 || path.indexOf('/attendance/') === 0 || path.indexOf('/tasks/') === 0 || path.indexOf('/academics/reports/') === 0 || path.indexOf('/academics/progression/') === 0 || path.indexOf('/events/') === 0 || path.indexOf('/accounts/profile') === 0;
-  if (!isMobileOk && window.innerWidth < 1024) {
-    document.getElementById('desktopWarning').style.display = 'flex';
-  }
-})();
-window.addEventListener('beforeinstallprompt', function(e) {
-  e.preventDefault();
-  window.pwaInstallPrompt = e;
-});
-</script>
-<div id="toaster" class="toaster-container"></div>
-{% if request.is_impersonating %}
-<style>
-  .view-as-pill {
-    position: fixed;
-    top: 12px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 999999;
-    background: linear-gradient(135deg, #FCD34D 0%, #FBBF24 50%, #F59E0B 100%);
-    color: #1A1A2E;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    padding: 0 16px;
-    font-size: 12px;
-    font-weight: 500;
-    box-shadow: 0 4px 16px rgba(217, 119, 6, 0.3);
-    border-radius: 999px;
-    gap: 8px;
-    animation: viewAsFadeIn 0.3s ease;
-  }
-  @keyframes viewAsFadeIn {
-    from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
-    to { opacity: 1; transform: translateX(-50%) translateY(0); }
-  }
-  .view-as-pill-icon {
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: rgba(0,0,0,0.12);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-  .view-as-pill-text {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    white-space: nowrap;
-  }
-  .view-as-pill-text strong {
-    font-weight: 700;
-    color: #1A1A2E;
-  }
-  .view-as-pill-text span {
-    opacity: 0.8;
-    font-size: 11px;
-  }
-  .view-as-pill-divider {
-    width: 1px;
-    height: 18px;
-    background: rgba(0,0,0,0.15);
-    flex-shrink: 0;
-  }
-  .view-as-pill-stop {
-    background: #1A1A2E;
-    color: #fff;
-    border: none;
-    border-radius: 999px;
-    padding: 5px 12px;
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: var(--font-ui);
-    white-space: nowrap;
-    transition: all 0.15s ease;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-  }
-  .view-as-pill-stop:hover {
-    background: #DC2626;
-    transform: scale(1.02);
-  }
-  .view-as-pill-stop:active {
-    transform: scale(0.98);
-  }
-</style>
-<div id="viewAsBanner" class="view-as-pill">
-  <div class="view-as-pill-icon">
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1A1A2E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-      <circle cx="12" cy="12" r="3"/>
-    </svg>
-  </div>
-  <div class="view-as-pill-text">
-    <span>Viewing as</span>
-    <strong>{{ user.get_full_name|default:user.username }}</strong>
-    <span>({{ user.get_role_display }})</span>
-  </div>
-  <div class="view-as-pill-divider"></div>
-  <form method="post" action="{% url 'users:impersonate_stop' %}" style="margin:0;display:flex">
-    {% csrf_token %}
-    <button type="submit" class="view-as-pill-stop">
-      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
-        <line x1="18" y1="6" x2="6" y2="18"/>
-        <line x1="6" y1="6" x2="18" y2="18"/>
+  <!-- NFR-BROWSER-003: Desktop minimum width warning for non-parent portals -->
+  <div id="desktopWarning"
+    style="display:none;position:fixed;inset:0;z-index:100000;background:#fff;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px">
+    <div
+      style="width:64px;height:64px;border-radius:50%;background:#EEF4FF;display:flex;align-items:center;justify-content:center;margin-bottom:20px">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#023AA5" stroke-width="2"
+        stroke-linecap="round">
+        <rect x="2" y="3" width="20" height="14" rx="2" />
+        <path d="M8 21h8M12 17v4" />
       </svg>
-      Stop
+    </div>
+    <h2 style="font-size:20px;font-weight:700;color:#1A1A2E;margin:0 0 8px">Desktop Required</h2>
+    <p style="font-size:14px;color:#5A697D;margin:0 0 24px;max-width:380px;line-height:1.5">This portal is designed for
+      desktop use. Please access on a device with a screen width of at least 1024px.</p>
+    <a href="/attendance/pwa/app/"
+      style="display:inline-flex;align-items:center;gap:8px;padding:14px 32px;background:#023AA5;color:#fff;font-size:16px;font-weight:600;border-radius:12px;text-decoration:none;width:280px;justify-content:center;margin-bottom:12px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 19V5M5 12l7-7 7 7" />
+      </svg>
+      Open Attendance App
+    </a>
+    <button id="installAppBtn" onclick="window.pwaInstallPrompt && window.pwaInstallPrompt.prompt()"
+      style="display:inline-flex;align-items:center;gap:8px;padding:14px 32px;background:#16A34A;color:#fff;font-size:16px;font-weight:600;border-radius:12px;border:none;cursor:pointer;width:280px;justify-content:center">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+        <polyline points="7 10 12 15 17 10" />
+        <line x1="12" y1="15" x2="12" y2="3" />
+      </svg>
+      Install App
     </button>
-  </form>
-</div>
-{% endif %}
-
-<div id="mobileBackdrop" style="display:none;position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.4)" onclick="closeSidebar()"></div>
-
-<aside class="sidebar" id="sidebar">
-  <div class="sidebar-logo">
-    <img src="{% static 'branding/hodari-logo-white.png' %}" alt="{{ brand.school_name }} Logo" style="height:40px;width:auto;flex-shrink:0">
   </div>
+  <script>
+    (function () {
+      var path = window.location.pathname;
+      var isMobileOk = path.indexOf('/parent/') === 0 || path.indexOf('/attendance/') === 0 || path.indexOf('/tasks/') === 0 || path.indexOf('/academics/reports/') === 0 || path.indexOf('/academics/progression/') === 0 || path.indexOf('/events/') === 0 || path.indexOf('/accounts/profile') === 0;
+      if (!isMobileOk && window.innerWidth < 1024) {
+        document.getElementById('desktopWarning').style.display = 'flex';
+      }
+    })();
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      window.pwaInstallPrompt = e;
+    });
+  </script>
+  <div id="toaster" class="toaster-container"></div>
+  {% if request.is_impersonating %}
+  <style>
+    .view-as-pill {
+      position: fixed;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 999999;
+      background: linear-gradient(135deg, #FCD34D 0%, #FBBF24 50%, #F59E0B 100%);
+      color: #1A1A2E;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      font-size: 12px;
+      font-weight: 500;
+      box-shadow: 0 4px 16px rgba(217, 119, 6, 0.3);
+      border-radius: 999px;
+      gap: 8px;
+      animation: viewAsFadeIn 0.3s ease;
+    }
 
-  <nav class="nav">
-    {% for section, items in nav.items %}
+    @keyframes viewAsFadeIn {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-8px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    }
+
+    .view-as-pill-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .view-as-pill-text {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+
+    .view-as-pill-text strong {
+      font-weight: 700;
+      color: #1A1A2E;
+    }
+
+    .view-as-pill-text span {
+      opacity: 0.8;
+      font-size: 11px;
+    }
+
+    .view-as-pill-divider {
+      width: 1px;
+      height: 18px;
+      background: rgba(0, 0, 0, 0.15);
+      flex-shrink: 0;
+    }
+
+    .view-as-pill-stop {
+      background: #1A1A2E;
+      color: #fff;
+      border: none;
+      border-radius: 999px;
+      padding: 5px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: var(--font-ui);
+      white-space: nowrap;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .view-as-pill-stop:hover {
+      background: #DC2626;
+      transform: scale(1.02);
+    }
+
+    .view-as-pill-stop:active {
+      transform: scale(0.98);
+    }
+  </style>
+  <div id="viewAsBanner" class="view-as-pill">
+    <div class="view-as-pill-icon">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1A1A2E" stroke-width="2.5"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+    </div>
+    <div class="view-as-pill-text">
+      <span>Viewing as</span>
+      <strong>{{ user.get_full_name|default:user.username }}</strong>
+      <span>({{ user.get_role_display }})</span>
+    </div>
+    <div class="view-as-pill-divider"></div>
+    <form method="post" action="{% url 'users:impersonate_stop' %}" style="margin:0;display:flex">
+      {% csrf_token %}
+      <button type="submit" class="view-as-pill-stop">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+          stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+        Stop
+      </button>
+    </form>
+  </div>
+  {% endif %}
+
+  <div id="mobileBackdrop" style="display:none;position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.4)"
+    onclick="closeSidebar()"></div>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <img src="{% static 'branding/hodari-logos.png' %}" alt="{{ brand.school_name }} Logo"
+        style="height:40px;width:auto;flex-shrink:0">
+    </div>
+
+    <nav class="nav">
+      {% for section, items in nav.items %}
       {% if items and section != 'MAIN' %}<div class="nav-section-label">{{ section }}</div>{% endif %}
       {% for item in items %}
-        <a href="{{ item.href }}"
-           class="nav-item {% if item.active %}active{% endif %} {% if not item.enabled %}disabled{% endif %}"
-           {% if not item.enabled %}tabindex="-1" aria-disabled="true"{% endif %}
-        >
-          {% if item.icon == 'grid' %}
-            <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="1.5" y="1.5" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="9.5" y="1.5" width="6" height="6" rx="1.5" fill="currentColor" opacity=".6"/><rect x="1.5" y="9.5" width="6" height="6" rx="1.5" fill="currentColor" opacity=".6"/><rect x="9.5" y="9.5" width="6" height="6" rx="1.5" fill="currentColor"/></svg>
-          {% elif item.icon == 'user' %}
-            <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6zm-5.5 11c0-3 2.46-5.5 5.5-5.5s5.5 2.5 5.5 5.5H3z" fill="currentColor"/></svg>
-          {% elif item.icon == 'doc' %}
-            <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3 2h11v13H3V2zm2 3h7M5 8h7M5 11h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>
-          {% elif item.icon == 'calendar' %}
-            <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="3" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M2 7h13M6 3v4M11 3v4" stroke="currentColor" stroke-width="1.5"/></svg>
-          {% elif item.icon == 'report' %}
-            <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="3" y="2" width="11" height="13" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M6 6h5M6 9h5M6 12h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          {% elif item.icon == 'check' %}
-            <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="13" height="13" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M5 8.5l2.5 2.5L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          {% elif item.icon == 'card' %}
-            <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="4" width="13" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M2 7.5h13M6 7.5v7" stroke="currentColor" stroke-width="1.5"/></svg>
-          {% elif item.icon == 'chat' %}
-            <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 3h13v9H9l-4 3V12H2V3z" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-          {% elif item.icon == 'clock' %}
-            <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8.5 5.5v4l2.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          {% elif item.icon == 'pin' %}
-            <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 14s-6-3.8-6-8a6 6 0 0 1 12 0c0 4.2-6 8-6 8z" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-          {% elif item.icon == 'users' %}
-            <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M5 6a2 2 0 1 1 4 0 2 2 0 0 1-4 0zm10 0a2 2 0 1 1 4 0 2 2 0 0 1-4 0zM3 13c0-2 1.5-3.5 4-3.5s4 1.5 4 3.5H3zm10 0c0-2 1.5-3.5 4-3.5s4 1.5 4 3.5h-8z" fill="currentColor"/></svg>
-          {% elif item.icon == 'badge' %}
-            <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="3" y="3" width="11" height="11" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M6 6h5M6 9h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="11" cy="11" r="2" fill="currentColor"/></svg>
-                  {% elif item.icon == 'settings' %}
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-          </svg>
-{% endif %}
-          <span>{{ item.label }}</span>
-          {% if item.badge %}<span class="nav-badge">{{ item.badge }}</span>{% endif %}
-        </a>
+      <a href="{{ item.href }}"
+        class="nav-item {% if item.active %}active{% endif %} {% if not item.enabled %}disabled{% endif %}" {% if not item.enabled %}tabindex="-1" aria-disabled="true"{% endif %}>
+        {% if item.icon == 'grid' %}
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none">
+          <rect x="1.5" y="1.5" width="6" height="6" rx="1.5" fill="currentColor" />
+          <rect x="9.5" y="1.5" width="6" height="6" rx="1.5" fill="currentColor" opacity=".6" />
+          <rect x="1.5" y="9.5" width="6" height="6" rx="1.5" fill="currentColor" opacity=".6" />
+          <rect x="9.5" y="9.5" width="6" height="6" rx="1.5" fill="currentColor" />
+        </svg>
+        {% elif item.icon == 'user' %}
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none">
+          <path d="M8.5 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6zm-5.5 11c0-3 2.46-5.5 5.5-5.5s5.5 2.5 5.5 5.5H3z"
+            fill="currentColor" />
+        </svg>
+        {% elif item.icon == 'doc' %}
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none">
+          <path d="M3 2h11v13H3V2zm2 3h7M5 8h7M5 11h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+            fill="none" />
+        </svg>
+        {% elif item.icon == 'calendar' %}
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none">
+          <rect x="2" y="3" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none" />
+          <path d="M2 7h13M6 3v4M11 3v4" stroke="currentColor" stroke-width="1.5" />
+        </svg>
+        {% elif item.icon == 'report' %}
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none">
+          <rect x="3" y="2" width="11" height="13" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none" />
+          <path d="M6 6h5M6 9h5M6 12h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+        {% elif item.icon == 'check' %}
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none">
+          <rect x="2" y="2" width="13" height="13" rx="2" stroke="currentColor" stroke-width="1.5" fill="none" />
+          <path d="M5 8.5l2.5 2.5L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+            stroke-linejoin="round" />
+        </svg>
+        {% elif item.icon == 'card' %}
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none">
+          <rect x="2" y="4" width="13" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none" />
+          <path d="M2 7.5h13M6 7.5v7" stroke="currentColor" stroke-width="1.5" />
+        </svg>
+        {% elif item.icon == 'chat' %}
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none">
+          <path d="M2 3h13v9H9l-4 3V12H2V3z" stroke="currentColor" stroke-width="1.5" fill="none" />
+        </svg>
+        {% elif item.icon == 'clock' %}
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none">
+          <circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.5" fill="none" />
+          <path d="M8.5 5.5v4l2.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+        {% elif item.icon == 'pin' %}
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none">
+          <path d="M8.5 14s-6-3.8-6-8a6 6 0 0 1 12 0c0 4.2-6 8-6 8z" stroke="currentColor" stroke-width="1.5"
+            fill="none" />
+        </svg>
+        {% elif item.icon == 'users' %}
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none">
+          <path
+            d="M5 6a2 2 0 1 1 4 0 2 2 0 0 1-4 0zm10 0a2 2 0 1 1 4 0 2 2 0 0 1-4 0zM3 13c0-2 1.5-3.5 4-3.5s4 1.5 4 3.5H3zm10 0c0-2 1.5-3.5 4-3.5s4 1.5 4 3.5h-8z"
+            fill="currentColor" />
+        </svg>
+        {% elif item.icon == 'badge' %}
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none">
+          <rect x="3" y="3" width="11" height="11" rx="1" stroke="currentColor" stroke-width="1.5" fill="none" />
+          <path d="M6 6h5M6 9h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          <circle cx="11" cy="11" r="2" fill="currentColor" />
+        </svg>
+        {% elif item.icon == 'settings' %}
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3" />
+          <path
+            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+        </svg>
+        {% endif %}
+        <span>{{ item.label }}</span>
+        {% if item.badge %}<span class="nav-badge">{{ item.badge }}</span>{% endif %}
+      </a>
       {% endfor %}
-    {% endfor %}
-  </nav>
+      {% endfor %}
+    </nav>
 
-  <div class="sidebar-footer">
-    <a href="{% url 'users:profile' %}" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit">
-        <div style="width:36px; height:36px; border-radius:50%; overflow:hidden; background:var(--hodari-blue); color:#fff; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; border:2px solid #fff; box-shadow:0 0 0 1px rgba(255,255,255,0.2)">
+    <div class="sidebar-footer">
+      <a href="{% url 'users:profile' %}"
+        style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit">
+        <div
+          style="width:36px; height:36px; border-radius:50%; overflow:hidden; background:var(--hodari-blue); color:#fff; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; border:2px solid #fff; box-shadow:0 0 0 1px rgba(255,255,255,0.2)">
           {% if request.user.profile_picture %}
-            <img src="{{ request.user.profile_picture.url }}" style="width:100%; height:100%; object-fit:cover">
+          <img src="{{ request.user.profile_picture.url }}" style="width:100%; height:100%; object-fit:cover">
           {% else %}
-            {{ request.user.first_name|slice:":1" }}{{ request.user.last_name|slice:":1" }}
+          {{ request.user.first_name|slice:":1" }}{{ request.user.last_name|slice:":1" }}
           {% endif %}
         </div>
         <div>
           <div class="sf-name">{{ request.user.get_full_name|default:request.user.username }}</div>
           <div class="sf-role">{{ brand.school_name }}</div>
         </div>
-    </a>
-  </div>
-</aside>
-
-<div class="main" id="mainContent">
-  <header class="topbar">
-    <div class="topbar-left">
-      <div class="topbar-greeting">
-        <button onclick="openSidebar()" id="menuBtn" style="display:none;background:none;border:none;cursor:pointer;padding:0 10px 0 0;vertical-align:middle">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 5h14M3 10h14M3 15h14" stroke="#023AA5" stroke-width="1.8" stroke-linecap="round"/></svg>
-        </button>
-        {% block topbar_greeting %}{% endblock %}
-      </div>
-      <div class="topbar-date">{% block topbar_date %}{{ today_date }} &middot; {{ brand.school_name }}{% endblock %}</div>
+      </a>
     </div>
-    <div class="topbar-right">
-      {% block topbar_badges %}{% endblock %}
-      {% if user.is_authenticated %}
-      <!-- Notification Bell + Dropdown -->
-      <div style="position:relative;">
-        <button id="notifBell" style="position:relative;text-decoration:none;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;background:var(--hodari-blue-pale,#F0F4FB);border:1px solid var(--border);transition:background .15s;cursor:pointer;" onmouseover="this.style.background='var(--hodari-blue-light,#E8EEF9)'" onmouseout="this.style.background='var(--hodari-blue-pale,#F0F4FB)'" title="Notifications">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--hodari-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-          </svg>
-          {% if unread_notifs > 0 %}
-          <span style="position:absolute;top:-4px;right:-4px;background:var(--hodari-gold);color:#fff;font-size:9px;font-weight:700;min-width:16px;height:16px;border-radius:99px;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg-card,#fff);line-height:1;padding:0 3px">{{ unread_notifs }}</span>
-          {% endif %}
-        </button>
-        <!-- Notification Dropdown -->
-        <div id="notifDropdown" style="display:none;position:absolute;right:0;top:calc(100% + 8px);width:360px;max-height:480px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 30px rgba(2,58,165,0.15);z-index:1000;overflow:hidden;">
-          <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
-            <div style="font-weight:700;color:var(--text);font-size:14px;">Notifications</div>
-            <div style="display:flex;gap:8px;">
-              {% if unread_notifs > 0 %}
-              <form method="post" action="{% url 'communications:mark_all_read' %}">
-                {% csrf_token %}
-                <button type="submit" style="background:none;border:none;padding:4px 8px;color:var(--hodari-blue);font-size:12px;font-weight:600;cursor:pointer;">Mark all read</button>
-              </form>
-              {% endif %}
-              <a href="{% url 'communications:inbox' %}" style="font-size:12px;color:var(--text-secondary);text-decoration:none;font-weight:500;">View all &rarr;</a>
+  </aside>
+
+  <div class="main" id="mainContent">
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="topbar-greeting">
+          <button onclick="openSidebar()" id="menuBtn"
+            style="display:none;background:none;border:none;cursor:pointer;padding:0 10px 0 0;vertical-align:middle">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M3 5h14M3 10h14M3 15h14" stroke="#023AA5" stroke-width="1.8" stroke-linecap="round" />
+            </svg>
+          </button>
+          {% block topbar_greeting %}{% endblock %}
+        </div>
+        <div class="topbar-date">{% block topbar_date %}{{ today_date }} &middot; {{ brand.school_name }}{% endblock %}
+        </div>
+      </div>
+      <div class="topbar-right">
+        {% block topbar_badges %}{% endblock %}
+        {% if user.is_authenticated %}
+        <!-- Notification Bell + Dropdown -->
+        <div style="position:relative;">
+          <button id="notifBell"
+            style="position:relative;text-decoration:none;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;background:var(--hodari-blue-pale,#F0F4FB);border:1px solid var(--border);transition:background .15s;cursor:pointer;"
+            onmouseover="this.style.background='var(--hodari-blue-light,#E8EEF9)'"
+            onmouseout="this.style.background='var(--hodari-blue-pale,#F0F4FB)'" title="Notifications">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--hodari-blue)" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+            </svg>
+            {% if unread_notifs > 0 %}
+            <span
+              style="position:absolute;top:-4px;right:-4px;background:var(--hodari-gold);color:#fff;font-size:9px;font-weight:700;min-width:16px;height:16px;border-radius:99px;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg-card,#fff);line-height:1;padding:0 3px">{{ unread_notifs }}</span>
+            {% endif %}
+          </button>
+          <!-- Notification Dropdown -->
+          <div id="notifDropdown"
+            style="display:none;position:absolute;right:0;top:calc(100% + 8px);width:360px;max-height:480px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 30px rgba(2,58,165,0.15);z-index:1000;overflow:hidden;">
+            <div
+              style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+              <div style="font-weight:700;color:var(--text);font-size:14px;">Notifications</div>
+              <div style="display:flex;gap:8px;">
+                {% if unread_notifs > 0 %}
+                <form method="post" action="{% url 'communications:mark_all_read' %}">
+                  {% csrf_token %}
+                  <button type="submit"
+                    style="background:none;border:none;padding:4px 8px;color:var(--hodari-blue);font-size:12px;font-weight:600;cursor:pointer;">Mark
+                    all read</button>
+                </form>
+                {% endif %}
+                <a href="{% url 'communications:inbox' %}"
+                  style="font-size:12px;color:var(--text-secondary);text-decoration:none;font-weight:500;">View all
+                  &rarr;</a>
+              </div>
             </div>
-          </div>
-          <div style="overflow-y:auto;max-height:380px;">
-            {% for n in recent_notifications %}
+            <div style="overflow-y:auto;max-height:380px;">
+              {% for n in recent_notifications %}
               <a href="{% if n.link %}{{ n.link }}{% else %}{% url 'communications:inbox' %}{% endif %}" onclick="
                 {% if not n.is_read %}
                   event.preventDefault();
@@ -362,420 +673,491 @@ window.addEventListener('beforeinstallprompt', function(e) {
                     // Navigate to the link
                     setTimeout(() => window.location.href = notifLink, 100);
                   });
-                {% endif %}" style="display:block;text-decoration:none;padding:12px 16px;border-bottom:1px solid var(--border);{% if not n.is_read %}background:rgba(2,58,165,0.04);{% endif %}">
+                {% endif %}"
+                style="display:block;text-decoration:none;padding:12px 16px;border-bottom:1px solid var(--border);{% if not n.is_read %}background:rgba(2,58,165,0.04);{% endif %}">
                 <div style="display:flex;gap:12px;align-items:flex-start;">
-                  <div style="width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;{% if not n.is_read %}background:var(--hodari-blue-pale);{% else %}background:var(--bg);{% endif %}">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{% if not n.is_read %}var(--hodari-blue){% else %}var(--text-muted){% endif %}" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                  <div
+                    style="width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;{% if not n.is_read %}background:var(--hodari-blue-pale);{% else %}background:var(--bg);{% endif %}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                      stroke="{% if not n.is_read %}var(--hodari-blue){% else %}var(--text-muted){% endif %}"
+                      stroke-width="2">
+                      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
                   </div>
                   <div style="flex:1;">
                     <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                      <div style="font-size:13px;font-weight:{% if not n.is_read %}700{% else %}500{% endif %};color:var(--text);line-height:1.4;">{{ n.title }}</div>
+                      <div
+                        style="font-size:13px;font-weight:{% if not n.is_read %}700{% else %}500{% endif %};color:var(--text);line-height:1.4;">
+                        {{ n.title }}</div>
                       <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;margin-left:8px;">{{ n.created_at|date:"d M, H:i" }}</div>
                     </div>
                     <div style="font-size:12px;color:var(--text-secondary);margin-top:3px;line-height:1.4;">{{ n.body|truncatechars:120 }}</div>
                   </div>
                 </div>
               </a>
-            {% empty %}
+              {% empty %}
               <div style="padding:32px;text-align:center;">
                 {% include '_partials/empty_state.html' with title='No notifications' desc='You have no notifications at this time.' icon='inbox' icon_color='grey' %}
               </div>
-            {% endfor %}
+              {% endfor %}
+            </div>
           </div>
         </div>
-      </div>
-      {% endif %}
-      {% if user.is_authenticated and task_pending_count is not None %}
-      <a href="{% url 'tasks:dashboard' %}" style="position:relative;text-decoration:none;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;background:var(--hodari-blue-pale,#F0F4FB);border:1px solid var(--border);transition:background .15s" onmouseover="this.style.background='var(--hodari-blue-light,#E8EEF9)'" onmouseout="this.style.background='var(--hodari-blue-pale,#F0F4FB)'" title="Tasks & Todo">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--hodari-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>
-        {% if task_overdue_count > 0 %}
-        <span style="position:absolute;top:-4px;right:-4px;background:#DC2626;color:#fff;font-size:9px;font-weight:700;min-width:16px;height:16px;border-radius:99px;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg-card,#fff);line-height:1;padding:0 3px">{{ task_overdue_count }}</span>
-        {% elif task_pending_count > 0 %}
-        <span style="position:absolute;top:-4px;right:-4px;background:var(--hodari-blue);color:#fff;font-size:9px;font-weight:700;min-width:16px;height:16px;border-radius:99px;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg-card,#fff);line-height:1;padding:0 3px">{{ task_pending_count }}</span>
         {% endif %}
-      </a>
-      {% endif %}
-      {% if user.is_authenticated %}
+        {% if user.is_authenticated and task_pending_count is not None %}
+        <a href="{% url 'tasks:dashboard' %}"
+          style="position:relative;text-decoration:none;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;background:var(--hodari-blue-pale,#F0F4FB);border:1px solid var(--border);transition:background .15s"
+          onmouseover="this.style.background='var(--hodari-blue-light,#E8EEF9)'"
+          onmouseout="this.style.background='var(--hodari-blue-pale,#F0F4FB)'" title="Tasks & Todo">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--hodari-blue)" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M9 12l2 2 4-4" />
+          </svg>
+          {% if task_overdue_count > 0 %}
+          <span
+            style="position:absolute;top:-4px;right:-4px;background:#DC2626;color:#fff;font-size:9px;font-weight:700;min-width:16px;height:16px;border-radius:99px;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg-card,#fff);line-height:1;padding:0 3px">{{ task_overdue_count }}</span>
+          {% elif task_pending_count > 0 %}
+          <span
+            style="position:absolute;top:-4px;right:-4px;background:var(--hodari-blue);color:#fff;font-size:9px;font-weight:700;min-width:16px;height:16px;border-radius:99px;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg-card,#fff);line-height:1;padding:0 3px">{{ task_pending_count }}</span>
+          {% endif %}
+        </a>
+        {% endif %}
+        {% if user.is_authenticated %}
         <form method="post" action="{% url 'logout' %}" style="margin:0">
           {% csrf_token %}
-          <button type="submit" style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 12px;font-size:12px;color:var(--text-secondary);cursor:pointer;font-family:var(--font-ui)">Sign out</button>
+          <button type="submit"
+            style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 12px;font-size:12px;color:var(--text-secondary);cursor:pointer;font-family:var(--font-ui)">Sign
+            out</button>
         </form>
-      {% endif %}
-      <a href="{% url 'users:profile' %}" class="topbar-avatar" style="text-decoration:none; overflow:hidden; padding:0; display:flex; align-items:center; justify-content:center; background:var(--hodari-blue); color:#fff; font-weight:700; font-size:13px">
-        {% if request.user.profile_picture %}
-          <img src="{{ request.user.profile_picture.url }}" style="width:100%; height:100%; object-fit:cover">
-        {% else %}
-          {{ request.user.first_name|slice:":1" }}{{ request.user.last_name|slice:":1" }}
         {% endif %}
-      </a>
-    </div>
-  </header>
+        <a href="{% url 'users:profile' %}" class="topbar-avatar"
+          style="text-decoration:none; overflow:hidden; padding:0; display:flex; align-items:center; justify-content:center; background:var(--hodari-blue); color:#fff; font-weight:700; font-size:13px">
+          {% if request.user.profile_picture %}
+          <img src="{{ request.user.profile_picture.url }}" style="width:100%; height:100%; object-fit:cover">
+          {% elif request.user.first_name or request.user.last_name %}
+          {{ request.user.first_name|slice:":1"|upper }}{{ request.user.last_name|slice:":1"|upper }}
+          {% else %}
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          {% endif %}
+        </a>
+      </div>
+    </header>
 
-  <main class="content">
-    {% if messages %}
+    <main class="content">
+      {% if messages %}
       <div id="django-messages" style="display:none">
         {% for message in messages %}
-          <div class="django-msg" data-tags="{{ message.tags }}">{{ message }}</div>
+        <div class="django-msg" data-tags="{{ message.tags }}">{{ message }}</div>
         {% endfor %}
       </div>
-    {% endif %}
-    {% block content %}{% endblock %}
-  </main>
-</div>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
 
-<script>
-  function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
+  <script>
+    function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
         const cookies = document.cookie.split(';');
         for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
+          const cookie = cookies[i].trim();
+          if (cookie.substring(0, name.length + 1) === (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
         }
+      }
+      return cookieValue;
     }
-    return cookieValue;
-  }
 
-  // Notification Dropdown Toggle
-  document.getElementById('notifBell').addEventListener('click', function(e) {
-    e.stopPropagation();
-    const dropdown = document.getElementById('notifDropdown');
-    dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
-  });
+    // Notification Dropdown Toggle
+    document.getElementById('notifBell').addEventListener('click', function (e) {
+      e.stopPropagation();
+      const dropdown = document.getElementById('notifDropdown');
+      dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+    });
 
-  // Close dropdown when clicking outside
-  document.addEventListener('click', function(e) {
-    const dropdown = document.getElementById('notifDropdown');
-    const bell = document.getElementById('notifBell');
-    if (dropdown && !dropdown.contains(e.target) && !bell.contains(e.target)) {
-      dropdown.style.display = 'none';
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function (e) {
+      const dropdown = document.getElementById('notifDropdown');
+      const bell = document.getElementById('notifBell');
+      if (dropdown && !dropdown.contains(e.target) && !bell.contains(e.target)) {
+        dropdown.style.display = 'none';
+      }
+    });
+
+    function openSidebar() {
+      document.getElementById('sidebar').classList.add('open');
+      document.getElementById('mobileBackdrop').style.display = 'block';
     }
-  });
-
-  function openSidebar(){
-    document.getElementById('sidebar').classList.add('open');
-    document.getElementById('mobileBackdrop').style.display='block';
-  }
-  function closeSidebar(){
-    document.getElementById('sidebar').classList.remove('open');
-    document.getElementById('mobileBackdrop').style.display='none';
-  }
-  // Show mobile menu button on small screens
-  if(window.innerWidth<=900){document.getElementById('menuBtn').style.display='inline-block'}
-  window.addEventListener('resize',()=>{
-    document.getElementById('menuBtn').style.display=window.innerWidth<=900?'inline-block':'none';
-  });
-
-  function showToast(message, level = 'info') {
-    const toaster = document.getElementById('toaster');
-    const toast = document.createElement('div');
-    toast.className = `toast ${level}`;
-    
-    let icon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>';
-    if(level === 'success') icon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>';
-    if(level === 'error') icon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>';
-    if(level === 'warning') icon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
-
-    toast.innerHTML = `<div class="toast-icon">${icon}</div><div style="flex:1">${message}</div>`;
-    toaster.appendChild(toast);
-
-    setTimeout(() => {
-      toast.classList.add('hide');
-      setTimeout(() => toast.remove(), 400);
-    }, 5000);
-  }
-
-  // Convert Django messages to toast notifications
-  (function(){
-    var container = document.getElementById('django-messages');
-    if (!container) return;
-    var msgs = container.querySelectorAll('.django-msg');
-    msgs.forEach(function(el, i) {
-      setTimeout(function() {
-        var tags = el.getAttribute('data-tags') || '';
-        var level = 'info';
-        if (tags.indexOf('success') !== -1) level = 'success';
-        else if (tags.indexOf('error') !== -1) level = 'error';
-        else if (tags.indexOf('warning') !== -1) level = 'warning';
-        showToast(el.textContent, level);
-      }, i * 300);
-    });
-  })();
-
-  // Check for view_as_warning param and show toast
-  (function() {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('view_as_warning') === '1') {
-      showToast('Write actions are disabled in View-As mode. Stop Viewing As to perform actions.', 'warning');
-      params.delete('view_as_warning');
-      const newUrl = params.toString() ? window.location.pathname + '?' + params.toString() : window.location.pathname;
-      window.history.replaceState({}, '', newUrl);
+    function closeSidebar() {
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('mobileBackdrop').style.display = 'none';
     }
-  })();
+    // Show mobile menu button on small screens
+    if (window.innerWidth <= 900) { document.getElementById('menuBtn').style.display = 'inline-block' }
+    window.addEventListener('resize', () => {
+      document.getElementById('menuBtn').style.display = window.innerWidth <= 900 ? 'inline-block' : 'none';
+    });
 
-  // HTMX & Picker Integration
-  document.body.addEventListener('htmx:afterOnLoad', function(evt) {
-    initPickers(); // Re-init for dynamic content
-    const trigger = evt.detail.xhr.getResponseHeader('HX-Trigger');
-    if (trigger) {
-      try {
-        const obj = JSON.parse(trigger);
-        if (obj.showToast) {
-          showToast(obj.showToast.message, obj.showToast.level || 'info');
-        }
-      } catch (e) {}
+    function showToast(message, level = 'info') {
+      const toaster = document.getElementById('toaster');
+      const toast = document.createElement('div');
+      toast.className = `toast ${level}`;
+
+      let icon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>';
+      if (level === 'success') icon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>';
+      if (level === 'error') icon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>';
+      if (level === 'warning') icon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+
+      toast.innerHTML = `<div class="toast-icon">${icon}</div><div style="flex:1">${message}</div>`;
+      toaster.appendChild(toast);
+
+      setTimeout(() => {
+        toast.classList.add('hide');
+        setTimeout(() => toast.remove(), 400);
+      }, 5000);
     }
-  });
 
-  // Flatpickr initialization
-  function initPickers() {
-    document.querySelectorAll("input[type='date']").forEach(function(el) {
-      var opts = { altInput: true, altFormat: "F j, Y", dateFormat: "Y-m-d", allowInput: true };
-      if (el.getAttribute("min")) opts.minDate = el.getAttribute("min");
-      if (el.getAttribute("max")) opts.maxDate = el.getAttribute("max");
-      flatpickr(el, opts);
-    });
-    flatpickr("input[type='time']", {
-      enableTime: true, noCalendar: true,
-      dateFormat: "H:i",
-      altInput: true, altFormat: "h:i K",
-      time_24hr: false
-    });
-    flatpickr("input[type='datetime-local']", {
-      enableTime: true, altInput: true, altFormat: "F j, Y H:i", dateFormat: "Y-m-d H:i"
-    });
-  }
-  document.addEventListener('DOMContentLoaded', initPickers);
+    // Convert Django messages to toast notifications
+    (function () {
+      var container = document.getElementById('django-messages');
+      if (!container) return;
+      var msgs = container.querySelectorAll('.django-msg');
+      msgs.forEach(function (el, i) {
+        setTimeout(function () {
+          var tags = el.getAttribute('data-tags') || '';
+          var level = 'info';
+          if (tags.indexOf('success') !== -1) level = 'success';
+          else if (tags.indexOf('error') !== -1) level = 'error';
+          else if (tags.indexOf('warning') !== -1) level = 'warning';
+          showToast(el.textContent, level);
+        }, i * 300);
+      });
+    })();
 
-  // Django Messages Integration — only banner display (no duplicate toasts)
-</script>
+    // Check for view_as_warning param and show toast
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('view_as_warning') === '1') {
+        showToast('Write actions are disabled in View-As mode. Stop Viewing As to perform actions.', 'warning');
+        params.delete('view_as_warning');
+        const newUrl = params.toString() ? window.location.pathname + '?' + params.toString() : window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
+    })();
+
+    // HTMX & Picker Integration
+    document.body.addEventListener('htmx:afterOnLoad', function (evt) {
+      initPickers(); // Re-init for dynamic content
+      const trigger = evt.detail.xhr.getResponseHeader('HX-Trigger');
+      if (trigger) {
+        try {
+          const obj = JSON.parse(trigger);
+          if (obj.showToast) {
+            showToast(obj.showToast.message, obj.showToast.level || 'info');
+          }
+        } catch (e) { }
+      }
+    });
+
+    // Flatpickr initialization
+    function initPickers() {
+      document.querySelectorAll("input[type='date']").forEach(function (el) {
+        var opts = { altInput: true, altFormat: "F j, Y", dateFormat: "Y-m-d", allowInput: true };
+        if (el.getAttribute("min")) opts.minDate = el.getAttribute("min");
+        if (el.getAttribute("max")) opts.maxDate = el.getAttribute("max");
+        flatpickr(el, opts);
+      });
+      flatpickr("input[type='time']", {
+        enableTime: true, noCalendar: true,
+        dateFormat: "H:i",
+        altInput: true, altFormat: "h:i K",
+        time_24hr: false
+      });
+      flatpickr("input[type='datetime-local']", {
+        enableTime: true, altInput: true, altFormat: "F j, Y H:i", dateFormat: "Y-m-d H:i"
+      });
+    }
+    document.addEventListener('DOMContentLoaded', initPickers);
+
+    // Django Messages Integration — only banner display (no duplicate toasts)
+  </script>
   {% block extra_js %}{% endblock %}
 
   <!-- ═══ Global Delete Confirmation Modal ═══ -->
-  <div id="confirmDeleteModal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;backdrop-filter:blur(2px)">
-    <div style="background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.2);max-width:420px;width:90%;overflow:hidden;animation:modalSlideIn 0.25s cubic-bezier(0.16,1,0.3,1)">
+  <div id="confirmDeleteModal"
+    style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;backdrop-filter:blur(2px)">
+    <div
+      style="background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.2);max-width:420px;width:90%;overflow:hidden;animation:modalSlideIn 0.25s cubic-bezier(0.16,1,0.3,1)">
       <div style="padding:28px 28px 20px;text-align:center">
-        <div id="cdm-icon-wrap" style="width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
-          <svg id="cdm-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+        <div id="cdm-icon-wrap"
+          style="width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+          <svg id="cdm-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+            <line x1="10" y1="11" x2="10" y2="17" />
+            <line x1="14" y1="11" x2="14" y2="17" />
+          </svg>
         </div>
         <h3 id="cdm-title" style="font-size:18px;font-weight:700;color:#1E293B;margin:0 0 8px">Delete Item?</h3>
         <p id="cdm-body" style="font-size:13px;color:#64748B;margin:0;line-height:1.5">This action cannot be undone.</p>
       </div>
       <div id="cdm-detail" style="display:none;padding:0 28px 16px">
-        <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px 14px;font-size:12px;color:#475569"></div>
+        <div
+          style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px 14px;font-size:12px;color:#475569">
+        </div>
       </div>
       <div style="display:flex;border-top:1px solid #E2E8F0">
-        <button onclick="closeConfirmDeleteModal()" style="flex:1;padding:14px;font-size:14px;font-weight:600;color:#475569;background:none;border:none;border-right:1px solid #E2E8F0;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='none'">Cancel</button>
-        <button id="cdm-confirm-btn" onclick="confirmDeleteAction()" style="flex:1;padding:14px;font-size:14px;font-weight:700;color:#fff;background:#DC2626;border:none;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background='#B91C1C'" onmouseout="this.style.background='#DC2626'">Delete</button>
+        <button onclick="closeConfirmDeleteModal()"
+          style="flex:1;padding:14px;font-size:14px;font-weight:600;color:#475569;background:none;border:none;border-right:1px solid #E2E8F0;cursor:pointer;transition:background 0.15s"
+          onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='none'">Cancel</button>
+        <button id="cdm-confirm-btn" onclick="confirmDeleteAction()"
+          style="flex:1;padding:14px;font-size:14px;font-weight:700;color:#fff;background:#DC2626;border:none;cursor:pointer;transition:background 0.15s"
+          onmouseover="this.style.background='#B91C1C'" onmouseout="this.style.background='#DC2626'">Delete</button>
       </div>
     </div>
   </div>
   <style>
-    @keyframes modalSlideIn { from { transform: translateY(16px) scale(0.97); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
-  </style>
-  <script>
-  /* ── Global Confirm-Delete Modal ──
-     Usage:
-       confirmDeleteModal({
-         title: 'Delete Student?',
-         body: 'Are you sure you want to delete Lucas Chacha?',
-         detail: 'This cannot be undone.',
-         confirmText: 'Delete Student',
-         url: '/students/5/delete/',
-         type: 'danger' | 'warning' | 'info'
-       });
-  */
-  var _cdmFormAction = '';
-  var _cdmExtraData = null;
-  var _cdmCallback = null;
-  function confirmDeleteModal(opts) {
-    opts = opts || {};
-    var modal = document.getElementById('confirmDeleteModal');
-    var titleEl = document.getElementById('cdm-title');
-    var bodyEl = document.getElementById('cdm-body');
-    var detailEl = document.getElementById('cdm-detail');
-    var btnEl = document.getElementById('cdm-confirm-btn');
-    var iconWrap = document.getElementById('cdm-icon-wrap');
-    var iconSvg = document.getElementById('cdm-icon');
+    @keyframes modalSlideIn {
+      from {
+        transform: translateY(16px) scale(0.97);
+        opacity: 0;
+      }
 
-    titleEl.textContent = opts.title || 'Delete?';
-    // Safe body rendering: split on <strong> tags, create text + bold elements
-    bodyEl.textContent = '';
-    var bodyHtml = opts.body || 'This action cannot be undone.';
-    var parts = bodyHtml.split(/<strong>(.*?)<\/strong>/g);
-    for (var i = 0; i < parts.length; i++) {
-      if (i % 2 === 0) {
-        if (parts[i]) bodyEl.appendChild(document.createTextNode(parts[i]));
-      } else {
-        var strong = document.createElement('strong');
-        strong.textContent = parts[i];
-        bodyEl.appendChild(strong);
+      to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
       }
     }
-    btnEl.textContent = opts.confirmText || 'Delete';
-    _cdmFormAction = opts.url || '';
-    _cdmExtraData = opts.extraData || null;
-    _cdmCallback = opts.onConfirm || null;
+  </style>
+  <script>
+    /* ── Global Confirm-Delete Modal ──
+       Usage:
+         confirmDeleteModal({
+           title: 'Delete Student?',
+           body: 'Are you sure you want to delete Lucas Chacha?',
+           detail: 'This cannot be undone.',
+           confirmText: 'Delete Student',
+           url: '/students/5/delete/',
+           type: 'danger' | 'warning' | 'info'
+         });
+    */
+    var _cdmFormAction = '';
+    var _cdmExtraData = null;
+    var _cdmCallback = null;
+    function confirmDeleteModal(opts) {
+      opts = opts || {};
+      var modal = document.getElementById('confirmDeleteModal');
+      var titleEl = document.getElementById('cdm-title');
+      var bodyEl = document.getElementById('cdm-body');
+      var detailEl = document.getElementById('cdm-detail');
+      var btnEl = document.getElementById('cdm-confirm-btn');
+      var iconWrap = document.getElementById('cdm-icon-wrap');
+      var iconSvg = document.getElementById('cdm-icon');
 
-    // Type styling
-    var t = opts.type || 'danger';
-    var colors = { danger: ['#DC2626','#B91C1C','#FEF2F2'], warning: ['#D97706','#B45309','#FEF3C7'], info: ['#023AA5','#012A80','#EFF6FF'] };
-    var c = colors[t] || colors.danger;
-    btnEl.style.background = c[0];
-    btnEl.onmouseover = function(){ btnEl.style.background = c[1]; };
-    btnEl.onmouseout = function(){ btnEl.style.background = c[0]; };
-    iconWrap.style.background = c[2];
-    iconSvg.setAttribute('stroke', c[0]);
-    if (t === 'warning') {
-      iconSvg.innerHTML = '<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>';
-    } else if (t === 'info') {
-      iconSvg.innerHTML = '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>';
-    } else {
-      iconSvg.innerHTML = '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>';
-    }
+      titleEl.textContent = opts.title || 'Delete?';
+      // Safe body rendering: split on <strong> tags, create text + bold elements
+      bodyEl.textContent = '';
+      var bodyHtml = opts.body || 'This action cannot be undone.';
+      var parts = bodyHtml.split(/<strong>(.*?)<\/strong>/g);
+      for (var i = 0; i < parts.length; i++) {
+        if (i % 2 === 0) {
+          if (parts[i]) bodyEl.appendChild(document.createTextNode(parts[i]));
+        } else {
+          var strong = document.createElement('strong');
+          strong.textContent = parts[i];
+          bodyEl.appendChild(strong);
+        }
+      }
+      btnEl.textContent = opts.confirmText || 'Delete';
+      _cdmFormAction = opts.url || '';
+      _cdmExtraData = opts.extraData || null;
+      _cdmCallback = opts.onConfirm || null;
 
-    // Detail
-    if (opts.detail) {
-      detailEl.style.display = 'block';
-      detailEl.querySelector('div').textContent = opts.detail;
-    } else {
-      detailEl.style.display = 'none';
-    }
+      // Type styling
+      var t = opts.type || 'danger';
+      var colors = { danger: ['#DC2626', '#B91C1C', '#FEF2F2'], warning: ['#D97706', '#B45309', '#FEF3C7'], info: ['#023AA5', '#012A80', '#EFF6FF'] };
+      var c = colors[t] || colors.danger;
+      btnEl.style.background = c[0];
+      btnEl.onmouseover = function () { btnEl.style.background = c[1]; };
+      btnEl.onmouseout = function () { btnEl.style.background = c[0]; };
+      iconWrap.style.background = c[2];
+      iconSvg.setAttribute('stroke', c[0]);
+      if (t === 'warning') {
+        iconSvg.innerHTML = '<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>';
+      } else if (t === 'info') {
+        iconSvg.innerHTML = '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>';
+      } else {
+        iconSvg.innerHTML = '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>';
+      }
 
-    modal.style.display = 'flex';
-    document.addEventListener('keydown', _cdmEscHandler);
-  }
-  function closeConfirmDeleteModal() {
-    document.getElementById('confirmDeleteModal').style.display = 'none';
-    _cdmFormAction = '';
-    _cdmExtraData = null;
-    _cdmCallback = null;
-    document.removeEventListener('keydown', _cdmEscHandler);
-  }
-  function _cdmEscHandler(e) { if (e.key === 'Escape') closeConfirmDeleteModal(); }
-  function confirmDeleteAction() {
-    if (_cdmCallback) {
-      var cb = _cdmCallback;
-      closeConfirmDeleteModal();
-      cb();
-      return;
+      // Detail
+      if (opts.detail) {
+        detailEl.style.display = 'block';
+        detailEl.querySelector('div').textContent = opts.detail;
+      } else {
+        detailEl.style.display = 'none';
+      }
+
+      modal.style.display = 'flex';
+      document.addEventListener('keydown', _cdmEscHandler);
     }
-    if (!_cdmFormAction) return;
-    var form = document.createElement('form');
-    form.method = 'POST';
-    form.action = _cdmFormAction;
-    var csrf = document.createElement('input');
-    csrf.type = 'hidden'; csrf.name = 'csrfmiddlewaretoken'; csrf.value = '{{ csrf_token }}';
-    form.appendChild(csrf);
-    if (_cdmExtraData && _cdmExtraData.length > 0) {
-      _cdmExtraData.forEach(function(d) {
-        var inp = document.createElement('input');
-        inp.type = 'hidden';
-        inp.name = d.name;
-        inp.value = d.value;
-        form.appendChild(inp);
-      });
+    function closeConfirmDeleteModal() {
+      document.getElementById('confirmDeleteModal').style.display = 'none';
+      _cdmFormAction = '';
+      _cdmExtraData = null;
+      _cdmCallback = null;
+      document.removeEventListener('keydown', _cdmEscHandler);
     }
-    document.body.appendChild(form);
-    form.submit();
-  }
-  document.getElementById('confirmDeleteModal').addEventListener('click', function(e) {
-    if (e.target === this) closeConfirmDeleteModal();
-  });
+    function _cdmEscHandler(e) { if (e.key === 'Escape') closeConfirmDeleteModal(); }
+    function confirmDeleteAction() {
+      if (_cdmCallback) {
+        var cb = _cdmCallback;
+        closeConfirmDeleteModal();
+        cb();
+        return;
+      }
+      if (!_cdmFormAction) return;
+      var form = document.createElement('form');
+      form.method = 'POST';
+      form.action = _cdmFormAction;
+      var csrf = document.createElement('input');
+      csrf.type = 'hidden'; csrf.name = 'csrfmiddlewaretoken'; csrf.value = '{{ csrf_token }}';
+      form.appendChild(csrf);
+      if (_cdmExtraData && _cdmExtraData.length > 0) {
+        _cdmExtraData.forEach(function (d) {
+          var inp = document.createElement('input');
+          inp.type = 'hidden';
+          inp.name = d.name;
+          inp.value = d.value;
+          form.appendChild(inp);
+        });
+      }
+      document.body.appendChild(form);
+      form.submit();
+    }
+    document.getElementById('confirmDeleteModal').addEventListener('click', function (e) {
+      if (e.target === this) closeConfirmDeleteModal();
+    });
   </script>
 
   {% if user.is_authenticated %}
   <!-- Session Warning Modal — FRD NFR-SEC-003 -->
-  <div id="sessionModal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);align-items:center;justify-content:center">
-    <div style="background:#fff;border-radius:16px;max-width:420px;width:92%;padding:32px;box-shadow:0 20px 60px rgba(0,0,0,.25);text-align:center;position:relative;overflow:hidden">
-      <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--hodari-blue),var(--hodari-gold));transition:width 1s linear" id="sessionBar"></div>
-      <div style="width:56px;height:56px;border-radius:50%;background:var(--amber-bg,#FEF3C7);display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--hodari-gold,#D97706)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+  <div id="sessionModal"
+    style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);align-items:center;justify-content:center">
+    <div
+      style="background:#fff;border-radius:16px;max-width:420px;width:92%;padding:32px;box-shadow:0 20px 60px rgba(0,0,0,.25);text-align:center;position:relative;overflow:hidden">
+      <div
+        style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--hodari-blue),var(--hodari-gold));transition:width 1s linear"
+        id="sessionBar"></div>
+      <div
+        style="width:56px;height:56px;border-radius:50%;background:var(--amber-bg,#FEF3C7);display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--hodari-gold,#D97706)" stroke-width="2"
+          stroke-linecap="round">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 6v6l4 2" />
+        </svg>
       </div>
       <h3 style="margin:0 0 8px;font-size:18px;font-weight:700;color:var(--text-primary)">Session Expiring Soon</h3>
-      <p style="margin:0 0 20px;font-size:14px;color:var(--text-secondary);line-height:1.5">Your session will expire in <strong id="sessionCountdown" style="color:var(--hodari-gold);font-variant-numeric:tabular-nums">2:00</strong>. Click below to stay signed in.</p>
+      <p style="margin:0 0 20px;font-size:14px;color:var(--text-secondary);line-height:1.5">Your session will expire in
+        <strong id="sessionCountdown" style="color:var(--hodari-gold);font-variant-numeric:tabular-nums">2:00</strong>.
+        Click below to stay signed in.</p>
       <div style="display:flex;gap:10px;justify-content:center">
-        <button id="sessionExtendBtn" onclick="extendSession()" style="flex:1;max-width:200px;padding:10px 20px;border:none;border-radius:8px;background:var(--hodari-blue);color:#fff;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--hodari-blue-dark,#012A80)'" onmouseout="this.style.background='var(--hodari-blue)'">Keep Me Signed In</button>
-        <button onclick="window.location.href='{% url 'logout' %}'" style="flex:0;padding:10px 20px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text-secondary);font-size:14px;font-weight:600;cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--bg-secondary,#F9FAFB)'" onmouseout="this.style.background='#fff'">Sign Out</button>
+        <button id="sessionExtendBtn" onclick="extendSession()"
+          style="flex:1;max-width:200px;padding:10px 20px;border:none;border-radius:8px;background:var(--hodari-blue);color:#fff;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s"
+          onmouseover="this.style.background='var(--hodari-blue-dark,#012A80)'"
+          onmouseout="this.style.background='var(--hodari-blue)'">Keep Me Signed In</button>
+        <button onclick="window.location.href='{% url 'logout' %}'"
+          style="flex:0;padding:10px 20px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text-secondary);font-size:14px;font-weight:600;cursor:pointer;transition:background .15s"
+          onmouseover="this.style.background='var(--bg-secondary,#F9FAFB)'"
+          onmouseout="this.style.background='#fff'">Sign Out</button>
       </div>
     </div>
   </div>
   <script>
-  (function(){
-    const POLL_INTERVAL = 30000; // check every 30s
-    const WARNING_THRESHOLD = 120; // show modal at 2 min left
-    let modalShown = false;
-    let countdownInterval = null;
-    let secondsLeft = 0;
+    (function () {
+      const POLL_INTERVAL = 30000; // check every 30s
+      const WARNING_THRESHOLD = 120; // show modal at 2 min left
+      let modalShown = false;
+      let countdownInterval = null;
+      let secondsLeft = 0;
 
-    function formatTime(s) {
-      const m = Math.floor(s / 60);
-      const sec = s % 60;
-      return m + ':' + String(sec).padStart(2, '0');
-    }
-
-    function updateCountdown() {
-      secondsLeft = Math.max(0, secondsLeft - 1);
-      const el = document.getElementById('sessionCountdown');
-      if (el) el.textContent = formatTime(secondsLeft);
-      // Update progress bar
-      const bar = document.getElementById('sessionBar');
-      if (bar) bar.style.width = Math.max(0, (secondsLeft / 120) * 100) + '%';
-      if (secondsLeft <= 0) {
-        clearInterval(countdownInterval);
-        window.location.href = '/accounts/login/?next=' + encodeURIComponent(window.location.pathname);
+      function formatTime(s) {
+        const m = Math.floor(s / 60);
+        const sec = s % 60;
+        return m + ':' + String(sec).padStart(2, '0');
       }
-    }
 
-    function showModal(remaining) {
-      if (modalShown) return;
-      modalShown = true;
-      secondsLeft = remaining;
-      document.getElementById('sessionModal').style.display = 'flex';
-      document.getElementById('sessionCountdown').textContent = formatTime(secondsLeft);
-      document.getElementById('sessionBar').style.width = '100%';
-      countdownInterval = setInterval(updateCountdown, 1000);
-    }
+      function updateCountdown() {
+        secondsLeft = Math.max(0, secondsLeft - 1);
+        const el = document.getElementById('sessionCountdown');
+        if (el) el.textContent = formatTime(secondsLeft);
+        // Update progress bar
+        const bar = document.getElementById('sessionBar');
+        if (bar) bar.style.width = Math.max(0, (secondsLeft / 120) * 100) + '%';
+        if (secondsLeft <= 0) {
+          clearInterval(countdownInterval);
+          window.location.href = '/accounts/login/?next=' + encodeURIComponent(window.location.pathname);
+        }
+      }
 
-    function hideModal() {
-      modalShown = false;
-      document.getElementById('sessionModal').style.display = 'none';
-      if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
-    }
+      function showModal(remaining) {
+        if (modalShown) return;
+        modalShown = true;
+        secondsLeft = remaining;
+        document.getElementById('sessionModal').style.display = 'flex';
+        document.getElementById('sessionCountdown').textContent = formatTime(secondsLeft);
+        document.getElementById('sessionBar').style.width = '100%';
+        countdownInterval = setInterval(updateCountdown, 1000);
+      }
 
-    // CSRF token passed from Django template (safe since cookie is HttpOnly)
-    var CSRF_TOKEN = '{{ csrf_token }}';
+      function hideModal() {
+        modalShown = false;
+        document.getElementById('sessionModal').style.display = 'none';
+        if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+      }
 
-    window.extendSession = function() {
-      fetch('{% url "core:session_extend" %}', {
-        method: 'POST',
-        headers: {'X-CSRFToken': CSRF_TOKEN}
-      }).then(function() {
-        hideModal();
-        pollSession();
-      });
-    };
+      // CSRF token passed from Django template (safe since cookie is HttpOnly)
+      var CSRF_TOKEN = '{{ csrf_token }}';
 
-    function pollSession() {
-      fetch('{% url "core:session_check" %}')
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (data.seconds_remaining <= WARNING_THRESHOLD) {
-            showModal(data.seconds_remaining);
-          }
-        })
-        .catch(function() {}); // silently fail on network errors
-    }
+      window.extendSession = function () {
+        fetch('{% url "core:session_extend" %}', {
+          method: 'POST',
+          headers: { 'X-CSRFToken': CSRF_TOKEN }
+        }).then(function () {
+          hideModal();
+          pollSession();
+        });
+      };
 
-    // Start polling after page load
-    setTimeout(function() { pollSession(); }, 2000);
-    setInterval(pollSession, POLL_INTERVAL);
-  })();
+      function pollSession() {
+        fetch('{% url "core:session_check" %}')
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data.seconds_remaining <= WARNING_THRESHOLD) {
+              showModal(data.seconds_remaining);
+            }
+          })
+          .catch(function () { }); // silently fail on network errors
+      }
+
+      // Start polling after page load
+      setTimeout(function () { pollSession(); }, 2000);
+      setInterval(pollSession, POLL_INTERVAL);
+    })();
   </script>
   {% endif %}
   {% block scripts %}{% endblock %}
+
+  <!-- ═══ Hodari component kit: dynamic modal/drawer roots + behaviour ═══ -->
+  <div id="hui-modal-root"></div>
+  <div id="hui-drawer-root"></div>
+  <script src="{% static 'branding/hodari-ui.js' %}?v=1.0" defer></script>
+  <script src="{% static 'branding/password-toggle.js' %}?v=1.0" defer></script>
 </body>
+
 </html>

@@ -38,7 +38,6 @@
   <div style="margin-top:20px;">
     <form method="post" id="inquiry-form">
       {% csrf_token %}
-      {{ form.inquiry_channel }}
       {{ form.sibling_matched_parent }}
       {{ form.sibling_link_decision }}
       {% if form.previous_school_other %}<div style="display:none">{{ form.previous_school_other }}</div>{% endif %}
@@ -52,14 +51,11 @@
         <div class="form-container">
 
           <div class="card" id="channel-card" style="margin-bottom:14px">
-            <div class="form-section-title">How did this inquiry come in?<span style="color:#DC2626;margin-left:2px">*</span></div>
-            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
-              <div class="channel-pill" data-value="walk_in" onclick="selectChannel(this)">Walk-in</div>
-              <div class="channel-pill" data-value="phone_call" onclick="selectChannel(this)">Phone call</div>
-              <div class="channel-pill" data-value="website" onclick="selectChannel(this)">Website</div>
-              <div class="channel-pill" data-value="social" onclick="selectChannel(this)">Social media</div>
+            <div class="hf2-group" style="max-width:420px">
+              <label class="hf2-label" for="id_inquiry_channel">How did this inquiry come in?<span class="hf2-req">*</span></label>
+              {{ form.inquiry_channel }}
+              {% for err in form.inquiry_channel.errors %}<p class="hf2-error">{{ err }}</p>{% endfor %}
             </div>
-            {% for err in form.inquiry_channel.errors %}<p class="hf2-error">{{ err }}</p>{% endfor %}
           </div>
 
           <div id="form-fields-wrapper" style="display:none">
@@ -91,12 +87,12 @@
                   {% field form.child_full_name placeholder="Name of the Child" %}
                   {% field form.child_date_of_birth %}
                   <div class="hf2-group">
-                    <label class="hf2-label">Gender<span class="hf2-req">*</span></label>
-                    <div style="display:flex;gap:12px;margin-top:6px">
-                      <div class="channel-pill gender-pill" data-value="Female" onclick="selectGender(this)">Female</div>
-                      <div class="channel-pill gender-pill" data-value="Male" onclick="selectGender(this)">Male</div>
-                    </div>
-                    <input type="hidden" name="x_gender" id="id_x_gender" value="">
+                    <label class="hf2-label" for="id_x_gender">Gender<span class="hf2-req">*</span></label>
+                    <select name="x_gender" id="id_x_gender" class="hf2-select">
+                      <option value="">Select gender…</option>
+                      <option value="Female" {% if form_gender == 'Female' %}selected{% endif %}>Female</option>
+                      <option value="Male" {% if form_gender == 'Male' %}selected{% endif %}>Male</option>
+                    </select>
                   </div>
                 </div>
                 <div class="grid-2" style="margin-top:14px">
@@ -126,6 +122,9 @@
                   <span style="display:inline-block;width:26px;height:26px;border-radius:6px;background:#023AA5;color:#fff;text-align:center;line-height:26px;font-size:12px;margin-right:8px">2</span>
                   Parent / Guardian Information
                 </div>
+                <div class="section-hdr" style="margin-bottom:10px">
+                  <span class="section-title" style="font-size:13px">Parent / Guardian 1 <span class="chip chip-blue" style="margin-left:6px">Required</span></span>
+                </div>
                 <div class="grid-2">
                   <div style="position:relative">
                     {% field form.parent_full_name placeholder="Full Name" span="full" %}
@@ -136,7 +135,48 @@
                   {% field form.parent_email %}
                   {% field form.parent_invoice_name %}
                 </div>
+
+                {# Additional parents / guardians (optional, unlimited) #}
+                <div id="extra-parents"></div>
+
+                <div style="margin-top:16px">
+                  <c-button type="button" variant="secondary" id="add-parent-btn">
+                    <c-slot name="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></c-slot>
+                    Add another parent / guardian
+                  </c-button>
+                </div>
               </div>
+
+              {# Template cloned by JS for each additional parent #}
+              <template id="extra-parent-template">
+                <div class="extra-parent-block" style="margin-top:20px;padding-top:18px;border-top:1px dashed var(--border)">
+                  <div class="section-hdr" style="margin-bottom:10px">
+                    <span class="section-title" style="font-size:13px">Parent / Guardian <span class="ep-index">2</span></span>
+                    <button type="button" class="btn btn-danger btn-sm ep-remove">Remove</button>
+                  </div>
+                  <div class="grid-2">
+                    <div class="hf2-group hf2-span-full">
+                      <label class="hf2-label">Parent / guardian name</label>
+                      <input type="text" name="extra_parent_full_name[]" class="hf2-input" placeholder="e.g. Mrs. Jane Kamau">
+                    </div>
+                    <div class="hf2-group">
+                      <label class="hf2-label">Relationship to student</label>
+                      <select name="extra_parent_relationship[]" class="hf2-select">
+                        <option value="">Select relationship…</option>
+                        {% for val, lbl in form.parent_relationship.field.choices %}{% if val %}<option value="{{ val }}">{{ lbl }}</option>{% endif %}{% endfor %}
+                      </select>
+                    </div>
+                    <div class="hf2-group">
+                      <label class="hf2-label">Phone number</label>
+                      <input type="text" name="extra_parent_phone[]" class="hf2-input" placeholder="+255 7XX XXX XXX">
+                    </div>
+                    <div class="hf2-group">
+                      <label class="hf2-label">Email address</label>
+                      <input type="email" name="extra_parent_email[]" class="hf2-input" placeholder="parent@email.com">
+                    </div>
+                  </div>
+                </div>
+              </template>
 
               <div style="margin-top:28px;display:flex;justify-content:space-between">
                 <button type="button" class="btn-secondary" onclick="switchTab('tab-child')">
@@ -243,24 +283,13 @@
   <script id="admission-grades-data" type="application/json">{{ admission_grades_json|safe }}</script>
 
   <script>
-    function selectChannel(el) {
-      document.querySelectorAll('.channel-pill:not(.gender-pill)').forEach(function(p) { p.classList.remove('selected'); });
-      el.classList.add('selected');
-      var val = el.getAttribute('data-value');
-      var hiddenInput = document.getElementById('id_inquiry_channel');
-      if (hiddenInput) hiddenInput.value = val;
+    function applyChannelReveal() {
+      var sel = document.getElementById('id_inquiry_channel');
       var fw = document.getElementById('form-fields-wrapper');
       var cb = document.getElementById('channel-required-banner');
-      if (fw) { fw.style.display = 'block'; fw.style.animation = 'fadeIn 0.3s ease'; }
-      if (cb) cb.style.display = 'none';
-    }
-
-    function selectGender(el) {
-      document.querySelectorAll('.gender-pill').forEach(function(p) { p.classList.remove('selected'); });
-      el.classList.add('selected');
-      var val = el.getAttribute('data-value');
-      var hiddenInput = document.getElementById('id_x_gender');
-      if (hiddenInput) hiddenInput.value = val;
+      var chosen = sel && sel.value;
+      if (fw) fw.style.display = chosen ? 'block' : 'none';
+      if (cb) cb.style.display = chosen ? 'none' : 'flex';
     }
 
     function switchTab(tabId) {
@@ -286,11 +315,39 @@
       });
     });
 
+    // Channel dropdown reveals the rest of the form once chosen
     (function() {
-      var h = document.getElementById('id_inquiry_channel');
-      var init = h ? h.value : 'walk_in';
-      var pill = document.querySelector('.channel-pill[data-value="' + init + '"]');
-      if (pill) selectChannel(pill);
+      var sel = document.getElementById('id_inquiry_channel');
+      if (sel) sel.addEventListener('change', applyChannelReveal);
+      applyChannelReveal();
+    })();
+
+    // Add / remove additional parents (guardians)
+    (function() {
+      var addBtn = document.getElementById('add-parent-btn');
+      var container = document.getElementById('extra-parents');
+      var tpl = document.getElementById('extra-parent-template');
+      if (!addBtn || !container || !tpl) return;
+
+      function renumber() {
+        var blocks = container.querySelectorAll('.extra-parent-block');
+        blocks.forEach(function(b, i) {
+          var idx = b.querySelector('.ep-index');
+          if (idx) idx.textContent = (i + 2); // Parent 1 is the required one
+        });
+      }
+
+      addBtn.addEventListener('click', function() {
+        var node = tpl.content.firstElementChild.cloneNode(true);
+        node.querySelector('.ep-remove').addEventListener('click', function() {
+          node.remove();
+          renumber();
+        });
+        container.appendChild(node);
+        renumber();
+        var name = node.querySelector('input[name="extra_parent_full_name[]"]');
+        if (name) name.focus();
+      });
     })();
   </script>
   <script src="{% static 'admissions/admissions-inquiry.js' %}?v=3"></script>

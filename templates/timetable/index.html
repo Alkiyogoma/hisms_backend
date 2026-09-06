@@ -197,15 +197,15 @@
         </div>
     </div>
 
-<div class="card-title-row">
-  <div style="display:flex; align-items:center; gap:20px">
-    <h1 style="font-size:22px; font-weight:700; margin:0">School Timetable</h1>
+<div class="section-hdr" style="flex-wrap:wrap; gap:12px">
+  <div style="display:flex; align-items:center; gap:16px">
+    <h1 style="font-family:var(--font-display); font-size:18px; font-weight:700; margin:0">School Timetable</h1>
     <div class="view-toggle">
         <a href="?view=grid&class_name={{ class_filter }}&teacher_id={{ teacher_filter }}&q={{ q }}&week={{ week_offset }}" class="view-btn {% if view_type == 'grid' %}active{% endif %}">Weekly Grid</a>
         <a href="?view=list&day={{ day }}&class_name={{ class_filter }}&teacher_id={{ teacher_filter }}&q={{ q }}&week={{ week_offset }}" class="view-btn {% if view_type == 'list' %}active{% endif %}">Daily List</a>
     </div>
   </div>
-  <div style="display:flex; align-items:center; gap:12px; margin-left: auto;">
+  <div style="display:flex; align-items:center; gap:10px; margin-left: auto;">
       <button onclick="window.print()" class="hf-btn hf-btn-secondary" style="font-size:12px; padding:8px 16px;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle; margin-right:8px"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z"/></svg>
           Print Timetable

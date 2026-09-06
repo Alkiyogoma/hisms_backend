@@ -1390,7 +1390,10 @@ class FeeStructureSetupView(RoleRequiredMixin, TemplateView):
         ctx["departments"] = departments_data
 
         # Available source terms for copy feature (exclude current term)
-        ctx["source_terms"] = Term.objects.filter(is_locked=False).exclude(pk=current_term.pk).order_by("-academic_year__name", "name")
+        source_terms = Term.objects.filter(is_locked=False).order_by("-academic_year__name", "name")
+        if current_term:
+            source_terms = source_terms.exclude(pk=current_term.pk)
+        ctx["source_terms"] = source_terms
 
         # Available classes not yet configured
         all_class_names = set(c.name for c in classes)

@@ -36,6 +36,51 @@
       {% field form.parent_invoice_name %}
     </div>
 
+    {# Additional parents / guardians (optional, unlimited) #}
+    <div id="edit-extra-parents">
+      {% for p in additional_parents %}
+      <div class="extra-parent-block" style="margin-top:8px;padding-top:12px;border-top:1px dashed var(--border)">
+        <div class="section-hdr" style="margin-bottom:8px">
+          <span class="section-title" style="font-size:12.5px">Parent / Guardian <span class="ep-index">{{ forloop.counter|add:1 }}</span></span>
+          <button type="button" class="btn btn-danger btn-sm ep-remove">Remove</button>
+        </div>
+        <div class="hf2-grid-2">
+          <div class="hf2-group hf2-span-full"><label class="hf2-label">Parent / guardian name</label><input type="text" name="extra_parent_full_name[]" class="hf2-input" value="{{ p.full_name }}"></div>
+          <div class="hf2-group"><label class="hf2-label">Relationship to student</label>
+            <select name="extra_parent_relationship[]" class="hf2-select">
+              <option value="">Select relationship…</option>
+              {% for val, lbl in form.parent_relationship.field.choices %}{% if val %}<option value="{{ val }}" {% if val == p.relationship %}selected{% endif %}>{{ lbl }}</option>{% endif %}{% endfor %}
+            </select>
+          </div>
+          <div class="hf2-group"><label class="hf2-label">Phone number</label><input type="text" name="extra_parent_phone[]" class="hf2-input" value="{{ p.phone }}"></div>
+          <div class="hf2-group"><label class="hf2-label">Email address</label><input type="email" name="extra_parent_email[]" class="hf2-input" value="{{ p.email }}"></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div>
+      <button type="button" id="edit-add-parent-btn" class="btn btn-secondary btn-sm">+ Add another parent / guardian</button>
+    </div>
+    <template id="edit-extra-parent-template">
+      <div class="extra-parent-block" style="margin-top:8px;padding-top:12px;border-top:1px dashed var(--border)">
+        <div class="section-hdr" style="margin-bottom:8px">
+          <span class="section-title" style="font-size:12.5px">Parent / Guardian <span class="ep-index">2</span></span>
+          <button type="button" class="btn btn-danger btn-sm ep-remove">Remove</button>
+        </div>
+        <div class="hf2-grid-2">
+          <div class="hf2-group hf2-span-full"><label class="hf2-label">Parent / guardian name</label><input type="text" name="extra_parent_full_name[]" class="hf2-input" placeholder="e.g. Mrs. Jane Kamau"></div>
+          <div class="hf2-group"><label class="hf2-label">Relationship to student</label>
+            <select name="extra_parent_relationship[]" class="hf2-select">
+              <option value="">Select relationship…</option>
+              {% for val, lbl in form.parent_relationship.field.choices %}{% if val %}<option value="{{ val }}">{{ lbl }}</option>{% endif %}{% endfor %}
+            </select>
+          </div>
+          <div class="hf2-group"><label class="hf2-label">Phone number</label><input type="text" name="extra_parent_phone[]" class="hf2-input" placeholder="+255 7XX XXX XXX"></div>
+          <div class="hf2-group"><label class="hf2-label">Email address</label><input type="email" name="extra_parent_email[]" class="hf2-input" placeholder="parent@email.com"></div>
+        </div>
+      </div>
+    </template>
+
     <div style="font-size:13px;font-weight:700;color:var(--text-primary);padding-bottom:8px;border-bottom:1px solid var(--border);margin-top:8px">
       Student Details
     </div>
@@ -88,6 +133,28 @@
         otherWrap.style.display = this.value === '__other__' ? 'block' : 'none';
       });
       if (prevSelect.value === '__other__') otherWrap.style.display = 'block';
+    }
+
+    // Add / remove additional parents
+    var addBtn = document.getElementById('edit-add-parent-btn');
+    var container = document.getElementById('edit-extra-parents');
+    var tpl = document.getElementById('edit-extra-parent-template');
+    function renumber() {
+      container.querySelectorAll('.extra-parent-block').forEach(function(b, i) {
+        var idx = b.querySelector('.ep-index'); if (idx) idx.textContent = (i + 2);
+      });
+    }
+    if (container) {
+      container.querySelectorAll('.ep-remove').forEach(function(btn) {
+        btn.addEventListener('click', function() { btn.closest('.extra-parent-block').remove(); renumber(); });
+      });
+    }
+    if (addBtn && container && tpl) {
+      addBtn.addEventListener('click', function() {
+        var node = tpl.content.firstElementChild.cloneNode(true);
+        node.querySelector('.ep-remove').addEventListener('click', function() { node.remove(); renumber(); });
+        container.appendChild(node); renumber();
+      });
     }
   })();
 </script>

@@ -1,0 +1,27 @@
+{% comment %}
+  Content card. Optional uppercase title + right-aligned actions slot.
+  Props:
+    title     optional uppercase card label
+    subtitle  optional muted line under the title
+  Slots:
+    actions   optional right-aligned controls (buttons, links)
+    default   card body
+  Usage:
+    <c-card title="Recent invoices">
+      <c-slot name="actions"><c-button size="sm" variant="secondary">Export</c-button></c-slot>
+      … body …
+    </c-card>
+{% endcomment %}
+<c-vars title="" subtitle="" />
+<div class="card" {{ attrs }}>
+  {% if title or actions %}
+  <div class="card-title-row">
+    <div>
+      {% if title %}<div class="card-title">{{ title }}</div>{% endif %}
+      {% if subtitle %}<div class="trow-sub">{{ subtitle }}</div>{% endif %}
+    </div>
+    {% if actions %}<div class="toolbar-group">{{ actions }}</div>{% endif %}
+  </div>
+  {% endif %}
+  {{ slot }}
+</div>

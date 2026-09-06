@@ -88,7 +88,20 @@
         {% if applicant.parent_email %}
           <div class="info-row"><div class="info-lbl">Email</div><div class="info-val">{{ applicant.parent_email }}</div></div>
         {% endif %}
+        {% if additional_parents %}<div class="info-row"><div class="info-lbl">Role</div><div class="info-val"><span class="chip chip-blue">Primary</span></div></div>{% endif %}
       </div>
+
+      {% for p in additional_parents %}
+      <div class="card" style="margin-top:16px">
+        <div class="card-title-row">
+          <div class="card-title" style="margin:0">Additional Parent / Guardian {{ forloop.counter|add:1 }}</div>
+        </div>
+        {% if p.full_name %}<div class="info-row"><div class="info-lbl">Name</div><div class="info-val">{{ p.full_name }}</div></div>{% endif %}
+        {% if p.relationship %}<div class="info-row"><div class="info-lbl">Relationship</div><div class="info-val">{{ p.relationship|capfirst }}</div></div>{% endif %}
+        {% if p.phone %}<div class="info-row"><div class="info-lbl">Phone</div><div class="info-val">{{ p.phone }}</div></div>{% endif %}
+        {% if p.email %}<div class="info-row"><div class="info-lbl">Email</div><div class="info-val">{{ p.email }}</div></div>{% endif %}
+      </div>
+      {% endfor %}
 
       <div class="card" style="margin-top:16px">
         <div class="card-title">Student Details</div>

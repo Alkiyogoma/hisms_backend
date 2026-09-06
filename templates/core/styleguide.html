@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Component Kit · Style Guide{% endblock %}
+{% block topbar_greeting %}Component Kit{% endblock %}
+
+{% block content %}
+<c-page-header title="Hodari Component Kit" subtitle="The shared UI system. Use these components on every page for a consistent look.">
+  <c-button variant="secondary" href="{% url 'students:list' %}">View pilot: Students</c-button>
+</c-page-header>
+
+<!-- BUTTONS -->
+<c-card title="Buttons">
+  <div class="toolbar-group" style="margin-bottom:14px">
+    <c-button variant="primary">Primary</c-button>
+    <c-button variant="secondary">Secondary</c-button>
+    <c-button variant="success">Success</c-button>
+    <c-button variant="danger">Danger</c-button>
+    <c-button variant="danger-solid">Delete</c-button>
+    <c-button variant="amber">Amber</c-button>
+    <c-button variant="ghost">Ghost</c-button>
+  </div>
+  <div class="toolbar-group">
+    <c-button variant="primary" size="sm">Small</c-button>
+    <c-button variant="primary">Default</c-button>
+    <c-button variant="primary" size="lg">Large</c-button>
+    <c-button variant="primary" disabled>Disabled</c-button>
+    <c-button variant="primary">
+      <c-slot name="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></c-slot>
+      With icon
+    </c-button>
+  </div>
+</c-card>
+
+<!-- BADGES -->
+<c-card title="Badges / status chips">
+  <div class="toolbar-group">
+    <c-badge variant="green" dot="green">Active</c-badge>
+    <c-badge variant="amber" dot="amber">Pending</c-badge>
+    <c-badge variant="red" dot="red">Overdue</c-badge>
+    <c-badge variant="blue">Enrolled</c-badge>
+    <c-badge variant="gold">VIP</c-badge>
+    <c-badge variant="grey">Archived</c-badge>
+  </div>
+</c-card>
+
+<!-- STATS -->
+<div class="metrics" style="margin-bottom:20px">
+  <c-stat variant="blue" label="Clients" value="195" badge="total" sub="Across all sheets">
+    <c-slot name="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></c-slot>
+  </c-stat>
+  <c-stat variant="green" label="Collected" value="54.3M" badge="TZS" sub="+12% vs last term">
+    <c-slot name="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></c-slot>
+  </c-stat>
+  <c-stat variant="amber" label="Pending" value="18" sub="Awaiting approval">
+    <c-slot name="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></c-slot>
+  </c-stat>
+  <c-stat variant="red" label="Overdue" value="7" sub="Needs attention">
+    <c-slot name="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></c-slot>
+  </c-stat>
+</div>
+
+<!-- TABLE + PAGINATION -->
+<c-card title="Data table">
+  <c-slot name="actions">
+    <c-button variant="secondary" size="sm">Export</c-button>
+    <c-button variant="primary" size="sm" data-hui-open="sgModal">Add row</c-button>
+  </c-slot>
+  <c-table>
+    <c-slot name="head"><th>Reference</th><th>Client</th><th class="col-num">Amount</th><th>Status</th><th class="col-actions">Actions</th></c-slot>
+    <tr><td><a href="#" class="row-link">CR-VIN-029042</a></td><td>Professional Cleaners Ltd</td><td class="col-num">TSh 1,345,500</td><td><c-badge variant="green" dot="green">Paid</c-badge></td><td class="col-actions"><c-button variant="secondary" size="sm" data-hui-open="sgDrawer">View</c-button></td></tr>
+    <tr><td><a href="#" class="row-link">CR-VIN-028979</a></td><td>Bakwata Hospital</td><td class="col-num">TSh 625,000</td><td><c-badge variant="amber" dot="amber">Pending</c-badge></td><td class="col-actions"><c-button variant="secondary" size="sm" data-hui-open="sgDrawer">View</c-button></td></tr>
+    <tr><td><a href="#" class="row-link">CR-VIN-028943</a></td><td>Boka Pharmacy</td><td class="col-num">TSh 1,763,400</td><td><c-badge variant="red" dot="red">Overdue</c-badge></td><td class="col-actions"><c-button variant="secondary" size="sm" data-hui-open="sgDrawer">View</c-button></td></tr>
+  </c-table>
+  <div class="pagination">
+    <div class="pagination-info">Showing 1–20 of 1,522 results</div>
+    <div class="pagination-nav">
+      <label class="pagination-rows">Rows
+        <select><option>20</option><option>50</option><option>100</option></select>
+      </label>
+      <div class="pagination-pages">
+        <span class="page-btn is-disabled">‹</span>
+        <span class="page-btn active">1</span>
+        <a class="page-btn" href="#">2</a>
+        <span class="page-ellipsis">…</span>
+        <a class="page-btn" href="#">77</a>
+        <a class="page-btn" href="#">›</a>
+      </div>
+    </div>
+  </div>
+</c-card>
+
+<!-- FORM FIELDS (visual only) -->
+<c-card title="Form fields">
+  <div class="hf2-grid-2">
+    <div class="hf2-group">
+      <label class="hf2-label">First name<span class="hf2-req">*</span></label>
+      <input class="hf2-input" placeholder="Jane">
+    </div>
+    <div class="hf2-group">
+      <label class="hf2-label">Status</label>
+      <select class="hf2-select"><option>Active</option><option>Archived</option></select>
+    </div>
+    <div class="hf2-group hf2-span-full">
+      <label class="hf2-label">Notes</label>
+      <textarea class="hf2-textarea" rows="3" placeholder="Optional notes…"></textarea>
+    </div>
+  </div>
+  <p class="trow-sub" style="margin-top:12px">In real forms use <code>&lbrace;% field form.first_name %&rbrace;</code> or <code>&lt;c-field :field="form.first_name" /&gt;</code> — it renders the label, widget, help and errors automatically.</p>
+</c-card>
+
+<!-- OVERLAYS -->
+<c-card title="Modals & drawers">
+  <p class="trow-sub" style="margin-bottom:12px">Prefer these over a separate full page for add / edit / view.</p>
+  <div class="toolbar-group">
+    <c-button variant="primary" data-hui-open="sgModal">Open modal</c-button>
+    <c-button variant="secondary" data-hui-open="sgDrawer">Open drawer</c-button>
+  </div>
+</c-card>
+
+<!-- EMPTY STATE -->
+<c-card title="Empty state">
+  <c-empty-state title="No results found" desc="Try adjusting your search or filters." icon="search" />
+</c-card>
+
+<!-- Static overlays for the demo -->
+<c-modal id="sgModal" title="Add row" subtitle="Example modal form">
+  <div class="hf2-grid-1">
+    <div class="hf2-group"><label class="hf2-label">Client name</label><input class="hf2-input" placeholder="e.g. Boka Pharmacy"></div>
+    <div class="hf2-group"><label class="hf2-label">Amount</label><input class="hf2-input" placeholder="0.00"></div>
+  </div>
+  <c-slot name="footer">
+    <c-button variant="secondary" data-hui-close>Cancel</c-button>
+    <c-button variant="primary" data-hui-close>Save</c-button>
+  </c-slot>
+</c-modal>
+
+<c-drawer id="sgDrawer" title="Record details" subtitle="CR-VIN-029042">
+  <div class="detail-grid">
+    <div class="info-row"><span class="info-lbl">Client</span><span class="info-val">Professional Cleaners Ltd</span></div>
+    <div class="info-row"><span class="info-lbl">Amount</span><span class="info-val">TSh 1,345,500</span></div>
+    <div class="info-row"><span class="info-lbl">Status</span><span class="info-val"><c-badge variant="green" dot="green">Paid</c-badge></span></div>
+  </div>
+  <c-slot name="footer">
+    <c-button variant="secondary" data-hui-close>Close</c-button>
+    <c-button variant="primary">Edit</c-button>
+  </c-slot>
+</c-drawer>
+{% endblock %}

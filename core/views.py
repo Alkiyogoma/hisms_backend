@@ -3010,3 +3010,12 @@ class SessionExtendView(RoleRequiredMixin, View):
     def post(self, request):
         request.session["_last_activity"] = timezone.now().timestamp()
         return JsonResponse({"status": "extended"})
+
+
+class StyleGuideView(LoginRequiredMixin, TemplateView):
+    """Living style guide for the Hodari component kit (Cotton components).
+
+    Renders every shared component so the UI can be reviewed in one place and
+    used as the reference when standardising other pages.
+    """
+    template_name = "core/styleguide.html"

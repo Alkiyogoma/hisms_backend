@@ -2,7 +2,7 @@
 {% load role_tags %}
 {% block title %}Report Cards &mdash; {{ class_name|default:"All" }}{% endblock %}
 
-{% block topbar_greeting %}{{ class_name|default:"Reports" }} Reports{% endblock %}
+{% block topbar_greeting %}{% if class_name %}{{ class_name }} Reports{% else %}Reports{% endif %}{% endblock %}
 {% block topbar_date %}{{ current_term.academic_year.name }} - {{ current_term.name }}{% endblock %}
 
 {% block content %}

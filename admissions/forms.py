@@ -49,7 +49,9 @@ class ApplicantCreateForm(forms.ModelForm):
             "notes": forms.Textarea(attrs={"rows": 3}),
             "sibling_matched_parent": forms.HiddenInput(),
             "sibling_link_decision": forms.HiddenInput(),
-            "inquiry_channel": forms.HiddenInput(),
+            "inquiry_channel": forms.Select(
+                choices=[("", "Select how this inquiry came in…"), *InquiryChannel.choices]
+            ),
         }
 
     def __init__(self, *args, **kwargs):
@@ -83,15 +85,21 @@ class ApplicantCreateForm(forms.ModelForm):
         )
         self.fields["sibling_details"].label = "Siblings currently enrolled at Hodari"
         self.fields["notes"].label = "Inquiry notes"
-        self.fields["inquiry_channel"].label = "How did they hear about us? (Channel)*"
+        self.fields["inquiry_channel"].label = "How did this inquiry come in?*"
+        # Show a blank prompt so the channel must be actively chosen.
+        self.fields["inquiry_channel"].choices = [
+            ("", "Select how this inquiry came in…"),
+            *InquiryChannel.choices,
+        ]
         self.fields["photo"].label = "Student Photo"
         self.fields["photo"].help_text = "Optional. High quality photo for the student file."
-        self.fields["inquiry_channel"].initial = InquiryChannel.WALK_IN
+        # Start blank so the user must actively choose a channel (this also gates
+        # the reveal of the rest of the form). Model still defaults to WALK_IN.
+        self.fields["inquiry_channel"].initial = ""
 
         self.fields["parent_phone"].help_text = "Primary contact number for all school communication."
         self.fields["parent_email"].help_text = "Optional. Used for digital communications and report delivery."
         self.fields["parent_invoice_name"].help_text = "Used on all fee invoices for this family."
-        self.fields["child_date_of_birth"].help_text = "Used to verify age and grade eligibility."
         self.fields["sibling_details"].help_text = "System will check automatically once parent details are entered."
 
         # S5: Custom error messages for mandatory fields
@@ -285,10 +293,6 @@ class ApplicantFilterForm(forms.Form):
     )
     department = forms.ChoiceField(required=False, label="Department")
     grade = forms.ChoiceField(required=False)
-    channel = forms.ChoiceField(
-        required=False,
-        choices=[("", "All channels"), *InquiryChannel.choices],
-    )
     start_date = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}))
     end_date = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}))
     status_scope = forms.ChoiceField(

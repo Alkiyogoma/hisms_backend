@@ -29,7 +29,9 @@
         <select name="teacher" class="hf-select" style="min-width:180px">
           <option value="">All Teachers</option>
           {% for t in class_teachers %}
-          <option value="{{ t.id }}" {% if teacher_filter == t.id|stringformat:"d" %}selected{% endif %}>{{ t.get_full_name }}</option>
+          <option value="{{ t.id }}" {% if teacher_filter == t.id|stringformat:"d" %}selected{% endif %}>
+            {{ t.get_full_name }}
+          </option>
           {% endfor %}
         </select>
       </div>
@@ -54,7 +56,8 @@
           <td style="font-weight:600">{{ log.student.get_full_name }}</td>
           <td style="color:var(--text-secondary)">{{ log.student.class_name }}</td>
           <td>{{ log.class_teacher.get_full_name }}</td>
-          <td style="color:var(--text-secondary);font-variant-numeric:tabular-nums">{{ log.opened_at|date:"d M Y H:i" }}</td>
+          <td style="color:var(--text-secondary);font-variant-numeric:tabular-nums">{{ log.opened_at|date:"d M Y H:i" }}
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -62,7 +65,8 @@
   </div>
   {% else %}
   <div class="card" style="padding:20px">
-    {% include '_partials/empty_state.html' with icon='doc' icon_color='grey' title='No PTC generation logs found' desc='Logs will appear once teachers open PTC screens.' %}
+    {% include '_partials/empty_state.html' with icon='doc' icon_color='grey' title='No PTC generation logs found'
+    desc='Logs will appear once teachers open PTC screens.' %}
   </div>
   {% endif %}
 </div>

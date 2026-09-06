@@ -1,0 +1,29 @@
+{% comment %}
+  Stat / metric tile (icon + label + value + sub). Wraps the .metric-icon system.
+  Props:
+    variant  blue (default) | green | amber | red
+    label    uppercase label
+    value    the number/value
+    unit     optional small unit after value
+    badge    optional small corner text (e.g. 'TZS')
+    sub      optional sub line (coloured to variant)
+    href     optional — makes the whole tile a link
+  Slot:
+    icon     optional leading icon (SVG)
+  Usage:
+    <c-stat variant="blue" label="Clients" value="195" sub="+12 this term">
+      <c-slot name="icon"><svg …></svg></c-slot>
+    </c-stat>
+{% endcomment %}
+<c-vars variant="blue" label="" value="" unit="" badge="" sub="" href="" />
+<{% if href %}a href="{{ href }}"{% else %}div{% endif %} class="metric-icon metric-{{ variant }}" {{ attrs }}>
+  {% if icon %}<div class="mi-icon">{{ icon }}</div>{% endif %}
+  <div class="mi-body">
+    <div class="mi-lbl-row">
+      <span class="mi-lbl">{{ label }}</span>
+      {% if badge %}<span class="mi-currency">{{ badge }}</span>{% endif %}
+    </div>
+    <div class="mi-val">{{ value }}{% if unit %}<span class="mi-currency" style="margin-left:4px">{{ unit }}</span>{% endif %}</div>
+    {% if sub %}<div class="mi-sub mi-sub-{{ variant }}">{{ sub }}</div>{% endif %}
+  </div>
+</{% if href %}a{% else %}div{% endif %}>

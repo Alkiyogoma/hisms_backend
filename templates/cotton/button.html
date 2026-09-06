@@ -1,0 +1,20 @@
+{% comment %}
+  Canonical button. Renders <a> when `href` is given, else <button>.
+  All extra attributes (type, hx-*, data-hui-open, onclick, id, style, disabled…)
+  pass straight through via {{ attrs }}.
+
+  Props:
+    variant  primary (default) | secondary | success | danger | danger-solid | amber | ghost
+    size     '' (default) | sm | lg
+    href     if set, renders an anchor
+    icon     optional named slot for a leading icon (SVG)
+  Usage:
+    <c-button variant="primary" href="/x/">New invoice</c-button>
+    <c-button variant="secondary" size="sm" data-hui-open="editModal">Edit</c-button>
+{% endcomment %}
+<c-vars variant="primary" size="" href="" type="button" />
+{% if href %}
+<a href="{{ href }}" class="btn btn-{{ variant }}{% if size %} btn-{{ size }}{% endif %}" {{ attrs }}>{% if icon %}{{ icon }}{% endif %}{{ slot }}</a>
+{% else %}
+<button type="{{ type }}" class="btn btn-{{ variant }}{% if size %} btn-{{ size }}{% endif %}" {{ attrs }}>{% if icon %}{{ icon }}{% endif %}{{ slot }}</button>
+{% endif %}

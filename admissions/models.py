@@ -236,7 +236,6 @@ class Applicant(TimeStampedModel):
         choices=PARENT_RELATIONSHIP_CHOICES,
         blank=True,
         default="",
-        help_text="Relationship of parent/guardian to the student.",
     )
     status = models.CharField(
         max_length=40,

@@ -1,0 +1,9 @@
+{% comment %}
+  Status chip / badge.
+  Props:
+    variant  grey (default) | green | amber | red | blue | gold
+    dot      optional coloured dot: green | amber | red
+  Usage: <c-badge variant="green">Active</c-badge>
+{% endcomment %}
+<c-vars variant="grey" dot="" />
+<span class="chip chip-{{ variant }}" {{ attrs }}>{% if dot %}<span class="status-dot dot-{{ dot }}"></span>{% endif %}{{ slot }}</span>

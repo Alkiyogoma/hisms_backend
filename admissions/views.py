@@ -106,7 +106,6 @@ class AdmissionsPipelineView(AdmissionsCountsMixin, PermissionCacheMixin, Admiss
             status = form.cleaned_data.get("status")
             grade = form.cleaned_data.get("grade")
             department = form.cleaned_data.get("department")
-            channel = form.cleaned_data.get("channel")
             start_date = form.cleaned_data.get("start_date")
             end_date = form.cleaned_data.get("end_date")
             status_scope = form.cleaned_data.get("status_scope")
@@ -127,8 +126,6 @@ class AdmissionsPipelineView(AdmissionsCountsMixin, PermissionCacheMixin, Admiss
                     department=department
                 ).values_list("name", flat=True)
                 queryset = queryset.filter(grade_applying_for__in=grade_names)
-            if channel:
-                queryset = queryset.filter(inquiry_channel=channel)
             if start_date:
                 queryset = queryset.filter(created_at__date__gte=start_date)
             if end_date:
@@ -282,6 +279,28 @@ class AdmissionsPipelineView(AdmissionsCountsMixin, PermissionCacheMixin, Admiss
 
 
 
+def _collect_additional_parents(post):
+    """Build the additional-parents list from repeatable POST fields.
+
+    Reads the ``extra_parent_*[]`` arrays from the inquiry/edit forms and
+    returns a list of dicts, skipping fully empty rows.
+    """
+    names = post.getlist("extra_parent_full_name[]")
+    rels = post.getlist("extra_parent_relationship[]")
+    phones = post.getlist("extra_parent_phone[]")
+    emails = post.getlist("extra_parent_email[]")
+    result = []
+    for i, name in enumerate(names):
+        name = (name or "").strip()
+        phone = (phones[i] if i < len(phones) else "").strip()
+        email = (emails[i] if i < len(emails) else "").strip()
+        rel = (rels[i] if i < len(rels) else "").strip()
+        if not (name or phone or email):
+            continue
+        result.append({"full_name": name, "relationship": rel, "phone": phone, "email": email})
+    return result
+
+
 class InquiryCreateView(AdmissionsCountsMixin, PermissionCacheMixin, AdmissionsRoleRequiredMixin, CreateView):
     template_name = "admissions/new_inquiry.html"
     form_class = ApplicantCreateForm
@@ -299,6 +318,9 @@ class InquiryCreateView(AdmissionsCountsMixin, PermissionCacheMixin, AdmissionsR
         from django.utils import timezone
         now = timezone.now()
         ctx["enrollment_years"] = list(range(now.year, now.year + 4))
+        # Repopulate non-model fields after a validation error
+        if self.request.method == "POST":
+            ctx["form_gender"] = self.request.POST.get("x_gender", "")
         return ctx
 
     def form_valid(self, form):
@@ -307,10 +329,16 @@ class InquiryCreateView(AdmissionsCountsMixin, PermissionCacheMixin, AdmissionsR
         import json
         post = self.request.POST
 
+        # Collect additional parents / guardians (optional, unlimited).
+        # Parent 1 lives on the model fields; extras are stored in notes JSON.
+        additional_parents = _collect_additional_parents(post)
+
         inquiry_notes = {
             "submitted_via": "staff_form",
             "gender": post.get("x_gender", ""),
             "current_grade": post.get("x_current_grade", ""),
+            "inquiry_notes": (post.get("notes") or "").strip(),
+            "additional_parents": additional_parents,
         }
 
         self.object.notes = json.dumps(inquiry_notes)
@@ -595,8 +623,35 @@ class InquiryEditView(PermissionCacheMixin, AdmissionsRoleRequiredMixin, UpdateV
             return redirect("admissions:detail", pk=self.object.pk)
         return super().get(request, *args, **kwargs)
 
+    def get_initial(self):
+        # Show the human free-text notes (not the raw JSON) in the notes field.
+        from admissions.services import _parse_inquiry_notes
+        initial = super().get_initial()
+        parsed = _parse_inquiry_notes(self.object)
+        if parsed:
+            initial["notes"] = parsed.get("inquiry_notes", "")
+        return initial
+
     def form_valid(self, form):
+        import json
+        from admissions.services import _parse_inquiry_notes
+        # Preserve structured fields (gender/current_grade/submitted_via) from the
+        # stored JSON — read from the DB before the form overwrites `notes`.
+        original = _parse_inquiry_notes(Applicant.objects.get(pk=self.object.pk))
+        typed_notes = (form.cleaned_data.get("notes") or "").strip()
+        additional_parents = _collect_additional_parents(self.request.POST)
+
         response = super().form_valid(form)
+
+        self.object.notes = json.dumps({
+            "submitted_via": original.get("submitted_via", "staff_form"),
+            "gender": original.get("gender", ""),
+            "current_grade": original.get("current_grade", ""),
+            "inquiry_notes": typed_notes,
+            "additional_parents": additional_parents,
+        })
+        self.object.save(update_fields=["notes"])
+
         from audit.models import log_event
         log_event(
             actor=self.request.user,
@@ -616,8 +671,10 @@ class InquiryEditView(PermissionCacheMixin, AdmissionsRoleRequiredMixin, UpdateV
         return redirect("admissions:detail", pk=self.object.pk)
 
     def get_context_data(self, **kwargs):
+        from admissions.services import _extract_additional_parents
         ctx = super().get_context_data(**kwargs)
         ctx["applicant"] = self.object
+        ctx["additional_parents"] = _extract_additional_parents(self.object)
         return ctx
 
     def get_success_url(self):
@@ -652,6 +709,8 @@ class ApplicantDetailView(AdmissionsCountsMixin, PermissionCacheMixin, Admission
             pk=kwargs["pk"],
         )
         ctx["applicant"] = applicant
+        from admissions.services import _extract_additional_parents
+        ctx["additional_parents"] = _extract_additional_parents(applicant)
         ctx["timeline"] = applicant.timeline.select_related("actor")[:50]
         ctx["status_choices"] = ApplicantStatus.choices
         ctx["assessment_form"] = AssessmentScheduleForm(

@@ -1,0 +1,17 @@
+{% comment %}
+  Page header: display title + optional subtitle, with actions on the right.
+  Props:  title (required), subtitle (optional)
+  Slot:   default → right-aligned page actions (buttons)
+  Usage:
+    <c-page-header title="Students" subtitle="195 enrolled">
+      <c-button href="/students/new/">Add student</c-button>
+    </c-page-header>
+{% endcomment %}
+<c-vars title="" subtitle="" />
+<div class="page-hdr-row">
+  <div class="page-hdr">
+    <h1>{{ title }}</h1>
+    {% if subtitle %}<p>{{ subtitle }}</p>{% endif %}
+  </div>
+  {% if slot %}<div class="page-hdr-row-actions">{{ slot }}</div>{% endif %}
+</div>

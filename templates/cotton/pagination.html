@@ -1,0 +1,52 @@
+{% comment %}
+  Canonical pager. Preserves existing querystring filters via {% querystring %}.
+  Props:
+    page_obj   Django Page object (required) — pass :page_obj="page_obj"
+    label      noun for the range text (default 'results')
+    rows       optional list of page-size options, e.g. :rows="'20,50,100'"
+               (renders a Rows selector that sets ?page_size=)
+  Usage:
+    <c-pagination :page_obj="page_obj" label="students" rows="20,50,100" />
+{% endcomment %}
+<c-vars label="results" rows="" />
+{% load hodari_ui %}
+{% if page_obj and page_obj.paginator.num_pages > 1 %}
+<div class="pagination" {{ attrs }}>
+  <div class="pagination-info">
+    Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} {{ label }}
+  </div>
+  <div class="pagination-nav">
+    {% if rows %}
+    <label class="pagination-rows">Rows
+      <select onchange="window.location.href=this.value">
+        {% for opt in rows|split:',' %}
+          <option value="{% querystring page_size=opt page=1 %}"{% if opt == request.GET.page_size %} selected{% endif %}>{{ opt }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    <div class="pagination-pages">
+      {% if page_obj.has_previous %}
+        <a class="page-btn" href="{% querystring page=page_obj.previous_page_number %}" aria-label="Previous">‹</a>
+      {% else %}
+        <span class="page-btn is-disabled" aria-hidden="true">‹</span>
+      {% endif %}
+      {% elided_pages page_obj as pages %}
+      {% for p in pages %}
+        {% if p == page_obj.paginator.ELLIPSIS %}
+          <span class="page-ellipsis">{{ p }}</span>
+        {% elif p == page_obj.number %}
+          <span class="page-btn active">{{ p }}</span>
+        {% else %}
+          <a class="page-btn" href="{% querystring page=p %}">{{ p }}</a>
+        {% endif %}
+      {% endfor %}
+      {% if page_obj.has_next %}
+        <a class="page-btn" href="{% querystring page=page_obj.next_page_number %}" aria-label="Next">›</a>
+      {% else %}
+        <span class="page-btn is-disabled" aria-hidden="true">›</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}

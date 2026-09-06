@@ -1,0 +1,15 @@
+{% comment %}
+  Form field — delegates to the canonical {% field %} tag (hf2 design system),
+  which renders label + widget + help + errors consistently.
+  Props:
+    field        bound form field — pass :field="form.first_name"
+    label        override label (optional)
+    placeholder  optional
+    hint         optional help text
+    span         'full' to span a full grid row
+    rows         textarea rows (optional)
+  Usage:  <c-field :field="form.first_name" placeholder="Jane" />
+{% endcomment %}
+<c-vars field="" label="" placeholder="" hint="" span="" rows="" />
+{% load hodari_forms %}
+{% field field label=label placeholder=placeholder hint=hint span=span rows=rows %}

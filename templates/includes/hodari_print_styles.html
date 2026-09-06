@@ -1,6 +1,5 @@
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Merriweather:wght@700&display=swap');
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
     --hodari-blue: #023AA5;
     --hodari-gold: #FBBC05;
@@ -11,7 +10,12 @@
     --font-ui: 'Roboto', sans-serif;
     --font-display: 'Merriweather', serif;
   }
-  body { font-family: var(--font-ui); background: #F2F5FA; color: var(--text-primary); line-height: 1.5; padding: 20px; }
+  /* Standalone print documents only. When this include is used inside the app
+     shell (which has a .sidebar), these body-level styles must NOT apply — they
+     would inset the whole layout (topbar/sidebar) and reset app spacing. The
+     :not(:has(.sidebar)) guard keeps them scoped to standalone print pages. */
+  body:not(:has(.sidebar)) { font-family: var(--font-ui); background: #F2F5FA; color: var(--text-primary); line-height: 1.5; padding: 20px; }
+  body:not(:has(.sidebar)) *, body:not(:has(.sidebar)) *::before, body:not(:has(.sidebar)) *::after { box-sizing: border-box; margin: 0; padding: 0; }
   .no-print { max-width: 720px; margin: 0 auto 16px; display: flex; justify-content: flex-end; gap: 10px; }
   .btn { padding: 8px 16px; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; border: none; }
   .btn-primary { background: var(--hodari-blue); color: #fff; }

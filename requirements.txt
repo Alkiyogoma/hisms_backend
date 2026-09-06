@@ -8,6 +8,8 @@ python-dotenv>=1.0
 channels>=4.0
 channels-redis>=4.1
 daphne>=4.0
+# Pin cbor2 to a version with prebuilt wheels (6.x ships sdist-only on macOS and needs a Rust toolchain to build)
+cbor2==5.6.5
 # PDF rendering: install WeasyPrint on Linux/Ubuntu deployments (Windows dev often skips it).
 weasyprint>=62.0
 Pillow
@@ -22,3 +24,5 @@ requests>=2.31
 gunicorn>=21.2
 django-celery-beat>=2.9.0
 sentry-sdk[django]>=2.0
+
+django-cotton>=2.7,<3.0
