@@ -325,10 +325,10 @@ def setup_services(client, password):
     """Configure nginx, systemd, and start services."""
     step("Configuring Nginx...")
 
-    # Copy nginx config
-    run_cmd(client, f"cp {REMOTE_BACKEND_DIR}/deployment/nginx_hodari.conf /etc/nginx/sites-available/hodari", sudo=True)
-    run_cmd(client, f"ln -sf /etc/nginx/sites-available/hodari /etc/nginx/sites-enabled/hodari", sudo=True)
-    run_cmd(client, f"rm -f /etc/nginx/sites-enabled/default", sudo=True)
+    # Copy nginx config — isolated site name/config so a co-hosted site
+    # (e.g. connect.hodari.ac.tz) is never overwritten. NEVER `rm sites-enabled/default`.
+    run_cmd(client, f"cp {REMOTE_BACKEND_DIR}/deployment/nguzo/nginx_nguzo.conf /etc/nginx/sites-available/nguzo", sudo=True)
+    run_cmd(client, f"ln -sf /etc/nginx/sites-available/nguzo /etc/nginx/sites-enabled/nguzo", sudo=True)
 
     # Test and reload
     out, err, code = run_cmd(client, "nginx -t 2>&1", sudo=True)
@@ -339,28 +339,29 @@ def setup_services(client, password):
         warn(f"Nginx config issue: {err[:200]}")
 
     step("Configuring systemd services...")
-    run_cmd(client, f"cp {REMOTE_BACKEND_DIR}/deployment/hodari.service /etc/systemd/system/", sudo=True)
-    run_cmd(client, f"cp {REMOTE_BACKEND_DIR}/deployment/hodari-celery.service /etc/systemd/system/", sudo=True)
+    # Isolated unit names (hodari-nguzo*) so connect's hodari* units are untouched.
+    run_cmd(client, f"cp {REMOTE_BACKEND_DIR}/deployment/nguzo/hodari-nguzo.service /etc/systemd/system/", sudo=True)
+    run_cmd(client, f"cp {REMOTE_BACKEND_DIR}/deployment/nguzo/hodari-nguzo-celery.service /etc/systemd/system/", sudo=True)
     run_cmd(client, f"systemctl daemon-reload", sudo=True)
-    run_cmd(client, "systemctl enable hodari", sudo=True)
-    run_cmd(client, "systemctl enable hodari-celery", sudo=True)
+    run_cmd(client, "systemctl enable hodari-nguzo", sudo=True)
+    run_cmd(client, "systemctl enable hodari-nguzo-celery", sudo=True)
     ok("Systemd services configured")
 
     step("Starting services...")
-    run_cmd(client, "systemctl restart hodari", sudo=True)
+    run_cmd(client, "systemctl restart hodari-nguzo", sudo=True)
     time.sleep(3)
-    run_cmd(client, "systemctl restart hodari-celery", sudo=True)
+    run_cmd(client, "systemctl restart hodari-nguzo-celery", sudo=True)
 
     # Check status
-    out, _, _ = run_cmd(client, "systemctl is-active hodari", sudo=True)
+    out, _, _ = run_cmd(client, "systemctl is-active hodari-nguzo", sudo=True)
     if "active" in out:
         ok("HODARI service is RUNNING")
     else:
         warn(f"HODARI service status: {out}")
-        out, _, _ = run_cmd(client, "journalctl -u hodari -n 20 --no-pager", sudo=True)
+        out, _, _ = run_cmd(client, "journalctl -u hodari-nguzo -n 20 --no-pager", sudo=True)
         print(f"    Logs:\n{out[-1000:]}")
 
-    out, _, _ = run_cmd(client, "systemctl is-active hodari-celery", sudo=True)
+    out, _, _ = run_cmd(client, "systemctl is-active hodari-nguzo-celery", sudo=True)
     if "active" in out:
         ok("Celery worker is RUNNING")
     else:
@@ -371,15 +372,15 @@ def verify_deployment(client, password):
     """Verify the deployment is working."""
     step("Verifying deployment...")
 
-    # Test HTTP
-    out, _, code = run_cmd(client, "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8070/ 2>/dev/null || echo 000", timeout=10)
+    # Test HTTP (nguzo gunicorn binds 127.0.0.1:8009)
+    out, _, code = run_cmd(client, "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8009/ 2>/dev/null || echo 000", timeout=10)
     if out and out != "000":
-        ok(f"HTTP response on port 8070: {out}")
+        ok(f"HTTP response on port 8009: {out}")
     else:
-        warn("No HTTP response on port 8070")
+        warn("No HTTP response on port 8009")
 
-    # Test through nginx
-    out, _, code = run_cmd(client, f"curl -s -o /dev/null -w '%{http_code}' -H 'Host: {DOMAIN}' http://127.0.0.1:8070/ 2>/dev/null || echo 000", timeout=10)
+    # Test through nginx (HTTPS, routed by Host)
+    out, _, code = run_cmd(client, f"curl -sk -o /dev/null -w '%{http_code}' -H 'Host: {DOMAIN}' https://127.0.0.1/ 2>/dev/null || echo 000", timeout=10)
     if out and out != "000":
         ok(f"Nginx proxy response: {out}")
     else:
@@ -387,7 +388,7 @@ def verify_deployment(client, password):
 
     # Check all services
     step("Service Status:")
-    for svc in ["hodari", "hodari-celery", "postgresql", "redis-server", "nginx"]:
+    for svc in ["hodari-nguzo", "hodari-nguzo-celery", "postgresql", "redis-server", "nginx"]:
         status, _, _ = run_cmd(client, f"systemctl is-active {svc}", sudo=True)
         if "active" in status:
             ok(f"{svc}: {C.GREEN}RUNNING{C.END}")
@@ -459,10 +460,10 @@ def main():
   4. Seed demo data: cd {REMOTE_BACKEND_DIR} && {REMOTE_DEPLOY_DIR}/venv/bin/python manage.py seed_demo_data
 
   {C.YELLOW}Useful commands:{C.END}
-  sudo systemctl status hodari
-  sudo journalctl -u hodari -f
-  sudo systemctl restart hodari
-  sudo systemctl restart hodari-celery
+  sudo systemctl status hodari-nguzo
+  sudo journalctl -u hodari-nguzo -f
+  sudo systemctl restart hodari-nguzo
+  sudo systemctl restart hodari-nguzo-celery
 
 {C.BLUE}{'='*70}{C.END}
 """)

@@ -14,7 +14,7 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-DEPLOY_DIR="/opt/hodari"
+DEPLOY_DIR="/var/www/hodari"
 BACKEND_DIR="${DEPLOY_DIR}/hisms_backend"
 VENV_DIR="${DEPLOY_DIR}/venv"
 DOMAIN="connect.hodari.ac.tz"
@@ -262,21 +262,19 @@ setup_django() {
 setup_nginx() {
     step "Configuring Nginx..."
 
-    # Copy nginx config
-    cp "${BACKEND_DIR}/deployment/nginx_hodari.conf" /etc/nginx/sites-available/hodari
+    # Copy nginx config — isolated site name/config so a co-hosted site
+    # (e.g. connect.hodari.ac.tz) is never overwritten. Do NOT remove other sites.
+    cp "${BACKEND_DIR}/deployment/nguzo/nginx_nguzo.conf" /etc/nginx/sites-available/nguzo
 
     # Enable site
-    ln -sf /etc/nginx/sites-available/hodari /etc/nginx/sites-enabled/hodari
-
-    # Remove default site if it conflicts on port 8070
-    rm -f /etc/nginx/sites-enabled/default
+    ln -sf /etc/nginx/sites-available/nguzo /etc/nginx/sites-enabled/nguzo
 
     # Test nginx config
     if nginx -t 2>&1; then
         systemctl reload nginx
         ok "Nginx configured and reloaded"
     else
-        warn "Nginx config test failed - check /etc/nginx/sites-available/hodari"
+        warn "Nginx config test failed - check /etc/nginx/sites-available/nguzo"
     fi
 }
 
@@ -286,18 +284,19 @@ setup_nginx() {
 setup_services() {
     step "Configuring systemd services..."
 
-    # Copy service files
-    cp "${BACKEND_DIR}/deployment/hodari.service" /etc/systemd/system/
-    cp "${BACKEND_DIR}/deployment/hodari-celery.service" /etc/systemd/system/
-    cp "${BACKEND_DIR}/deployment/hodari-celery-beat.service" /etc/systemd/system/
+    # Copy service files — isolated unit names (hodari-nguzo*) so connect's
+    # hodari* units are never overwritten.
+    cp "${BACKEND_DIR}/deployment/nguzo/hodari-nguzo.service" /etc/systemd/system/
+    cp "${BACKEND_DIR}/deployment/nguzo/hodari-nguzo-celery.service" /etc/systemd/system/
+    cp "${BACKEND_DIR}/deployment/nguzo/hodari-nguzo-celery-beat.service" /etc/systemd/system/
 
     # Reload systemd
     systemctl daemon-reload
 
     # Enable services
-    systemctl enable hodari
-    systemctl enable hodari-celery
-    systemctl enable hodari-celery-beat
+    systemctl enable hodari-nguzo
+    systemctl enable hodari-nguzo-celery
+    systemctl enable hodari-nguzo-celery-beat
 
     ok "Systemd services configured"
 }
@@ -379,7 +378,7 @@ setup_backups() {
 
     cat > /etc/cron.d/hodari-backup << 'EOF'
 # Backup PostgreSQL database daily at 2 AM
-0 2 * * * hodari /opt/hodari/venv/bin/python /opt/hodari/hisms_backend/manage.py dumpdata --natural-foreign --natural-primary -o /var/backups/hodari/db_backup_$(date +\%Y\%m\%d).json 2>/dev/null
+0 2 * * * hodari /var/www/hodari/venv/bin/python /var/www/hodari/hisms_backend/manage.py dumpdata --natural-foreign --natural-primary -o /var/backups/hodari/db_backup_$(date +\%Y\%m\%d).json 2>/dev/null
 
 # Cleanup old backups
 0 3 * * * find /var/backups/hodari -name "*.json" -mtime +30 -delete 2>/dev/null
@@ -394,10 +393,10 @@ EOF
 start_services() {
     step "Starting all services..."
 
-    systemctl start hodari
+    systemctl start hodari-nguzo
     sleep 2
-    systemctl start hodari-celery
-    systemctl start hodari-celery-beat
+    systemctl start hodari-nguzo-celery
+    systemctl start hodari-nguzo-celery-beat
 
     # Verify
     echo ""
@@ -419,7 +418,7 @@ verify() {
     step "Verifying deployment..."
 
     # Test HTTP
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8070/ 2>/dev/null || echo "000")
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8009/ 2>/dev/null || echo "000")
     if [ "$HTTP_CODE" != "000" ]; then
         ok "HTTP response: ${HTTP_CODE}"
     else
@@ -507,9 +506,9 @@ main() {
     echo "  4. Create admin: cd ${BACKEND_DIR} && ${VENV_DIR}/bin/python manage.py createsuperuser"
     echo ""
     echo -e "  ${YELLOW}Useful commands:${NC}"
-    echo "  sudo systemctl status hodari"
-    echo "  sudo journalctl -u hodari -f"
-    echo "  sudo systemctl restart hodari"
+    echo "  sudo systemctl status hodari-nguzo"
+    echo "  sudo journalctl -u hodari-nguzo -f"
+    echo "  sudo systemctl restart hodari-nguzo"
     echo ""
 }
 

@@ -40,7 +40,7 @@ PGPASSWORD='wPDUA3bTLJvLMrLgWfWuL5KT36XU' psql -h 127.0.0.1 -U hodari_user -d ho
 
 ## 2. Point the app's `.env` at the new database
 
-Edit `/opt/hodari/hisms_backend/.env` and set exactly these (keep everything
+Edit `/var/www/hodari/hisms_backend/.env` and set exactly these (keep everything
 else — allowed hosts, Redis, email — as it already is):
 
 ```ini
@@ -57,7 +57,7 @@ POSTGRES_PORT=5432
 > HTTPS redirect the Nginx `:8443` config relies on). `DEBUG=1` is only for local.
 
 ```bash
-chmod 600 /opt/hodari/hisms_backend/.env
+chmod 600 /var/www/hodari/hisms_backend/.env
 ```
 
 ---
@@ -66,8 +66,8 @@ chmod 600 /opt/hodari/hisms_backend/.env
 
 ```bash
 sudo -u hodari -i
-cd /opt/hodari/hisms_backend
-source /opt/hodari/venv/bin/activate
+cd /var/www/hodari/hisms_backend
+source /var/www/hodari/venv/bin/activate
 
 git pull                                   # if you're shipping the cbor2 pin / doc changes
 pip install -r requirements.txt            # only if deps changed

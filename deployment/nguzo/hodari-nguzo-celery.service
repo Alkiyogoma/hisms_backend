@@ -1,5 +1,5 @@
 [Unit]
-Description=HODARI Celery Worker
+Description=HODARI (nguzo.co.tz) Celery Worker
 After=network.target postgresql.service redis.service
 Wants=postgresql.service redis.service
 
@@ -7,6 +7,8 @@ Wants=postgresql.service redis.service
 User=hodari
 Group=hodari
 WorkingDirectory=/var/www/hodari/hisms_backend
+# NOTE: if this site shares the Redis broker with connect.hodari.ac.tz, give it
+# its own broker DB / queue in the nguzo .env to avoid cross-site task delivery.
 ExecStart=/var/www/hodari/venv/bin/celery -A config worker \
     --loglevel=warning \
     --concurrency=4 \
@@ -19,11 +21,10 @@ RestartSec=10
 KillMode=mixed
 TimeoutStopSec=30
 
-# Security
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/var/www/hodari/hisms_backend/media /var/www/hodari/hisms_backend/staticfiles /var/log/hodari
+ReadWritePaths=/var/www/hodari/hisms_backend/media /var/www/hodari/hisms_backend/staticfiles /var/log/hodari-nguzo
 PrivateTmp=yes
 
 Environment="DJANGO_SETTINGS_MODULE=config.settings"

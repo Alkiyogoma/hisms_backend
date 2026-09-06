@@ -7,6 +7,20 @@ Gunicorn behind Nginx**.
 This document is self-contained. It documents the **database configuration and
 migration** in detail and then walks through the full server setup.
 
+> ⚠️ **SINGLE-SITE ASSUMPTIONS — READ THIS IF THE VPS ALREADY HOSTS ANOTHER SITE.**
+> This guide assumes it is the **only** deployment on the box. Several steps will
+> **break a co-hosted site** if run blindly, because they reuse global names/paths:
+> - systemd units `hodari.service` / `hodari-celery.service` / `hodari-celery-beat.service`
+>   (copying these **overwrites** another site's units of the same name),
+> - the `hodari` system user and `/var/www/hodari` paths,
+> - `sudo rm -f /etc/nginx/sites-enabled/default` (removes whatever the other site used),
+> - `sudo ufw enable` **without** `443/tcp` (drops the other site's HTTPS — see §9.4).
+>
+> To run a **second** site alongside an existing one (e.g. `hodari.nguzo.co.tz`
+> next to `connect.hodari.ac.tz`), do **not** follow this guide as-is — use
+> [`SECOND_SITE_NGUZO.md`](SECOND_SITE_NGUZO.md), which uses isolated unit names,
+> a separate port, and an `server_name`-scoped nginx block so the two never collide.
+
 ---
 
 ## 1. Architecture overview
@@ -49,7 +63,7 @@ Reference units and configs already live in `deployment/`:
 | App user       | `hodari`                           |
 | Project path   | `/var/www/hodari/hisms_backend`        |
 | Virtualenv     | `/var/www/hodari/venv`                 |
-| Domain         | `connect.example.com`              |
+| Domain         | `hodari.nguzo.co.tz`              |
 | DB name / user | `hodari` / `hodari_user`           |
 
 > **Updating an existing live server to the `hodari` DB?** Follow the focused
@@ -224,9 +238,9 @@ python -c "from django.core.management.utils import get_random_secret_key; print
 # --- Core ---
 DJANGO_SECRET_KEY=<paste-generated-key>
 DJANGO_DEBUG=0
-DJANGO_ALLOWED_HOSTS=connect.example.com,127.0.0.1,localhost
+DJANGO_ALLOWED_HOSTS=hodari.nguzo.co.tz,127.0.0.1,localhost
 # App is served on :8443 (shipped Nginx config) — include the port on the origin
-CSRF_TRUSTED_ORIGINS=https://connect.example.com:8443
+CSRF_TRUSTED_ORIGINS=https://hodari.nguzo.co.tz:8443
 
 # --- Database (PostgreSQL) ---
 DJANGO_USE_SQLITE=0
@@ -245,7 +259,7 @@ CHANNELS_REDIS_URL=redis://localhost:6379/2
 
 # --- CORS (mobile app / SPA) ---
 CORS_ALLOW_ALL_ORIGINS=False
-CORS_ALLOWED_ORIGINS=https://connect.example.com
+CORS_ALLOWED_ORIGINS=https://hodari.nguzo.co.tz
 
 # --- Email (optional; DatabaseEmailBackend reads SchoolSettings, falls back here) ---
 DEFAULT_FROM_EMAIL=noreply@example.com
@@ -366,13 +380,13 @@ sudo cp /var/www/hodari/hisms_backend/deployment/nginx_hodari.conf \
         /etc/nginx/sites-available/nguzo.conf
 
 # Replace the domain if yours differs from hodari.nguzo.co.tz
-sudo sed -i 's/connect\.hodari\.ac\.tz/connect.example.com/g' \
+sudo sed -i 's/connect\.hodari\.ac\.tz/hodari.nguzo.co.tz/g' \
         /etc/nginx/sites-available/nguzo.conf
 ```
 
 Make sure `DJANGO_ALLOWED_HOSTS` and `CSRF_TRUSTED_ORIGINS` in `.env`
 (Section 6) match this domain — including the `:8443` port on the CSRF origin,
-e.g. `CSRF_TRUSTED_ORIGINS=https://connect.example.com:8443`.
+e.g. `CSRF_TRUSTED_ORIGINS=https://hodari.nguzo.co.tz:8443`.
 
 ### 9.2 Enable HTTP first (ports 80 + 8070)
 
@@ -388,7 +402,7 @@ sudo mkdir -p /var/www/certbot
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-The app is now reachable at `http://connect.example.com:8070/`.
+The app is now reachable at `http://hodari.nguzo.co.tz:8070/`.
 
 ### 9.3 Issue the TLS certificate (webroot)
 
@@ -397,24 +411,32 @@ port 80, so use the `--webroot` method (not `--nginx`):
 
 ```bash
 sudo apt install -y certbot
-sudo certbot certonly --webroot -w /var/www/certbot -d connect.example.com
+sudo certbot certonly --webroot -w /var/www/certbot -d hodari.nguzo.co.tz
 ```
 
 Once the cert exists at
-`/etc/letsencrypt/live/connect.example.com/`, re-enable the `8443` block (if you
+`/etc/letsencrypt/live/hodari.nguzo.co.tz/`, re-enable the `8443` block (if you
 commented it out) and reload:
 
 ```bash
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-HTTPS is now live at `https://connect.example.com:8443/`.
+HTTPS is now live at `https://hodari.nguzo.co.tz:8443/`.
 
 ### 9.4 Open the firewall
+
+> ⚠️ **If another site already runs on this VPS (e.g. `connect.hodari.ac.tz` on
+> standard 80/443), you MUST allow those ports too before `ufw enable`, or you
+> will black-hole the existing site.** `ufw enable` switches the firewall to
+> default-deny; any port not explicitly allowed is dropped (connections time
+> out). Always include `443/tcp` (and `80/tcp`) so a co-hosted HTTPS site keeps
+> working.
 
 ```bash
 sudo ufw allow OpenSSH
 sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp     # standard HTTPS — required for any co-hosted site (e.g. connect.hodari.ac.tz)
 sudo ufw allow 8070/tcp
 sudo ufw allow 8443/tcp
 sudo ufw enable
@@ -433,18 +455,18 @@ sudo ufw enable
 systemctl is-active hodari hodari-celery hodari-celery-beat nginx postgresql redis-server
 
 # App responds through Nginx (HTTP on 8070, HTTPS on 8443)
-curl -I http://connect.example.com:8070/
-curl -I https://connect.example.com:8443/
+curl -I http://hodari.nguzo.co.tz:8070/
+curl -I https://hodari.nguzo.co.tz:8443/
 
 # DB connectivity from Django
-cd /var/www/hodari/hisms_backend && source /var/www/hodari/venv/bin/activate
+cd /var/www/hodari/hisms_backend && source /var/www/hodari/venv/bin/deactivate
 python manage.py dbshell -c '\dt' | head
 
 # Celery worker sees the broker
 celery -A config inspect ping
 ```
 
-Then log in to `https://connect.example.com:8443/admin/` with the superuser.
+Then log in to `https://hodari.nguzo.co.tz:8443/admin/` with the superuser.
 
 ---
 

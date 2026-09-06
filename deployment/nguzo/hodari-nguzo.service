@@ -1,5 +1,5 @@
 [Unit]
-Description=HODARI Gunicorn Application Server
+Description=HODARI (nguzo.co.tz) Gunicorn Application Server
 After=network.target postgresql.service redis.service
 Wants=postgresql.service redis.service
 
@@ -8,7 +8,7 @@ User=hodari
 Group=hodari
 WorkingDirectory=/var/www/hodari/hisms_backend
 ExecStart=/var/www/hodari/venv/bin/gunicorn config.wsgi:application \
-    --config /var/www/hodari/hisms_backend/deployment/gunicorn_config.py
+    --config /var/www/hodari/hisms_backend/deployment/nguzo/gunicorn_config.py
 ExecReload=/bin/kill -s HUP $MAINPID
 Restart=on-failure
 RestartSec=5
@@ -20,7 +20,7 @@ TimeoutStartSec=60
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/var/www/hodari/hisms_backend/media /var/www/hodari/hisms_backend/staticfiles /var/log/hodari /var/backups/hodari
+ReadWritePaths=/var/www/hodari/hisms_backend/media /var/www/hodari/hisms_backend/staticfiles /var/log/hodari-nguzo /var/run/hodari-nguzo
 PrivateTmp=yes
 ProtectControlGroups=yes
 ProtectKernelModules=yes
@@ -29,12 +29,10 @@ RestrictSUIDSGID=yes
 RestrictNamespaces=yes
 MemoryDenyWriteExecute=no
 
-# Environment
 Environment="DJANGO_SETTINGS_MODULE=config.settings"
 Environment="LANG=en_US.UTF-8"
 Environment="LC_ALL=en_US.UTF-8"
 
-# Resource limits
 LimitNOFILE=65535
 LimitNPROC=4096
 

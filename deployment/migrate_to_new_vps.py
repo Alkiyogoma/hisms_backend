@@ -14,8 +14,8 @@ except ImportError:
 OLD_VPS = "72.62.0.216"
 NEW_VPS = "187.7.21.133"
 USER = "root"
-DEPLOY_DIR = "/opt/hodari"
-BACKEND_DIR = "/opt/hodari/hisms_backend"
+DEPLOY_DIR = "/var/www/hodari"
+BACKEND_DIR = "/var/www/hodari/hisms_backend"
 HODARI_USER = "hodari"
 OLD_PASS = None  # will prompt
 NEW_PASS = None  # will prompt
@@ -149,10 +149,10 @@ def setup_django(client):
 
 def setup_services(client):
     step("Configuring services...")
-    # nginx
-    run(client, f"cp {BACKEND_DIR}/deployment/nginx_hodari.conf /etc/nginx/sites-available/hodari")
-    run(client, "ln -sf /etc/nginx/sites-available/hodari /etc/nginx/sites-enabled/hodari")
-    run(client, "rm -f /etc/nginx/sites-enabled/default")
+    # nginx — isolated site name/config so a co-hosted site (e.g. connect.hodari.ac.tz)
+    # is never overwritten. NEVER `rm sites-enabled/default` here — only add our own.
+    run(client, f"cp {BACKEND_DIR}/deployment/nguzo/nginx_nguzo.conf /etc/nginx/sites-available/nguzo")
+    run(client, "ln -sf /etc/nginx/sites-available/nguzo /etc/nginx/sites-enabled/nguzo")
     out, _, _ = run(client, "nginx -t 2>&1")
     if "successful" in out or "test is successful" in out:
         run(client, "systemctl reload nginx")
@@ -160,21 +160,21 @@ def setup_services(client):
     else:
         warn(f"Nginx issue: {out[:200]}")
 
-    # systemd
-    run(client, f"cp {BACKEND_DIR}/deployment/hodari.service /etc/systemd/system/")
-    run(client, f"cp {BACKEND_DIR}/deployment/hodari-celery.service /etc/systemd/system/")
-    run(client, f"cp {BACKEND_DIR}/deployment/hodari-celery-beat.service /etc/systemd/system/")
+    # systemd — isolated unit names (hodari-nguzo*) so connect's hodari* units are untouched
+    run(client, f"cp {BACKEND_DIR}/deployment/nguzo/hodari-nguzo.service /etc/systemd/system/")
+    run(client, f"cp {BACKEND_DIR}/deployment/nguzo/hodari-nguzo-celery.service /etc/systemd/system/")
+    run(client, f"cp {BACKEND_DIR}/deployment/nguzo/hodari-nguzo-celery-beat.service /etc/systemd/system/")
     run(client, "systemctl daemon-reload")
-    for svc in ["hodari", "hodari-celery", "hodari-celery-beat"]:
+    for svc in ["hodari-nguzo", "hodari-nguzo-celery", "hodari-nguzo-celery-beat"]:
         run(client, f"systemctl enable {svc}")
 
     step("Starting services...")
-    for svc in ["postgresql", "redis-server", "hodari", "hodari-celery", "hodari-celery-beat", "nginx"]:
+    for svc in ["postgresql", "redis-server", "hodari-nguzo", "hodari-nguzo-celery", "hodari-nguzo-celery-beat", "nginx"]:
         run(client, f"systemctl restart {svc}")
     time.sleep(3)
 
     step("Service status:")
-    for svc in ["hodari", "hodari-celery", "postgresql", "redis-server", "nginx"]:
+    for svc in ["hodari-nguzo", "hodari-nguzo-celery", "postgresql", "redis-server", "nginx"]:
         out, _, _ = run(client, f"systemctl is-active {svc}")
         if "active" in out: ok(f"{svc}: RUNNING")
         else: warn(f"{svc}: {out}")
@@ -216,7 +216,7 @@ def transfer_db(old_client, new_client):
 
 def transfer_media(old_client, new_client):
     step("Transferring media files...")
-    run(old_client, "tar czf /tmp/hodari_media.tar.gz -C /opt/hodari/hism*s_backend media 2>/dev/null || tar czf /tmp/hodari_media.tar.gz -C /opt/hodari/hisms_backend media 2>/dev/null")
+    run(old_client, "tar czf /tmp/hodari_media.tar.gz -C /var/www/hodari/hism*s_backend media 2>/dev/null || tar czf /tmp/hodari_media.tar.gz -C /var/www/hodari/hisms_backend media 2>/dev/null")
     out, _, _ = run(old_client, "ls -la /tmp/hodari_media.tar.gz 2>/dev/null")
     if not out: warn("No media to transfer"); return
 
@@ -237,9 +237,9 @@ def transfer_media(old_client, new_client):
 
 def verify(client):
     step("Verifying deployment...")
-    out, _, _ = run(client, "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8070/ 2>/dev/null || echo 000")
+    out, _, _ = run(client, "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8009/ 2>/dev/null || echo 000")
     if out and out != "000": ok(f"HTTP response: {out}")
-    else: warn("No HTTP response on 8070")
+    else: warn("No HTTP response on 8009 (nguzo gunicorn)")
 
 def setup_firewall(client):
     step("Configuring firewall...")
@@ -313,9 +313,9 @@ def main():
      cd {BACKEND_DIR} && {DEPLOY_DIR}/venv/bin/python manage.py createsuperuser
 
   \033[93mUseful commands:\033[0m
-  sudo systemctl status hodari
-  sudo journalctl -u hodari -f
-  sudo systemctl restart hodari hodari-celery
+  sudo systemctl status hodari-nguzo
+  sudo journalctl -u hodari-nguzo -f
+  sudo systemctl restart hodari-nguzo hodari-nguzo-celery
 
 \033[94m{'='*70}\033[0m
 """)

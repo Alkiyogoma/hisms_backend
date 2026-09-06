@@ -1,5 +1,5 @@
 [Unit]
-Description=HODARI Celery Worker
+Description=HODARI (nguzo.co.tz) Celery Beat Scheduler
 After=network.target postgresql.service redis.service
 Wants=postgresql.service redis.service
 
@@ -7,27 +7,23 @@ Wants=postgresql.service redis.service
 User=hodari
 Group=hodari
 WorkingDirectory=/var/www/hodari/hisms_backend
-ExecStart=/var/www/hodari/venv/bin/celery -A config worker \
+ExecStart=/var/www/hodari/venv/bin/celery -A config beat \
     --loglevel=warning \
-    --concurrency=4 \
-    --max-tasks-per-child=1000 \
-    --without-heartbeat \
-    --without-mingle
+    --pidfile=/var/run/hodari-nguzo/celerybeat.pid \
+    --scheduler django_celery_beat.schedulers:DatabaseScheduler
 ExecReload=/bin/kill -s HUP $MAINPID
 Restart=on-failure
 RestartSec=10
 KillMode=mixed
 TimeoutStopSec=30
 
-# Security
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/var/www/hodari/hisms_backend/media /var/www/hodari/hisms_backend/staticfiles /var/log/hodari
+ReadWritePaths=/var/www/hodari/hisms_backend /var/log/hodari-nguzo /var/run/hodari-nguzo
 PrivateTmp=yes
 
 Environment="DJANGO_SETTINGS_MODULE=config.settings"
-Environment="LANG=en_US.UTF-8"
 
 [Install]
 WantedBy=multi-user.target
