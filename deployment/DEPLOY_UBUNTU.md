@@ -363,11 +363,11 @@ to your domain if different:
 
 ```bash
 sudo cp /var/www/hodari/hisms_backend/deployment/nginx_hodari.conf \
-        /etc/nginx/sites-available/hodari
+        /etc/nginx/sites-available/nguzo.conf
 
 # Replace the domain if yours differs from hodari.nguzo.co.tz
 sudo sed -i 's/connect\.hodari\.ac\.tz/connect.example.com/g' \
-        /etc/nginx/sites-available/hodari
+        /etc/nginx/sites-available/nguzo.conf
 ```
 
 Make sure `DJANGO_ALLOWED_HOSTS` and `CSRF_TRUSTED_ORIGINS` in `.env`
@@ -381,7 +381,7 @@ exist yet, so Nginx won't start with it enabled. Comment out the `8443` block
 for the first bring-up, or issue the cert before reloading.
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/hodari /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/nguzo.conf /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo mkdir -p /var/www/certbot
 
