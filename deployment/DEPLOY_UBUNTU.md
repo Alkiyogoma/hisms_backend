@@ -358,14 +358,14 @@ WebSocket (`/ws/`) location for Django Channels.
 
 ### 9.1 Edit the domain
 
-The file ships with `server_name connect.hodari.ac.tz`. Change every occurrence
+The file ships with `server_name hodari.nguzo.co.tz`. Change every occurrence
 to your domain if different:
 
 ```bash
 sudo cp /var/www/hodari/hisms_backend/deployment/nginx_hodari.conf \
         /etc/nginx/sites-available/hodari
 
-# Replace the domain if yours differs from connect.hodari.ac.tz
+# Replace the domain if yours differs from hodari.nguzo.co.tz
 sudo sed -i 's/connect\.hodari\.ac\.tz/connect.example.com/g' \
         /etc/nginx/sites-available/hodari
 ```
