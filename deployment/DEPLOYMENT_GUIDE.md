@@ -301,3 +301,15 @@ For issues, check:
 2. Nginx logs: `/var/log/nginx/error.log`
 3. Django checks: `cd /var/www/hodari/hisms_backend && /var/www/hodari/venvi/bin/python manage.py check`
 4. Database: `cd /var/www/hodari/hisms_backend && /var/www/hodari/venvi/bin/python manage.py dbshell`
+
+  Demo credentials:
+  Username         Password               Role
+  --------------------------------------------------------
+  superadmin       Hodari@SA1             super_admin
+  hos              hodari123              head_of_school
+  primaryhod       Hodari@HOD1            primary_hod
+  ecdhod           Hodari@ECD1            ecd_hod
+  admin            Hodari@ADM1            admin_officer
+  finance          Hodari@FIN1            finance_officer
+  teacher          Hodari@TCH1            teacher
+  parent           Hodari@PAR1            parent
