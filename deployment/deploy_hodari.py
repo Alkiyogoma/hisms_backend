@@ -2,7 +2,7 @@
 """
 HODARI Production Deployment Script
 Uploads project to VPS 187.7.21.133 and configures for production.
-Domain: hodari.nguzo.co.tz | Port: 8070
+Domain: demo.hodari.ac.tz | Port: 8070
 
 Usage:
     python deploy_hodari.py
@@ -33,7 +33,7 @@ REMOTE_DEPLOY_DIR = "/var/www/hodari"
 REMOTE_BACKEND_DIR = "/var/www/hodari/hisms_backend"
 LOCAL_PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # hisms_backend parent
 LOCAL_BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))  # hisms_backend
-DOMAIN = "hodari.nguzo.co.tz"
+DOMAIN = "demo.hodari.ac.tz"
 HODARI_USER = "hodari"
 
 # Files/dirs to exclude from upload
@@ -227,7 +227,7 @@ def setup_env(client, password):
 
     env_content = """DJANGO_SECRET_KEY=hodari-pr0d-s3cr3t-k3y-2026-elimcore!
 DJANGO_DEBUG=0
-DJANGO_ALLOWED_HOSTS=hodari.nguzo.co.tz,hodari.nguzo.co.tz,187.7.21.133,localhost,127.0.0.1
+DJANGO_ALLOWED_HOSTS=demo.hodari.ac.tz,demo.hodari.ac.tz,187.7.21.133,localhost,127.0.0.1
 DJANGO_USE_SQLITE=0
 POSTGRES_DB=hisms_prod
 POSTGRES_USER=hodari_user
@@ -244,9 +244,9 @@ CELERY_TIMEZONE=Africa/Nairobi
 CELERY_ENABLE_UTC=1
 CHANNELS_REDIS_URL=redis://localhost:6379/2
 CORS_ALLOW_ALL_ORIGINS=False
-CORS_ALLOWED_ORIGINS=https://hodari.nguzo.co.tz,https://hodari.nguzo.co.tz
+CORS_ALLOWED_ORIGINS=https://demo.hodari.ac.tz,https://demo.hodari.ac.tz
 EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
-DEFAULT_FROM_EMAIL=noreply@hodari.nguzo.co.tz
+DEFAULT_FROM_EMAIL=noreply@demo.hodari.ac.tz
 SESSION_IDLE_TIMEOUT=1800
 LOGIN_MAX_ATTEMPTS=5
 LOGIN_LOCKOUT_DURATION=900

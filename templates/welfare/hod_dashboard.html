@@ -105,45 +105,6 @@
   </div>
 </div>
 
-{# ── SECONDARY CHARTS ROW ─────────────────────────────────────────── #}
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px">
-  {# Welfare Severity Distribution #}
-  <div class="card" style="margin:0">
-    <div class="card-title">Welfare Severity (This Week)</div>
-    <div style="margin-top:16px">
-      {% for sev, count in severity_counts.items %}
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f3f4f6">
-        <div style="display:flex;align-items:center;gap:8px">
-          <div style="width:10px;height:10px;border-radius:50%;background:{% if sev == 'critical' %}#dc2626{% elif sev == 'high' %}#f59e0b{% elif sev == 'medium' %}#3b82f6{% else %}#6b7280{% endif %}"></div>
-          <span style="font-size:13px">{{ sev|title }}</span>
-        </div>
-        <span style="font-weight:600">{{ count }}</span>
-      </div>
-      {% empty %}
-      {% include '_partials/empty_state.html' with icon='doc' icon_color='grey' title='No welfare entries this week' desc='Entries will appear here once recorded.' %}
-      {% endfor %}
-    </div>
-  </div>
-
-  {# Discipline Severity Distribution #}
-  <div class="card" style="margin:0">
-    <div class="card-title">Discipline Severity (This Month)</div>
-    <div style="margin-top:16px">
-      {% for sev, count in discipline_severity_counts.items %}
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f3f4f6">
-        <div style="display:flex;align-items:center;gap:8px">
-          <div style="width:10px;height:10px;border-radius:50%;background:{% if sev == 'critical' %}#dc2626{% elif sev == 'high' %}#f59e0b{% elif sev == 'medium' %}#3b82f6{% else %}#6b7280{% endif %}"></div>
-          <span style="font-size:13px">{{ sev|title }}</span>
-        </div>
-        <span style="font-weight:600">{{ count }}</span>
-      </div>
-      {% empty %}
-      {% include '_partials/empty_state.html' with icon='check' icon_color='green' title='No discipline incidents this month' desc='All clear for now.' %}
-      {% endfor %}
-    </div>
-  </div>
-</div>
-
 {# ── TABLES ROW ───────────────────────────────────────────────────── #}
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px">
   {# Open Welfare Entries #}

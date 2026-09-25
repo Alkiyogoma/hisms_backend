@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Live-update hodari.nguzo.co.tz to the latest main.
+# Live-update demo.hodari.ac.tz to the latest main.
 # Pulls code, then applies EVERY kind of change safely and restarts.
 # Run:  sudo bash /var/www/hodari/hisms_backend/deployment/nguzo/update.sh
 # =============================================================================
@@ -34,5 +34,5 @@ systemctl restart hodari-nguzo hodari-nguzo-celery hodari-nguzo-celery-beat
 sleep 2
 echo "--- status ---"
 systemctl is-active hodari-nguzo || true
-curl -sI --connect-timeout 8 https://hodari.nguzo.co.tz/ | head -1 || true
+curl -sI --connect-timeout 8 https://demo.hodari.ac.tz/ | head -1 || true
 echo "Done."

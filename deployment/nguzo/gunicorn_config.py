@@ -1,5 +1,5 @@
 """
-Gunicorn config for the hodari.nguzo.co.tz site (SECOND site on the VPS).
+Gunicorn config for the demo.hodari.ac.tz site (SECOND site on the VPS).
 Isolated from connect.hodari.ac.tz: its own port, so the two never collide.
 Referenced by hodari-nguzo.service as --config path.
 """

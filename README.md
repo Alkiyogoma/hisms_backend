@@ -26,7 +26,7 @@ Django-based school management system for Hodari Christian School.
 
 ## Deployment
 
-- **Test**: `hodari.nguzo.co.tz:8443`
+- **Test**: `demo.hodari.ac.tz:8443`
 - **Live**: `connect.hodari.ac.tz:8444`
 - Deploy script: `python deployment/deploy.py --env test|live`
 

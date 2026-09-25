@@ -2,7 +2,7 @@
 
 ## Overview
 - **VPS:** 187.7.21.133 (root)
-- **Domain:** hodari.nguzo.co.tz
+- **Domain:** demo.hodari.ac.tz
 - **Port:** 8070 (HTTP) / 8443 (HTTPS)
 - **Database:** PostgreSQL (`hisms_prod`)
 - **App Server:** Gunicorn (port 8008 internal → Nginx 8070/8443)
@@ -38,7 +38,7 @@ python deployment/deploy_hodari.py
 ssh root@187.7.21.133
 
 # Point domain DNS first, then:
-certbot --nginx -d hodari.nguzo.co.tz --non-interactive --agree-tos --email admin@hodari.nguzo.co.tz
+certbot --nginx -d demo.hodari.ac.tz --non-interactive --agree-tos --email admin@demo.hodari.ac.tz
 
 # Update nginx for HTTPS (after cert is issued)
 # The setup script handles this automatically
@@ -52,7 +52,7 @@ certbot --nginx -d hodari.nguzo.co.tz --non-interactive --agree-tos --email admi
 Point your domain to the VPS IP:
 ```
 Type: A Record
-Name: hodari.nguzo.co.tz
+Name: demo.hodari.ac.tz
 Value: 187.7.21.133
 TTL: 300
 ```
@@ -76,7 +76,7 @@ Database is created automatically:
 Production `.env` is created at `/var/www/hodari/hisms_backend/.env`
 Key settings:
 - `DJANGO_DEBUG=0` (production mode)
-- `DJANGO_ALLOWED_HOSTS=hodari.nguzo.co.tz,...`
+- `DJANGO_ALLOWED_HOSTS=demo.hodari.ac.tz,...`
 - `DJANGO_USE_SQLITE=0` (using PostgreSQL)
 
 ### 5. Services
@@ -88,7 +88,7 @@ Three systemd services run:
 ### 6. SSL/HTTPS
 After DNS is configured:
 ```bash
-certbot --nginx -d hodari.nguzo.co.tz
+certbot --nginx -d demo.hodari.ac.tz
 ```
 Auto-renewal is configured via systemd timer.
 

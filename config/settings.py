@@ -372,7 +372,7 @@ CSRF_COOKIE_HTTPONLY = True
 # CSRF trusted origins for HTTPS behind reverse proxy (Nginx)
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
-    for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "https://connect.hodari.ac.tz,https://hodari.nguzo.co.tz").split(",")
+    for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "https://connect.hodari.ac.tz,https://demo.hodari.ac.tz").split(",")
     if origin.strip()
 ]
 

@@ -1,23 +1,23 @@
-# Running `hodari.nguzo.co.tz` as a SECOND site (without breaking `connect.hodari.ac.tz`)
+# Running `demo.hodari.ac.tz` as a SECOND site (without breaking `connect.hodari.ac.tz`)
 
 `connect.hodari.ac.tz` already runs on this VPS from **`/opt/hodari`**, as
 **`hodari.service`** (gunicorn on **`127.0.0.1:8007`**), behind nginx on
-standard **80/443**. This runbook stands up `hodari.nguzo.co.tz` as a fully
+standard **80/443**. This runbook stands up `demo.hodari.ac.tz` as a fully
 **isolated** second stack so the two never collide.
 
 **Isolation contract — the second site gets its own everything:**
 
-| Thing            | connect.hodari.ac.tz | hodari.nguzo.co.tz (this) |
+| Thing            | connect.hodari.ac.tz | demo.hodari.ac.tz (this) |
 |------------------|----------------------|---------------------------|
 | Code dir         | `/opt/hodari`        | `/var/www/hodari`         |
 | Virtualenv       | `/opt/hodari/venv`   | `/var/www/hodari/venv`    |
 | Gunicorn port    | `127.0.0.1:8007`     | **`127.0.0.1:8009`**      |
 | systemd units    | `hodari*`            | **`hodari-nguzo*`**       |
 | nginx site       | `/etc/nginx/sites-available/hodari` | **`.../nguzo`** |
-| TLS host (443)   | `connect.hodari.ac.tz` | `hodari.nguzo.co.tz` (same 443, routed by `server_name`) |
+| TLS host (443)   | `connect.hodari.ac.tz` | `demo.hodari.ac.tz` (same 443, routed by `server_name`) |
 | Logs / run       | `/var/log/hodari`    | `/var/log/hodari-nguzo`   |
 
-> Prereq: a DNS **A record** `hodari.nguzo.co.tz → 187.7.21.133`, and the
+> Prereq: a DNS **A record** `demo.hodari.ac.tz → 187.7.21.133`, and the
 > firewall allows **80 + 443** (`sudo ufw allow 80/tcp && sudo ufw allow 443/tcp`).
 > Both sites share standard 443 — nginx picks the right one by `server_name`.
 > The old 8070/8443 scheme is **not** needed and should not be used here.
@@ -62,8 +62,8 @@ and — unless the two sites intentionally share data — **its own database** a
 ```
 DJANGO_DEBUG=0
 DJANGO_SECRET_KEY=<fresh: python -c "import secrets; print(secrets.token_urlsafe(64))">
-DJANGO_ALLOWED_HOSTS=hodari.nguzo.co.tz,187.7.21.133,localhost,127.0.0.1
-CSRF_TRUSTED_ORIGINS=https://hodari.nguzo.co.tz
+DJANGO_ALLOWED_HOSTS=demo.hodari.ac.tz,187.7.21.133,localhost,127.0.0.1
+CSRF_TRUSTED_ORIGINS=https://demo.hodari.ac.tz
 POSTGRES_DB=hodari_nguzo            # separate DB from connect
 POSTGRES_USER=hodari_nguzo
 POSTGRES_PASSWORD=<strong>
@@ -71,7 +71,7 @@ POSTGRES_HOST=localhost
 REDIS_URL=redis://localhost:6379/6  # distinct Redis DBs from connect (which uses 0/1/3…)
 CELERY_BROKER_URL=redis://localhost:6379/7
 CELERY_RESULT_BACKEND=redis://localhost:6379/8
-SITE_URL=https://hodari.nguzo.co.tz
+SITE_URL=https://demo.hodari.ac.tz
 WEBHOOK_API_TOKEN=<generate>
 ATTENDANCE_WEBHOOK_SECRET=<generate>
 ```
@@ -105,14 +105,14 @@ sudo mkdir -p /var/www/certbot
 sudo nginx -t && sudo systemctl reload nginx
 
 # Issue this site's own cert (webroot; keeps port 80 for ACME):
-sudo certbot certonly --webroot -w /var/www/certbot -d hodari.nguzo.co.tz
+sudo certbot certonly --webroot -w /var/www/certbot -d demo.hodari.ac.tz
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
 ## 5. Verify BOTH sites
 
 ```bash
-curl -sI https://hodari.nguzo.co.tz/  | head -1   # expect 200/302
+curl -sI https://demo.hodari.ac.tz/  | head -1   # expect 200/302
 curl -sI https://connect.hodari.ac.tz/ | head -1   # still 200/302 — untouched
 ```
 
