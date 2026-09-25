@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load hodari_forms %}
-{% block title %}{{ dept_label }} Welfare Dashboard &mdash; {{ brand.school_name }}{% endblock %}
-{% block topbar_greeting %}{{ dept_label }} Welfare Dashboard{% endblock %}
+{% block title %}Welfare Dashboard &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Welfare Dashboard{% endblock %}
 
 {% block content %}
 {% include "welfare/_top_tabs.html" %}
@@ -19,7 +19,7 @@
 {# ── HOS ECD CLASS AGGREGATE (FR-WEL-008) ───────────────────────── #}
 {% if is_hos_view and ecd_class_grid %}
 <div class="card" style="margin:0 0 24px">
-  <div class="card-title">ECD Welfare by Class</div>
+  <div class="card-title">ECD Welfare by Class (HOS View)</div>
   <div style="overflow-x:auto;margin-top:16px">
     <table style="width:100%;border-collapse:collapse;font-size:13px">
       <thead>

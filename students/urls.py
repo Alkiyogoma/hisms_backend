@@ -27,6 +27,8 @@ urlpatterns = [
     path("<int:pk>/generate-id/", views.GenerateStudentIDView.as_view(), name="generate_id"),
     path("bulk-generate-ids/", views.BulkGenerateStudentIDsView.as_view(), name="bulk_generate_ids"),
     path("<int:pk>/print-id/", views.PrintStudentIDView.as_view(), name="print_id"),
+    path("print-id-class/<str:class_name>/", views.PrintClassIDView.as_view(), name="print_class_id"),
+    path("print-id-class-bulk/<str:class_name>/", views.PrintClassIDBulkView.as_view(), name="print_class_id_bulk"),
     path("<int:pk>/leaving-certificate/", views.PrintLeavingCertificateView.as_view(), name="leaving_certificate"),
     path("<int:pk>/delete/", views.StudentDeleteView.as_view(), name="delete"),
 ]

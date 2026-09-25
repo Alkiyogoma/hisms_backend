@@ -197,7 +197,7 @@ class StudentListView(RoleRequiredMixin, ListView):
             )
         else:
             ctx["classes"] = list(
-                Student.objects.values_list("class_name", flat=True).distinct().order_by("class_name")
+                GradeClass.objects.values_list("name", flat=True).distinct().order_by("name")
             )
         ctx["statuses"] = StudentStatus.choices
         ctx["genders"] = [("male", "Male"), ("female", "Female"), ("other", "Other")]
@@ -522,8 +522,13 @@ class StudentDetailView(RoleRequiredMixin, DetailView):
             "attendance_recent": attendance_data[:10],
             "attendance_stats": attendance_stats,
             "attendance_data": attendance_data,
-            "welfare_incidents": list(welfare_incidents[:5]),
+            "welfare_incidents": list(welfare_incidents[:10]),
             "welfare_stats": welfare_stats,
+            "welfare_type_counts": {
+                "positive": welfare_incidents.filter(severity="low", concern_type="other").count(),
+                "observation": welfare_incidents.exclude(concern_type="other").filter(severity__in=["low", "medium"]).count(),
+                "concern": welfare_incidents.filter(severity__in=["high", "critical"]).count() + welfare_incidents.filter(severity="medium", concern_type__in=["behavioral", "health", "attendance", "academic", "home_situation"]).count(),
+            },
             "discipline_incidents": list(discipline_incidents[:5]),
             "discipline_stats": discipline_incidents.aggregate(
                 total=Count('id'),
@@ -536,12 +541,30 @@ class StudentDetailView(RoleRequiredMixin, DetailView):
             "all_reports": all_reports,
             "financial_info": financial_info,
             "admission_docs": admission_docs,
+            "doc_stats": self._get_doc_stats(student),
             "today_date": date.today().strftime("%d %B %Y"),
             "id_standard_compliant": bool(re.match(r"^ADM-\d{4}-\d{3}$", student.admission_no or "")),
             "ecd_class_names": ecd_class_names,
         })
         
         return ctx
+
+    def _get_doc_stats(self, student):
+        from students.models import StudentDocument
+        docs = student.documents.all()
+        by_type = {t: 0 for t, _ in StudentDocument.DOCUMENT_TYPES}
+        for doc in docs:
+            by_type[doc.document_type] = by_type.get(doc.document_type, 0) + 1
+        required = ["birth_certificate", "medical_record", "transfer_slip", "report_card"]
+        uploaded_required = [t for t in required if by_type.get(t, 0) > 0]
+        missing_required = [t for t in required if by_type.get(t, 0) == 0]
+        return {
+            "total": docs.count(),
+            "by_type": by_type,
+            "required_count": len(required),
+            "uploaded_required_count": len(uploaded_required),
+            "missing_required": missing_required,
+        }
 
 
 class StudentPhotoUploadView(RoleRequiredMixin, View):
@@ -625,13 +648,58 @@ class StudentEditView(RoleRequiredMixin, TemplateView):
         ctx["today_date"] = date.today().strftime("%d %B %Y")
         ctx["form"] = kwargs.get("form", StudentCreateForm(instance=student))
 
-        # Onboarding documents from linked applicant
+        # Linked guardians
+        ctx["linked_guardians"] = StudentGuardian.objects.filter(
+            student=student
+        ).select_related("guardian").order_by("-is_primary", "guardian__full_name")
+
+        # Siblings (students sharing at least one guardian)
+        my_guardian_ids = StudentGuardian.objects.filter(
+            student=student
+        ).values_list("guardian_id", flat=True)
+        if my_guardian_ids:
+            sibling_ids = StudentGuardian.objects.filter(
+                guardian_id__in=my_guardian_ids
+            ).exclude(student=student).values_list("student_id", flat=True).distinct()
+            ctx["siblings"] = Student.objects.filter(id__in=sibling_ids).order_by("first_name")
+        else:
+            ctx["siblings"] = Student.objects.none()
+
+        # Build merged document list (onboarding + uploaded)
         from admissions.models import ApplicantDocumentReceipt
+        from students.models import StudentDocument
+
+        all_docs = []
         applicant = getattr(student, "from_applicant", None)
         if applicant:
-            ctx["onboarding_docs"] = ApplicantDocumentReceipt.objects.filter(
-                applicant=applicant
-            ).order_by("document_type")
+            for od in ApplicantDocumentReceipt.objects.filter(applicant=applicant).order_by("document_type"):
+                all_docs.append({
+                    "id": f"onb_{od.pk}",
+                    "title": od.get_document_type_display(),
+                    "doc_type_display": od.get_document_type_display(),
+                    "file": od.file if hasattr(od, "file") and od.file else None,
+                    "date": od.received_at,
+                    "is_received": od.is_received,
+                    "source": "onboarding",
+                    "pk": od.pk,
+                })
+        for sd in StudentDocument.objects.filter(student=student).order_by("-uploaded_at"):
+            all_docs.append({
+                "id": f"stu_{sd.pk}",
+                "title": sd.title,
+                "doc_type_display": sd.get_document_type_display(),
+                "file": sd.file,
+                "date": sd.uploaded_at,
+                "is_received": True,
+                "source": "uploaded",
+                "pk": sd.pk,
+            })
+
+        ctx["all_documents"] = all_docs
+
+        # Admission pipeline data from linked applicant
+        if applicant:
+            ctx["admission_applicant"] = applicant
 
         return ctx
 
@@ -641,6 +709,85 @@ class StudentEditView(RoleRequiredMixin, TemplateView):
         if student.is_archived and not request.user.is_superuser:
             from django.core.exceptions import PermissionDenied
             raise PermissionDenied("Archived student records can only be edited by Super Admin.")
+        # Handle document upload (separate form in sidebar)
+        if "upload_document" in request.POST:
+            from students.models import StudentDocument
+            doc_file = request.FILES.get("doc_file")
+            doc_title = request.POST.get("doc_title", "").strip()
+            doc_type = request.POST.get("doc_type", "other")
+            if doc_file and doc_title:
+                StudentDocument.objects.create(
+                    student=student,
+                    title=doc_title,
+                    document_type=doc_type,
+                    file=doc_file,
+                    uploaded_by=request.user,
+                )
+                from audit.models import log_event
+                log_event(
+                    actor=request.user, action_type="CREATE", model_name="StudentDocument",
+                    object_id=student.pk,
+                    description=f"Document '{doc_title}' uploaded for {student.admission_no}",
+                    request=request,
+                )
+                messages.success(request, f"Document '{doc_title}' uploaded successfully.")
+            else:
+                messages.error(request, "Please provide a document title and select a file.")
+            return redirect("students:edit", pk=pk)
+
+        # Handle document change (replace file for existing doc)
+        if "change_document_id" in request.POST:
+            from students.models import StudentDocument
+            change_id = request.POST.get("change_document_id")
+            new_file = request.FILES.get("change_doc_file")
+            if new_file and change_id:
+                if change_id.startswith("onb_"):
+                    # Onboarding doc → create a new StudentDocument as replacement
+                    od_pk = int(change_id.replace("onb_", ""))
+                    from admissions.models import ApplicantDocumentReceipt
+                    od = ApplicantDocumentReceipt.objects.filter(pk=od_pk).first()
+                    doc_title = od.get_document_type_display() if od else "Updated Document"
+                    doc_type = od.document_type if od else "other"
+                    StudentDocument.objects.create(
+                        student=student, title=doc_title, document_type=doc_type,
+                        file=new_file, uploaded_by=request.user,
+                    )
+                    messages.success(request, f"Replacement uploaded for '{doc_title}'.")
+                elif change_id.startswith("stu_"):
+                    # Uploaded doc → replace the file
+                    sd_pk = int(change_id.replace("stu_", ""))
+                    sd = StudentDocument.objects.filter(pk=sd_pk, student=student).first()
+                    if sd:
+                        sd.file = new_file
+                        sd.save(update_fields=["file", "updated_at"])
+                        messages.success(request, f"Document '{sd.title}' updated.")
+                from audit.models import log_event
+                log_event(
+                    actor=request.user, action_type="UPDATE", model_name="StudentDocument",
+                    object_id=student.pk,
+                    description=f"Document replaced for {student.admission_no}",
+                    request=request,
+                )
+            return redirect("students:edit", pk=pk)
+
+        # Handle document delete
+        if "delete_document_id" in request.POST:
+            from students.models import StudentDocument
+            doc_id = request.POST.get("delete_document_id")
+            doc = StudentDocument.objects.filter(pk=doc_id, student=student).first()
+            if doc:
+                doc_title = doc.title
+                doc.delete()
+                from audit.models import log_event
+                log_event(
+                    actor=request.user, action_type="DELETE", model_name="StudentDocument",
+                    object_id=student.pk,
+                    description=f"Document '{doc_title}' deleted for {student.admission_no}",
+                    request=request,
+                )
+                messages.success(request, f"Document '{doc_title}' deleted.")
+            return redirect("students:edit", pk=pk)
+
         form = StudentCreateForm(request.POST, instance=student)
         if form.is_valid():
             # FR-AUD-001: Capture all changed fields with before/after values
@@ -1647,8 +1794,10 @@ class GenerateStudentIDView(RoleRequiredMixin, View):
         # We'll allow "regenerating" if it doesn't follow the pattern or if forced
         new_id = generate_admission_number()
         old_id = student.admission_no
-        student.admission_no = new_id
-        student.save(update_fields=["admission_no", "updated_at"])
+        Student.objects.filter(pk=student.pk).update(
+            admission_no=new_id,
+            updated_at=timezone.now()
+        )
         
         from audit.models import log_event
         log_event(
@@ -1694,8 +1843,10 @@ class BulkGenerateStudentIDsView(RoleRequiredMixin, View):
                 if not re.match(valid_pattern, student.admission_no):
                     old_id = student.admission_no
                     new_id = generate_admission_number()
-                    student.admission_no = new_id
-                    student.save(update_fields=["admission_no", "updated_at"])
+                    Student.objects.filter(pk=student.pk).update(
+                        admission_no=new_id,
+                        updated_at=timezone.now()
+                    )
                     
                     from audit.models import log_event
                     log_event(
@@ -1748,7 +1899,125 @@ class PrintStudentIDView(RoleRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        # Sibling info might be useful for identification? (Optional)
+        from datetime import date, timedelta
+        today = date.today()
+        ctx["issued_date"] = today.strftime("%d/%m/%Y")
+        ctx["expiry_date"] = (today.replace(year=today.year + 1) - timedelta(days=1)).strftime("%d/%m/%Y")
+        return ctx
+
+
+class PrintClassIDView(RoleRequiredMixin, TemplateView):
+    """Print pickup cards for all students in a class."""
+    template_name = "students/id_card_print_class.html"
+    required_permission = "students.view_student"
+
+    def get(self, request, *args, **kwargs):
+        class_name = kwargs.get("class_name", "").strip()
+        if not class_name:
+            messages.error(request, "Please specify a class.")
+            return redirect("students:list")
+
+        from users.role_models import RoleConfig
+        user = request.user
+        rc = RoleConfig.objects.filter(role=user.role, is_active=True).first()
+        depts = rc.departments if rc and rc.departments else []
+        is_teacher_role = not depts and user.role not in (
+            UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL,
+            UserRole.ADMIN_OFFICER, UserRole.FINANCE_OFFICER,
+        )
+
+        students = Student.objects.filter(
+            class_name=class_name, is_archived=False
+        ).order_by("last_name")
+
+        if is_teacher_role or user.role == UserRole.TEACHER:
+            from core.teacher_context import get_teacher_assigned_classes
+            my_classes = get_teacher_assigned_classes(user)
+            if my_classes:
+                students = students.filter(class_name__in=my_classes)
+            elif not my_classes:
+                messages.error(request, "No classes assigned to you.")
+                return redirect("students:list")
+
+        if not students.exists():
+            messages.warning(request, f"No active students found in {class_name}.")
+            return redirect(f"/students/?class_name={class_name}")
+
+        return super().get(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        from datetime import date, timedelta
+        class_name = self.kwargs.get("class_name", "").strip()
+        today = date.today()
+        ctx["class_name"] = class_name
+        ctx["students"] = Student.objects.filter(
+            class_name=class_name, is_archived=False
+        ).order_by("last_name")
+        ctx["issued_date"] = today.strftime("%d/%m/%Y")
+        ctx["expiry_date"] = (today.replace(year=today.year + 1) - timedelta(days=1)).strftime("%d/%m/%Y")
+        return ctx
+
+
+class PrintClassIDBulkView(RoleRequiredMixin, TemplateView):
+    """Print pickup cards for all students in a class — A4 portrait, 10 per page (5+5)."""
+    template_name = "students/id_card_print_bulk.html"
+    required_permission = "students.view_student"
+
+    def get(self, request, *args, **kwargs):
+        class_name = kwargs.get("class_name", "").strip()
+        if not class_name:
+            messages.error(request, "Please specify a class.")
+            return redirect("students:list")
+
+        from users.role_models import RoleConfig
+        user = request.user
+        rc = RoleConfig.objects.filter(role=user.role, is_active=True).first()
+        depts = rc.departments if rc and rc.departments else []
+        is_teacher_role = not depts and user.role not in (
+            UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL,
+            UserRole.ADMIN_OFFICER, UserRole.FINANCE_OFFICER,
+        )
+
+        students = Student.objects.filter(
+            class_name=class_name, is_archived=False
+        ).order_by("last_name")
+
+        if is_teacher_role or user.role == UserRole.TEACHER:
+            from core.teacher_context import get_teacher_assigned_classes
+            my_classes = get_teacher_assigned_classes(user)
+            if my_classes:
+                students = students.filter(class_name__in=my_classes)
+            elif not my_classes:
+                messages.error(request, "No classes assigned to you.")
+                return redirect("students:list")
+
+        if not students.exists():
+            messages.warning(request, f"No active students found in {class_name}.")
+            return redirect(f"/students/?class_name={class_name}")
+
+        return super().get(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        from datetime import date, timedelta
+        import math
+        class_name = self.kwargs.get("class_name", "").strip()
+        today = date.today()
+        students = list(Student.objects.filter(
+            class_name=class_name, is_archived=False
+        ).order_by("last_name"))
+
+        # Group into pages of 10
+        page_size = 10
+        pages = [students[i:i + page_size] for i in range(0, len(students), page_size)]
+
+        ctx["class_name"] = class_name
+        ctx["students"] = students
+        ctx["pages"] = pages
+        ctx["total_pages"] = len(pages)
+        ctx["issued_date"] = today.strftime("%d/%m/%Y")
+        ctx["expiry_date"] = (today.replace(year=today.year + 1) - timedelta(days=1)).strftime("%d/%m/%Y")
         return ctx
 
 

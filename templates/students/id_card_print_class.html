@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student ID Card</title>
+    <title>Pick Up Cards — {{ class_name }}</title>
     <style>
         :root {
             --hodari-blue: #023AA5;
@@ -13,14 +13,53 @@
         body {
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             background: #e9ecf2;
+            padding: 40px;
+        }
+        .print-controls {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 100;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        .print-controls .info {
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+            background: #fff;
+            padding: 10px 18px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .btn-print {
+            background: var(--hodari-blue);
+            color: #fff;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(30, 58, 138, 0.25);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.2s;
+        }
+        .btn-print:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 28px rgba(30, 58, 138, 0.35);
+        }
+        .cards-container {
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            padding: 40px;
+            gap: 32px;
         }
-        .id-card {
+        .card-page {
             width: 540px;
             height: 340px;
             background: #fff;
@@ -28,8 +67,9 @@
             box-shadow: 0 4px 24px rgba(0,0,0,0.08);
             position: relative;
             overflow: hidden;
+            flex-shrink: 0;
         }
-        .id-card::before {
+        .card-page::before {
             content: '';
             position: absolute;
             top: 0;
@@ -129,69 +169,39 @@
             bottom: 16px;
             left: 15px;
         }
-        .print-controls {
-            position: fixed;
-            top: 24px;
-            right: 24px;
-            z-index: 100;
-        }
-        .btn-print {
-            background: var(--hodari-blue);
-            color: #fff;
-            border: none;
-            padding: 14px 28px;
-            border-radius: 12px;
-            font-weight: 700;
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            font-size: 14px;
-            cursor: pointer;
-            box-shadow: 0 8px 20px rgba(30, 58, 138, 0.25);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            transition: all 0.2s;
-        }
-        .btn-print:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 28px rgba(30, 58, 138, 0.35);
-        }
         @media print {
             @page {
                 size: 85.6mm 53.98mm;
                 margin: 0;
             }
-            html {
+            html, body {
                 width: 85.6mm;
-                height: 53.98mm;
-            }
-            body {
-                width: 85.6mm;
-                height: 53.98mm;
                 background: #fff;
                 padding: 0;
                 margin: 0;
-                overflow: hidden;
-                display: block;
+                height: auto;
+                overflow: visible;
             }
             .print-controls { display: none !important; }
-            .id-card {
+            .cards-container { gap: 0; }
+            .card-page {
                 box-shadow: none;
                 border: none;
                 border-radius: 0;
                 width: 85.6mm;
                 height: 53.98mm;
                 margin: 0;
-                position: fixed;
-                top: 0;
-                left: 0;
+                page-break-after: always;
+                page-break-inside: avoid;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
+            .card-page:last-child { page-break-after: auto; }
             .school-logo { height: 10mm; }
             .orange-corner { width: 16mm; height: 16mm; border-radius: 0 3mm 0 0; }
             .qr-on-corner { top: 2mm; right: 2mm; padding: 1mm; }
             .qr-on-corner img { width: 22mm; height: 22mm; }
-            .id-card::before { width: 2mm; border-radius: 3mm 0 0 3mm; }
+            .card-page::before { width: 2mm; border-radius: 3mm 0 0 3mm; }
             .info-box-adm { font-size: 3.8mm; }
             .info-box-grade { font-size: 3.5mm; }
             .card-title { font-size: 2.8mm; }
@@ -204,28 +214,33 @@
 <body>
     {% load static %}
     <div class="print-controls">
+        <div class="info">{{ students|length }} card{{ students|length|pluralize }} — {{ class_name }}</div>
         <button class="btn-print" onclick="window.print()">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-            Generate Print
+            Print All Cards
         </button>
     </div>
 
-    <div class="id-card">
-        <div class="orange-corner"></div>
-        <img src="{% static 'branding/hodari-logo.png' %}" alt="Hodari" class="school-logo">
-        <div class="qr-on-corner">
-            <img src="{% url 'attendance:qr_student' student.id %}" alt="QR">
+    <div class="cards-container">
+        {% for student in students %}
+        <div class="card-page">
+            <div class="orange-corner"></div>
+            <img src="{% static 'branding/hodari-logo.png' %}" alt="Hodari" class="school-logo">
+            <div class="qr-on-corner">
+                <img src="{% url 'attendance:qr_student' student.id %}" alt="QR">
+            </div>
+            <div class="card-content">
+                <div class="info-box"><div class="card-title">Pick Up Card</div></div>
+                <div class="info-box"><div class="info-box-grade">{{ student.class_name }}</div></div>
+                <div class="info-box"><div class="info-box-adm">{{ student.admission_no }}</div></div>
+                <div class="info-box"><p class="pickup-note">Kindly come with this card when picking up your child. Students will not be allowed to go home without it.</p></div>
+            </div>
+            <div class="card-dates">
+                <span>Issued: {{ issued_date }}</span>
+                <span>Expires: {{ expiry_date }}</span>
+            </div>
         </div>
-        <div class="card-content">
-            <div class="info-box"><div class="card-title">Pick Up Card</div></div>
-            <div class="info-box"><div class="info-box-grade">{{ student.class_name }}</div></div>
-            <div class="info-box"><div class="info-box-adm">{{ student.admission_no }}</div></div>
-            <div class="info-box"><p class="pickup-note">Kindly come with this card when picking up your child. Students will not be allowed to go home without it.</p></div>
-        </div>
-        <div class="card-dates">
-            <span>Issued: {{ issued_date }}</span>
-            <span>Expires: {{ expiry_date }}</span>
-        </div>
+        {% endfor %}
     </div>
 </body>
 </html>

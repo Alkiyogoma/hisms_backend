@@ -307,3 +307,173 @@ def check_overdue_invoices_task():
     except Exception as exc:
         logger.error("check_overdue_invoices_task failed: %s", exc)
         raise
+
+
+@shared_task
+def broadcast_statistics_update_task(class_id=None):
+    """
+    Async statistics broadcast — runs outside the scan hot path.
+    Avoids 2 DB queries per scan in the synchronous request cycle.
+    """
+    try:
+        from attendance.realtime_tracker import get_realtime_tracker
+        tracker = get_realtime_tracker()
+        tracker.broadcast_statistics_update(class_id=class_id)
+    except Exception as exc:
+        logger.error("broadcast_statistics_update_task failed: %s", exc)
+
+
+@shared_task
+def broadcast_checkin_event_task(student_id, timestamp_iso, marked_by_id=None):
+    """
+    Async check-in event broadcast — runs outside the scan hot path.
+    Avoids 2x async_to_sync(group_send) blocking the response (~1-2s).
+    """
+    try:
+        from attendance.realtime_tracker import get_realtime_tracker
+        from students.models import Student
+        from users.models import User
+        student = Student.objects.get(id=student_id)
+        timestamp = datetime.fromisoformat(timestamp_iso)
+        marked_by = User.objects.get(id=marked_by_id) if marked_by_id else None
+        tracker = get_realtime_tracker()
+        tracker.broadcast_checkin_event(student, timestamp, marked_by=marked_by)
+    except Exception as exc:
+        logger.error("broadcast_checkin_event_task failed for student %s: %s", student_id, exc)
+
+
+@shared_task
+def broadcast_checkout_event_task(student_id, timestamp_iso, marked_by_id=None):
+    """
+    Async check-out event broadcast — runs outside the scan hot path.
+    Avoids 2x async_to_sync(group_send) blocking the response (~1-2s).
+    """
+    try:
+        from attendance.realtime_tracker import get_realtime_tracker
+        from students.models import Student
+        from users.models import User
+        student = Student.objects.get(id=student_id)
+        timestamp = datetime.fromisoformat(timestamp_iso)
+        marked_by = User.objects.get(id=marked_by_id) if marked_by_id else None
+        tracker = get_realtime_tracker()
+        tracker.broadcast_checkout_event(student, timestamp, marked_by=marked_by)
+    except Exception as exc:
+        logger.error("broadcast_checkout_event_task failed for student %s: %s", student_id, exc)
+
+
+@shared_task
+def audit_log_task(actor_id, action_type, model_name, object_id="", description="", after=None):
+    """
+    Async audit log write — runs outside the scan hot path.
+    Avoids synchronous DB write blocking the response.
+    """
+    try:
+        from audit.services import log_event
+        from users.models import User
+        actor = User.objects.get(id=actor_id)
+        log_event(
+            actor=actor,
+            action_type=action_type,
+            model_name=model_name,
+            object_id=object_id,
+            description=description,
+            after=after,
+        )
+    except Exception as exc:
+        logger.error("audit_log_task failed: %s", exc)
+
+
+# ---------------------------------------------------------------------------
+# Scan speed: Async notification helpers (removed from scan hot path)
+# ---------------------------------------------------------------------------
+
+def _collect_parent_contacts(student):
+    """Collect deduplicated parent phone contacts for a student."""
+    from students.models import Student
+    parents = []
+    seen_phones = set()
+    for guardian_rel in student.guardians.all():
+        phone = (guardian_rel.phone or '').strip()
+        if phone and phone not in seen_phones:
+            seen_phones.add(phone)
+            parents.append({'phone': phone, 'name': guardian_rel.full_name})
+    if hasattr(student, 'laravel_parents'):
+        for parent_rel in student.laravel_parents.all():
+            phone = (parent_rel.parent.phone or '').strip()
+            if phone and phone not in seen_phones:
+                seen_phones.add(phone)
+                parents.append({'phone': phone, 'name': parent_rel.parent.full_name})
+    return parents
+
+
+@shared_task(bind=True, max_retries=3)
+def send_checkin_notification_task(self, student_id, entry_id, timestamp_iso):
+    """
+    Async check-in notification — runs outside the scan hot path.
+    Queues SMS messages and logs notifications for all parent contacts.
+    """
+    try:
+        from attendance.models import Message, NotificationLog
+        from students.models import Student
+
+        student = Student.objects.get(id=student_id)
+        timestamp = datetime.fromisoformat(timestamp_iso)
+
+        message_text = (
+            f"Your child {student.get_full_name()} has been checked in at "
+            f"{timestamp.strftime('%Y-%m-%d %H:%M:%S')} to Hodari Christian School."
+        )
+
+        parents = _collect_parent_contacts(student)
+        for parent in parents:
+            Message.objects.create(phone=parent['phone'], message=message_text, status=0)
+            NotificationLog.objects.create(
+                attendance_entry_id=entry_id,
+                recipient_phone=parent['phone'],
+                notification_type='checkin',
+                message=message_text,
+                delivery_status='pending',
+            )
+
+        logger.info("Checkin notifications queued for student %s: %d parents", student_id, len(parents))
+
+    except Exception as exc:
+        logger.error("send_checkin_notification_task failed for student %s: %s", student_id, exc)
+        raise self.retry(exc=exc, countdown=60 * (2 ** self.request.retries))
+
+
+@shared_task(bind=True, max_retries=3)
+def send_checkout_notification_task(self, student_id, entry_id, timestamp_iso, parent_name=""):
+    """
+    Async check-out notification — runs outside the scan hot path.
+    Queues SMS messages and logs notifications for all parent contacts.
+    """
+    try:
+        from attendance.models import Message, NotificationLog
+        from students.models import Student
+
+        student = Student.objects.get(id=student_id)
+        timestamp = datetime.fromisoformat(timestamp_iso)
+        pickup_info = f" by {parent_name}" if parent_name else ""
+
+        message_text = (
+            f"Your child {student.get_full_name()} has been picked up{pickup_info} on "
+            f"{timestamp.strftime('%Y-%m-%d %H:%M:%S')} from Hodari Christian School."
+        )
+
+        parents = _collect_parent_contacts(student)
+        for parent in parents:
+            Message.objects.create(phone=parent['phone'], message=message_text, status=0)
+            NotificationLog.objects.create(
+                attendance_entry_id=entry_id,
+                recipient_phone=parent['phone'],
+                notification_type='checkout',
+                message=message_text,
+                delivery_status='pending',
+            )
+
+        logger.info("Checkout notifications queued for student %s: %d parents", student_id, len(parents))
+
+    except Exception as exc:
+        logger.error("send_checkout_notification_task failed for student %s: %s", student_id, exc)
+        raise self.retry(exc=exc, countdown=60 * (2 ** self.request.retries))

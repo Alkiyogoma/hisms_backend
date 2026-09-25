@@ -111,21 +111,22 @@
       <label>Search</label>
       <input type="text" name="q" placeholder="Student name, admission no, or keyword" value="{{ filter_q }}">
     </div>
+    {% if is_unified_welfare %}
     <div class="si-filter-group">
-      <label>Severity</label>
-      <select name="severity">
-        <option value="">All severities</option>
-        {% for val, label in severity_choices %}
-          <option value="{{ val }}" {% if filter_severity == val %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
+      <label>Department</label>
+      <select name="department">
+        <option value="">All departments</option>
+        <option value="ecd" {% if filter_department == 'ecd' %}selected{% endif %}>ECD</option>
+        <option value="primary" {% if filter_department == 'primary' %}selected{% endif %}>Primary</option>
       </select>
     </div>
+    {% endif %}
     <div class="si-filter-group">
-      <label>Concern</label>
-      <select name="concern">
-        <option value="">All concerns</option>
-        {% for val, label in concern_choices %}
-          <option value="{{ val }}" {% if filter_concern == val %}selected{% endif %}>{{ label }}</option>
+      <label>Note Type</label>
+      <select name="note_type">
+        <option value="">All note types</option>
+        {% for val, label in note_type_choices %}
+          <option value="{{ val }}" {% if filter_note_type == val %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
     </div>
@@ -157,7 +158,7 @@
     </div>
     <div style="display:flex;gap:8px;align-self:flex-end">
       <button type="submit" class="si-btn si-btn-primary">Apply</button>
-      <a href="{% if is_ecd_welfare %}{% url 'welfare:student_incidents_ecd' %}{% else %}{% url 'welfare:student_incidents_primary' %}{% endif %}" class="si-btn si-btn-ghost">Clear</a>
+      <a href="{% url 'welfare:student_incidents' %}" class="si-btn si-btn-ghost">Clear</a>
     </div>
   </div>
 </form>
@@ -278,21 +279,21 @@
   {% if total_pages > 1 %}
   <div class="si-pagination">
     {% if page > 1 %}
-      <a class="si-page-btn" href="?page={{ page|add:"-1" }}&q={{ filter_q }}&severity={{ filter_severity }}&concern={{ filter_concern }}&status={{ filter_status }}&class_name={{ filter_class }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">Previous</a>
+      <a class="si-page-btn" href="?page={{ page|add:"-1" }}&q={{ filter_q }}&note_type={{ filter_note_type }}&status={{ filter_status }}&class_name={{ filter_class }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">Previous</a>
     {% endif %}
     {% if show_first_ellipsis %}
-      <a class="si-page-btn" href="?page=1&q={{ filter_q }}&severity={{ filter_severity }}&concern={{ filter_concern }}&status={{ filter_status }}&class_name={{ filter_class }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">1</a>
+      <a class="si-page-btn" href="?page=1&q={{ filter_q }}&note_type={{ filter_note_type }}&status={{ filter_status }}&class_name={{ filter_class }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">1</a>
       <span style="padding:0 4px;color:var(--text-muted)">...</span>
     {% endif %}
     {% for pnum in page_range %}
-      <a class="si-page-btn {% if pnum == page %}active{% endif %}" href="?page={{ pnum }}&q={{ filter_q }}&severity={{ filter_severity }}&concern={{ filter_concern }}&status={{ filter_status }}&class_name={{ filter_class }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">{{ pnum }}</a>
+      <a class="si-page-btn {% if pnum == page %}active{% endif %}" href="?page={{ pnum }}&q={{ filter_q }}&note_type={{ filter_note_type }}&status={{ filter_status }}&class_name={{ filter_class }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">{{ pnum }}</a>
     {% endfor %}
     {% if show_last_ellipsis %}
       <span style="padding:0 4px;color:var(--text-muted)">...</span>
-      <a class="si-page-btn" href="?page={{ total_pages }}&q={{ filter_q }}&severity={{ filter_severity }}&concern={{ filter_concern }}&status={{ filter_status }}&class_name={{ filter_class }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">{{ total_pages }}</a>
+      <a class="si-page-btn" href="?page={{ total_pages }}&q={{ filter_q }}&note_type={{ filter_note_type }}&status={{ filter_status }}&class_name={{ filter_class }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">{{ total_pages }}</a>
     {% endif %}
     {% if page < total_pages %}
-      <a class="si-page-btn" href="?page={{ page|add:"1" }}&q={{ filter_q }}&severity={{ filter_severity }}&concern={{ filter_concern }}&status={{ filter_status }}&class_name={{ filter_class }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">Next</a>
+      <a class="si-page-btn" href="?page={{ page|add:"1" }}&q={{ filter_q }}&note_type={{ filter_note_type }}&status={{ filter_status }}&class_name={{ filter_class }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">Next</a>
     {% endif %}
   </div>
   {% endif %}

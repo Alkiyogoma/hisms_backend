@@ -46,7 +46,8 @@ def _assert_observation_department_match(user, observation):
 class WelfareStudentIncidentsView(DepartmentScopedMixin, RoleRequiredMixin, TemplateView):
     """Student incidents dashboard.
     Shows recent incidents, trends, severity breakdown, and key insights
-    with search filters and charts."""
+    with search filters and charts.  Supports unified mode (all departments)
+    when department="all" is passed via as_view()."""
     template_name = "welfare/student_incidents.html"
     allowed_roles = [UserRole.TEACHER, UserRole.ECD_HOD, UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
     required_permission = "welfare.view_welfareobservation"
@@ -56,7 +57,8 @@ class WelfareStudentIncidentsView(DepartmentScopedMixin, RoleRequiredMixin, Temp
         auth_resp = super().dispatch(request, *args, **kwargs)
         if hasattr(auth_resp, 'status_code') and auth_resp.status_code in (302, 403):
             return auth_resp
-        if not self.department:
+        # Legacy department-specific routes: redirect if no explicit department set
+        if self.department is None and not self._is_unified():
             from academics.models import Department
             dept = self._get_department()
             if dept == Department.ECD:
@@ -81,9 +83,11 @@ class WelfareStudentIncidentsView(DepartmentScopedMixin, RoleRequiredMixin, Temp
             description="Welfare student incidents dashboard viewed"
         )
         # Get department context
-        department = self._get_department()
-        is_ecd = (department == Department.ECD)
+        department = self._get_department()  # None in unified mode
+        is_unified = self._is_unified()
+        is_ecd = (department == Department.ECD) if department else False
         ctx["department"] = department
+        ctx["is_unified_welfare"] = is_unified
         ctx["is_ecd_welfare"] = is_ecd
         ctx["page_title"] = "Incidents"
 
@@ -91,11 +95,14 @@ class WelfareStudentIncidentsView(DepartmentScopedMixin, RoleRequiredMixin, Temp
         qs = WelfareObservation.objects.select_related(
             'student', 'submitted_by', 'reviewed_by'
         ).order_by('-observation_date', '-created_at')
-        
-        # Scope to department classes
-        dept_class_names = list(GradeClass.objects.filter(
-            department=department
-        ).values_list('name', flat=True))
+
+        # Scope to department classes (or all ECD+Primary in unified mode)
+        if is_unified:
+            dept_class_names = self._get_all_welfare_classes()
+        else:
+            dept_class_names = list(GradeClass.objects.filter(
+                department=department
+            ).values_list('name', flat=True))
         qs = qs.filter(student__class_name__in=dept_class_names)
 
         if role == UserRole.TEACHER:
@@ -106,12 +113,20 @@ class WelfareStudentIncidentsView(DepartmentScopedMixin, RoleRequiredMixin, Temp
 
         # Apply search filters
         q = request.GET.get('q', '').strip()
-        severity = request.GET.get('severity', '')
-        concern = request.GET.get('concern', '')
+        note_type = request.GET.get('note_type', '')
         status = request.GET.get('status', '')
         class_name = request.GET.get('class_name', '')
         date_from = request.GET.get('date_from', '')
         date_to = request.GET.get('date_to', '')
+        dept_filter = request.GET.get('department', '')
+
+        # Department filter (for unified mode)
+        if dept_filter and is_unified:
+            from academics.models import Department as Dept
+            dept_val = Dept.ECD if dept_filter == "ecd" else Dept.PRIMARY if dept_filter == "primary" else None
+            if dept_val:
+                dept_cls = list(GradeClass.objects.filter(department=dept_val).values_list("name", flat=True))
+                qs = qs.filter(student__class_name__in=dept_cls)
 
         if q:
             from django.db.models import Q
@@ -121,10 +136,19 @@ class WelfareStudentIncidentsView(DepartmentScopedMixin, RoleRequiredMixin, Temp
                 Q(student__admission_no__icontains=q) |
                 Q(observation_text__icontains=q)
             )
-        if severity:
-            qs = qs.filter(severity=severity)
-        if concern:
-            qs = qs.filter(concern_type=concern)
+        if note_type:
+            if note_type == "positive":
+                qs = qs.filter(severity="low", concern_type="other")
+            elif note_type == "observation":
+                qs = qs.exclude(concern_type="other").filter(severity__in=["low", "medium"])
+            elif note_type == "concern":
+                from django.db.models import Q
+                qs = qs.filter(
+                    Q(severity__in=["high", "critical"]) |
+                    Q(severity="medium", concern_type__in=["behavioral", "health", "attendance", "academic", "home_situation"])
+                )
+            elif note_type == "safeguarding":
+                qs = qs.filter(severity="critical")
         if status:
             qs = qs.filter(hod_status=status)
         if class_name:
@@ -143,30 +167,29 @@ class WelfareStudentIncidentsView(DepartmentScopedMixin, RoleRequiredMixin, Temp
         offset = (page - 1) * per_page
         recent_incidents = qs[offset:offset + per_page]
 
-        # Full dataset (scoped by department) for stats
-        base_qs = WelfareObservation.objects.filter(student__class_name__in=dept_class_names)
-
-        total_count = base_qs.count()
+        # Stats from filtered queryset so cards/charts respond to filters
         today = timezone.now().date()
         this_month_start = today.replace(day=1)
-        this_month_count = base_qs.filter(observation_date__gte=this_month_start).count()
+        total_count = qs.count()
+        this_month_count = qs.filter(observation_date__gte=this_month_start).count()
         last_month_end = this_month_start - timedelta(days=1)
         last_month_start = last_month_end.replace(day=1)
-        last_month_count = base_qs.filter(
+        last_month_count = qs.filter(
             observation_date__gte=last_month_start,
             observation_date__lte=last_month_end,
         ).count()
-        open_count = base_qs.exclude(hod_status='resolved').count()
-        resolved_count = base_qs.filter(hod_status='resolved').count()
-        parent_contacted_count = base_qs.filter(parent_contacted=True).count()
+        open_count = qs.exclude(hod_status='resolved').count()
+        resolved_count = qs.filter(hod_status='resolved').count()
+        parent_contacted_count = qs.filter(parent_contacted=True).count()
 
         # Severity breakdown
-        severity_data = dict(Counter(base_qs.values_list('severity', flat=True)))
+        severity_data = dict(Counter(qs.values_list('severity', flat=True)))
 
         # Concern type breakdown
-        concern_data = dict(Counter(base_qs.values_list('concern_type', flat=True)))
+        concern_data = dict(Counter(qs.values_list('concern_type', flat=True)))
 
-        # Monthly trend (last 6 months)
+        # Monthly trend (last 6 months) — from full department scope for context
+        base_qs = WelfareObservation.objects.filter(student__class_name__in=dept_class_names)
         current_month_start = today.replace(day=1)
         monthly_trend = []
         for i in range(5, -1, -1):
@@ -193,7 +216,7 @@ class WelfareStudentIncidentsView(DepartmentScopedMixin, RoleRequiredMixin, Temp
         # Top students with most incidents
         from django.db.models import F
         top_students = (
-            base_qs.values('student__first_name', 'student__last_name', 'student__class_name', 'student_id')
+            qs.values('student__first_name', 'student__last_name', 'student__class_name', 'student_id')
             .annotate(incident_count=Count('id'), student_pk=F('student_id'))
             .order_by('-incident_count')[:8]
         )
@@ -217,8 +240,9 @@ class WelfareStudentIncidentsView(DepartmentScopedMixin, RoleRequiredMixin, Temp
         show_last_ellipsis = page_range[-1] < total_pages - 1
 
         # Department context for _top_tabs.html include
-        ctx['department'] = getattr(self, 'department', 'primary')
-        ctx['is_ecd_welfare'] = (ctx['department'] == 'ecd')
+        ctx['department'] = department
+        ctx['is_unified_welfare'] = is_unified
+        ctx['is_ecd_welfare'] = is_ecd
         ctx['can_see_hod_dashboard'] = self.request.user.has_perm("welfare.can_review_observation")
 
         ctx.update({
@@ -240,15 +264,14 @@ class WelfareStudentIncidentsView(DepartmentScopedMixin, RoleRequiredMixin, Temp
             'monthly_trend': monthly_trend,
             'top_students': top_students,
             'available_classes': available_classes,
-            'severity_choices': WelfareSeverity.choices,
-            'concern_choices': WelfareConcernType.choices,
+            'note_type_choices': [('positive', 'Positive'), ('observation', 'Observation'), ('concern', 'Concern'), ('safeguarding', 'Safeguarding')],
             'status_choices': [('pending', 'Pending'), ('in_progress', 'In progress'), ('resolved', 'Resolved')],
             # Pass current filter values back to template
             'filter_q': q,
-            'filter_severity': severity,
-            'filter_concern': concern,
+            'filter_note_type': note_type,
             'filter_status': status,
             'filter_class': class_name,
+            'filter_department': dept_filter,
             'filter_date_from': date_from,
             'filter_date_to': date_to,
             'page_range': page_range,
@@ -278,11 +301,15 @@ class WelfareListView(DepartmentScopedMixin, RoleRequiredMixin, ListView):
         from academics.models import Department, GradeClass
         qs = WelfareObservation.objects.select_related("student", "submitted_by").order_by("-observation_date")
 
-        # Scope by department
+        # Scope by department (or all in unified mode)
         department = self._get_department()
-        dept_class_names = GradeClass.objects.filter(
-            department=department
-        ).values_list("name", flat=True)
+        is_unified = self._is_unified()
+        if is_unified:
+            dept_class_names = self._get_all_welfare_classes()
+        else:
+            dept_class_names = GradeClass.objects.filter(
+                department=department
+            ).values_list("name", flat=True)
         qs = qs.filter(student__class_name__in=dept_class_names)
 
         role = self.request.user.role
@@ -291,26 +318,46 @@ class WelfareListView(DepartmentScopedMixin, RoleRequiredMixin, ListView):
         severity = self.request.GET.get("severity")
         if severity:
             qs = qs.filter(severity=severity)
+        # Department filter (for unified mode)
+        dept_filter = self.request.GET.get("department", "")
+        if dept_filter and is_unified:
+            from academics.models import Department as Dept
+            dept_val = Dept.ECD if dept_filter == "ecd" else Dept.PRIMARY if dept_filter == "primary" else None
+            if dept_val:
+                dept_cls = list(GradeClass.objects.filter(department=dept_val).values_list("name", flat=True))
+                qs = qs.filter(student__class_name__in=dept_cls)
         return qs
 
     def get_context_data(self, **kwargs):
         from academics.models import Department
+        from django.core.paginator import Paginator
         ctx = super().get_context_data(**kwargs)
         department = self._get_department()
-        is_ecd = (department == Department.ECD)
+        is_unified = self._is_unified()
+        is_ecd = (department == Department.ECD) if department else False
         # NFR-PDPA-006: Log access to welfare list (sensitive data)
         from audit.view_audit import log_sensitive_access
         log_sensitive_access(
             self.request, "WelfareObservation", None, "welfare",
-            description=f"Welfare list viewed ({'ECD' if is_ecd else 'Primary'} department)"
+            description=f"Welfare list viewed ({'Unified' if is_unified else 'ECD' if is_ecd else 'Primary'} mode)"
         )
         ctx["welfare_tab"] = "list"
         ctx["department"] = department
+        ctx["is_unified_welfare"] = is_unified
         ctx["is_ecd_welfare"] = is_ecd
-        ctx["page_title"] = "ECD Welfare" if is_ecd else "Primary Welfare"
+        ctx["page_title"] = "Welfare Observations"
         ctx["can_see_hod_dashboard"] = self.request.user.has_perm("welfare.can_review_observation")
         qs = self.get_queryset()
-        ctx["active_observations"] = qs.exclude(hod_status="resolved")
+
+        # Paginate active observations
+        active_qs = qs.exclude(hod_status="resolved")
+        paginator = Paginator(active_qs, 20)
+        page_number = self.request.GET.get("page")
+        page_obj = paginator.get_page(page_number)
+        ctx["active_observations"] = page_obj
+        ctx["page_obj"] = page_obj
+        ctx["paginator"] = paginator
+
         ctx["resolved_observations"] = qs.filter(hod_status="resolved")[:15]
         ctx["severity_choices"] = WelfareSeverity.choices
         ctx["today_date"] = date.today().strftime("%d %B %Y")
@@ -339,16 +386,21 @@ class WelfareSubmitView(DepartmentScopedMixin, RoleRequiredMixin, TemplateView):
         ctx["can_see_hod_dashboard"] = self.request.user.has_perm("welfare.can_review_observation")
 
         department = self._get_department()
-        is_ecd = (department == Department.ECD)
+        is_unified = self._is_unified()
+        is_ecd = (department == Department.ECD) if department else False
         ctx["department"] = department
+        ctx["is_unified_welfare"] = is_unified
         ctx["is_ecd_welfare"] = is_ecd
-        ctx["page_title"] = "ECD Welfare" if is_ecd else "Primary Welfare"
+        ctx["page_title"] = "New Welfare Note"
 
-        # Filter classes by department
-        dept_classes = GradeClass.objects.filter(
-            department=department
-        ).values_list("name", flat=True).distinct()
-        dept_class_names = sorted(dept_classes)
+        # Filter classes by department (or all in unified mode)
+        if is_unified:
+            dept_class_names = self._get_all_welfare_classes()
+        else:
+            dept_classes = GradeClass.objects.filter(
+                department=department
+            ).values_list("name", flat=True).distinct()
+            dept_class_names = sorted(dept_classes)
 
         all_students = Student.objects.filter(is_archived=False)
         if self.request.user.role == UserRole.TEACHER:
@@ -358,7 +410,7 @@ class WelfareSubmitView(DepartmentScopedMixin, RoleRequiredMixin, TemplateView):
             students = all_students.filter(class_name__in=valid_classes)
             available_classes = valid_classes
         else:
-            # HODs / Admins see only department classes
+            # HODs / Admins see only department classes (or all in unified)
             students = all_students.filter(class_name__in=dept_class_names)
             available_classes = dept_class_names
 
@@ -376,8 +428,9 @@ class WelfareSubmitView(DepartmentScopedMixin, RoleRequiredMixin, TemplateView):
         from django.utils import timezone
 
         department = self._get_department()
-        is_ecd = (department == Department.ECD)
-        submit_redirect = "welfare:submit_ecd" if is_ecd else "welfare:submit_primary"
+        is_unified = self._is_unified()
+        is_ecd = (department == Department.ECD) if department else False
+        submit_redirect = "welfare:submit"
 
         student_id = request.POST.get("student")
         concern_type = request.POST.get("concern_type")
@@ -450,12 +503,13 @@ class WelfareSubmitView(DepartmentScopedMixin, RoleRequiredMixin, TemplateView):
             messages.error(request, "Invalid student selected.")
             return redirect(submit_redirect)
 
-        # Validate student belongs to the correct department
-        from academics.models import GradeClass
-        student_dept = GradeClass.objects.filter(name=student.class_name).values_list("department", flat=True).first()
-        if student_dept and student_dept != department:
-            messages.error(request, f"Selected student does not belong to {'ECD' if is_ecd else 'Primary'} classes.")
-            return redirect(submit_redirect)
+        # Validate student belongs to the correct department (or any in unified)
+        if not is_unified:
+            from academics.models import GradeClass
+            student_dept = GradeClass.objects.filter(name=student.class_name).values_list("department", flat=True).first()
+            if student_dept and student_dept != department:
+                messages.error(request, f"Selected student does not belong to {'ECD' if is_ecd else 'Primary'} classes.")
+                return redirect(submit_redirect)
 
         if request.user.role == UserRole.TEACHER:
             my_classes = get_teacher_assigned_classes(request.user)
@@ -775,7 +829,7 @@ class WelfareEditView(RoleRequiredMixin, View):
 class WelfareHODDashboardView(DepartmentScopedMixin, RoleRequiredMixin, TemplateView):
     """HOD welfare dashboard - cross-module overview scoped by department.
     Pulls real data from welfare, discipline, and attendance modules.
-    HOS users additionally see a per-ECD-class aggregate breakdown."""
+    Supports unified mode (all departments) when department="all"."""
     template_name = "welfare/hod_dashboard.html"
     allowed_roles = [UserRole.ECD_HOD, UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
     required_permission = "welfare.view_welfareobservation"
@@ -795,11 +849,13 @@ class WelfareHODDashboardView(DepartmentScopedMixin, RoleRequiredMixin, Template
         ctx["can_see_hod_dashboard"] = True  # This view is only accessible to HOD+ roles
 
         department = self._get_department()
-        is_ecd = (department == Department.ECD)
+        is_unified = self._is_unified()
+        is_ecd = (department == Department.ECD) if department else False
         ctx["department"] = department
+        ctx["is_unified_welfare"] = is_unified
         ctx["is_ecd_welfare"] = is_ecd
-        ctx["page_title"] = "ECD Welfare" if is_ecd else "Primary Welfare"
-        ctx["dept_label"] = "ECD" if is_ecd else "Primary"
+        ctx["page_title"] = "Welfare Dashboard"
+        ctx["dept_label"] = "All Departments" if is_unified else ("ECD" if is_ecd else "Primary")
 
         # FR-WEL-008: HOS sees per-ECD-class aggregate breakdown
         is_hos = self.request.user.role == UserRole.HEAD_OF_SCHOOL
@@ -829,10 +885,13 @@ class WelfareHODDashboardView(DepartmentScopedMixin, RoleRequiredMixin, Template
                 })
             ctx["ecd_class_grid"] = class_grid
 
-        # Scope to department's classes
-        dept_class_names = list(GradeClass.objects.filter(
-            department=department
-        ).values_list("name", flat=True))
+        # Scope to department's classes (or all ECD+Primary in unified mode)
+        if is_unified:
+            dept_class_names = self._get_all_welfare_classes()
+        else:
+            dept_class_names = list(GradeClass.objects.filter(
+                department=department
+            ).values_list("name", flat=True))
 
         today = timezone.now().date()
         week_start = today - datetime.timedelta(days=today.weekday())

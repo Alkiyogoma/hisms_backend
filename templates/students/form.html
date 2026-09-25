@@ -64,17 +64,13 @@
         {% field form.preferred_name placeholder="Nickname or middle name" %}
         {% field form.date_of_birth %}
         {% field form.gender %}
+        {% field form.phone placeholder="e.g. +255 712 345 678" %}
         {% field form.nationality placeholder="e.g. Tanzanian" %}
         {% field form.religion placeholder="e.g. Christian" %}
         {% field form.blood_type %}
-      </div>
-    </div>
-
-    <div class="hf2-section">
-      <div class="hf2-section-title">Academic Assignment</div>
-      <div class="hf2-grid-2">
-        {% field form.class_name %}
-        {% field form.stream_name placeholder="e.g. North, South, or A, B" %}
+        {% if student %}
+          {% field form.status %}
+        {% endif %}
       </div>
     </div>
 
@@ -84,6 +80,62 @@
         {% field form.allergies_medical rows="3" placeholder="List any known allergies or medical conditions..." %}
       </div>
     </div>
+
+    {% if admission_applicant %}
+    <div class="hf2-section">
+      <div class="hf2-section-title">Admission Pipeline</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px 20px">
+        <div style="padding:10px 14px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px">
+          <div style="font-size:10px; font-weight:600; color:#94A3B8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px">Grade Applied</div>
+          <div style="font-size:13px; font-weight:600; color:#1E293B">{{ admission_applicant.grade_applying_for }}</div>
+        </div>
+        <div style="padding:10px 14px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px">
+          <div style="font-size:10px; font-weight:600; color:#94A3B8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px">Inquiry Channel</div>
+          <div style="font-size:13px; font-weight:600; color:#1E293B">{{ admission_applicant.get_inquiry_channel_display }}</div>
+        </div>
+        <div style="padding:10px 14px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px">
+          <div style="font-size:10px; font-weight:600; color:#94A3B8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px">Previous School</div>
+          <div style="font-size:13px; font-weight:600; color:#1E293B">{{ admission_applicant.previous_school|default:admission_applicant.previous_school_other|default:"—" }}</div>
+        </div>
+        <div style="padding:10px 14px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px">
+          <div style="font-size:10px; font-weight:600; color:#94A3B8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px">Sibling Enrolled</div>
+          <div style="font-size:13px; font-weight:600; color:#1E293B">{% if admission_applicant.sibling_currently_enrolled %}Yes — {{ admission_applicant.sibling_details|default:"" }}{% else %}No{% endif %}</div>
+        </div>
+        <div style="padding:10px 14px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px">
+          <div style="font-size:10px; font-weight:600; color:#94A3B8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px">Parent Name</div>
+          <div style="font-size:13px; font-weight:600; color:#1E293B">{{ admission_applicant.parent_full_name }}</div>
+        </div>
+        <div style="padding:10px 14px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px">
+          <div style="font-size:10px; font-weight:600; color:#94A3B8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px">Parent Phone</div>
+          <div style="font-size:13px; font-weight:600; color:#1E293B">{{ admission_applicant.parent_phone }}</div>
+        </div>
+        {% if admission_applicant.parent_email %}
+        <div style="padding:10px 14px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px">
+          <div style="font-size:10px; font-weight:600; color:#94A3B8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px">Parent Email</div>
+          <div style="font-size:13px; font-weight:600; color:#1E293B">{{ admission_applicant.parent_email }}</div>
+        </div>
+        {% endif %}
+        {% if admission_applicant.parent_relationship %}
+        <div style="padding:10px 14px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px">
+          <div style="font-size:10px; font-weight:600; color:#94A3B8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px">Relationship</div>
+          <div style="font-size:13px; font-weight:600; color:#1E293B">{{ admission_applicant.get_parent_relationship_display }}</div>
+        </div>
+        {% endif %}
+        {% if admission_applicant.notes %}
+        <div style="padding:10px 14px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; grid-column:1/-1">
+          <div style="font-size:10px; font-weight:600; color:#94A3B8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px">Notes</div>
+          <div style="font-size:13px; color:#475569; line-height:1.5">{{ admission_applicant.notes }}</div>
+        </div>
+        {% endif %}
+        {% if admission_applicant.conditional_conditions %}
+        <div style="padding:10px 14px; background:#FEF3C7; border:1px solid #FCD34D; border-radius:8px; grid-column:1/-1">
+          <div style="font-size:10px; font-weight:600; color:#92400E; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px">Conditional Admission</div>
+          <div style="font-size:13px; color:#78350F; line-height:1.5">{{ admission_applicant.conditional_conditions }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
 
     {# Parent/Guardian section — only shown for new student creation #}
     {% if not student %}
@@ -147,48 +199,231 @@
   </form>
   </div>{# /form card #}
 
-  {# RIGHT SIDEBAR: Onboarding Documents #}
+  {# RIGHT SIDEBAR #}
   {% if student %}
-  <div class="sidebar-card">
-    <div class="sc-header" style="display:flex; align-items:center; justify-content:space-between">
-      <span>Onboarding Documents</span>
-      {% if onboarding_docs %}
-        <span style="font-size:10px; font-weight:600; background:#DCFCE7; color:#16a34a; padding:2px 8px; border-radius:4px">{{ onboarding_docs|length }}</span>
-      {% endif %}
+  <div style="display:flex; flex-direction:column; gap:16px">
+
+    {# Linked Guardians #}
+    <div class="sidebar-card" style="overflow:hidden">
+      <div class="sc-header" style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid #F1F5F9">
+        <div style="display:flex; align-items:center; gap:8px">
+          <div style="width:28px; height:28px; border-radius:8px; background:#EEF4FF; color:#023AA5; display:flex; align-items:center; justify-content:center">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <span style="font-size:13px; font-weight:700; color:#1E293B">Guardians</span>
+        </div>
+        {% if linked_guardians %}
+          <span style="font-size:10px; font-weight:700; background:#DBEAFE; color:#1D4ED8; padding:2px 7px; border-radius:10px">{{ linked_guardians|length }}</span>
+        {% endif %}
+      </div>
+      <div class="sc-body" style="padding:10px 14px">
+        {% if linked_guardians %}
+          {% for sg in linked_guardians %}
+          <a href="{% url 'students:guardian_detail' sg.guardian.pk %}" style="display:block; padding:10px; background:{% if sg.is_primary %}linear-gradient(135deg, #F0F4FB 0%, #FAFCFF 100%){% else %}#FAFAFA{% endif %}; border:1px solid {% if sg.is_primary %}#BFDBFE{% else %}#F1F5F9{% endif %}; border-radius:10px; margin-bottom:8px; text-decoration:none; transition:all 0.15s; border-left:3px solid {% if sg.is_primary %}#023AA5{% else %}#D1D5DB{% endif %}" onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.06)'; this.style.transform='translateY(-1px)'" onmouseout="this.style.boxShadow='none'; this.style.transform='none'">
+            <div style="display:flex; align-items:center; gap:10px">
+              <div style="width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg, {% if sg.is_primary %}#023AA5{% else %}#64748B{% endif %} 0%, {% if sg.is_primary %}#1A56C4{% else %}#94A3B8{% endif %} 100%); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0">
+                {{ sg.guardian.full_name|slice:":1" }}
+              </div>
+              <div style="flex:1; min-width:0">
+                <div style="font-size:13px; font-weight:600; color:#1E293B; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ sg.guardian.full_name }}</div>
+                <div style="font-size:11px; color:#64748B; margin-top:1px; display:flex; align-items:center; gap:4px">
+                  <span style="color:{% if sg.is_primary %}#023AA5{% else %}#94A3B8{% endif %}; font-weight:{% if sg.is_primary %}600{% else %}400{% endif %}">{{ sg.get_relationship_display }}</span>
+                  {% if sg.is_primary %}<span style="background:#DBEAFE; color:#1D4ED8; font-size:9px; font-weight:700; padding:1px 5px; border-radius:3px">PRIMARY</span>{% endif %}
+                </div>
+                {% if sg.guardian.phone %}
+                <div style="font-size:11px; color:#94A3B8; margin-top:2px; display:flex; align-items:center; gap:4px">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72"/></svg>
+                  {{ sg.guardian.phone }}
+                </div>
+                {% endif %}
+              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+          </a>
+          {% endfor %}
+        {% else %}
+          <div style="text-align:center; padding:20px 12px">
+            <div style="width:36px; height:36px; border-radius:10px; background:#F1F5F9; color:#94A3B8; display:flex; align-items:center; justify-content:center; margin:0 auto 8px">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="23" y1="11" x2="17" y2="11"/><line x1="20" y1="8" x2="20" y2="14"/></svg>
+            </div>
+            <div style="font-size:12px; font-weight:600; color:#64748B; margin-bottom:2px">No guardians linked</div>
+            <div style="font-size:11px; color:#94A3B8">Add a guardian to get started</div>
+          </div>
+        {% endif %}
+      </div>
     </div>
-    <div class="sc-body">
-      {% if onboarding_docs %}
-        {% for doc in onboarding_docs %}
-        <div style="display:flex; align-items:center; gap:10px; padding:10px; background:{% if doc.is_received %}#F0FDF4{% else %}#FFFBEB{% endif %}; border:1px solid {% if doc.is_received %}#BBF7D0{% else %}#FDE68A{% endif %}; border-radius:8px; margin-bottom:8px">
-          <div style="width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; background:{% if doc.is_received %}#DCFCE7{% else %}#FEF3C7{% endif %}; color:{% if doc.is_received %}#16a34a{% else %}#d97706{% endif %}">
-            {% if doc.is_received %}
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            {% else %}
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            {% endif %}
+
+    {# Siblings #}
+    {% if siblings %}
+    <div class="sidebar-card" style="overflow:hidden">
+      <div class="sc-header" style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid #F1F5F9">
+        <div style="display:flex; align-items:center; gap:8px">
+          <div style="width:28px; height:28px; border-radius:8px; background:#FEF3C7; color:#D97706; display:flex; align-items:center; justify-content:center">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <span style="font-size:13px; font-weight:700; color:#1E293B">Siblings</span>
+        </div>
+        <span style="font-size:10px; font-weight:700; background:#FEF3C7; color:#92400E; padding:2px 7px; border-radius:10px">{{ siblings|length }}</span>
+      </div>
+      <div class="sc-body" style="padding:10px 14px">
+        {% for sib in siblings %}
+        <a href="{% url 'students:detail' sib.pk %}" style="display:flex; align-items:center; gap:10px; padding:8px 10px; background:#FAFAFA; border:1px solid #F1F5F9; border-radius:10px; margin-bottom:6px; text-decoration:none; transition:all 0.15s" onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.06)'; this.style.transform='translateY(-1px)'" onmouseout="this.style.boxShadow='none'; this.style.transform='none'">
+          <div style="width:30px; height:30px; border-radius:50%; background:linear-gradient(135deg, #023AA5 0%, #1A56C4 100%); color:#fff; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; flex-shrink:0">
+            {{ sib.first_name|slice:":1" }}{{ sib.last_name|slice:":1" }}
           </div>
           <div style="flex:1; min-width:0">
-            <div style="font-size:12px; font-weight:600; color:#1E293B; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ doc.get_document_type_display }}</div>
-            <div style="font-size:10px; color:{% if doc.is_received %}#16a34a{% else %}#d97706{% endif %}; font-weight:500; margin-top:1px">
-              {% if doc.is_received %}Received{% else %}Pending{% endif %}
-              {% if doc.received_at %} &middot; {{ doc.received_at|date:"d M" }}{% endif %}
-            </div>
+            <div style="font-size:12px; font-weight:600; color:#1E293B; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ sib.first_name }} {{ sib.last_name }}</div>
+            <div style="font-size:10px; color:#94A3B8; margin-top:1px">{{ sib.class_name }}</div>
           </div>
-          {% if doc.file %}
-            <button type="button" onclick="previewDoc('{{ doc.file.url }}', '{{ doc.get_document_type_display|escapejs }}')" style="background:none; border:1px solid #E2E8F0; border-radius:6px; padding:4px 8px; cursor:pointer; color:#64748B; flex-shrink:0" title="Preview">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            </button>
-            <a href="{{ doc.file.url }}" target="_blank" style="background:none; border:1px solid #E2E8F0; border-radius:6px; padding:4px 8px; color:#64748B; flex-shrink:0; text-decoration:none; display:flex; align-items:center" title="Open in new tab">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-            </a>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# Documents (merged: onboarding + uploaded) #}
+    {% has_perm user "students.change_student" as can_edit_student %}
+    <div class="sidebar-card" style="overflow:hidden">
+      <div class="sc-header" style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid #F1F5F9">
+        <div style="display:flex; align-items:center; gap:8px">
+          <div style="width:28px; height:28px; border-radius:8px; background:#F0FDF4; color:#16a34a; display:flex; align-items:center; justify-content:center">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <span style="font-size:13px; font-weight:700; color:#1E293B">Documents</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px">
+          {% if all_documents %}
+            <span style="font-size:10px; font-weight:700; background:#DBEAFE; color:#1D4ED8; padding:2px 7px; border-radius:10px">{{ all_documents|length }}</span>
+          {% endif %}
+          {% if can_edit_student %}
+          <button type="button" onclick="document.getElementById('addDocModal').style.display='flex'" style="width:24px; height:24px; border-radius:6px; background:#023AA5; color:#fff; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; transition:background 0.15s" onmouseover="this.style.background='#1A56C4'" onmouseout="this.style.background='#023AA5'" title="Add document">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
           {% endif %}
         </div>
-        {% endfor %}
-      {% else %}
-        <div style="text-align:center; padding:20px; color:#94A3B8; font-size:12px">No onboarding documents on file.</div>
-      {% endif %}
+      </div>
+      <div class="sc-body" style="padding:10px 14px">
+        {% if all_documents %}
+          {% for doc in all_documents %}
+          <div style="display:flex; align-items:center; gap:10px; padding:10px; background:{% if doc.is_received %}#F0FDF4{% else %}#FFFBEB{% endif %}; border:1px solid {% if doc.is_received %}#BBF7D0{% else %}#FDE68A{% endif %}; border-radius:10px; margin-bottom:8px; transition:all 0.15s" onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.06)'" onmouseout="this.style.boxShadow='none'">
+            <div style="width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; background:{% if doc.is_received %}#DCFCE7{% else %}#FEF3C7{% endif %}; color:{% if doc.is_received %}#16a34a{% else %}#d97706{% endif %}">
+              {% if doc.is_received %}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              {% else %}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              {% endif %}
+            </div>
+            <div style="flex:1; min-width:0">
+              <div style="font-size:12px; font-weight:600; color:#1E293B; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ doc.title }}</div>
+              <div style="font-size:10px; color:{% if doc.is_received %}#16a34a{% else %}#d97706{% endif %}; font-weight:500; margin-top:1px">
+                {% if doc.is_received %}Received{% else %}Pending{% endif %}
+                {% if doc.date %} &middot; {{ doc.date|date:"d M" }}{% endif %}
+                {% if doc.source == "uploaded" %} <span style="color:#94A3B8">&middot; uploaded</span>{% endif %}
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:4px; flex-shrink:0">
+              {% if doc.file %}
+                <button type="button" onclick="previewDoc('{{ doc.file.url }}', '{{ doc.title|escapejs }}')" style="background:none; border:1px solid #E2E8F0; border-radius:6px; padding:5px; cursor:pointer; color:#64748B; transition:all 0.15s" onmouseover="this.style.background='#F1F5F9'; this.style.borderColor='#CBD5E1'" onmouseout="this.style.background='none'; this.style.borderColor='#E2E8F0'" title="Preview">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              {% endif %}
+              {% if can_edit_student %}
+                <button type="button" onclick="openChangeDoc('{{ doc.id }}', '{{ doc.title|escapejs }}')" style="background:none; border:1px solid #E2E8F0; border-radius:6px; padding:5px; cursor:pointer; color:#023AA5; transition:all 0.15s" onmouseover="this.style.background='#EEF4FF'; this.style.borderColor='#BFDBFE'" onmouseout="this.style.background='none'; this.style.borderColor='#E2E8F0'" title="Change document">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                {% if doc.source == "uploaded" %}
+                <form method="post" style="display:inline" onsubmit="return confirm('Delete this document?')">
+                  {% csrf_token %}
+                  <input type="hidden" name="delete_document_id" value="{{ doc.pk }}">
+                  <button type="submit" style="background:none; border:1px solid #FECACA; border-radius:6px; padding:5px; cursor:pointer; color:#DC2626; transition:all 0.15s" onmouseover="this.style.background='#FEF2F2'; this.style.borderColor='#FCA5A5'" onmouseout="this.style.background='none'; this.style.borderColor='#FECACA'" title="Delete">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  </button>
+                </form>
+                {% endif %}
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div style="text-align:center; padding:28px 16px; background:linear-gradient(135deg, #F0F4FB 0%, #F8FAFC 100%); border:1px dashed #BFDBFE; border-radius:10px">
+            <div style="width:44px; height:44px; border-radius:12px; background:#DBEAFE; color:#023AA5; display:flex; align-items:center; justify-content:center; margin:0 auto 10px">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+            </div>
+            <div style="font-size:12px; font-weight:600; color:#475569; margin-bottom:2px">No documents yet</div>
+            <div style="font-size:11px; color:#94A3B8; margin-bottom:12px">Birth certificates, medical records, report cards & more.</div>
+            {% if can_edit_student %}
+            <button type="button" onclick="document.getElementById('addDocModal').style.display='flex'" style="display:inline-flex; align-items:center; gap:5px; padding:7px 16px; background:#023AA5; color:#fff; border:none; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; transition:background 0.15s" onmouseover="this.style.background='#1A56C4'" onmouseout="this.style.background='#023AA5'">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add Document
+            </button>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
     </div>
-  </div>
+
+    {# Add Document Modal #}
+    {% if can_edit_student %}
+    <div id="addDocModal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); align-items:center; justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+      <div style="background:#fff; border-radius:12px; width:380px; max-width:90vw; box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #E2E8F0">
+          <span style="font-size:14px; font-weight:700; color:#1E293B">Add Document</span>
+          <button type="button" onclick="document.getElementById('addDocModal').style.display='none'" style="background:none; border:none; cursor:pointer; color:#64748B; padding:4px">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <form method="post" enctype="multipart/form-data" style="padding:20px">
+          {% csrf_token %}
+          <input type="hidden" name="upload_document" value="1">
+          <div style="margin-bottom:12px">
+            <label style="font-size:12px; font-weight:600; color:#475569; display:block; margin-bottom:4px">Title</label>
+            <input type="text" name="doc_title" placeholder="e.g. Birth Certificate" required style="width:100%; padding:8px 10px; font-size:13px; border:1px solid #D1D5DB; border-radius:6px; box-sizing:border-box">
+          </div>
+          <div style="margin-bottom:12px">
+            <label style="font-size:12px; font-weight:600; color:#475569; display:block; margin-bottom:4px">Type</label>
+            <select name="doc_type" style="width:100%; padding:8px 10px; font-size:13px; border:1px solid #D1D5DB; border-radius:6px; box-sizing:border-box; background:#fff">
+              <option value="birth_certificate">Birth Certificate</option>
+              <option value="medical_record">Medical Record</option>
+              <option value="transfer_slip">Transfer Slip</option>
+              <option value="report_card">Report Card</option>
+              <option value="fee_receipt">Fee Receipt</option>
+              <option value="other" selected>Other</option>
+            </select>
+          </div>
+          <div style="margin-bottom:16px">
+            <label style="font-size:12px; font-weight:600; color:#475569; display:block; margin-bottom:4px">File</label>
+            <input type="file" name="doc_file" required style="width:100%; font-size:12px; box-sizing:border-box">
+          </div>
+          <button type="submit" style="width:100%; padding:8px; background:#023AA5; color:#fff; border:none; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer">Upload</button>
+        </form>
+      </div>
+    </div>
+
+    {# Change Document Modal #}
+    <div id="changeDocModal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); align-items:center; justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+      <div style="background:#fff; border-radius:12px; width:380px; max-width:90vw; box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #E2E8F0">
+          <span style="font-size:14px; font-weight:700; color:#1E293B">Change Document</span>
+          <button type="button" onclick="document.getElementById('changeDocModal').style.display='none'" style="background:none; border:none; cursor:pointer; color:#64748B; padding:4px">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <form method="post" enctype="multipart/form-data" style="padding:20px">
+          {% csrf_token %}
+          <input type="hidden" name="change_document_id" id="changeDocId">
+          <div style="font-size:12px; color:#64748B; margin-bottom:12px">Replacing: <strong id="changeDocTitle" style="color:#1E293B"></strong></div>
+          <div style="margin-bottom:16px">
+            <label style="font-size:12px; font-weight:600; color:#475569; display:block; margin-bottom:4px">New File</label>
+            <input type="file" name="change_doc_file" id="changeDocFile" required style="width:100%; font-size:12px; box-sizing:border-box">
+          </div>
+          <button type="submit" style="width:100%; padding:8px; background:#023AA5; color:#fff; border:none; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer">Replace Document</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>{# /sidebar column #}
   </div>{# /grid #}
   {% endif %}
 
@@ -308,48 +543,58 @@
 </script>
 {% endif %}
 
-{% if onboarding_docs %}
-<script>
-function previewDoc(url, title) {
-  var modal = document.getElementById('docPreviewModal');
-  var body = document.getElementById('docPreviewBody');
-  var titleEl = document.getElementById('docPreviewTitle');
-  var downloadBtn = document.getElementById('docPreviewDownload');
-  titleEl.textContent = title;
-  downloadBtn.href = url;
-  body.innerHTML = '';
-  var ext = url.split('.').pop().toLowerCase();
-  if (['jpg','jpeg','png','gif','webp','bmp','svg'].indexOf(ext) !== -1) {
-    var img = document.createElement('img');
-    img.src = url;
-    img.style.maxWidth = '100%';
-    img.style.maxHeight = '100%';
-    img.style.borderRadius = '8px';
-    body.appendChild(img);
-  } else if (ext === 'pdf') {
-    var iframe = document.createElement('iframe');
-    iframe.src = url;
-    iframe.style.width = '100%';
-    iframe.style.height = '100%';
-    iframe.style.border = 'none';
-    iframe.style.borderRadius = '8px';
-    body.appendChild(iframe);
-  } else {
-    body.innerHTML = '<div style="text-align:center;padding:40px;color:#64748B"><div style="font-size:48px;margin-bottom:12px">📄</div><div style="font-size:14px;font-weight:600">' + title + '</div><div style="font-size:12px;margin-top:8px;color:#94A3B8">Click Download to view this file</div></div>';
+  <script>
+  function previewDoc(url, title) {
+    var modal = document.getElementById('docPreviewModal');
+    var body = document.getElementById('docPreviewBody');
+    var titleEl = document.getElementById('docPreviewTitle');
+    var downloadBtn = document.getElementById('docPreviewDownload');
+    titleEl.textContent = title;
+    downloadBtn.href = url;
+    body.innerHTML = '';
+    var ext = url.split('.').pop().toLowerCase();
+    if (['jpg','jpeg','png','gif','webp','bmp','svg'].indexOf(ext) !== -1) {
+      var img = document.createElement('img');
+      img.src = url;
+      img.style.maxWidth = '100%';
+      img.style.maxHeight = '100%';
+      img.style.borderRadius = '8px';
+      body.appendChild(img);
+    } else if (ext === 'pdf') {
+      var iframe = document.createElement('iframe');
+      iframe.src = url;
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.border = 'none';
+      iframe.style.borderRadius = '8px';
+      body.appendChild(iframe);
+    } else {
+      body.innerHTML = '<div style="text-align:center;padding:40px;color:#64748B"><div style="font-size:48px;margin-bottom:12px">&#128196;</div><div style="font-size:14px;font-weight:600">' + title + '</div><div style="font-size:12px;margin-top:8px;color:#94A3B8">Click Download to view this file</div></div>';
+    }
+    modal.style.display = 'block';
+    document.body.style.overflow = 'hidden';
   }
-  modal.style.display = 'block';
-  document.body.style.overflow = 'hidden';
-}
-function closeDocModal(e) {
-  if (e && e.target !== e.currentTarget) return;
-  var modal = document.getElementById('docPreviewModal');
-  modal.style.display = 'none';
-  document.body.style.overflow = '';
-  document.getElementById('docPreviewBody').innerHTML = '';
-}
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') closeDocModal();
-});
-</script>
-{% endif %}
+  function closeDocModal(e) {
+    if (e && e.target !== e.currentTarget) return;
+    var modal = document.getElementById('docPreviewModal');
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+    document.getElementById('docPreviewBody').innerHTML = '';
+  }
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      closeDocModal();
+      var addM = document.getElementById('addDocModal');
+      if (addM) addM.style.display = 'none';
+      var chgM = document.getElementById('changeDocModal');
+      if (chgM) chgM.style.display = 'none';
+    }
+  });
+  function openChangeDoc(docId, docTitle) {
+    document.getElementById('changeDocId').value = docId;
+    document.getElementById('changeDocTitle').textContent = docTitle;
+    document.getElementById('changeDocFile').value = '';
+    document.getElementById('changeDocModal').style.display = 'flex';
+  }
+  </script>
 {% endblock %}

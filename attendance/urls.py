@@ -3,6 +3,7 @@ from django.urls import path
 from attendance.views import (
     AttendanceCorrectionView,
     AttendanceMarkView,
+    AttendanceMarkAllView,
     AttendanceTodayView,
     ParentAttendanceView,
     StaffAttendanceView,
@@ -62,6 +63,7 @@ urlpatterns = [
     path("pwa/config/", PWAConfigView.as_view(), name="pwa_config"),
     path("pwa/app/", PWAAttendanceShellView.as_view(), name="pwa_app"),
     path("mark/", AttendanceMarkView.as_view(), name="mark"),
+    path("mark-all/", AttendanceMarkAllView.as_view(), name="mark_all"),
     path("correct/", AttendanceCorrectionView.as_view(), name="correct"),
     path("parent/", ParentAttendanceView.as_view(), name="parent"),
     path("staff/", StaffAttendanceView.as_view(), name="staff"),

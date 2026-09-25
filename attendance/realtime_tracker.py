@@ -199,38 +199,45 @@ class RealTimeTracker:
     def _calculate_statistics(self, class_id: Optional[int] = None) -> Dict[str, Any]:
         """
         Calculate current attendance statistics.
-        
+
+        Uses a single DB query with conditional aggregation instead of
+        separate .filter().count() calls per status.
+
         Args:
             class_id: Optional class name to calculate class-specific statistics
             
         Returns:
             Dictionary containing calculated statistics
         """
+        from django.db.models import Count, Q, IntegerField
+        from django.db.models.functions import Coalesce
+
         today = timezone.now().date()
-        
-        # Get today's attendance entries
+
         entries = AttendanceEntry.objects.filter(date=today)
-        
         if class_id:
-            # class_id is actually a class_name string in this context
             entries = entries.filter(class_name=class_id)
-        
-        # Calculate counts
-        checked_in = entries.filter(check_in_time__isnull=False).count()
-        checked_out = entries.filter(check_out_time__isnull=False).count()
-        absent = entries.filter(status="absent").count()
-        present = entries.filter(status="present").count()
-        
-        # Get total active students
-        total_students = Student.objects.filter(status="active")
+
+        # Single query with conditional counts
+        agg = entries.aggregate(
+            checked_in=Count('id', filter=Q(check_in_time__isnull=False)),
+            checked_out=Count('id', filter=Q(check_out_time__isnull=False)),
+            absent=Count('id', filter=Q(status='absent')),
+            present=Count('id', filter=Q(status='present')),
+        )
+
+        total_students_q = Student.objects.filter(status='active')
         if class_id:
-            total_students = total_students.filter(class_name=class_id)
-        total_count = total_students.count()
-        
-        # Calculate percentages
+            total_students_q = total_students_q.filter(class_name=class_id)
+        total_count = total_students_q.count()
+
+        checked_in = agg['checked_in']
+        checked_out = agg['checked_out']
+        absent = agg['absent']
+        present = agg['present']
         checked_in_percentage = (checked_in / total_count * 100) if total_count > 0 else 0
         present_percentage = (present / total_count * 100) if total_count > 0 else 0
-        
+
         return {
             "date": today.isoformat(),
             "checked_in": checked_in,

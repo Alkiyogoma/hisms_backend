@@ -23,9 +23,9 @@ from attendance.services import (
     AttendanceService,
     calculate_attendance_rate,
     correct_attendance,
-    get_teacher_assigned_classes,
     mark_attendance,
 )
+from core.teacher_context import get_teacher_assigned_classes
 from django.http import HttpResponse
 from students.models import ParentGuardian, Student
 from users.models import UserRole
@@ -374,6 +374,9 @@ class AttendanceTodayView(RoleRequiredMixin, TemplateView):
 
         ctx["filter_form"] = form
         ctx["date"] = d
+        today = timezone.localdate()
+        now = timezone.localtime()
+        ctx["is_locked"] = (d < today) or (d == today and now.hour >= 18)
         ctx["class_name"] = class_name
         ctx["rows"] = rows
         ctx["statuses"] = AttendanceStatus.choices
@@ -398,24 +401,33 @@ class AttendanceMarkView(RoleRequiredMixin, TemplateView):
         return redirect("attendance:today")
 
     def post(self, request, *args, **kwargs):
+        from django.http import HttpResponse
+        from django.utils import timezone as tz
         if not request.user.has_perm("attendance.change_attendanceentry"):
-            raise PermissionDenied()
+            return HttpResponse("Permission denied", status=403)
         form = AttendanceMarkForm(request.POST)
         if not form.is_valid():
-            raise ValidationError("Invalid attendance mark request.")
+            return HttpResponse("Invalid form data", status=400)
         reason = (form.cleaned_data.get("reason") or "").strip()
-        if not reason:
-            messages.error(request, "A mandatory reason is required for manual attendance changes.")
-            return redirect("attendance:today")
+        status = form.cleaned_data["status"]
+        if status == "excused" and not reason:
+            return HttpResponse("Reason required for excused", status=400)
         student = Student.objects.get(pk=form.cleaned_data["student_id"])
         d = form.cleaned_data["date"]
-        status = form.cleaned_data["status"]
+        today = tz.localdate()
+        now = tz.localtime()
+        if d < today:
+            return HttpResponse("Cannot mark attendance for past dates.", status=403)
+        if d == today and now.hour >= 18:
+            return HttpResponse("Today's attendance is locked after 18:00.", status=403)
         try:
             entry = mark_attendance(actor=request.user, student=student, date=d, status=status)
-            messages.success(request, "Attendance saved.")
         except PermissionDenied:
-            messages.error(request, "You are not allowed to mark attendance.")
             entry = AttendanceEntry.objects.filter(date=d, student=student).first()
+        if reason and entry:
+            entry.reason = reason
+            entry.save(update_fields=["reason"])
+            entry.refresh_from_db()
 
         rate = calculate_attendance_rate(student)
         is_below = rate < 85.0 if rate is not None else False
@@ -445,21 +457,54 @@ class AttendanceMarkView(RoleRequiredMixin, TemplateView):
                 'state': state,
             })
 
-        response = self.render_to_response(
-            {
-                "student": student,
-                "entry": entry,
-                "date": d,
-                "attendance_rate": rate,
-                "is_below_threshold": is_below,
-                "weekly_bars": attendance_week,
-                "statuses": AttendanceStatus.choices,
-                "can_correct": request.user.has_perm("attendance.change_attendanceentry"),
-                "can_mark": request.user.has_perm("attendance.change_attendanceentry"),
-            }
-        )
-        response["HX-Trigger"] = "attendance-updated"
-        return response
+        rendered = render(request, "attendance/_tr_content.html", {
+            "student": student,
+            "entry": entry,
+            "date": d,
+            "attendance_rate": rate,
+            "is_below_threshold": is_below,
+            "weekly_bars": attendance_week,
+            "statuses": AttendanceStatus.choices,
+            "can_correct": request.user.has_perm("attendance.change_attendanceentry"),
+            "can_mark": request.user.has_perm("attendance.change_attendanceentry"),
+        }).content.decode('utf-8')
+        wrapped = '<tr id="att-row-' + str(student.id) + '">' + rendered + '</tr>'
+        resp = HttpResponse(wrapped)
+        resp["HX-Trigger"] = "attendance-updated"
+        return resp
+
+
+class AttendanceMarkAllView(RoleRequiredMixin, View):
+    login_url = "/accounts/login/"
+    allowed_roles = [UserRole.SUPER_ADMIN, UserRole.ADMIN_OFFICER]
+    required_permission = "attendance.change_attendanceentry"
+
+    def post(self, request, *args, **kwargs):
+        if not request.user.has_perm("attendance.change_attendanceentry"):
+            raise PermissionDenied()
+        status = request.POST.get("status", "").strip()
+        date_str = request.POST.get("date", "").strip()
+        if status not in ("present", "absent"):
+            return JsonResponse({"success": False, "message": "Invalid status"}, status=400)
+        try:
+            from django.utils.dateparse import parse_date
+            d = parse_date(date_str)
+        except (ValueError, TypeError):
+            d = None
+        if d is None:
+            d = timezone.now().date()
+        class_name = request.GET.get("class_name") or request.POST.get("class_name", "").strip()
+        if not class_name:
+            return JsonResponse({"success": False, "message": "Class is required"}, status=400)
+        students = Student.objects.filter(class_name=class_name, is_archived=False, status="active")
+        marked = 0
+        for student in students:
+            existing = AttendanceEntry.objects.filter(student=student, date=d).first()
+            if existing and existing.status != "unconfirmed":
+                continue
+            mark_attendance(actor=request.user, student=student, date=d, status=status)
+            marked += 1
+        return JsonResponse({"success": True, "marked": marked, "status": status, "date": str(d)})
 
 
 class AttendanceCorrectionView(RoleRequiredMixin, TemplateView):

@@ -130,7 +130,11 @@
     </div>
     {% has_perm user "students.add_student" as can_add_student %}
     {% if request.GET.class_name and can_add_student %}
-    <div style="margin-left:auto">
+    <div class="toolbar-group" style="margin-left:auto">
+      <c-button variant="secondary" href="{% url 'students:print_class_id_bulk' request.GET.class_name %}" target="_blank">
+        <c-slot name="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg></c-slot>
+        Print IDs
+      </c-button>
       <c-button variant="secondary"
         onclick="confirmDeleteModal({title:'Bulk Generate IDs?',body:'Generate IDs for all students in <strong>{{ request.GET.class_name }}</strong> who do not have a valid ADM-YYYY-XXX format?',detail:'Existing valid IDs will NOT be changed.',confirmText:'Generate IDs',url:'{% url 'students:bulk_generate_ids' %}',type:'info',extraData:[{name:'class_name',value:'{{ request.GET.class_name }}'}]})">
         <c-slot name="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></c-slot>

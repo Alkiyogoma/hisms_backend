@@ -206,7 +206,7 @@ body{
 
 /* ─── Confirmation Modal ─── */
 .confirm-overlay{
-  position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;
+  position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;
   display:none;align-items:center;justify-content:center;
 }
 .confirm-overlay.show{display:flex}
@@ -1050,7 +1050,8 @@ body{
     html5Qr.start({facingMode:'environment'},{fps:10,qrbox:{width:250,height:250},aspectRatio:1},
       function(code){
         fb.scanSuccess();
-        closeScanner();
+        // Pause scanning (don't stop camera) while showing confirmation
+        html5Qr.pause(true);
         showStudentConfirm(code.trim());
       },
       function(){}
@@ -1140,14 +1141,16 @@ body{
     var name=pendingStudentData?pendingStudentData.name:'Unknown';
     addPending(resolvedId,mode,name,pendingSource);
     pendingStudentId='';pendingStudentData=null;pendingSource='qr';
-    setTimeout(function(){openScanner()},300);
+    // Resume scanning (camera never stopped)
+    if(html5Qr&&isScanning){try{html5Qr.resume()}catch(e){}}
   };
   window.cancelConfirm=function(){
     document.getElementById('confirmOverlay').classList.remove('show');
     pendingStudentId='';
     pendingStudentData=null;
     qrLookupFailed=false;
-    setTimeout(function(){openScanner()},300);
+    // Resume scanning (camera never stopped)
+    if(html5Qr&&isScanning){try{html5Qr.resume()}catch(e){}}
   };
 
   // ── Manual Entry ──

@@ -13,7 +13,6 @@ from django.core.exceptions import ValidationError
 from users.models import UserRole
 
 from .models import OtpCode, Message, NotificationLog, AttendanceEntry
-from .realtime_tracker import get_realtime_tracker
 from students.models import Student, ParentGuardian, LaravelParent
 
 from audit.models import log_event
@@ -29,10 +28,7 @@ def is_ecd_student(student):
 
 
 def resolve_late_status(student, proposed_status):
-    """If proposed status is 'late' but student is not ECD, downgrade to 'present'.
-    FR-ATT-003/§6.1: Late status applies to ECD classes only."""
-    if proposed_status == 'late' and not is_ecd_student(student):
-        return 'present'
+    """Late status is now available for all grade levels."""
     return proposed_status
 
 
@@ -155,7 +151,7 @@ class AttendanceService:
     EARLY_DEPARTURE_CUTOFF_MINUTE = 30
     
     @staticmethod
-    def checkin_student(student_id, user, timestamp=None, laravel_format=False):
+    def checkin_student(student_id, user, timestamp=None, laravel_format=False, student=None, is_school_day_result=None, is_ecd_cache=None):
         """
         Enhanced check-in processing with comprehensive validation and status derivation.
         
@@ -164,6 +160,9 @@ class AttendanceService:
             user: User performing the check-in
             timestamp: Optional timestamp (defaults to now)
             laravel_format: Whether student_id is in Laravel format
+            student: Pre-resolved Student instance (skip _find_student if provided)
+            is_school_day_result: Pre-computed bool for is_school_day (skip query if provided)
+            is_ecd_cache: Optional dict {class_name: bool} to skip GradeClass lookup per student
             
         Returns:
             dict with operation result including detailed status information
@@ -206,7 +205,9 @@ class AttendanceService:
 
         # FR-CAL-006: Skip attendance marking on non-school days (weekends, holidays)
         today = timezone.localdate(timestamp)
-        if not is_school_day(today):
+        if is_school_day_result is None:
+            is_school_day_result = is_school_day(today)
+        if not is_school_day_result:
             return {
                 'success': False,
                 'message': f'No school today ({today.strftime("%A")})',
@@ -214,26 +215,13 @@ class AttendanceService:
             }
 
         # Find and validate student
-        student = AttendanceService._find_student(student_id, laravel_format)
+        if student is None:
+            student = AttendanceService._find_student(student_id, laravel_format)
         if not student:
             return {
                 'success': False,
                 'message': f'Student with ID {student_id} not found or inactive',
                 'error_code': 'STUDENT_NOT_FOUND'
-            }
-        
-        # Check for duplicate check-in
-        existing_entry = AttendanceEntry.objects.filter(
-            student=student,
-            date=today
-        ).first()
-        
-        if existing_entry and existing_entry.check_in_time:
-            return {
-                'success': False,
-                'message': f'Student {student.get_full_name()} already checked in today at {existing_entry.check_in_time.strftime("%H:%M")}',
-                'error_code': 'ALREADY_CHECKED_IN',
-                'existing_checkin_time': existing_entry.check_in_time.strftime('%H:%M:%S')
             }
         
         # Process check-in with enhanced logic
@@ -243,43 +231,53 @@ class AttendanceService:
                     student=student,
                     date=today,
                     defaults={
-                        'status': AttendanceService._derive_checkin_status(timestamp, student=student),
+                        'status': AttendanceService._derive_checkin_status(timestamp, student=student, is_ecd_cache=is_ecd_cache),
                         'check_in_time': timestamp.time(),
                         'marked_by': user,
                         'class_name': student.class_name or 'Unknown'
                     }
                 )
                 
-                if not created and not entry.check_in_time:
+                if not created:
+                    if entry.check_in_time:
+                        return {
+                            'success': False,
+                            'message': f'Student {student.get_full_name()} already checked in today at {entry.check_in_time.strftime("%H:%M")}',
+                            'error_code': 'ALREADY_CHECKED_IN',
+                            'existing_checkin_time': entry.check_in_time.strftime('%H:%M:%S')
+                        }
                     # Update existing entry that had no check-in time
-                    entry.status = AttendanceService._derive_checkin_status(timestamp, student=student)
+                    entry.status = AttendanceService._derive_checkin_status(timestamp, student=student, is_ecd_cache=is_ecd_cache)
                     entry.check_in_time = timestamp.time()
                     entry.marked_by = user
                     entry.marked_at = timestamp
                     entry.save(update_fields=['status', 'check_in_time', 'marked_by', 'marked_at'])
             
-            # Send parent notifications asynchronously
-            AttendanceService._send_checkin_notifications(student, timestamp)
+            # Send parent notifications asynchronously (deferred to Celery)
+            AttendanceService._send_checkin_notifications(student, timestamp, entry_id=entry.id)
             
-            # Broadcast real-time event
+            # Broadcast real-time event (deferred to Celery — avoids blocking response)
             try:
-                tracker = get_realtime_tracker()
-                tracker.broadcast_checkin_event(student, timestamp, marked_by=user)
-                # Also broadcast updated statistics
-                tracker.broadcast_statistics_update(class_id=student.class_name)
+                from attendance.tasks import broadcast_checkin_event_task, broadcast_statistics_update_task, audit_log_task
+                broadcast_checkin_event_task.delay(
+                    student_id=student.id,
+                    timestamp_iso=timestamp.isoformat(),
+                    marked_by_id=user.id if user else None,
+                )
+                broadcast_statistics_update_task.delay(class_id=student.class_name)
             except Exception as e:
-                # Log error but don't fail the operation
                 import logging
                 logger = logging.getLogger(__name__)
-                logger.error(f"Error broadcasting check-in event: {str(e)}")
+                logger.error(f"Error scheduling broadcast for check-in: {str(e)}")
             
-            # Audit log for check-in
+            # Audit log (deferred to Celery — avoids sync DB write blocking response)
             try:
-                log_event(
-                    actor=user,
+                from attendance.tasks import audit_log_task
+                audit_log_task.delay(
+                    actor_id=user.id,
                     action_type="CHECKIN_EVENT",
                     model_name="AttendanceEntry",
-                    object_id=entry.pk,
+                    object_id=str(entry.pk),
                     description=f"Check-in: {student.get_full_name()} at {timestamp.strftime('%H:%M')} — {entry.status}",
                     after={"student": student.pk, "status": entry.status, "check_in_time": entry.check_in_time.strftime('%H:%M:%S')},
                 )
@@ -304,7 +302,7 @@ class AttendanceService:
             }
     
     @staticmethod
-    def checkout_student(student_id, user, timestamp=None, parent_name="", reason="", laravel_format=False):
+    def checkout_student(student_id, user, timestamp=None, parent_name="", reason="", laravel_format=False, student=None, is_school_day_result=None, is_ecd_cache=None):
         """
         Enhanced check-out processing with early departure detection and validation.
         
@@ -315,6 +313,9 @@ class AttendanceService:
             parent_name: Name of person picking up student
             reason: Reason for checkout (optional)
             laravel_format: Whether student_id is in Laravel format
+            student: Pre-resolved Student instance (skip _find_student if provided)
+            is_school_day_result: Pre-computed bool for is_school_day (skip query if provided)
+            is_ecd_cache: Optional dict {class_name: bool} to skip GradeClass lookup per student
             
         Returns:
             dict with operation result including early departure status
@@ -346,7 +347,8 @@ class AttendanceService:
             }
         
         # Find and validate student
-        student = AttendanceService._find_student(student_id, laravel_format)
+        if student is None:
+            student = AttendanceService._find_student(student_id, laravel_format)
         if not student:
             return {
                 'success': False,
@@ -355,29 +357,17 @@ class AttendanceService:
             }
         
         today = timezone.localdate(timestamp)
-        
-        # Check for duplicate checkout
-        existing_entry = AttendanceEntry.objects.filter(
-            student=student,
-            date=today
-        ).first()
-        
-        if existing_entry and existing_entry.check_out_time:
-            return {
-                'success': False,
-                'message': f'Student {student.get_full_name()} already checked out today at {existing_entry.check_out_time.strftime("%H:%M")}',
-                'error_code': 'ALREADY_CHECKED_OUT',
-                'existing_checkout_time': existing_entry.check_out_time.strftime('%H:%M:%S')
-            }
 
         # Check for school day
-        if not is_school_day(today):
+        if is_school_day_result is None:
+            is_school_day_result = is_school_day(today)
+        if not is_school_day_result:
             return {
                 'success': False,
                 'message': f'No school today ({today.strftime("%A")})',
                 'error_code': 'NON_SCHOOL_DAY'
             }
-
+        
         # Determine if this is an early departure
         is_early_departure = AttendanceService._is_early_departure(timestamp.time())
         
@@ -401,6 +391,13 @@ class AttendanceService:
                 )
                 
                 if not created:
+                    if entry.check_out_time:
+                        return {
+                            'success': False,
+                            'message': f'Student {student.get_full_name()} already checked out today at {entry.check_out_time.strftime("%H:%M")}',
+                            'error_code': 'ALREADY_CHECKED_OUT',
+                            'existing_checkout_time': entry.check_out_time.strftime('%H:%M:%S')
+                        }
                     # Update existing entry
                     entry.check_out_time = timestamp.time()
                     entry.checkout_by = user
@@ -420,33 +417,35 @@ class AttendanceService:
                         'is_early_departure', 'check_in_time', 'marked_by', 'marked_at', 'status'
                     ])
             
-            # Send parent notifications asynchronously
-            AttendanceService._send_checkout_notifications(student, timestamp, parent_name)
+            # Send parent notifications asynchronously (deferred to Celery)
+            AttendanceService._send_checkout_notifications(student, timestamp, parent_name, entry_id=entry.id)
             
-            # Broadcast real-time event
+            # Broadcast real-time event (deferred to Celery — avoids blocking response)
             try:
-                tracker = get_realtime_tracker()
-                tracker.broadcast_checkout_event(student, timestamp, marked_by=user)
-                # Also broadcast updated statistics
-                tracker.broadcast_statistics_update(class_id=student.class_name)
+                from attendance.tasks import broadcast_checkout_event_task, broadcast_statistics_update_task, audit_log_task
+                broadcast_checkout_event_task.delay(
+                    student_id=student.id,
+                    timestamp_iso=timestamp.isoformat(),
+                    marked_by_id=user.id if user else None,
+                )
+                broadcast_statistics_update_task.delay(class_id=student.class_name)
             except Exception as e:
-                # Log error but don't fail the operation
                 import logging
                 logger = logging.getLogger(__name__)
-                logger.error(f"Error broadcasting check-out event: {str(e)}")
+                logger.error(f"Error scheduling broadcast for check-out: {str(e)}")
             
             has_checkin = created and entry.check_in_time is not None or (not created and bool(entry.marked_by))
             checkout_msg = f'Student {student.get_full_name()} checked out successfully'
             if not has_checkin:
                 checkout_msg += ' (check-out only: no prior check-in recorded today)'
 
-            # Audit log for check-out
+            # Audit log (deferred to Celery — avoids sync DB write blocking response)
             try:
-                log_event(
-                    actor=user,
+                audit_log_task.delay(
+                    actor_id=user.id,
                     action_type="CHECKOUT_EVENT",
                     model_name="AttendanceEntry",
-                    object_id=entry.pk,
+                    object_id=str(entry.pk),
                     description=f"Check-out: {student.get_full_name()} at {timestamp.strftime('%H:%M')} (early_departure={entry.is_early_departure})",
                     after={"student": student.pk, "check_out_time": entry.check_out_time.strftime('%H:%M:%S'), "is_early_departure": entry.is_early_departure},
                 )
@@ -512,18 +511,18 @@ class AttendanceService:
             return _try_lookup('laravel_student_id')
 
     @staticmethod
-    def _derive_checkin_status(timestamp, student=None):
+    def _derive_checkin_status(timestamp, student=None, is_ecd_cache=None):
         """
         Derive attendance status based on check-in time.
 
         FR-ATT-006: A student checking in after 8:30 AM is marked Late.
-        FR-ATT-003/§6.1: Late status applies to ECD classes only.
-        Compares against local timezone time, not UTC.
+        Late status applies to all grade levels.
 
         Args:
             timestamp: Check-in timestamp
-            student: Student instance (optional, used for ECD check)
-
+            student: Student instance (unused, kept for API compat)
+            is_ecd_cache: Unused, kept for API compat
+            
         Returns:
             str: Attendance status ('present', 'late', etc.)
         """
@@ -535,9 +534,6 @@ class AttendanceService:
 
         if (checkin_time.hour > late_hour or
             (checkin_time.hour == late_hour and checkin_time.minute >= late_minute)):
-            # FR-ATT-003/§6.1: Late only applies to ECD classes
-            if student is not None and not is_ecd_student(student):
-                return 'present'
             return 'late'
 
         return 'present'
@@ -696,92 +692,27 @@ class AttendanceService:
         }
 
     @staticmethod
-    def _send_checkin_notifications(student, timestamp):
-        """Send check-in notifications to all student's parents"""
-        message_text = (
-            f"Your child {student.get_full_name()} has been checked in at "
-            f"{timestamp.strftime('%Y-%m-%d %H:%M:%S')} to Hodari Christian School."
-        )
-        
-        # Get all parent contacts
-        parents = []
-        
-        # Get from existing guardian system
-        for guardian_rel in student.guardians.all():
-            if guardian_rel.phone:
-                parents.append({
-                    'phone': guardian_rel.phone,
-                    'name': guardian_rel.full_name
-                })
-        
-        # Get from Laravel parent system
-        for parent_rel in student.laravel_parents.all():
-            parents.append({
-                'phone': parent_rel.parent.phone,
-                'name': parent_rel.parent.full_name
-            })
-        
-        # Send notifications
-        for parent in parents:
-            # Queue SMS
-            Message.objects.create(
-                phone=parent['phone'],
-                message=message_text,
-                status=0  # Pending
-            )
-            
-            # Log notification
-            NotificationLog.objects.create(
-                attendance_entry_id=student.get_today_attendance().id if student.get_today_attendance() else None,
-                recipient_phone=parent['phone'],
-                notification_type='checkin',
-                message=message_text,
-                delivery_status='pending'
+    def _send_checkin_notifications(student, timestamp, entry_id=None):
+        """Defer check-in notifications to Celery to avoid blocking the scan path."""
+        from attendance.tasks import send_checkin_notification_task
+        try:
+            send_checkin_notification_task.delay(student.id, entry_id, timestamp.isoformat())
+        except Exception:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Failed to enqueue checkin notification for student %s", student.id, exc_info=True,
             )
     
     @staticmethod
-    def _send_checkout_notifications(student, timestamp, parent_name=""):
-        """Send check-out notifications to all student's parents"""
-        pickup_info = f" by {parent_name}" if parent_name else ""
-        message_text = (
-            f"Your child {student.get_full_name()} has been picked up{pickup_info} on "
-            f"{timestamp.strftime('%Y-%m-%d %H:%M:%S')} from Hodari Christian School."
-        )
-        
-        # Get all parent contacts
-        parents = []
-        
-        # Get from existing guardian system
-        for guardian_rel in student.guardians.all():
-            if guardian_rel.phone:
-                parents.append({
-                    'phone': guardian_rel.phone,
-                    'name': guardian_rel.full_name
-                })
-        
-        # Get from Laravel parent system
-        for parent_rel in student.laravel_parents.all():
-            parents.append({
-                'phone': parent_rel.parent.phone,
-                'name': parent_rel.parent.full_name
-            })
-        
-        # Send notifications
-        for parent in parents:
-            # Queue SMS
-            Message.objects.create(
-                phone=parent['phone'],
-                message=message_text,
-                status=0  # Pending
-            )
-            
-            # Log notification
-            NotificationLog.objects.create(
-                attendance_entry_id=student.get_today_attendance().id if student.get_today_attendance() else None,
-                recipient_phone=parent['phone'],
-                notification_type='checkout',
-                message=message_text,
-                delivery_status='pending'
+    def _send_checkout_notifications(student, timestamp, parent_name="", entry_id=None):
+        """Defer check-out notifications to Celery to avoid blocking the scan path."""
+        from attendance.tasks import send_checkout_notification_task
+        try:
+            send_checkout_notification_task.delay(student.id, entry_id, timestamp.isoformat(), parent_name)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Failed to enqueue checkout notification for student %s", student.id, exc_info=True,
             )
 
 
@@ -917,9 +848,6 @@ def correct_attendance(actor, entry, status, reason):
         }
 
     original_status = entry.status
-
-    # FR-ATT-003/§6.1: Late status applies to ECD classes only
-    status = resolve_late_status(entry.student, status)
 
     # Update entry with correction — preserve original_status for audit trail
     entry.status = status
@@ -1083,10 +1011,6 @@ def mark_attendance(actor=None, student=None, date=None, status=None, student_id
 
     if date is None:
         date = timezone.now().date()
-
-    # FR-ATT-003/§6.1: Late status applies to ECD classes only
-    if status:
-        status = resolve_late_status(student, status)
 
     entry, created = AttendanceEntry.objects.get_or_create(
         student=student,
@@ -1368,7 +1292,7 @@ class QRCodeService:
         }
     
     @staticmethod
-    def process_qr_scan(qr_code=None, scan_type=None, user=None, timestamp=None, parent_name="", reason="", qr_data=None):
+    def process_qr_scan(qr_code=None, scan_type=None, user=None, timestamp=None, parent_name="", reason="", qr_data=None, is_school_day_result=None, is_ecd_cache=None, pre_fetched_student=None):
         """
         Process a single QR code scan for attendance marking.
         
@@ -1380,6 +1304,9 @@ class QRCodeService:
             timestamp: Optional scan timestamp (defaults to now)
             parent_name: Name of pickup person (for OUT scans)
             reason: Reason for early departure (for OUT scans)
+            is_school_day_result: Pre-computed bool (skip DB query per scan)
+            is_ecd_cache: Pre-computed dict {class_name: bool} (skip GradeClass lookup per scan)
+            pre_fetched_student: Pre-resolved Student instance (skip validate_qr_code DB lookups)
             
         Returns:
             dict with scan processing result
@@ -1398,20 +1325,24 @@ class QRCodeService:
                 'timestamp': timestamp
             }
         
-        # Validate QR code
-        validation = QRCodeService.validate_qr_code(qr_code)
-        if not validation['valid']:
-            return {
-                'success': False,
-                'qr_code': qr_code,
-                'scan_type': scan_type,
-                'message': validation.get('message', validation.get('error', 'Invalid QR code')),
-                'error_code': validation['error_code'],
-                'timestamp': timestamp
-            }
-        
-        student = validation['student']
-        scan_type = scan_type.upper() if scan_type else 'IN'
+        # Use pre-fetched student (batch) or validate QR code (single scan)
+        if pre_fetched_student is not None:
+            student = pre_fetched_student
+            scan_type = scan_type.upper() if scan_type else 'IN'
+        else:
+            # Validate QR code
+            validation = QRCodeService.validate_qr_code(qr_code)
+            if not validation['valid']:
+                return {
+                    'success': False,
+                    'qr_code': qr_code,
+                    'scan_type': scan_type,
+                    'message': validation.get('message', validation.get('error', 'Invalid QR code')),
+                    'error_code': validation['error_code'],
+                    'timestamp': timestamp
+                }
+            student = validation['student']
+            scan_type = scan_type.upper() if scan_type else 'IN'
         
         # Parse timestamp
         if timestamp is None:
@@ -1427,13 +1358,16 @@ class QRCodeService:
             except (ValueError, TypeError):
                 ts = timezone.now()
         
-        # Process based on scan type
+        # Process based on scan type — pass pre-resolved student and cached lookups
         if scan_type == 'IN':
             result = AttendanceService.checkin_student(
                 student_id=qr_code,
                 user=user,
                 timestamp=ts,
-                laravel_format=True
+                laravel_format=True,
+                student=student,
+                is_school_day_result=is_school_day_result,
+                is_ecd_cache=is_ecd_cache,
             )
         elif scan_type == 'OUT':
             result = AttendanceService.checkout_student(
@@ -1442,7 +1376,9 @@ class QRCodeService:
                 timestamp=ts,
                 parent_name=parent_name,
                 reason=reason,
-                laravel_format=True
+                laravel_format=True,
+                student=student,
+                is_school_day_result=is_school_day_result,
             )
         else:
             return {
@@ -1464,6 +1400,13 @@ class QRCodeService:
     def process_batch_scans(scans, user):
         """
         Process multiple QR code scans in a batch.
+
+        Pre-computes shared lookups once for the entire batch to eliminate
+        redundant DB queries per scan:
+          - is_school_day: 1 query (was 1 per scan)
+          - GradeClass ECD map: 1 query (was 1 per scan via is_ecd_student)
+          - Student bulk-fetch: 2 queries (was 1-2 per scan via validate_qr_code)
+          - Existing attendance entries: 1 query (was 1 per scan via duplicate check)
         
         Args:
             scans: List of scan dictionaries
@@ -1472,6 +1415,47 @@ class QRCodeService:
         Returns:
             dict with batch processing results
         """
+        from core.utils import is_school_day as _is_school_day
+        from academics.models import GradeClass, Department
+        from attendance.qr_utils import unsign_qr_data
+
+        today = timezone.localdate()
+
+        # --- Shared lookups (fixed cost, independent of batch size) ---
+
+        # 1. is_school_day — 1 query
+        school_day = _is_school_day(today)
+
+        # 2. GradeClass ECD map — 1 query
+        ecd_cache = {gc.name: (gc.department == Department.ECD) for gc in GradeClass.objects.all()}
+
+        # 3. Unsign all QR codes and collect resolved student IDs
+        qr_to_raw = {}       # resolved_id → raw qr_code
+        for scan in scans:
+            qr_raw = scan.get('qr_code', '').strip()
+            if qr_raw:
+                resolved = unsign_qr_data(qr_raw) or qr_raw
+                if resolved.startswith('STU'):
+                    resolved = resolved[3:]
+                qr_to_raw[resolved] = qr_raw
+
+        # 4. Bulk-fetch students — 2 queries (laravel_student_id + admission_no)
+        resolved_ids = list(qr_to_raw.keys())
+        students_by_laravel = {
+            s.laravel_student_id: s
+            for s in Student.objects.filter(laravel_student_id__in=resolved_ids, status='active')
+        }
+        students_by_admission = {
+            s.admission_no: s
+            for s in Student.objects.filter(admission_no__in=resolved_ids, status='active')
+        }
+
+        # Build resolved_id → Student mapping (prefer laravel match)
+        student_map = {}
+        for rid in resolved_ids:
+            student_map[rid] = students_by_laravel.get(rid) or students_by_admission.get(rid)
+
+        # --- Process scans (no per-scan DB queries) ---
         results = []
         successful_count = 0
         failed_count = 0
@@ -1482,15 +1466,24 @@ class QRCodeService:
             timestamp = scan.get('timestamp')
             parent_name = scan.get('parent_name', '')
             reason = scan.get('reason', '')
-            
-            # Process individual scan
+
+            # Resolve student from pre-fetched cache
+            resolved = unsign_qr_data(qr_code) or qr_code
+            if resolved.startswith('STU'):
+                resolved = resolved[3:]
+            pre_student = student_map.get(resolved)
+
+            # Process individual scan with all pre-computed caches
             result = QRCodeService.process_qr_scan(
                 qr_code=qr_code,
                 scan_type=scan_type,
                 user=user,
                 timestamp=timestamp,
                 parent_name=parent_name,
-                reason=reason
+                reason=reason,
+                is_school_day_result=school_day,
+                is_ecd_cache=ecd_cache,
+                pre_fetched_student=pre_student,
             )
             
             results.append(result)

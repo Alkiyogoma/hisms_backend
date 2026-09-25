@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load hodari_forms role_tags %}
-{% block title %}{{ page_title|default:"Welfare Observations" }} &mdash; {{ brand.school_name }}{% endblock %}
-{% block topbar_greeting %}{{ page_title|default:"Student Welfare" }}{% endblock %}
+{% block title %}Welfare Observations &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Welfare Observations{% endblock %}
 {% block extra_head %}
 {% include "includes/hodari_print_styles.html" %}
 <style>
@@ -35,31 +35,35 @@
 </div>
 <div class="card">
   <div class="card-title-row">
-    <div class="card-title" style="margin:0">{% if is_ecd_welfare %}ECD{% else %}Primary{% endif %} Welfare Queue</div>
+    <div class="card-title" style="margin:0">Welfare Queue</div>
   </div>
 
   <!-- Filters -->
   <form method="get" class="hf2-toolbar" style="margin-bottom:20px;margin-top:20px">
-    <div style="display:flex;align-items:center;gap:12px">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <span class="hf2-toolbar-label">Severity:</span>
-      <select name="severity" class="hf2-select">
+      <select name="severity" class="hf2-select" style="min-width:140px">
         <option value="">All severities</option>
         {% for val, lbl in severity_choices %}
           <option value="{{ val }}" {% if request.GET.severity == val %}selected{% endif %}>{{ lbl }}</option>
         {% endfor %}
       </select>
+      {% if is_unified_welfare %}
+      <span class="hf2-toolbar-label" style="margin-left:8px">Department:</span>
+      <select name="department" class="hf2-select" style="min-width:140px">
+        <option value="">All departments</option>
+        <option value="ecd" {% if request.GET.department == 'ecd' %}selected{% endif %}>ECD</option>
+        <option value="primary" {% if request.GET.department == 'primary' %}selected{% endif %}>Primary</option>
+      </select>
+      {% endif %}
     </div>
     <button type="submit" class="btn-primary btn-sm">Filter</button>
-    {% if is_ecd_welfare %}
-    <a href="{% url 'welfare:list_ecd' %}" class="btn-secondary btn-sm">Reset</a>
-    {% else %}
-    <a href="{% url 'welfare:list_primary' %}" class="btn-secondary btn-sm">Reset</a>
-    {% endif %}
+    <a href="{% url 'welfare:list' %}" class="btn-secondary btn-sm">Reset</a>
   </form>
 
   <!-- Dashboard Layout -->
   <div style="display:grid; grid-template-columns: 1fr 340px; gap:24px; margin-top:24px; align-items:start">
-    
+
     <!-- Left Section (Active Queue) -->
     <div class="card" style="margin:0">
       <div class="card-title">Active Welfare Queue</div>
@@ -69,6 +73,7 @@
             <tr style="text-align:left;border-bottom:2px solid #F3F4F6">
               <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Date</th>
               <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Student</th>
+              <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Class</th>
               <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Severity</th>
               <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Status</th>
               <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600"></th>
@@ -80,8 +85,8 @@
               <td style="padding:12px 8px;color:var(--text-muted)">{{ obs.observation_date|date:"d M" }}</td>
               <td style="padding:12px 8px">
                 <a href="{% url 'students:detail' obs.student.pk %}" style="font-weight:600;color:var(--hodari-blue);text-decoration:none">{{ obs.student }}</a>
-                <div style="font-size:11px;color:var(--text-muted)">{{ obs.student.class_name }}</div>
               </td>
+              <td style="padding:12px 8px;color:var(--text-muted)">{{ obs.student.class_name }}</td>
               <td style="padding:12px 8px">
                 <span class="chip {% if obs.severity == 'critical' %}chip-red{% elif obs.severity == 'high' %}chip-amber{% else %}chip-blue{% endif %}">
                   {{ obs.get_severity_display }}
@@ -97,11 +102,29 @@
               </td>
             </tr>
             {% empty %}
-            <tr><td colspan="5" style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with icon='inbox' title='No observations yet' desc='Submit an observation to get started.' action_url='/welfare/submit/' action_text='+ New Observation' %}</td></tr>
+            <tr><td colspan="6" style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with icon='inbox' title='No observations yet' desc='Submit an observation to get started.' action_url='/welfare/submit/' action_text='+ New Observation' %}</td></tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
+
+      {% if page_obj.has_other_pages %}
+      <div style="display:flex;align-items:center;justify-content:center;gap:6px;padding:16px;border-top:1px solid var(--border)">
+        {% if page_obj.has_previous %}
+          <a href="?page={{ page_obj.previous_page_number }}&severity={{ request.GET.severity }}&department={{ request.GET.department }}" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-weight:600;color:#4B5563;background:#fff;text-decoration:none">&laquo; Prev</a>
+        {% endif %}
+        {% for num in page_obj.paginator.page_range %}
+          {% if page_obj.number == num %}
+            <span style="padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;color:#fff;background:var(--hodari-blue)">{{ num }}</span>
+          {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
+            <a href="?page={{ num }}&severity={{ request.GET.severity }}&department={{ request.GET.department }}" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-weight:600;color:#4B5563;background:#fff;text-decoration:none">{{ num }}</a>
+          {% endif %}
+        {% endfor %}
+        {% if page_obj.has_next %}
+          <a href="?page={{ page_obj.next_page_number }}&severity={{ request.GET.severity }}&department={{ request.GET.department }}" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-weight:600;color:#4B5563;background:#fff;text-decoration:none">Next &raquo;</a>
+        {% endif %}
+      </div>
+      {% endif %}
     </div>
 
     <!-- Right Section (Resolved Sidebar) -->
@@ -118,7 +141,7 @@
                 <div class="chip chip-green" style="font-size:10px">Resolved</div>
               </div>
               <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px">
-                {{ obs.get_concern_type_display }} &middot; {{ obs.observation_date|date:"d M" }}
+                {{ obs.get_concern_type_display }} &middot; {{ obs.observation_date|date:"d M" }} &middot; {{ obs.student.class_name }}
               </div>
               <a href="{% url 'welfare:detail' obs.pk %}" style="font-size:11px; font-weight:600; color:var(--hodari-blue); text-decoration:none">View Details &rarr;</a>
             </div>

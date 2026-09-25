@@ -572,3 +572,34 @@ class EnrollmentHistory(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.student.admission_no} → {self.class_name} ({self.get_action_display()})"
+
+
+class StudentDocument(TimeStampedModel):
+    """General document storage for a student (uploaded by admins)."""
+
+    DOCUMENT_TYPES = [
+        ("birth_certificate", "Birth Certificate"),
+        ("medical_record", "Medical Record"),
+        ("transfer_slip", "Transfer Slip"),
+        ("report_card", "Report Card"),
+        ("fee_receipt", "Fee Receipt"),
+        ("other", "Other"),
+    ]
+
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="documents")
+    title = models.CharField(max_length=120)
+    document_type = models.CharField(max_length=32, choices=DOCUMENT_TYPES, default="other")
+    file = models.FileField(upload_to="student_docs/%Y/%m/", max_length=255)
+    uploaded_by = models.ForeignKey(
+        "users.User", on_delete=models.SET_NULL, null=True, related_name="uploaded_student_docs"
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-uploaded_at"]
+        indexes = [
+            models.Index(fields=["student", "document_type"]),
+        ]
+
+    def __str__(self):
+        return f"{self.student.admission_no} — {self.title}"

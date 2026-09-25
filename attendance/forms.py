@@ -74,18 +74,7 @@ class AttendanceMarkForm(forms.Form):
                 field.widget.attrs["class"] = "hf-input mt-1"
 
     def clean_status(self):
-        status = self.cleaned_data.get("status")
-        student_id = self.cleaned_data.get("student_id")
-        if status == "late" and student_id:
-            from students.models import Student
-            from attendance.services import is_ecd_student
-            try:
-                student = Student.objects.get(pk=student_id)
-                if not is_ecd_student(student):
-                    raise forms.ValidationError("Late status is only available for ECD classes.")
-            except Student.DoesNotExist:
-                pass
-        return status
+        return self.cleaned_data.get("status")
 
 
 class AttendanceCorrectionForm(forms.Form):
@@ -102,17 +91,6 @@ class AttendanceCorrectionForm(forms.Form):
                 field.widget.attrs["class"] = "hf-input mt-1"
 
     def clean_status(self):
-        status = self.cleaned_data.get("status")
-        entry_id = self.cleaned_data.get("entry_id")
-        if status == "late" and entry_id:
-            from attendance.models import AttendanceEntry
-            from attendance.services import is_ecd_student
-            try:
-                entry = AttendanceEntry.objects.select_related("student").get(pk=entry_id)
-                if not is_ecd_student(entry.student):
-                    raise forms.ValidationError("Late status is only available for ECD classes.")
-            except AttendanceEntry.DoesNotExist:
-                pass
-        return status
+        return self.cleaned_data.get("status")
 
 

@@ -11,16 +11,20 @@ class StudentCreateForm(forms.ModelForm):
             "preferred_name",
             "date_of_birth",
             "gender",
-            "class_name",
-            "stream_name",
             "nationality",
             "religion",
             "blood_type",
             "allergies_medical",
             "photo",
+            "phone",
+            "class_name",
+            "stream_name",
+            "enrolment_date",
+            "status",
         ]
         widgets = {
             "date_of_birth": forms.DateInput(attrs={"type": "date"}),
+            "enrolment_date": forms.DateInput(attrs={"type": "date"}),
             "allergies_medical": forms.Textarea(attrs={"rows": 2}),
         }
 
@@ -29,16 +33,14 @@ class StudentCreateForm(forms.ModelForm):
         class_choices = [("", "Select class")] + [
             (g.name, g.name) for g in GradeClass.objects.order_by("sort_order", "name")
         ]
-        self.fields["class_name"] = forms.ChoiceField(choices=class_choices, label="Class*")
-        
-        # Add labels/help text to match admissions style
-        self.fields["first_name"].label = "First Name*"
-        self.fields["last_name"].label = "Last Name*"
+        self.fields["class_name"] = forms.ChoiceField(choices=class_choices, label="Class")
+
+        self.fields["first_name"].label = "First Name"
+        self.fields["last_name"].label = "Last Name"
         self.fields["date_of_birth"].required = True
-        self.fields["date_of_birth"].label = "Date of Birth*"
+        self.fields["date_of_birth"].label = "Date of Birth"
         self.fields["gender"].required = True
-        self.fields["gender"].label = "Gender*"
-        self.fields["class_name"].help_text = "Primary academic group for this student."
+        self.fields["gender"].label = "Gender"
 
         # Apply specific classes based on widget type for consistent premium UI
         for name, field in self.fields.items():

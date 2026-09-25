@@ -29,6 +29,7 @@ def globals(request):
         except Exception:
             pass
     from django.utils import timezone
+    from django.conf import settings
     today = timezone.now().date()
     return {
         "user_initials": initials,
@@ -37,6 +38,7 @@ def globals(request):
         "unread_notifs": unread_notifs,
         "recent_notifications": recent_notifications,
         "is_ecd_teacher": is_ecd_teacher,
+        "support_widget_url": getattr(settings, "SUPPORT_WIDGET_URL", "http://localhost:8002"),
     }
 
 
@@ -198,15 +200,12 @@ def navigation(request):
         add(NavItem(key=ModuleKey.LESSON_PLANS,     label="Lesson plans",     href="/academics/lesson-plans/",section="ACADEMIC",   icon="doc",      enabled=True))
     add(NavItem(key=ModuleKey.BEHAVIOUR,        label="Discipline",        href="/behaviour/",             section="ACADEMIC",   icon="badge",    enabled=True))
 
-    # Welfare — visibility is permission-driven (welfare.view_welfareobservation);
-    # only the ECD/Primary link routing is contextual (teacher track / department head).
+    # Welfare — unified module for ECD + Primary (single nav item)
     if ModuleKey.WELFARE in granted_modules:
-        if role in {UserRole.ECD_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN, UserRole.ADMIN_OFFICER} or is_ecd_teacher:
-            add(NavItem(key=ModuleKey.WELFARE,          label="ECD Welfare",       href="/welfare/ecd/incidents/", section="ACADEMIC",   icon="pin",      enabled=True))
-        if role in {UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN, UserRole.ADMIN_OFFICER} or (role == UserRole.TEACHER and not is_ecd_teacher):
-            add(NavItem(key=ModuleKey.PRIMARY_WELFARE,  label="Primary Welfare" if role != UserRole.TEACHER else "Welfare",   href="/welfare/primary/incidents/", section="ACADEMIC",   icon="pin",      enabled=True))
         if _is_parent:
-            add(NavItem(key=ModuleKey.WELFARE,          label="Welfare",           href="/parent/welfare/",         section="ACADEMIC",   icon="pin",      enabled=True))
+            add(NavItem(key=ModuleKey.WELFARE, label="Welfare", href="/parent/welfare/", section="ACADEMIC", icon="pin", enabled=True))
+        elif role in {UserRole.ECD_HOD, UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN, UserRole.ADMIN_OFFICER} or role == UserRole.TEACHER:
+            add(NavItem(key=ModuleKey.WELFARE, label="Welfare", href="/welfare/student-incidents/", section="ACADEMIC", icon="pin", enabled=True))
     add(NavItem(key=ModuleKey.TIMETABLE,        label="Timetable",        href="/timetable/",             section="ACADEMIC",   icon="calendar", enabled=True))
     add(NavItem(key=ModuleKey.SUBJECTS,         label="Subjects",         href="/academics/subjects/",    section="ACADEMIC",   icon="doc",      enabled=True))
     add(NavItem(key=ModuleKey.REPORTS,          label="Reports",          href="/academics/reports/",     section="ACADEMIC",   icon="report",   enabled=True))

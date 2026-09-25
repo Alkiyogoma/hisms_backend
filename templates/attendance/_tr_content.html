@@ -31,12 +31,25 @@
    {% endif %}
 </td>
 <td>
-  {% if entry %}
-    <span class="chip {% if entry.status == 'present' %}chip-green{% elif entry.status == 'absent' %}chip-red{% else %}chip-amber{% endif %}" style="font-size:10px">
-      {{ entry.get_status_display }}
-    </span>
+  {% if can_mark %}
+  <div class="att-grade-group" data-student-id="{{ student.id }}" data-date="{{ date|date:'Y-m-d' }}" {% if is_locked %}style="opacity:0.4; pointer-events:none"{% endif %}>
+    <div class="att-grade-btn att-grade-P {% if entry and entry.status == 'present' %}selected-P{% endif %}"
+      onclick="markAttendance(this, '{{ student.id }}', '{{ date|date:'Y-m-d' }}', 'present')"
+      title="Present">P</div>
+    <div class="att-grade-btn att-grade-L {% if entry and entry.status == 'late' %}selected-L{% endif %}"
+      onclick="markAttendance(this, '{{ student.id }}', '{{ date|date:'Y-m-d' }}', 'late')"
+      title="Late">L</div>
+    <div class="att-grade-btn att-grade-A {% if entry and entry.status == 'absent' %}selected-A{% endif %}"
+      onclick="markAttendance(this, '{{ student.id }}', '{{ date|date:'Y-m-d' }}', 'absent')"
+      title="Absent">A</div>
+    <div class="att-grade-btn att-grade-E {% if entry and entry.status == 'excused' %}selected-E{% endif %}"
+      onclick="markWithReason('{{ student.id }}', '{{ date|date:'Y-m-d' }}', 'excused')"
+      title="{% if entry and entry.status == 'excused' and entry.reason %}{{ entry.reason }}{% else %}Excused{% endif %}">E</div>
+  </div>
   {% else %}
-    <span class="chip chip-grey" style="font-size:10px">Unconfirmed</span>
+  <span class="chip {% if entry %}{% if entry.status == 'present' %}chip-green{% elif entry.status == 'absent' %}chip-red{% elif entry.status == 'late' %}chip-amber{% else %}chip-grey{% endif %}{% else %}chip-grey{% endif %}" style="font-size:10px">
+    {% if entry %}{{ entry.get_status_display }}{% else %}Unconfirmed{% endif %}
+  </span>
   {% endif %}
 </td>
 <td style="text-align:right; min-width:170px; white-space:nowrap">
