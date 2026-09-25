@@ -50,21 +50,35 @@ if ('serviceWorker' in navigator) {
 {% include "attendance/_metrics.html" %}
 
 <!-- Filter Bar (full width, above chart) -->
+<style>
+#attendance-filters-form .hf-input,
+#attendance-filters-form .hf-select,
+#att-student-search {
+  height: 36px !important;
+  box-sizing: border-box;
+}
+</style>
 <div class="card print-hide" style="margin-bottom:12px; padding:12px 16px">
-  <form id="attendance-filters-form" method="get" style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;">
-    <div style="flex:0 0 180px; min-width:140px">
-      <label class="hf-label" style="font-size:12px; margin-bottom:2px; display:block">Attendance Date</label>
-      <input id="attendance-date" type="date" name="date" class="hf-input" value="{{ date|date:'Y-m-d' }}" style="height:34px; font-size:13px">
+  <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;">
+    <div style="flex:0 0 220px; min-width:180px">
+      <label class="hf-label" style="font-size:12px; margin-bottom:2px; display:block">Search Student</label>
+      <input id="att-student-search" type="text" class="hf-input" placeholder="Search by name..." style="height:36px; font-size:13px; width:100%" oninput="filterStudentRows(this.value)">
     </div>
-    <div style="flex:0 0 200px; min-width:150px">
-      <label class="hf-label" style="font-size:12px; margin-bottom:2px; display:block">Select Class / Grade</label>
-      {{ filter_form.class_name }}
-    </div>
-    <div style="display:flex; gap:6px; align-items:center; padding-bottom:1px;">
-      <button type="button" id="attendance-reset" class="hf-btn hf-btn-secondary" style="height:34px; display:inline-flex; align-items:center; font-size:13px; padding:0 14px">Reset</button>
-      <span style="font-size:11px; color:var(--text-muted); white-space:nowrap">Filters apply automatically.</span>
-    </div>
-  </form>
+    <form id="attendance-filters-form" method="get" style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin:0; padding:0">
+      <div style="flex:0 0 180px; min-width:140px">
+        <label class="hf-label" style="font-size:12px; margin-bottom:2px; display:block">Attendance Date</label>
+        <input id="attendance-date" type="date" name="date" class="hf-input" value="{{ date|date:'Y-m-d' }}" style="height:36px; font-size:13px">
+      </div>
+      <div style="flex:0 0 200px; min-width:150px">
+        <label class="hf-label" style="font-size:12px; margin-bottom:2px; display:block">Select Class / Grade</label>
+        {{ filter_form.class_name }}
+      </div>
+      <div style="display:flex; gap:6px; align-items:center; padding-bottom:0">
+        <button type="button" id="attendance-reset" class="hf-btn hf-btn-secondary" style="height:36px; display:inline-flex; align-items:center; font-size:13px; padding:0 14px">Reset</button>
+        <span style="font-size:11px; color:var(--text-muted); white-space:nowrap">Filters apply automatically.</span>
+      </div>
+    </form>
+  </div>
 </div>
 
 <!-- Status Comparison Chart (full width below filters) -->
@@ -107,6 +121,7 @@ if ('serviceWorker' in navigator) {
 </div>
 
 <!-- Roster Table -->
+{% include "attendance/_row.html" %}
 <div class="card" style="padding:0; overflow:hidden">
   <table class="h-table">
     <thead>
@@ -115,7 +130,17 @@ if ('serviceWorker' in navigator) {
           <th>Student Information</th>
           <th>Admission No.</th>
           <th>Term Rate</th>
-          <th>Status</th>
+          <th>
+            <div style="display:flex; align-items:center; gap:6px">
+              <span>Status</span>
+              {% if can_mark %}
+              <div style="display:flex; gap:4px" id="bulk-mark-btns" {% if is_locked %}style="opacity:0.4; pointer-events:none"{% endif %}>
+                <button type="button" class="chip chip-green" style="font-size:11px; padding:2px 10px; cursor:pointer; border:1px solid var(--green-bd, #B7DFBF)" onclick="markAllStudents('present')" title="Mark all as Present">All P</button>
+                <button type="button" class="chip chip-red" style="font-size:11px; padding:2px 10px; cursor:pointer; border:1px solid var(--red-bd, #FECACA)" onclick="markAllStudents('absent')" title="Mark all as Absent">All A</button>
+              </div>
+              {% endif %}
+            </div>
+          </th>
           <th style="text-align:right">
             <div style="display:inline-flex; align-items:center; gap:8px; justify-content:flex-end">
             <button id="week-prev" class="hf-btn hf-btn-outline" title="Previous week" style="height:32px; padding:6px 8px; font-size:16px; line-height:1">&#8249;</button>
@@ -128,7 +153,7 @@ if ('serviceWorker' in navigator) {
     <tbody>
       {% for row in rows %}
         <tr id="att-row-{{ row.student.id }}">
-          {% include "attendance/_tr_content.html" with student=row.student entry=row.entry date=date statuses=statuses can_correct=can_correct attendance_rate=row.attendance_rate is_below_threshold=row.is_below_threshold weekly_bars=row.weekly_bars %}
+          {% include "attendance/_tr_content.html" with student=row.student entry=row.entry date=date statuses=statuses can_correct=can_correct can_mark=can_mark attendance_rate=row.attendance_rate is_below_threshold=row.is_below_threshold weekly_bars=row.weekly_bars %}
         </tr>
       {% empty %}
         <tr>
@@ -633,4 +658,125 @@ if ('serviceWorker' in navigator) {
   }
 }
 </style>
+
+<script>
+var ATTENDANCE_MARK_URL = "{% url 'attendance:mark' %}";
+var CSRF_TOKEN = "{{ csrf_token }}";
+
+function getCsrfToken() { return CSRF_TOKEN; }
+
+function postMark(studentId, date, status, reason) {
+  var body = 'student_id=' + studentId + '&date=' + date + '&status=' + status + '&csrfmiddlewaretoken=' + getCsrfToken();
+  if (reason) body += '&reason=' + encodeURIComponent(reason);
+  return fetch(ATTENDANCE_MARK_URL, {
+    method: 'POST',
+    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body
+  }).then(function(r) { return r.text(); }).then(function(html) {
+    var tmp = document.createElement('table');
+    tmp.innerHTML = html;
+    var newRow = tmp.querySelector('tr');
+    var oldRow = document.getElementById('att-row-' + studentId);
+    if (newRow && oldRow) oldRow.replaceWith(newRow);
+    document.dispatchEvent(new Event('attendance-updated'));
+  });
+}
+
+function markAttendance(el, studentId, date, status) {
+  var group = el.parentElement;
+  group.querySelectorAll('.att-grade-btn').forEach(function(b) {
+    b.className = b.className.replace(/selected-[PLAE]/g, '').trim();
+  });
+  el.classList.add('selected-' + status.charAt(0).toUpperCase());
+  postMark(studentId, date, status);
+}
+
+function markWithReason(studentId, date, status) {
+  confirmDeleteModal({
+    title: 'Mark Excused',
+    body: 'Provide a reason for excusing this student:',
+    confirmText: 'Confirm',
+    type: 'warning',
+    detail: '',
+    onConfirm: function() {
+      var detailDiv = document.getElementById('cdm-detail');
+      var reasonInput = detailDiv ? detailDiv.querySelector('input') : null;
+      var reason = reasonInput ? reasonInput.value.trim() : '';
+      if (!reason) {
+        if (detailDiv) {
+          detailDiv.querySelector('div').innerHTML = '<span style="color:#DC2626">Reason is required!</span>';
+        }
+        return;
+      }
+      closeConfirmDeleteModal();
+      var group = document.querySelector('[data-student-id="' + studentId + '"]');
+      if (group) {
+        group.querySelectorAll('.att-grade-btn').forEach(function(b) {
+          b.className = b.className.replace(/selected-[PLAE]/g, '').trim();
+        });
+        var btn = group.querySelector('.att-grade-E');
+        if (btn) {
+          btn.classList.add('selected-E');
+          btn.title = reason;
+        }
+      }
+      postMark(studentId, date, status, reason);
+    }
+  });
+  setTimeout(function() {
+    var detailDiv = document.getElementById('cdm-detail');
+    if (detailDiv) {
+      detailDiv.style.display = 'block';
+      detailDiv.querySelector('div').innerHTML = '<input type="text" id="reason-input" class="hf-input" placeholder="Reason for excusal..." style="width:100%;font-size:13px;margin:0">';
+      var inp = document.getElementById('reason-input');
+      if (inp) {
+        inp.focus();
+        inp.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') { e.preventDefault(); document.getElementById('cdm-confirm-btn').click(); }
+        });
+      }
+    }
+  }, 100);
+}
+
+function filterStudentRows(query) {
+  var q = query.toLowerCase().trim();
+  var rows = document.querySelectorAll('tr[id^="att-row-"]');
+  rows.forEach(function(row) {
+    if (!q) { row.style.display = ''; return; }
+    var nameCell = row.querySelector('td:nth-child(2)');
+    var name = nameCell ? nameCell.textContent.toLowerCase() : '';
+    row.style.display = name.indexOf(q) !== -1 ? '' : 'none';
+  });
+}
+
+function markAllStudents(status) {
+  var rows = document.querySelectorAll('tr[id^="att-row-"]');
+  var dateInput = document.getElementById('attendance-date');
+  var date = dateInput ? dateInput.value : '';
+  var toMark = [];
+  rows.forEach(function(row) {
+    var group = row.querySelector('.att-grade-group');
+    if (!group) return;
+    var studentId = group.getAttribute('data-student-id');
+    toMark.push({studentId: studentId, row: row});
+  });
+  if (toMark.length === 0) return;
+  var label = status === 'present' ? 'Present' : 'Absent';
+  confirmDeleteModal({
+    title: 'Mark All ' + label + '?',
+    body: 'Mark <strong>all ' + toMark.length + ' student(s)</strong> as ' + label + '? This will overwrite any existing status.',
+    confirmText: 'Mark All ' + label,
+    type: status === 'present' ? 'info' : 'warning',
+    onConfirm: function() {
+      closeConfirmDeleteModal();
+      toMark.forEach(function(item, idx) {
+        setTimeout(function() {
+          postMark(item.studentId, date, status);
+        }, idx * 80);
+      });
+    }
+  });
+}
+</script>
 {% endblock %}

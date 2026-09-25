@@ -7,15 +7,21 @@ from users.models import UserRole
 class DepartmentScopedMixin:
     """Mixin that provides department-scoping for welfare views.
 
-    Set ``department = "ecd"`` or ``department = "primary"`` via
-    ``as_view(department=...)`` in urls.py.  When *None* (the default)
-    the department is inferred from the logged-in user's role.
+    Set ``department = "ecd"``, ``department = "primary"``, or
+    ``department = "all"`` (unified) via ``as_view(department=...)``
+    in urls.py.
+
+    When ``department = None`` (the default), the department is inferred
+    from the logged-in user's role.
     """
     department = None  # overridden by as_view(department=...)
 
     def _get_department(self):
+        """Return a Department queryset value, or None for unified (all depts)."""
         from academics.models import Department
         dept = self.department
+        if dept == "all":
+            return None  # unified mode — no department filtering
         if dept == "primary":
             return Department.PRIMARY
         if dept == "ecd":
@@ -39,6 +45,10 @@ class DepartmentScopedMixin:
             return Department.ECD
         return Department.ECD
 
+    def _is_unified(self):
+        """Return True if this view is in unified (all-departments) mode."""
+        return self.department == "all"
+
     def _get_non_ecd_classes(self):
         """Return sorted list of Primary + Secondary class names (no ECD)."""
         from academics.models import Department, GradeClass
@@ -57,11 +67,24 @@ class DepartmentScopedMixin:
             .distinct()
         )
 
+    def _get_all_welfare_classes(self):
+        """Return sorted list of all class names across ECD + Primary."""
+        from academics.models import Department, GradeClass
+        return sorted(
+            GradeClass.objects.filter(
+                department__in=[Department.ECD, Department.PRIMARY]
+            ).values_list("name", flat=True)
+            .distinct()
+        )
+
     def _check_teacher_department(self):
         """Raise PermissionDenied if a TEACHER accesses a department they don't belong to."""
         from django.core.exceptions import PermissionDenied
         user = self.request.user
         if user.role != UserRole.TEACHER:
+            return
+        # Teachers have access to unified views — no department restriction
+        if self._is_unified():
             return
         from core.teacher_context import is_ecd_teacher
         from academics.models import Department

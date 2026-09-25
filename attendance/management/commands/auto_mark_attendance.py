@@ -53,28 +53,19 @@ class Command(BaseCommand):
         present_count = 0
         absent_count = 0
 
-        #  Phase 1: Mark Late (ECD only) or Present (non-ECD)
+        #  Phase 1: Mark Late (all students with no check-in by 8:30 AM)
         if current_time >= LATE_CUTOFF:
             late_qs = unconfirmed.filter(
                 check_in_time__isnull=True,  # Still no check-in
             )
             if dry_run:
                 self.stdout.write(
-                    f"[DRY RUN] Would mark {late_qs.count()} students as Late/Present."
+                    f"[DRY RUN] Would mark {late_qs.count()} students as Late."
                 )
             else:
                 entries_to_mark = list(late_qs)
-                # FR-ATT-003/§6.1: Late only for ECD; non-ECD get Present
-                from academics.models import GradeClass, Department
-                ecd_class_names = set(
-                    GradeClass.objects.filter(department=Department.ECD)
-                    .values_list("name", flat=True)
-                )
-                ecd_entries = [e for e in entries_to_mark if (e.class_name or "") in ecd_class_names]
-                non_ecd_entries = [e for e in entries_to_mark if (e.class_name or "") not in ecd_class_names]
 
-                # Mark ECD entries as Late
-                for entry in ecd_entries:
+                for entry in entries_to_mark:
                     entry.status = AttendanceStatus.LATE
                     entry.save(update_fields=["status"])
                     try:
@@ -90,29 +81,10 @@ class Command(BaseCommand):
                         )
                     except Exception:
                         pass
-                late_count = len(ecd_entries)
-
-                # Mark non-ECD entries as Present (Late not allowed per §6.1)
-                for entry in non_ecd_entries:
-                    entry.status = AttendanceStatus.PRESENT
-                    entry.save(update_fields=["status"])
-                    try:
-                        from audit.models import log_event
-                        log_event(
-                            actor=None,
-                            action_type="ATTENDANCE_AUTO_PRESENT",
-                            model_name="AttendanceEntry",
-                            object_id=entry.pk,
-                            description=f"Auto-marked Present: {entry.student_id} on {today} (Late restricted to ECD per §6.1)",
-                            before={"status": AttendanceStatus.UNCONFIRMED},
-                            after={"status": AttendanceStatus.PRESENT},
-                        )
-                    except Exception:
-                        pass
-                present_count = len(non_ecd_entries)
+                late_count = len(entries_to_mark)
 
                 self.stdout.write(
-                    self.style.WARNING(f"Marked {late_count} ECD students as Late, {present_count} non-ECD as Present.")
+                    self.style.WARNING(f"Marked {late_count} students as Late.")
                 )
 
         #  Phase 2: Mark Absent 

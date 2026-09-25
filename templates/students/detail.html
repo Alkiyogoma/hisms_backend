@@ -255,6 +255,16 @@
         Medical Note
       </div>
       {% endif %}
+
+      <!-- Document Status -->
+      <div class="qi-pill" style="background:{% if doc_stats.missing_required %}#FEF3C7{% else %}#DCFCE7{% endif %}; color:{% if doc_stats.missing_required %}#92400E{% else %}#166534{% endif %}; border:1px solid {% if doc_stats.missing_required %}#FDE68A{% else %}#BBF7D0{% endif %}; gap:6px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        {{ doc_stats.uploaded_required_count }}/{{ doc_stats.required_count }} docs
+        {% has_perm user "students.change_student" as can_edit_student %}
+        {% if can_edit_student and doc_stats.missing_required %}
+        <a href="{% url 'students:edit' student.pk %}" title="Upload documents" style="display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; background:{% if doc_stats.missing_required %}#D97706{% else %}#16A34A{% endif %}; color:#fff; text-decoration:none; font-size:13px; font-weight:700; line-height:1; margin-left:2px">+</a>
+        {% endif %}
+      </div>
     </div>
   </div>
 
@@ -415,38 +425,127 @@
     </div>
     {% endif %}
 
-    <!-- 2. Welfare & Behavior -->
-    <div class="card">
-      <div class="card-title-row">
-        <h2 class="card-title" style="margin:0">Welfare & Behavior Monitoring</h2>
+    <!-- 2. Welfare & Behavior Monitoring -->
+    <div class="card" style="padding:0">
+      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.7px;color:var(--text-muted);text-transform:uppercase">Welfare & Behavior Monitoring</div>
         {% has_perm user "welfare.add_welfareobservation" as can_report_welfare %}
         {% if can_report_welfare %}
-          {% if student.class_name in ecd_class_names %}
-            <a href="{% url 'welfare:submit_ecd' %}?student={{ student.pk }}" class="hf-btn hf-btn-primary" style="padding:6px 12px; font-size:11px">+ Report Incident</a>
-          {% else %}
-            <a href="{% url 'welfare:submit_primary' %}?student={{ student.pk }}" class="hf-btn hf-btn-primary" style="padding:6px 12px; font-size:11px">+ Report Incident</a>
-          {% endif %}
+          <a href="{% url 'welfare:submit' %}?student={{ student.pk }}" class="hf-btn hf-btn-primary" style="padding:6px 14px;font-size:12px">+ Report Incident</a>
         {% endif %}
       </div>
-      <div class="stats-grid" style="margin-top:16px">
-        <div class="stat-card"><div class="stat-value" style="color:#dc2626">{{ welfare_stats.critical }}</div><div class="stat-label">Critical</div></div>
-        <div class="stat-card"><div class="stat-value" style="color:#d97706">{{ welfare_stats.high }}</div><div class="stat-label">High</div></div>
-        <div class="stat-card"><div class="stat-value" style="color:#2563eb">{{ welfare_stats.medium }}</div><div class="stat-label">Medium</div></div>
-        <div class="stat-card"><div class="stat-value" style="color:#64748B">{{ welfare_stats.low }}</div><div class="stat-label">Low</div></div>
-      </div>
-      <div style="font-size:13px; font-weight:700; color:#1E293B; margin-bottom:12px">Recent Incidents</div>
-      {% for inc in welfare_incidents %}
-        <div class="incident-card {% if inc.severity == 'critical' %}critical{% elif inc.severity == 'high' %}high{% endif %}">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
-            <span style="font-weight:700; font-size:12px">{{ inc.observation_date|date:"d M Y" }}</span>
-            <span class="chip chip-{{ inc.severity }}" style="font-size:10px">{{ inc.get_severity_display|upper }}</span>
-          </div>
-          <div style="font-size:13px; color:#475569; line-height:1.4">{{ inc.observation_text|truncatechars:120 }}</div>
+
+      <!-- Severity Stats Bar -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border)">
+        <div style="text-align:center;padding:16px;border-right:1px solid var(--border)">
+          <div style="font-size:22px;font-weight:800;color:#DC2626">{{ welfare_stats.critical }}</div>
+          <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Critical</div>
         </div>
-      {% empty %}
-        <div style="padding:24px; text-align:center; color:#94A3B8; font-size:13px; background:#F8FAFC; border-radius:8px">No welfare incidents recorded.</div>
-      {% endfor %}
+        <div style="text-align:center;padding:16px;border-right:1px solid var(--border)">
+          <div style="font-size:22px;font-weight:800;color:#D97706">{{ welfare_stats.high }}</div>
+          <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">High</div>
+        </div>
+        <div style="text-align:center;padding:16px;border-right:1px solid var(--border)">
+          <div style="font-size:22px;font-weight:800;color:#2563EB">{{ welfare_stats.medium }}</div>
+          <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Medium</div>
+        </div>
+        <div style="text-align:center;padding:16px">
+          <div style="font-size:22px;font-weight:800;color:#64748B">{{ welfare_stats.low }}</div>
+          <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Low</div>
+        </div>
+      </div>
+
+      <!-- Filter Tabs -->
+      <div style="display:flex;gap:6px;padding:16px 24px;border-bottom:1px solid var(--border)" id="welfareTabs">
+        <button type="button" class="welfare-tab active" data-filter="all" onclick="filterWelfare('all',this)">All notes</button>
+        <button type="button" class="welfare-tab" data-filter="positive" onclick="filterWelfare('positive',this)">Positive</button>
+        <button type="button" class="welfare-tab" data-filter="observation" onclick="filterWelfare('observation',this)">Observation</button>
+        <button type="button" class="welfare-tab" data-filter="concern" onclick="filterWelfare('concern',this)">Concern</button>
+      </div>
+
+      <!-- Timeline Feed -->
+      <div style="padding:20px 24px">
+        {% has_perm user "welfare.can_review_observation" as can_review_welfare %}
+        <div class="welfare-timeline" id="welfareTimeline">
+          {% for inc in welfare_incidents %}
+            <div class="welfare-entry" data-type="{% if inc.severity == 'critical' or inc.severity == 'high' %}concern{% elif inc.severity == 'medium' %}observation{% else %}positive{% endif %}">
+              <div class="welfare-dot" style="background:{% if inc.severity == 'critical' or inc.severity == 'high' %}#D97706{% elif inc.severity == 'medium' %}#2563EB{% else %}#16A34A{% endif %}"></div>
+              <div class="welfare-entry-content">
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
+                  <span class="welfare-pill" style="background:{% if inc.severity == 'critical' or inc.severity == 'high' %}#FEF2F2;color:#DC2626{% elif inc.severity == 'medium' %}#EFF6FF;color:#2563EB{% else %}#F0FDF4;color:#16A34A{% endif %}">
+                    {% if inc.severity == 'critical' or inc.severity == 'high' %}Concern{% elif inc.severity == 'medium' %}Observation{% else %}Positive{% endif %}
+                  </span>
+                  <span style="font-size:13px;font-weight:600;color:var(--text-primary)">{{ inc.observation_date|date:"d MMM yyyy" }}</span>
+                  {% if inc.hod_status %}
+                    <span style="font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);color:var(--text-muted)">{{ inc.get_hod_status_display }}</span>
+                  {% endif %}
+                  <span style="margin-left:auto;font-size:12px;color:var(--text-muted)">{% if inc.submitted_by.staff_profile %}{{ inc.submitted_by.staff_profile.full_name }}{% else %}{{ inc.submitted_by.get_full_name|default:inc.submitted_by.username }}{% endif %}</span>
+                  <div style="display:flex;gap:6px;flex-shrink:0">
+                    <a href="{% url 'welfare:detail' inc.pk %}" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);color:var(--text-secondary);text-decoration:none;font-weight:600;white-space:nowrap">View</a>
+                    {% if can_review_welfare and inc.hod_status != 'resolved' %}
+                      <a href="{% url 'welfare:detail' inc.pk %}#review-form" style="font-size:11px;padding:4px 10px;border-radius:6px;background:var(--hodari-blue);color:#fff;text-decoration:none;font-weight:600;white-space:nowrap">Review</a>
+                    {% endif %}
+                  </div>
+                </div>
+                <div style="font-size:13px;color:#475569;line-height:1.5;margin-bottom:6px">{{ inc.observation_text }}</div>
+                {% if inc.severity == 'high' or inc.severity == 'critical' %}
+                  <div style="font-size:12px;color:var(--text-muted)">Owner: {% if inc.reviewed_by %}{% if inc.reviewed_by.staff_profile %}{{ inc.reviewed_by.staff_profile.full_name }}{% else %}{{ inc.reviewed_by.get_full_name }}{% endif %}{% else %}Unassigned{% endif %}{% if inc.follow_up_date %}. Review by {{ inc.follow_up_date|date:"d MMM yyyy" }}.{% endif %}</div>
+                {% endif %}
+                {% if inc.concern_type %}
+                  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+                    <span style="font-size:11px;background:var(--bg-page);border:1px solid var(--border);padding:2px 8px;border-radius:10px;color:var(--text-muted)">{{ inc.get_concern_type_display }}</span>
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          {% empty %}
+            <div style="padding:40px;text-align:center;color:var(--text-muted);font-size:13px;background:var(--bg-page);border-radius:8px">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:8px;color:var(--faint)"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
+              <div>No welfare incidents recorded yet.</div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
     </div>
+
+    <style>
+      .welfare-tab {
+        border: 1px solid var(--border); background: var(--bg-card); border-radius: 16px;
+        padding: 5px 14px; font-size: 12.5px; cursor: pointer; font-weight: 600; color: var(--text-muted);
+        transition: all .15s;
+      }
+      .welfare-tab:hover { border-color: var(--hodari-blue); color: var(--hodari-blue); }
+      .welfare-tab.active { background: var(--hodari-blue); border-color: var(--hodari-blue); color: #fff; }
+      .welfare-timeline { position: relative; padding-left: 22px; }
+      .welfare-timeline::before {
+        content: ""; position: absolute; left: 6px; top: 6px; bottom: 6px;
+        width: 2px; background: var(--border);
+      }
+      .welfare-entry { position: relative; margin-bottom: 16px; padding: 14px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; }
+      .welfare-entry:last-child { margin-bottom: 0; }
+      .welfare-dot {
+        position: absolute; left: -21px; top: 18px; width: 12px; height: 12px;
+        border-radius: 50%; border: 2px solid var(--bg-card);
+      }
+      .welfare-pill {
+        font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px;
+      }
+      .welfare-entry.hidden { display: none; }
+    </style>
+
+    <script>
+    function filterWelfare(type, btn) {
+      document.querySelectorAll('.welfare-tab').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      document.querySelectorAll('.welfare-entry').forEach(function(entry) {
+        if (type === 'all' || entry.dataset.type === type) {
+          entry.classList.remove('hidden');
+        } else {
+          entry.classList.add('hidden');
+        }
+      });
+    }
+    </script>
 
     <!-- 3. Guardians & Family -->
     <div class="card">

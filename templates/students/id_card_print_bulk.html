@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pick Up Cards — {{ class_name }}</title>
+    <style>
+        :root {
+            --hodari-blue: #023AA5;
+            --hodari-orange: #FFB708;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #e9ecf2;
+            padding: 40px;
+        }
+        .print-controls {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 100;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        .print-controls .info {
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+            background: #fff;
+            padding: 10px 18px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .btn-print {
+            background: var(--hodari-blue);
+            color: #fff;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(30, 58, 138, 0.25);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.2s;
+        }
+        .btn-print:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 28px rgba(30, 58, 138, 0.35);
+        }
+        .print-page {
+            width: 210mm;
+            height: 297mm;
+            background: #fff;
+            margin: 0 auto 20px;
+            padding: 6mm;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+        .cards-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: repeat(5, 1fr);
+            gap: 3mm;
+            width: 100%;
+            height: 100%;
+        }
+        .card-cell {
+            background: #fff;
+            border-radius: 3mm;
+            position: relative;
+            overflow: hidden;
+            border: 0.3mm solid #e5e7eb;
+        }
+        .card-cell::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 2mm;
+            height: 100%;
+            background: var(--hodari-blue);
+            border-radius: 3mm 0 0 3mm;
+            z-index: 3;
+        }
+        .orange-corner {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 24mm;
+            height: 24mm;
+            background: var(--hodari-orange);
+            border-radius: 0 3mm 0 0;
+            z-index: 1;
+        }
+        .qr-on-corner {
+            position: absolute;
+            top: 1.5mm;
+            right: 1.5mm;
+            z-index: 2;
+            background: #fff;
+            border-radius: 2mm;
+            padding: 1.5mm;
+            box-shadow: 0 0.5mm 2mm rgba(0,0,0,0.12);
+        }
+        .qr-on-corner img {
+            display: block;
+            width: 21mm;
+            height: 21mm;
+        }
+        .school-logo {
+            position: absolute;
+            top: 2mm;
+            left: 3mm;
+            height: 7mm;
+            width: auto;
+            object-fit: contain;
+            z-index: 4;
+        }
+        .card-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: absolute;
+            top: 16mm;
+            left: 4mm;
+            right: 4mm;
+            bottom: 7mm;
+            text-align: center;
+        }
+        .card-title {
+            font-size: 2.4mm;
+            font-weight: 800;
+            color: var(--hodari-blue);
+            letter-spacing: 0.1em;
+            margin-bottom: 1.5mm;
+        }
+        .info-box-grade {
+            font-size: 3mm;
+            font-weight: 700;
+            color: var(--hodari-blue);
+            margin-bottom: 0.8mm;
+        }
+        .info-box-adm {
+            font-size: 3.2mm;
+            font-weight: 800;
+            color: var(--hodari-orange);
+            letter-spacing: 0.05em;
+            margin-bottom: 2mm;
+        }
+        .pickup-note {
+            font-size: 1.8mm;
+            color: var(--hodari-blue);
+            font-style: italic;
+            font-weight: 600;
+            line-height: 1.25;
+            border-left: 0.8mm solid var(--hodari-orange);
+            padding-left: 2mm;
+            text-align: center;
+        }
+        .card-dates {
+            display: flex;
+            justify-content: space-between;
+            width: calc(100% - 8mm);
+            font-size: 1.8mm;
+            color: #374151;
+            font-weight: 600;
+            position: absolute;
+            bottom: 2mm;
+            left: 4mm;
+        }
+        @media print {
+            @page {
+                size: A4 portrait;
+                margin: 0;
+            }
+            body {
+                background: #fff;
+                padding: 0;
+                margin: 0;
+            }
+            .print-controls { display: none !important; }
+            .print-page {
+                box-shadow: none;
+                border: none;
+                border-radius: 0;
+                width: 210mm;
+                height: 297mm;
+                padding: 6mm;
+                margin: 0;
+                page-break-after: always;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .print-page:last-child { page-break-after: auto; }
+        }
+    </style>
+</head>
+<body>
+    {% load static %}
+
+    <div class="print-controls">
+        <div class="info">
+            {{ students|length }} card{{ students|length|pluralize }} — {{ class_name }} — 10 per page
+        </div>
+        <button class="btn-print" onclick="window.print()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+            Print Bulk Cards
+        </button>
+    </div>
+
+    {% for page in pages %}
+    <div class="print-page">
+        <div class="cards-grid">
+            {% for student in page %}
+            <div class="card-cell">
+                <div class="orange-corner"></div>
+                <img src="{% static 'branding/hodari-logo.png' %}" alt="Hodari" class="school-logo">
+                <div class="qr-on-corner">
+                    <img src="{% url 'attendance:qr_student' student.id %}" alt="QR">
+                </div>
+                <div class="card-content">
+                    <div class="card-title">Pick Up Card</div>
+                    <div class="info-box-grade">{{ student.class_name }}</div>
+                    <div class="info-box-adm">{{ student.admission_no }}</div>
+                    <p class="pickup-note">Kindly come with this card when picking up your child. Students will not be allowed to go home without it.</p>
+                </div>
+                <div class="card-dates">
+                    <span>Issued: {{ issued_date }}</span>
+                    <span>Expires: {{ expiry_date }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</body>
+</html>

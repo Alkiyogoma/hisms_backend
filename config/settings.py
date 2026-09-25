@@ -131,6 +131,8 @@ else:
             "HOST": os.getenv("POSTGRES_HOST", "localhost"),
             "PORT": os.getenv("POSTGRES_PORT", "5432"),
             "CONN_MAX_AGE": int(os.getenv("DB_CONN_MAX_AGE", "300")),
+            # Postgres runs on the same host; set POSTGRES_SSLMODE=require for a remote DB.
+            "OPTIONS": {"sslmode": os.getenv("POSTGRES_SSLMODE", "disable")},
         }
     }
 

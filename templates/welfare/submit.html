@@ -1,190 +1,554 @@
 {% extends "base.html" %}
 {% load role_tags %}
 {% load hodari_forms role_tags %}
-{% block title %}{{ page_title|default:"Student Welfare" }} &mdash; {{ brand.school_name }}{% endblock %}
-{% block topbar_greeting %}{{ page_title|default:"Student Welfare" }}{% endblock %}
+{% block title %}New Welfare Note &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}New Welfare Note{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Note type cards */
+  .note-grid { display: grid; grid-template-columns: minmax(0,1fr) 300px; gap: 20px; max-width: 1120px; margin: 0 auto; }
+  .note-form { padding: 24px 26px; }
+  .section-title { font-size: 11px; font-weight: 600; letter-spacing: .7px; color: var(--text-muted); text-transform: uppercase; padding-bottom: 10px; border-bottom: 1px solid var(--border); margin: 4px 0 16px; }
+  .type-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 22px; }
+  .type-card {
+    border: 1.5px solid var(--border); border-radius: 9px; padding: 12px; text-align: left;
+    background: var(--bg-card); cursor: pointer; position: relative; transition: all .15s;
+  }
+  .type-card:hover { border-color: var(--border-strong); }
+  .type-card b { display: block; font-size: 13.5px; margin-bottom: 3px; color: var(--text-primary); }
+  .type-card span { font-size: 11.5px; color: var(--text-muted); line-height: 1.35; display: block; }
+  .type-card .dot { position: absolute; top: 12px; right: 12px; width: 10px; height: 10px; border-radius: 50%; }
+  .type-card[data-t="positive"] .dot { background: #16A34A; }
+  .type-card[data-t="observation"] .dot { background: #2563EB; }
+  .type-card[data-t="concern"] .dot { background: #D97706; }
+  .type-card[data-t="safeguarding"] .dot { background: #DC2626; }
+  .type-card.active[data-t="positive"] { border-color: #16A34A; background: #F0FDF4; }
+  .type-card.active[data-t="observation"] { border-color: #2563EB; background: #EFF6FF; }
+  .type-card.active[data-t="concern"] { border-color: #D97706; background: #FFFBEB; }
+  .type-card.active[data-t="safeguarding"] { border-color: #DC2626; background: #FEF2F2; }
+
+  /* Chip search */
+  .chip-search { display: flex; flex-wrap: wrap; gap: 6px; border: 1px solid var(--border); border-radius: 7px; padding: 6px 8px; min-height: 44px; align-items: center; background: var(--bg-card); }
+  .chip-search input { border: 0; outline: 0; flex: 1; min-width: 140px; padding: 5px 4px; background: transparent; font-size: 13px; }
+  .chip-item {
+    display: inline-flex; align-items: center; gap: 6px; background: var(--hodari-blue-light);
+    color: var(--hodari-blue); border-radius: 14px; padding: 4px 6px 4px 10px; font-size: 12.5px; font-weight: 600;
+  }
+  .chip-item small { font-weight: 400; opacity: .8; }
+  .chip-item button { border: 0; background: none; cursor: pointer; color: inherit; font-size: 14px; line-height: 1; padding: 0 3px; }
+  .chip-dropdown {
+    position: absolute; left: 0; right: 0; top: calc(100% + 4px); background: var(--bg-card);
+    border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(16,24,40,.12);
+    z-index: 5; max-height: 240px; overflow: auto; display: none;
+  }
+  .chip-dropdown.open { display: block; }
+  .chip-dropdown div { padding: 9px 12px; cursor: pointer; display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+  .chip-dropdown div:hover { background: var(--bg-page); }
+  .chip-dropdown div span { color: var(--text-muted); font-size: 12px; }
+
+  /* Tags */
+  .tag-list { display: flex; flex-wrap: wrap; gap: 7px; }
+  .tag-btn {
+    border: 1px solid var(--border); background: var(--bg-card); border-radius: 16px;
+    padding: 5px 12px; font-size: 12.5px; cursor: pointer; transition: all .15s;
+  }
+  .tag-btn:hover { border-color: var(--hodari-blue); }
+  .tag-btn.active { background: var(--hodari-blue); border-color: var(--hodari-blue); color: #fff; }
+
+  /* Reveal sections */
+  .reveal-box { border-left: 3px solid #D97706; background: #FFFBEB; border-radius: 0 8px 8px 0; padding: 16px; margin-bottom: 18px; }
+  .reveal-box.safeguarding { border-left-color: #DC2626; background: #FEF2F2; }
+
+  /* Banner */
+  .sg-banner { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 8px; margin-bottom: 18px; font-size: 13px; background: #FEF2F2; color: #DC2626; border: 1px solid rgba(220,38,38,.25); }
+  .sg-banner b { display: block; margin-bottom: 2px; }
+
+  /* Checkbox */
+  .check-row { display: flex; gap: 10px; align-items: center; padding: 10px 0; cursor: pointer; }
+  .check-row input { width: 16px; height: 16px; accent-color: var(--hodari-blue); }
+
+  /* Who-see sidebar */
+  .who-panel h3 { font-size: 13.5px; margin: 0 0 4px; color: var(--text-primary); }
+  .who-list { list-style: none; margin: 12px 0 16px; padding: 0; }
+  .who-list li { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .who-list li:last-child { border-bottom: 0; }
+  .who-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: #16A34A; }
+  .who-list li.no { color: var(--text-muted); } .who-list li.no .who-dot { background: var(--border); }
+  .who-note { font-size: 12px; color: var(--text-muted); background: var(--bg-page); padding: 10px 12px; border-radius: 7px; margin-bottom: 10px; }
+
+  @media (max-width: 1000px) {
+    .note-grid { grid-template-columns: 1fr; }
+    .type-cards { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 640px) {
+    .type-cards { grid-template-columns: 1fr; }
+  }
+</style>
+{% endblock %}
 
 {% block content %}
 {% include "welfare/_top_tabs.html" %}
-<div class="card" style="max-width:720px;margin:auto">
-  <div class="card-title-row">
-    <div class="card-title">{{ page_title|default:"Student Welfare" }}</div>
-    <div style="display:flex;gap:12px">
-      {% if is_ecd_welfare %}
-      <a href="{% url 'welfare:list_ecd' %}" class="btn-secondary btn-sm">← Back to List</a>
-      {% else %}
-      <a href="{% url 'welfare:list_primary' %}" class="btn-secondary btn-sm">← Back to List</a>
-      {% endif %}
+
+<div class="note-grid">
+  <!-- FORM COLUMN -->
+  <div class="card note-form">
+    <div class="section-title">What kind of note is this?</div>
+    <div class="type-cards" id="typeCards">
+      <button type="button" class="type-card active" data-t="positive">
+        <span class="dot"></span>
+        <b>Positive</b>
+        <span>Something a child did well, a kindness, growth</span>
+      </button>
+      <button type="button" class="type-card" data-t="observation">
+        <span class="dot"></span>
+        <b>Observation</b>
+        <span>Worth noting, no action needed yet</span>
+      </button>
+      <button type="button" class="type-card" data-t="concern">
+        <span class="dot"></span>
+        <b>Concern</b>
+        <span>Needs monitoring or follow-up</span>
+      </button>
+      <button type="button" class="type-card" data-t="safeguarding">
+        <span class="dot"></span>
+        <b>Safeguarding</b>
+        <span>A child may be at risk of harm</span>
+      </button>
     </div>
-  </div>
 
-  <form method="post" style="margin-top:20px">
-    {% csrf_token %}
-
-    <div class="hf2-section">
-      <div class="hf2-section-title">Observation Details</div>
-
-      <div class="hf2-grid-2">
-        <div class="hf2-group">
-          <label class="hf2-label">Select Class</label>
-          <select name="class_filter" class="hf2-select" id="class-filter-select">
-            <option value="">All classes...</option>
-            {% for cls in available_classes %}
-              <option value="{{ cls }}">{{ cls }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="hf2-group">
-          <label class="hf2-label">Date of Observation *</label>
-          <input type="date" name="observation_date" class="hf2-input hf2-date" value="{{ today_date_iso }}" min="{{ yesterday_iso }}" max="{{ today_date_iso }}" required>
-        </div>
+    <!-- Safeguarding banner -->
+    <div class="sg-banner" id="sgBanner" style="display:none">
+      <div>
+        <b>This note goes straight to the Safeguarding Lead.</b>
+        Record exactly what you saw or heard. Do not investigate or promise the child secrecy.
       </div>
+    </div>
 
-      <div class="hf2-grid-2" style="margin-top:16px">
-        <div class="hf2-group">
-          <label class="hf2-label">Child Name *</label>
-          <select name="student" class="hf2-select" id="student-select" required>
+    <form method="post" id="welfareForm">
+      {% csrf_token %}
+      <input type="hidden" name="note_type" id="noteTypeInput" value="positive">
+      <input type="hidden" name="concern_type" id="concernTypeInput" value="behavioral">
+      <input type="hidden" name="severity" id="severityHidden" value="low">
+
+      <div class="section-title">Details</div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <!-- Child search -->
+        <div class="hf2-group" style="position:relative">
+          <label class="hf2-label">Child <span style="color:var(--red)">*</span></label>
+          <div class="chip-search" id="chipSearch">
+            <input type="text" id="kidInput" placeholder="Type a name..." autocomplete="off">
+          </div>
+          <div class="chip-dropdown" id="kidDropdown"></div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:3px" id="kidHint">Search by name. You can add more than one child.</div>
+          <!-- Hidden select for form submission -->
+          <select name="student" id="studentSelect" style="display:none" required>
             <option value="">Select student...</option>
             {% for s in students %}
               <option value="{{ s.id }}" data-class="{{ s.class_name }}">{{ s.first_name }} {{ s.last_name }} ({{ s.class_name }})</option>
             {% endfor %}
           </select>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Select a class above to filter students</div>
         </div>
+
+        <!-- Date -->
         <div class="hf2-group">
-          <label class="hf2-label">Concern Type *</label>
-          <select name="concern_type" class="hf2-select" id="concern-type-select" required>
-            {% for val, lbl in concern_type_choices %}
-              <option value="{{ val }}" {% if val == 'behavioral' %}selected{% endif %}>{{ lbl }}</option>
-            {% endfor %}
-          </select>
+          <label class="hf2-label">Date <span style="color:var(--red)">*</span></label>
+          <input type="date" name="observation_date" class="hf2-input" value="{{ today_date_iso }}" min="{{ yesterday_iso }}" max="{{ today_date_iso }}" required>
         </div>
       </div>
 
-      <div class="hf2-group" id="other-concern-group" style="display:none;margin-top:12px">
-        <label class="hf2-label">Please describe the concern *</label>
-        <textarea name="other_concern_description" id="other-concern-input" class="hf2-textarea" rows="2" placeholder="Describe the nature of the concern in detail..."></textarea>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Provide a clear description of the concern not covered by the existing categories.</div>
+      <!-- Tags -->
+      <div class="hf2-group" id="tagField" style="margin-top:16px">
+        <label class="hf2-label">Tags <span style="font-weight:400;color:var(--text-muted)">(choose any that apply)</span></label>
+        <div class="tag-list" id="tagList"></div>
       </div>
 
+      <!-- What happened -->
       <div class="hf2-group" style="margin-top:16px">
-        <label class="hf2-label">Severity</label>
-        <select name="severity" class="hf2-select">
-          {% for val, lbl in severity_choices %}
-            <option value="{{ val }}" {% if val == 'low' %}selected{% endif %}>{{ lbl }}</option>
-          {% endfor %}
-        </select>
+        <label class="hf2-label" id="whatLabel">What happened? <span style="color:var(--red)">*</span></label>
+        <textarea name="observation_text" class="hf2-textarea" rows="4" id="whatInput" required></textarea>
       </div>
 
-      <div class="hf2-group" style="margin-top:16px">
-        <label class="hf2-label">What was observed? *</label>
-        <textarea name="observation_text" class="hf2-textarea" rows="4" placeholder="Describe what happened clearly..." required></textarea>
+      <!-- Concern-specific fields -->
+      <div id="concernBox" style="display:none">
+        <div class="reveal-box">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            <div class="hf2-group">
+              <label class="hf2-label">Level</label>
+              <select name="severity_display" class="hf2-select" id="severitySelect" onchange="document.getElementById('severityHidden').value=this.value">
+                {% for val, lbl in severity_choices %}
+                  <option value="{{ val }}">{{ lbl }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="hf2-group">
+              <label class="hf2-label">Follow-up owner <span style="color:var(--red)">*</span></label>
+              <select name="hod_owner" class="hf2-select">
+                <option value="">Select...</option>
+                <option value="me">Me</option>
+                <option value="head_of_school">Head of School</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px">
+            <div class="hf2-group">
+              <label class="hf2-label">Review by</label>
+              <input type="date" name="review_date" class="hf2-input">
+            </div>
+            <div class="hf2-group">
+              <label class="hf2-label">Action taken so far</label>
+              <input type="text" name="action_taken_so_far" class="hf2-input" placeholder="Optional">
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="hf2-group" style="margin-top:16px">
-        <label class="hf2-label">Action taken today</label>
-        <textarea name="action_taken" class="hf2-textarea" rows="3" placeholder="What action was taken? (spoke to child, contacted parent, etc.)"></textarea>
+      <!-- Safeguarding-specific fields -->
+      <div id="sgBox" style="display:none">
+        <div class="reveal-box safeguarding">
+          <div class="hf2-group">
+            <label class="hf2-label">The child's own words, if they said anything</label>
+            <textarea name="child_words" class="hf2-textarea" rows="3" placeholder="Write it exactly as said, even if it is in Swahili"></textarea>
+          </div>
+          <div class="hf2-group" style="margin-top:12px">
+            <label class="hf2-label">What did you do immediately?</label>
+            <input type="text" name="immediate_action" class="hf2-input" placeholder="e.g. Listened, reassured the child, came straight to report">
+          </div>
+        </div>
       </div>
-    </div>
 
-    <div class="hf2-section" style="margin-top:24px">
-      <div class="hf2-section-title">Parent Contact & Follow-up</div>
+      <!-- Action taken (always visible) -->
+      <div class="hf2-group" id="actionField" style="margin-top:16px">
+        <label class="hf2-label">Action taken today <span style="color:var(--red)">*</span></label>
+        <textarea name="action_taken" class="hf2-textarea" rows="3" placeholder="What action was taken? (spoke to child, contacted parent, etc.)" required></textarea>
+      </div>
 
-      <div class="hf2-check-group">
-        <label class="hf2-check-label">
-          <input type="checkbox" name="parent_contacted" class="hf2-checkbox" id="parent_contacted">
-          <span>Parent Contacted?</span>
+      <!-- Parent contact -->
+      <div class="section-title" style="margin-top:8px">Parent contact</div>
+      <label class="check-row">
+        <input type="checkbox" name="parent_contacted" id="parentContacted">
+        <span>I have spoken to a parent or guardian about this</span>
+      </label>
+      <div id="contactDetails" style="display:none;margin-top:12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="hf2-group">
+            <label class="hf2-label">How</label>
+            <select name="contact_method" class="hf2-select">
+              <option>In person</option>
+              <option>Phone call</option>
+              <option>WhatsApp</option>
+              <option>Email</option>
+            </select>
+          </div>
+          <div class="hf2-group">
+            <label class="hf2-label">Who you spoke to</label>
+            <input type="text" name="contact_who" class="hf2-input" placeholder="e.g. Mother">
+          </div>
+        </div>
+      </div>
+
+      <!-- Follow-up -->
+      <div style="margin-top:20px;padding-top:16px;border-top:1px dashed var(--border)">
+        <label class="check-row">
+          <input type="checkbox" name="follow_up_required" id="followUpRequired">
+          <span>Follow-up Required?</span>
         </label>
-      </div>
-      <div id="parent_contact_details" style="display:none;margin-top:12px">
-        <div class="hf2-grid-2">
-          <div class="hf2-group">
-            <label class="hf2-label">Contact Date</label>
-            <input type="date" name="parent_contact_date" class="hf2-input hf2-date">
-          </div>
-          <div class="hf2-group">
-            <label class="hf2-label">Contact Time</label>
-            <input type="time" name="parent_contact_time" class="hf2-input hf2-time">
-          </div>
-        </div>
-      </div>
-
-      <div style="margin-top:20px;padding-top:16px;border-top:1px dashed #e2e8f0">
-        <div class="hf2-check-group">
-          <label class="hf2-check-label">
-            <input type="checkbox" name="follow_up_required" class="hf2-checkbox" id="follow_up_required">
-            <span>Follow-up Required?</span>
-          </label>
-        </div>
-        <div id="follow_up_details" style="display:none;margin-top:12px">
+        <div id="followUpDetails" style="display:none;margin-top:12px">
           <div class="hf2-group">
             <label class="hf2-label">Follow-up Date</label>
-            <input type="date" name="follow_up_date" class="hf2-input hf2-date">
+            <input type="date" name="follow_up_date" class="hf2-input">
           </div>
         </div>
       </div>
-    </div>
 
-    <div class="hf2-actions" style="margin-top:28px">
-      {% if is_ecd_welfare %}
-      <a href="{% url 'welfare:list_ecd' %}" class="hf-btn hf-btn-secondary" style="margin-right:auto;text-decoration:none">Cancel</a>
-      {% else %}
-      <a href="{% url 'welfare:list_primary' %}" class="hf-btn hf-btn-secondary" style="margin-right:auto;text-decoration:none">Cancel</a>
-      {% endif %}
-      {% has_perm user "welfare.add_welfareobservation" as can_submit %}
-      {% if can_submit %}
-      <button type="submit" class="hf-btn hf-btn-primary">Submit Observation</button>
-      {% endif %}
+      <div class="hf2-actions" style="margin-top:28px;display:flex;justify-content:space-between;align-items:center">
+        <a href="{% url 'welfare:list' %}" class="hf-btn hf-btn-secondary" style="text-decoration:none">Clear</a>
+        <button type="submit" class="hf-btn hf-btn-primary" id="submitBtn">Save note</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- SIDEBAR: Who will see this -->
+  <div class="card" style="padding:18px;align-self:start;position:sticky;top:16px">
+    <div class="who-panel">
+      <h3>Who will see this note</h3>
+      <div class="muted" style="font-size:12.5px">Updates as you choose the note type.</div>
+      <ul class="who-list" id="whoList">
+        <li><span class="who-dot"></span><span>Class teachers of the child</span></li>
+        <li><span class="who-dot"></span><span>Head of Department</span></li>
+        <li><span class="who-dot"></span><span>Safeguarding Lead and Head of School</span></li>
+        <li class="no"><span class="who-dot"></span><span>Parents</span></li>
+      </ul>
+      <div class="who-note" id="whoNote">Positive notes are open to the child's teachers so good news travels.</div>
     </div>
-  </form>
+  </div>
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-  const classFilterSelect = document.getElementById('class-filter-select');
-  const studentSelect = document.getElementById('student-select');
-  const parentContacted = document.getElementById('parent_contacted');
-  const parentContactDetails = document.getElementById('parent_contact_details');
-  const followUpRequired = document.getElementById('follow_up_required');
-  const followUpDetails = document.getElementById('follow_up_details');
-  const concernTypeSelect = document.getElementById('concern-type-select');
-  const otherConcernGroup = document.getElementById('other-concern-group');
-  const otherConcernInput = document.getElementById('other-concern-input');
+(function() {
+  // ── Student data from Django ──
+  var STUDENTS = [
+    {% for s in students %}
+    {id: {{ s.id }}, name: "{{ s.first_name }} {{ s.last_name }}", cls: "{{ s.class_name }}"}{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ];
 
-  // Toggle "Other" concern description
-  function toggleOtherConcern() {
-    const isOther = concernTypeSelect.value === 'other';
-    otherConcernGroup.style.display = isOther ? 'block' : 'none';
-    otherConcernInput.required = isOther;
-    if (!isOther) otherConcernInput.value = '';
+  var TAGS = {
+    positive: ["Kindness","Effort","Achievement","Leadership","Creativity","Friendship","Growth","Faith and character"],
+    observation: ["Emotional","Social","Learning","Health","Attendance","Home","Behaviour","Friendship"],
+    concern: ["Emotional","Social","Learning","Health","Attendance","Home","Behaviour","Bullying"],
+    safeguarding: []
+  };
+
+  var WHAT_LABEL = {
+    positive: "What did the child do well?",
+    observation: "What did you notice?",
+    concern: "What is the concern?",
+    safeguarding: "What did you see or hear?"
+  };
+
+  var WHAT_PH = {
+    positive: "e.g. Helped a new classmate find their way around and sat with her at lunch.",
+    observation: "e.g. Quieter than usual this morning and did not want to go out at break.",
+    concern: "Describe what you have seen, when, and how often.",
+    safeguarding: "Facts only. Where, when, who was present."
+  };
+
+  var SEVERITY_MAP = {
+    positive: "low",
+    observation: "low",
+    concern: "medium",
+    safeguarding: "critical"
+  };
+
+  var CONCERN_TYPE_MAP = {
+    positive: "other",
+    observation: "behavioral",
+    concern: "behavioral",
+    safeguarding: "other"
+  };
+
+  var WHO_INFO = {
+    positive: {
+      items: [
+        {text: "Class teachers of the child", yes: true},
+        {text: "Head of Department", yes: true},
+        {text: "Safeguarding Lead and Head of School", yes: true},
+        {text: "Parents", no: true, note: "Only if you tick share"}
+      ],
+      note: "Positive notes are open to the child's teachers so good news travels."
+    },
+    observation: {
+      items: [
+        {text: "Class teachers of the child", yes: true},
+        {text: "Head of Department", yes: true},
+        {text: "Safeguarding Lead and Head of School", yes: true},
+        {text: "Parents", no: true}
+      ],
+      note: "Observations build the picture over time. Teachers of the child can read them; parents cannot."
+    },
+    concern: {
+      items: [
+        {text: "Class teachers of the child", yes: true},
+        {text: "Head of Department", yes: true},
+        {text: "Safeguarding Lead and Head of School", yes: true},
+        {text: "Parents", no: true}
+      ],
+      note: "Concerns hold more sensitive detail, so class teachers only see concerns they wrote. The owner is reminded on the review date."
+    },
+    safeguarding: {
+      items: [
+        {text: "Class teachers of the child", no: true},
+        {text: "Head of Department", no: true},
+        {text: "Safeguarding Lead and Head of School", yes: true},
+        {text: "Parents", no: true}
+      ],
+      note: "Safeguarding records are restricted to the Safeguarding Lead and Head of School. The author cannot reopen the note after saving."
+    }
+  };
+
+  var selectedKids = [];
+  var selectedTags = [];
+  var currentType = "positive";
+
+  // ── Type cards ──
+  document.querySelectorAll(".type-card").forEach(function(card) {
+    card.addEventListener("click", function() {
+      document.querySelectorAll(".type-card").forEach(function(c) { c.classList.remove("active"); });
+      card.classList.add("active");
+      currentType = card.dataset.t;
+      document.getElementById("noteTypeInput").value = currentType;
+      updateForm();
+    });
+  });
+
+  function updateForm() {
+    var t = currentType;
+    // Show/hide sections
+    document.getElementById("sgBanner").style.display = t === "safeguarding" ? "flex" : "none";
+    document.getElementById("concernBox").style.display = t === "concern" ? "block" : "none";
+    document.getElementById("sgBox").style.display = t === "safeguarding" ? "block" : "none";
+    document.getElementById("tagField").style.display = t === "safeguarding" ? "none" : "block";
+    // Update labels
+    document.getElementById("whatLabel").innerHTML = WHAT_LABEL[t] + ' <span style="color:var(--red)">*</span>';
+    document.getElementById("whatInput").placeholder = WHAT_PH[t];
+    document.getElementById("kidHint").textContent = t === "safeguarding" ? "One child per safeguarding note." : "Search by name. You can add more than one child.";
+    // Update submit button
+    var btn = document.getElementById("submitBtn");
+    btn.textContent = t === "safeguarding" ? "Send to Safeguarding Lead" : "Save note";
+    // Update severity
+    document.getElementById("severitySelect").value = SEVERITY_MAP[t];
+    document.getElementById("severityHidden").value = SEVERITY_MAP[t];
+    // Update concern type
+    document.getElementById("concernTypeInput").value = CONCERN_TYPE_MAP[t];
+    // Render tags
+    renderTags();
+    // Update who panel
+    renderWho();
+    // Limit kids for safeguarding
+    if (t === "safeguarding" && selectedKids.length > 1) {
+      selectedKids = [selectedKids[0]];
+      renderChips();
+    }
+    // Disable multi-child for safeguarding
+    var kidInput = document.getElementById("kidInput");
+    kidInput.disabled = t === "safeguarding" && selectedKids.length >= 1;
   }
-  concernTypeSelect.addEventListener('change', toggleOtherConcern);
-  toggleOtherConcern();
 
-  // Toggle parent contact fields
-  parentContacted.addEventListener('change', function() {
-    parentContactDetails.style.display = this.checked ? 'block' : 'none';
-    if (this.checked) {
-      const today = new Date().toISOString().split('T')[0];
-      document.querySelector('input[name="parent_contact_date"]').value = today;
-      document.querySelector('input[name="parent_contact_time"]').value = new Date().toTimeString().slice(0,5);
+  // ── Tags ──
+  function renderTags() {
+    var tags = TAGS[currentType] || [];
+    var html = tags.map(function(g) {
+      return '<button type="button" class="tag-btn' + (selectedTags.indexOf(g) >= 0 ? ' active' : '') + '" data-g="' + g + '">' + g + '</button>';
+    }).join("");
+    document.getElementById("tagList").innerHTML = html;
+    document.querySelectorAll(".tag-btn").forEach(function(b) {
+      b.addEventListener("click", function() {
+        var g = b.dataset.g;
+        if (selectedTags.indexOf(g) >= 0) { selectedTags = selectedTags.filter(function(x) { return x !== g; }); }
+        else { selectedTags.push(g); }
+        renderTags();
+      });
+    });
+  }
+
+  // ── Chips ──
+  function renderChips() {
+    var container = document.getElementById("chipSearch");
+    // Remove existing chips
+    container.querySelectorAll(".chip-item").forEach(function(c) { c.remove(); });
+    var inp = document.getElementById("kidInput");
+    selectedKids.forEach(function(id) {
+      var s = STUDENTS.find(function(x) { return x.id === id; });
+      if (!s) return;
+      var c = document.createElement("span");
+      c.className = "chip-item";
+      c.innerHTML = s.name + ' <small>' + s.cls + '</small><button type="button" aria-label="Remove">&times;</button>';
+      c.querySelector("button").addEventListener("click", function() {
+        selectedKids = selectedKids.filter(function(x) { return x !== id; });
+        renderChips();
+        updateStudentSelect();
+      });
+      container.insertBefore(c, inp);
+    });
+    inp.placeholder = selectedKids.length ? "" : "Type a name...";
+    inp.disabled = currentType === "safeguarding" && selectedKids.length >= 1;
+    updateStudentSelect();
+  }
+
+  function updateStudentSelect() {
+    var sel = document.getElementById("studentSelect");
+    if (selectedKids.length > 0) {
+      sel.value = selectedKids[0];
+    } else {
+      sel.value = "";
+    }
+  }
+
+  // ── Student search dropdown ──
+  var kidInput = document.getElementById("kidInput");
+  var dropdown = document.getElementById("kidDropdown");
+
+  kidInput.addEventListener("input", function() {
+    var q = kidInput.value.trim().toLowerCase();
+    if (!q) { dropdown.classList.remove("open"); return; }
+    var res = STUDENTS.filter(function(s) {
+      return s.name.toLowerCase().indexOf(q) >= 0 && selectedKids.indexOf(s.id) < 0;
+    }).slice(0, 6);
+    if (res.length === 0) {
+      dropdown.innerHTML = '<div style="cursor:default;color:var(--text-muted)">No child matches "' + kidInput.value + '"</div>';
+    } else {
+      dropdown.innerHTML = res.map(function(s, i) {
+        return '<div data-id="' + s.id + '">' + s.name + '<span>' + s.cls + '</span></div>';
+      }).join("");
+    }
+    dropdown.classList.add("open");
+    dropdown.querySelectorAll("div[data-id]").forEach(function(d) {
+      d.addEventListener("mousedown", function(e) {
+        e.preventDefault();
+        addKid(parseInt(d.dataset.id));
+      });
+    });
+  });
+
+  kidInput.addEventListener("keydown", function(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      var first = dropdown.querySelector("div[data-id]");
+      if (first) addKid(parseInt(first.dataset.id));
+    }
+    if (e.key === "Backspace" && !kidInput.value && selectedKids.length) {
+      selectedKids.pop();
+      renderChips();
     }
   });
 
-  // Toggle follow-up fields
-  followUpRequired.addEventListener('change', function() {
-    followUpDetails.style.display = this.checked ? 'block' : 'none';
+  kidInput.addEventListener("blur", function() {
+    setTimeout(function() { dropdown.classList.remove("open"); }, 120);
   });
 
-  // Class filter: narrow student dropdown by selected class
-  classFilterSelect.addEventListener('change', function() {
-    const selectedClass = this.value;
-    const options = studentSelect.querySelectorAll('option[data-class]');
-    options.forEach(function(opt) {
-      opt.style.display = (!selectedClass || opt.dataset.class === selectedClass) ? '' : 'none';
-    });
-    studentSelect.value = '';
+  document.getElementById("chipSearch").addEventListener("click", function() { kidInput.focus(); });
+
+  function addKid(id) {
+    if (currentType === "safeguarding" && selectedKids.length >= 1) return;
+    selectedKids.push(id);
+    kidInput.value = "";
+    dropdown.classList.remove("open");
+    renderChips();
+    if (!kidInput.disabled) kidInput.focus();
+  }
+
+  // ── Who panel ──
+  function renderWho() {
+    var info = WHO_INFO[currentType];
+    var html = info.items.map(function(item) {
+      var cls = item.no ? ' class="no"' : '';
+      var note = item.note ? '<br><span class="muted" style="font-size:12px">' + item.note + '</span>' : '';
+      return '<li' + cls + '><span class="who-dot"></span><span>' + item.text + note + '</span></li>';
+    }).join("");
+    document.getElementById("whoList").innerHTML = html;
+    document.getElementById("whoNote").textContent = info.note;
+  }
+
+  // ── Parent contact toggle ──
+  document.getElementById("parentContacted").addEventListener("change", function() {
+    document.getElementById("contactDetails").style.display = this.checked ? "block" : "none";
   });
-});
+
+  // ── Follow-up toggle ──
+  document.getElementById("followUpRequired").addEventListener("change", function() {
+    document.getElementById("followUpDetails").style.display = this.checked ? "block" : "none";
+  });
+
+  // ── Initialize ──
+  renderTags();
+  renderWho();
+
+  // Sync concern box severity with hidden field
+  document.getElementById("severitySelect").addEventListener("change", function() {
+    document.getElementById("severityHidden").value = this.value;
+  });
+})();
 </script>
 {% endblock %}
