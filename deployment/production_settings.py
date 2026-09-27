@@ -139,9 +139,9 @@ CSRF_COOKIE_HTTPONLY = True
 CSRF_TRUSTED_ORIGINS = [
     "https://connect.hodari.ac.tz",
     "http://connect.hodari.ac.tz",
-    "https://demo.hodari.ac.tz",
-    "https://demo.hodari.ac.tz:8443",
-    "http://demo.hodari.ac.tz",
+    "https://testing.hodari.ac.tz",
+    "https://testing.hodari.ac.tz:8443",
+    "http://testing.hodari.ac.tz",
 ]
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
@@ -155,8 +155,8 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
     "https://connect.hodari.ac.tz",
     "http://connect.hodari.ac.tz",
-    "https://demo.hodari.ac.tz",
-    "http://demo.hodari.ac.tz",
+    "https://testing.hodari.ac.tz",
+    "http://testing.hodari.ac.tz",
 ]
 CORS_ALLOW_CREDENTIALS = True
 

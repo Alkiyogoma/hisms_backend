@@ -16,7 +16,7 @@ migration** in detail and then walks through the full server setup.
 > - `sudo rm -f /etc/nginx/sites-enabled/default` (removes whatever the other site used),
 > - `sudo ufw enable` **without** `443/tcp` (drops the other site's HTTPS — see §9.4).
 >
-> To run a **second** site alongside an existing one (e.g. `demo.hodari.ac.tz`
+> To run a **second** site alongside an existing one (e.g. `testing.hodari.ac.tz`
 > next to `connect.hodari.ac.tz`), do **not** follow this guide as-is — use
 > [`SECOND_SITE_NGUZO.md`](SECOND_SITE_NGUZO.md), which uses isolated unit names,
 > a separate port, and an `server_name`-scoped nginx block so the two never collide.
@@ -63,7 +63,7 @@ Reference units and configs already live in `deployment/`:
 | App user       | `hodari`                           |
 | Project path   | `/var/www/hodari/hisms_backend`        |
 | Virtualenv     | `/var/www/hodari/venv`                 |
-| Domain         | `demo.hodari.ac.tz`              |
+| Domain         | `testing.hodari.ac.tz`              |
 | DB name / user | `hodari` / `hodari_user`           |
 
 > **Updating an existing live server to the `hodari` DB?** Follow the focused
@@ -238,9 +238,9 @@ python -c "from django.core.management.utils import get_random_secret_key; print
 # --- Core ---
 DJANGO_SECRET_KEY=<paste-generated-key>
 DJANGO_DEBUG=0
-DJANGO_ALLOWED_HOSTS=demo.hodari.ac.tz,127.0.0.1,localhost
+DJANGO_ALLOWED_HOSTS=testing.hodari.ac.tz,127.0.0.1,localhost
 # App is served on :8443 (shipped Nginx config) — include the port on the origin
-CSRF_TRUSTED_ORIGINS=https://demo.hodari.ac.tz:8443
+CSRF_TRUSTED_ORIGINS=https://testing.hodari.ac.tz:8443
 
 # --- Database (PostgreSQL) ---
 DJANGO_USE_SQLITE=0
@@ -259,7 +259,7 @@ CHANNELS_REDIS_URL=redis://localhost:6379/2
 
 # --- CORS (mobile app / SPA) ---
 CORS_ALLOW_ALL_ORIGINS=False
-CORS_ALLOWED_ORIGINS=https://demo.hodari.ac.tz
+CORS_ALLOWED_ORIGINS=https://testing.hodari.ac.tz
 
 # --- Email (optional; DatabaseEmailBackend reads SchoolSettings, falls back here) ---
 DEFAULT_FROM_EMAIL=noreply@example.com
@@ -372,21 +372,21 @@ WebSocket (`/ws/`) location for Django Channels.
 
 ### 9.1 Edit the domain
 
-The file ships with `server_name demo.hodari.ac.tz`. Change every occurrence
+The file ships with `server_name testing.hodari.ac.tz`. Change every occurrence
 to your domain if different:
 
 ```bash
 sudo cp /var/www/hodari/hisms_backend/deployment/nginx_hodari.conf \
         /etc/nginx/sites-available/nguzo.conf
 
-# Replace the domain if yours differs from demo.hodari.ac.tz
-sudo sed -i 's/connect\.hodari\.ac\.tz/demo.hodari.ac.tz/g' \
+# Replace the domain if yours differs from testing.hodari.ac.tz
+sudo sed -i 's/connect\.hodari\.ac\.tz/testing.hodari.ac.tz/g' \
         /etc/nginx/sites-available/nguzo.conf
 ```
 
 Make sure `DJANGO_ALLOWED_HOSTS` and `CSRF_TRUSTED_ORIGINS` in `.env`
 (Section 6) match this domain — including the `:8443` port on the CSRF origin,
-e.g. `CSRF_TRUSTED_ORIGINS=https://demo.hodari.ac.tz:8443`.
+e.g. `CSRF_TRUSTED_ORIGINS=https://testing.hodari.ac.tz:8443`.
 
 ### 9.2 Enable HTTP first (ports 80 + 8070)
 
@@ -402,7 +402,7 @@ sudo mkdir -p /var/www/certbot
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-The app is now reachable at `http://demo.hodari.ac.tz:8070/`.
+The app is now reachable at `http://testing.hodari.ac.tz:8070/`.
 
 ### 9.3 Issue the TLS certificate (webroot)
 
@@ -411,18 +411,18 @@ port 80, so use the `--webroot` method (not `--nginx`):
 
 ```bash
 sudo apt install -y certbot
-sudo certbot certonly --webroot -w /var/www/certbot -d demo.hodari.ac.tz
+sudo certbot certonly --webroot -w /var/www/certbot -d testing.hodari.ac.tz
 ```
 
 Once the cert exists at
-`/etc/letsencrypt/live/demo.hodari.ac.tz/`, re-enable the `8443` block (if you
+`/etc/letsencrypt/live/testing.hodari.ac.tz/`, re-enable the `8443` block (if you
 commented it out) and reload:
 
 ```bash
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-HTTPS is now live at `https://demo.hodari.ac.tz:8443/`.
+HTTPS is now live at `https://testing.hodari.ac.tz:8443/`.
 
 ### 9.4 Open the firewall
 
@@ -455,8 +455,8 @@ sudo ufw enable
 systemctl is-active hodari hodari-celery hodari-celery-beat nginx postgresql redis-server
 
 # App responds through Nginx (HTTP on 8070, HTTPS on 8443)
-curl -I http://demo.hodari.ac.tz:8070/
-curl -I https://demo.hodari.ac.tz:8443/
+curl -I http://testing.hodari.ac.tz:8070/
+curl -I https://testing.hodari.ac.tz:8443/
 
 # DB connectivity from Django
 cd /var/www/hodari/hisms_backend && source /var/www/hodari/venv/bin/deactivate
@@ -466,7 +466,7 @@ python manage.py dbshell -c '\dt' | head
 celery -A config inspect ping
 ```
 
-Then log in to `https://demo.hodari.ac.tz:8443/admin/` with the superuser.
+Then log in to `https://testing.hodari.ac.tz:8443/admin/` with the superuser.
 
 ---
 
