@@ -313,20 +313,25 @@ ssh root@187.7.21.133
 sudo bash /opt/hodari/hisms_backend/deployment/production/update.sh
 ```
 
-The script:
+The script (same steps as the testing script `deployment/nguzo/update.sh`):
 
-1. refuses to run if tracked files were edited on the server;
-2. shows the commits, new migrations and whether `requirements.txt` changed,
-   and asks for confirmation;
-3. backs up the database to `/var/backups/hodari/…_predeploy_….dump`;
-4. updates code, installs requirements, runs `check`, `migrate`,
-   `collectstatic`;
-5. restarts `hodari`, `hodari-celery`, `hodari-celery-beat` and checks the
-   site responds;
-6. on any failure, prints the exact commands to roll back code and database.
+1. backs up the database to `/var/backups/hodari/<db>_<date>.dump` and prints
+   the commit the server was on;
+2. pulls the latest code on the checked-out branch (`git pull`);
+3. fixes ownership, installs requirements, runs `migrate` and `collectstatic`;
+4. restarts `hodari`, `hodari-celery`, `hodari-celery-beat` and shows their
+   status and the site's HTTP response.
 
-If the server's paths differ from the defaults, pass them in, e.g.
-`sudo VENV=/opt/hodari/venv APPUSER=hodari bash …/update.sh`.
+If something goes wrong, roll back to the commit printed in step 1 and, only if
+new migrations ran and the old code errors, restore the backup:
+
+```bash
+cd /opt/hodari/hisms_backend && git reset --hard COMMIT && systemctl restart hodari hodari-celery hodari-celery-beat
+```
+
+```bash
+systemctl stop hodari hodari-celery hodari-celery-beat && sudo -u postgres pg_restore --clean --if-exists -d hisms_prod /var/backups/hodari/BACKUP.dump && systemctl start hodari hodari-celery hodari-celery-beat
+```
 
 ---
 
