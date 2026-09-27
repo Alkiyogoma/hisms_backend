@@ -68,13 +68,12 @@ class DepartmentScopedMixin:
         )
 
     def _get_all_welfare_classes(self):
-        """Return sorted list of all class names across ECD + Primary."""
-        from academics.models import Department, GradeClass
+        """Return sorted list of every class the school runs (ECD, Primary and
+        Lower Secondary). Welfare applies to all learners, so no department
+        may be left out here — Grade 7–9 were previously missing."""
+        from academics.models import GradeClass
         return sorted(
-            GradeClass.objects.filter(
-                department__in=[Department.ECD, Department.PRIMARY]
-            ).values_list("name", flat=True)
-            .distinct()
+            GradeClass.objects.values_list("name", flat=True).distinct()
         )
 
     def _check_teacher_department(self):

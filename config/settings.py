@@ -158,6 +158,8 @@ SITE_URL = os.getenv("SITE_URL", "http://127.0.0.1:8000")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "users.User"
+# Staff may sign in with their username or their school email address.
+AUTHENTICATION_BACKENDS = ["users.backends.EmailOrUsernameBackend"]
 LOGIN_URL = "/accounts/login/"
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/accounts/login/"

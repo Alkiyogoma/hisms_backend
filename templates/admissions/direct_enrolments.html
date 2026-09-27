@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Direct enrolments &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Admissions{% endblock %}
+
+{% block content %}
+{% include "admissions/_top_tabs.html" %}
+<div class="card">
+  <div class="card-title-row" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+    <div class="card-title" style="margin:0">Direct enrolments</div>
+    {% if perms.admissions.direct_enrol %}
+      <a href="{% url 'admissions:direct_enrol' %}" class="hf-btn hf-btn-primary" style="text-decoration:none">+ Enrol a learner directly</a>
+    {% endif %}
+  </div>
+  <div class="muted" style="font-size:12.5px;margin:6px 0 16px">Learners enrolled without the assessment pipeline, with who enrolled them, when, and why.</div>
+  <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="text-align:left;border-bottom:2px solid var(--border)">
+          <th style="padding:10px 8px">Learner</th><th style="padding:10px 8px">Class</th>
+          <th style="padding:10px 8px">Reason</th><th style="padding:10px 8px">Details</th>
+          <th style="padding:10px 8px">Enrolled by</th><th style="padding:10px 8px">When</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        {% with a=row.applicant %}
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:10px 8px;font-weight:600">
+            {% if a.enrolled_student %}<a href="{% url 'students:detail' a.enrolled_student.pk %}" style="color:var(--hodari-blue);text-decoration:none">{{ a.child_full_name }}</a>
+            <div class="muted" style="font-weight:400;font-size:11.5px">{{ a.enrolled_student.admission_no }}</div>
+            {% else %}{{ a.child_full_name }}{% endif %}
+          </td>
+          <td style="padding:10px 8px">{{ a.grade_applying_for }}</td>
+          <td style="padding:10px 8px">{{ a.get_direct_enrolment_reason_display }}</td>
+          <td style="padding:10px 8px;max-width:320px">{{ a.direct_enrolment_note|default:"—" }}</td>
+          <td style="padding:10px 8px">{{ row.entry.actor.get_full_name|default:row.entry.actor.username|default:"—" }}</td>
+          <td style="padding:10px 8px;white-space:nowrap">{{ a.created_at|date:"d M Y, H:i" }}</td>
+        </tr>
+        {% endwith %}
+        {% empty %}
+        <tr><td colspan="6" style="padding:28px;text-align:center" class="muted">No direct enrolments yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

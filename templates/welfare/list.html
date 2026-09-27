@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load hodari_forms role_tags %}
-{% block title %}Welfare Observations &mdash; {{ brand.school_name }}{% endblock %}
-{% block topbar_greeting %}Welfare Observations{% endblock %}
+{% block title %}Welfare notes &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Welfare notes{% endblock %}
 {% block extra_head %}
 {% include "includes/hodari_print_styles.html" %}
 <style>
@@ -28,15 +28,39 @@
   <div style="height:1px;background:var(--border);margin:16px 0"></div>
   <div style="display:flex;justify-content:space-between;align-items:center">
     <div>
-      <div style="font-family:var(--font-display);font-size:18pt;font-weight:bold;color:var(--hodari-blue);text-transform:uppercase">Welfare Queue</div>
+      <div style="font-family:var(--font-display);font-size:18pt;font-weight:bold;color:var(--hodari-blue);text-transform:uppercase">Welfare notes</div>
       <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Generated {% now "d M Y" %}</div>
     </div>
   </div>
 </div>
 <div class="card">
   <div class="card-title-row">
-    <div class="card-title" style="margin:0">Welfare Queue</div>
+    <div class="card-title" style="margin:0">Welfare notes</div>
   </div>
+
+  {% if drafts %}
+  <div class="no-print" style="margin-top:16px;border:1px dashed var(--border-strong,var(--border));border-radius:10px;padding:14px 16px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px">Your drafts <span class="muted" style="font-weight:400">&middot; only you can see these until you submit them</span></div>
+    {% for d in drafts %}
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border);font-size:13px">
+        <span><b>{{ d.student.first_name }} {{ d.student.last_name }}</b> <span class="muted">{{ d.student.class_name }} &middot; {{ d.type_label }} &middot; saved {{ d.updated_at|date:"d M, H:i" }}</span></span>
+        <a href="{% url 'welfare:edit' d.pk %}" class="btn-secondary btn-sm">Continue</a>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if sent_safeguarding %}
+  <div class="no-print" style="margin-top:16px;border:1px solid rgba(220,38,38,.25);background:#FEF2F2;border-radius:10px;padding:14px 16px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#B91C1C">Safeguarding notes you have sent</div>
+    {% for sg in sent_safeguarding %}
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid rgba(220,38,38,.15);font-size:13px">
+        <span>{{ sg.student.first_name }} {{ sg.student.last_name }} <span class="muted">&middot; {{ sg.created_at|date:"d M Y" }}</span></span>
+        <a href="{% url 'welfare:detail' sg.pk %}" class="btn-secondary btn-sm">Add follow-up</a>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
 
   <!-- Filters -->
   <form method="get" class="hf2-toolbar" style="margin-bottom:20px;margin-top:20px">
@@ -54,6 +78,7 @@
         <option value="">All departments</option>
         <option value="ecd" {% if request.GET.department == 'ecd' %}selected{% endif %}>ECD</option>
         <option value="primary" {% if request.GET.department == 'primary' %}selected{% endif %}>Primary</option>
+        <option value="lower_secondary" {% if request.GET.department == 'lower_secondary' %}selected{% endif %}>Lower Secondary</option>
       </select>
       {% endif %}
     </div>
@@ -66,7 +91,7 @@
 
     <!-- Left Section (Active Queue) -->
     <div class="card" style="margin:0">
-      <div class="card-title">Active Welfare Queue</div>
+      <div class="card-title">Open notes</div>
       <div style="border-top:1px solid var(--border)">
         <table style="width:100%;border-collapse:collapse">
           <thead>
@@ -74,7 +99,7 @@
               <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Date</th>
               <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Student</th>
               <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Class</th>
-              <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Severity</th>
+              <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Type</th>
               <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Status</th>
               <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600"></th>
             </tr>
@@ -88,8 +113,8 @@
               </td>
               <td style="padding:12px 8px;color:var(--text-muted)">{{ obs.student.class_name }}</td>
               <td style="padding:12px 8px">
-                <span class="chip {% if obs.severity == 'critical' %}chip-red{% elif obs.severity == 'high' %}chip-amber{% else %}chip-blue{% endif %}">
-                  {{ obs.get_severity_display }}
+                <span class="chip {% if obs.is_safeguarding %}chip-red{% elif obs.note_type == 'concern' %}chip-amber{% elif obs.note_type == 'positive' %}chip-green{% else %}chip-blue{% endif %}">
+                  {{ obs.type_label }}{% if obs.note_type == 'concern' %} &middot; {{ obs.severity|capfirst }}{% endif %}
                 </span>
               </td>
               <td style="padding:12px 8px">
@@ -102,7 +127,7 @@
               </td>
             </tr>
             {% empty %}
-            <tr><td colspan="6" style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with icon='inbox' title='No observations yet' desc='Submit an observation to get started.' action_url='/welfare/submit/' action_text='+ New Observation' %}</td></tr>
+            <tr><td colspan="6" style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with icon='inbox' title='No welfare notes yet' desc='Add a note to get started.' action_url='/welfare/submit/' action_text='+ Add note' %}</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -141,7 +166,7 @@
                 <div class="chip chip-green" style="font-size:10px">Resolved</div>
               </div>
               <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px">
-                {{ obs.get_concern_type_display }} &middot; {{ obs.observation_date|date:"d M" }} &middot; {{ obs.student.class_name }}
+                {{ obs.type_label }} &middot; {{ obs.observation_date|date:"d M" }} &middot; {{ obs.student.class_name }}
               </div>
               <a href="{% url 'welfare:detail' obs.pk %}" style="font-size:11px; font-weight:600; color:var(--hodari-blue); text-decoration:none">View Details &rarr;</a>
             </div>

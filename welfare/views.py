@@ -15,7 +15,12 @@ from core.scoping import DepartmentScopedMixin
 from core.teacher_context import get_teacher_assigned_classes, is_ecd_teacher
 from users.models import UserRole
 
-from .models import WelfareObservation, WelfareSeverity, WelfareConcernType
+from .models import (
+    CONCERN_SIGNAL_TAGS, POSITIVE_ONLY_TAGS, TAGS_BY_TYPE,
+    WelfareConcernType, WelfareNoteStatus, WelfareNoteType, WelfareObservation,
+    WelfareSeverity, clean_tags, concern_type_for_tags, type_tag_mismatch,
+)
+from .visibility import can_view_observation, can_view_safeguarding, visible_observations
 
 
 def _assert_observation_department_match(user, observation):
@@ -89,7 +94,7 @@ class WelfareStudentIncidentsView(DepartmentScopedMixin, RoleRequiredMixin, Temp
         ctx["department"] = department
         ctx["is_unified_welfare"] = is_unified
         ctx["is_ecd_welfare"] = is_ecd
-        ctx["page_title"] = "Incidents"
+        ctx["page_title"] = "Welfare overview"
 
         # Base queryset scoped by department and role
         qs = WelfareObservation.objects.select_related(
@@ -104,12 +109,9 @@ class WelfareStudentIncidentsView(DepartmentScopedMixin, RoleRequiredMixin, Temp
                 department=department
             ).values_list('name', flat=True))
         qs = qs.filter(student__class_name__in=dept_class_names)
-
-        if role == UserRole.TEACHER:
-            my_classes = get_teacher_assigned_classes(request.user)
-            # Intersect teacher's classes with department classes
-            valid_classes = list(set(my_classes) & set(dept_class_names))
-            qs = qs.filter(student__class_name__in=valid_classes)
+        # Same visibility rules as the student profile (class teacher / HOD /
+        # leadership for concerns and health; safeguarding lead + HOS only).
+        qs = visible_observations(request.user, qs)
 
         # Apply search filters
         q = request.GET.get('q', '').strip()
@@ -123,7 +125,7 @@ class WelfareStudentIncidentsView(DepartmentScopedMixin, RoleRequiredMixin, Temp
         # Department filter (for unified mode)
         if dept_filter and is_unified:
             from academics.models import Department as Dept
-            dept_val = Dept.ECD if dept_filter == "ecd" else Dept.PRIMARY if dept_filter == "primary" else None
+            dept_val = {"ecd": Dept.ECD, "primary": Dept.PRIMARY, "lower_secondary": Dept.LOWER_SECONDARY}.get(dept_filter)
             if dept_val:
                 dept_cls = list(GradeClass.objects.filter(department=dept_val).values_list("name", flat=True))
                 qs = qs.filter(student__class_name__in=dept_cls)
@@ -137,18 +139,8 @@ class WelfareStudentIncidentsView(DepartmentScopedMixin, RoleRequiredMixin, Temp
                 Q(observation_text__icontains=q)
             )
         if note_type:
-            if note_type == "positive":
-                qs = qs.filter(severity="low", concern_type="other")
-            elif note_type == "observation":
-                qs = qs.exclude(concern_type="other").filter(severity__in=["low", "medium"])
-            elif note_type == "concern":
-                from django.db.models import Q
-                qs = qs.filter(
-                    Q(severity__in=["high", "critical"]) |
-                    Q(severity="medium", concern_type__in=["behavioral", "health", "attendance", "academic", "home_situation"])
-                )
-            elif note_type == "safeguarding":
-                qs = qs.filter(severity="critical")
+            if note_type in WelfareNoteType.values:
+                qs = qs.filter(note_type=note_type)
         if status:
             qs = qs.filter(hod_status=status)
         if class_name:
@@ -189,7 +181,9 @@ class WelfareStudentIncidentsView(DepartmentScopedMixin, RoleRequiredMixin, Temp
         concern_data = dict(Counter(qs.values_list('concern_type', flat=True)))
 
         # Monthly trend (last 6 months) — from full department scope for context
-        base_qs = WelfareObservation.objects.filter(student__class_name__in=dept_class_names)
+        base_qs = visible_observations(
+            request.user, WelfareObservation.objects.filter(student__class_name__in=dept_class_names)
+        )
         current_month_start = today.replace(day=1)
         monthly_trend = []
         for i in range(5, -1, -1):
@@ -264,7 +258,7 @@ class WelfareStudentIncidentsView(DepartmentScopedMixin, RoleRequiredMixin, Temp
             'monthly_trend': monthly_trend,
             'top_students': top_students,
             'available_classes': available_classes,
-            'note_type_choices': [('positive', 'Positive'), ('observation', 'Observation'), ('concern', 'Concern'), ('safeguarding', 'Safeguarding')],
+            'note_type_choices': WelfareNoteType.choices,
             'status_choices': [('pending', 'Pending'), ('in_progress', 'In progress'), ('resolved', 'Resolved')],
             # Pass current filter values back to template
             'filter_q': q,
@@ -286,7 +280,8 @@ class WelfareListView(DepartmentScopedMixin, RoleRequiredMixin, ListView):
     context_object_name = "observations"
     paginate_by = 20
     allowed_roles = [
-        UserRole.ECD_HOD, UserRole.PRIMARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN, UserRole.TEACHER
+        UserRole.ECD_HOD, UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD,
+        UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN, UserRole.TEACHER
     ]
     required_permission = "welfare.view_welfareobservation"
 
@@ -315,6 +310,7 @@ class WelfareListView(DepartmentScopedMixin, RoleRequiredMixin, ListView):
         role = self.request.user.role
         if role == UserRole.TEACHER:
             qs = qs.filter(submitted_by=self.request.user)
+        qs = visible_observations(self.request.user, qs)
         severity = self.request.GET.get("severity")
         if severity:
             qs = qs.filter(severity=severity)
@@ -322,7 +318,7 @@ class WelfareListView(DepartmentScopedMixin, RoleRequiredMixin, ListView):
         dept_filter = self.request.GET.get("department", "")
         if dept_filter and is_unified:
             from academics.models import Department as Dept
-            dept_val = Dept.ECD if dept_filter == "ecd" else Dept.PRIMARY if dept_filter == "primary" else None
+            dept_val = {"ecd": Dept.ECD, "primary": Dept.PRIMARY, "lower_secondary": Dept.LOWER_SECONDARY}.get(dept_filter)
             if dept_val:
                 dept_cls = list(GradeClass.objects.filter(department=dept_val).values_list("name", flat=True))
                 qs = qs.filter(student__class_name__in=dept_cls)
@@ -345,7 +341,18 @@ class WelfareListView(DepartmentScopedMixin, RoleRequiredMixin, ListView):
         ctx["department"] = department
         ctx["is_unified_welfare"] = is_unified
         ctx["is_ecd_welfare"] = is_ecd
-        ctx["page_title"] = "Welfare Observations"
+        ctx["page_title"] = "Welfare notes"
+        user = self.request.user
+        # Drafts are private to their author and never appear in the queue.
+        ctx["drafts"] = WelfareObservation.all_objects.filter(
+            status=WelfareNoteStatus.DRAFT, submitted_by=user
+        ).select_related("student").order_by("-updated_at")
+        # Authors can't reopen their safeguarding notes, but can see that
+        # they were sent and add a follow-up.
+        if not can_view_safeguarding(user):
+            ctx["sent_safeguarding"] = WelfareObservation.objects.filter(
+                submitted_by=user, note_type=WelfareNoteType.SAFEGUARDING
+            ).select_related("student").order_by("-created_at")[:10]
         ctx["can_see_hod_dashboard"] = self.request.user.has_perm("welfare.can_review_observation")
         qs = self.get_queryset()
 
@@ -364,6 +371,320 @@ class WelfareListView(DepartmentScopedMixin, RoleRequiredMixin, ListView):
         return ctx
 
 
+# ── Note form: shared by new notes, drafts and corrections ─────────────────
+
+# Fields whose changes are recorded in a WelfareObservationRevision, with
+# the label shown in the note's correction history.
+_TRACKED_FIELDS = [
+    ("student_id", "Child"),
+    ("note_type", "Note type"),
+    ("tags", "Tags"),
+    ("observation_date", "Date"),
+    ("observation_text", "What happened"),
+    ("action_taken", "Action taken"),
+    ("severity", "Level"),
+    ("parent_contacted", "Parent contacted"),
+    ("follow_up_required", "Follow-up required"),
+    ("follow_up_date", "Follow-up date"),
+]
+
+_SEVERITY_FOR_TYPE = {
+    WelfareNoteType.POSITIVE: WelfareSeverity.LOW,
+    WelfareNoteType.OBSERVATION: WelfareSeverity.LOW,
+    WelfareNoteType.SAFEGUARDING: WelfareSeverity.CRITICAL,
+}
+
+
+def _students_for_user(user, class_names=None):
+    """Learners this user may write welfare notes about."""
+    from students.models import Student
+    qs = Student.objects.filter(is_archived=False)
+    if class_names is not None:
+        qs = qs.filter(class_name__in=class_names)
+    if user.role == UserRole.TEACHER:
+        qs = qs.filter(class_name__in=get_teacher_assigned_classes(user))
+    return qs.order_by("class_name", "last_name")
+
+
+def _read_note_form(request):
+    """Pull the note fields out of POST without validating them."""
+    post = request.POST
+    note_type = post.get("note_type", "").strip()
+    if note_type not in WelfareNoteType.values:
+        note_type = ""
+    student_ids = []
+    for raw in post.getlist("students") or [post.get("student", "")]:
+        if str(raw).isdigit() and int(raw) not in student_ids:
+            student_ids.append(int(raw))
+    severity = post.get("severity", "")
+    if note_type in _SEVERITY_FOR_TYPE:
+        severity = _SEVERITY_FOR_TYPE[note_type]
+    elif severity not in WelfareSeverity.values:
+        severity = WelfareSeverity.MEDIUM if note_type == WelfareNoteType.CONCERN else WelfareSeverity.LOW
+    return {
+        "note_type": note_type,
+        "student_ids": student_ids,
+        "tags": clean_tags(post.getlist("tags")) if note_type != WelfareNoteType.SAFEGUARDING else [],
+        "observation_date": post.get("observation_date", "").strip(),
+        "observation_text": post.get("observation_text", "").strip(),
+        "child_words": post.get("child_words", "").strip(),
+        "immediate_action": post.get("immediate_action", "").strip(),
+        "action_taken": post.get("action_taken", "").strip(),
+        "severity": severity,
+        "parent_contacted": post.get("parent_contacted") == "on",
+        "follow_up_required": post.get("follow_up_required") == "on" or bool(post.get("review_date")),
+        "follow_up_date": post.get("follow_up_date", "").strip() or post.get("review_date", "").strip(),
+        "edit_reason": post.get("edit_reason", "").strip(),
+        "confirm_mismatch": post.get("confirm_mismatch") == "1",
+    }
+
+
+def _validate_note_form(data, *, allowed_students, earliest_date, final, mode):
+    """Validate form data. Returns (errors, cleaned).
+
+    ``final`` is False only when saving a draft, which needs just a child.
+    ``mode`` is "new", "draft" or "correct".
+    """
+    from datetime import timedelta
+    errors = []
+    cleaned = {}
+    note_type = data["note_type"]
+
+    allowed_ids = set(allowed_students.values_list("pk", flat=True))
+    students = [pk for pk in data["student_ids"] if pk in allowed_ids]
+    if data["student_ids"] and len(students) != len(data["student_ids"]):
+        errors.append("You can only write welfare notes for learners in your class(es).")
+    if not students:
+        errors.append("Choose the child this note is about.")
+    if mode != "new" and len(students) > 1:
+        errors.append("A saved note can only be about one child.")
+    cleaned["student_ids"] = students
+
+    try:
+        obs_date = date.fromisoformat(data["observation_date"]) if data["observation_date"] else date.today()
+    except ValueError:
+        errors.append("Invalid observation date format.")
+        obs_date = date.today()
+    if obs_date > date.today():
+        errors.append("Observation date cannot be in the future. Please correct the date.")
+    elif final and obs_date < earliest_date - timedelta(days=1):
+        errors.append("Observation date cannot be more than 1 day before the note was started. Please correct the date.")
+    cleaned["observation_date"] = obs_date
+
+    text = data["observation_text"]
+    if note_type == WelfareNoteType.SAFEGUARDING and data["child_words"]:
+        text = f"{text}\n\nChild's own words: \"{data['child_words']}\"".strip()
+    cleaned["observation_text"] = text
+    cleaned["action_taken"] = data["action_taken"] or data["immediate_action"]
+
+    if note_type == WelfareNoteType.SAFEGUARDING:
+        if mode == "correct":
+            errors.append("A note cannot be changed into a safeguarding note. Write a new safeguarding note instead.")
+        elif not final:
+            errors.append("Safeguarding notes cannot be saved as drafts. Send them to the Safeguarding Lead straight away.")
+        if len(students) > 1:
+            errors.append("A safeguarding note can only be about one child.")
+
+    if final:
+        if not note_type:
+            errors.append("Choose what kind of note this is: Positive, Observation, Concern or Safeguarding.")
+        if not text:
+            errors.append("Please describe what happened.")
+        if not cleaned["action_taken"]:
+            errors.append("Please describe the action taken today.")
+        # Parents are not contacted by the teacher about safeguarding concerns.
+        if note_type != WelfareNoteType.SAFEGUARDING and not data["parent_contacted"]:
+            errors.append("Please confirm whether the parent was contacted (toggle required).")
+        if mode == "correct" and not data["edit_reason"]:
+            errors.append("Say briefly why you are correcting this note.")
+
+    cleaned["tags"] = data["tags"]
+    cleaned["note_type"] = note_type
+    cleaned["severity"] = data["severity"]
+    cleaned["concern_type"] = concern_type_for_tags(data["tags"])
+    cleaned["parent_contacted"] = data["parent_contacted"]
+    cleaned["follow_up_required"] = data["follow_up_required"]
+    try:
+        cleaned["follow_up_date"] = date.fromisoformat(data["follow_up_date"]) if data["follow_up_date"] else None
+    except ValueError:
+        errors.append("Invalid follow-up date format.")
+        cleaned["follow_up_date"] = None
+
+    # Type/tag disagreement needs an explicit "yes, save it" from the user.
+    cleaned["mismatch"] = type_tag_mismatch(note_type, data["tags"])
+    if final and cleaned["mismatch"] and not data["confirm_mismatch"] and not errors:
+        errors.append(cleaned["mismatch"])
+    return errors, cleaned
+
+
+def _note_initial(obs=None, data=None, student_id=None):
+    """Initial values for the note form's JavaScript state."""
+    if data is not None:
+        return {
+            "note_type": data["note_type"],
+            "students": data["student_ids"],
+            "tags": data["tags"],
+            "observation_date": data["observation_date"],
+            "observation_text": data["observation_text"],
+            "child_words": data["child_words"],
+            "action_taken": data["action_taken"],
+            "severity": data["severity"],
+            "parent_contacted": data["parent_contacted"],
+            "follow_up_required": data["follow_up_required"],
+            "follow_up_date": data["follow_up_date"],
+            "edit_reason": data["edit_reason"],
+        }
+    if obs is not None:
+        return {
+            "note_type": obs.note_type,
+            "students": [obs.student_id],
+            "tags": obs.tags or [],
+            "observation_date": obs.observation_date.isoformat(),
+            "observation_text": obs.observation_text,
+            "child_words": "",
+            "action_taken": obs.action_taken,
+            "severity": obs.severity,
+            "parent_contacted": obs.parent_contacted,
+            "follow_up_required": obs.follow_up_required,
+            "follow_up_date": obs.follow_up_date.isoformat() if obs.follow_up_date else "",
+            "edit_reason": "",
+        }
+    return {
+        "note_type": "",  # never pre-selected: the teacher must choose
+        "students": [student_id] if student_id else [],
+        "tags": [],
+        "observation_date": date.today().isoformat(),
+        "observation_text": "",
+        "child_words": "",
+        "action_taken": "",
+        "severity": "",
+        "parent_contacted": False,
+        "follow_up_required": False,
+        "follow_up_date": "",
+        "edit_reason": "",
+    }
+
+
+def _note_form_context(*, mode, students, initial, obs=None, errors=None, mismatch=""):
+    from datetime import timedelta
+    base = obs.created_at.date() if obs is not None else date.today()
+    return {
+        "note_mode": mode,
+        "obs": obs,
+        "students": students,
+        "students_data": [
+            {"id": s.pk, "name": f"{s.first_name} {s.last_name}", "cls": s.class_name} for s in students
+        ],
+        "available_classes": sorted({s.class_name for s in students}),
+        "severity_choices": WelfareSeverity.choices,
+        "note_initial": initial,
+        "tags_by_type": {k.value if hasattr(k, "value") else k: v for k, v in TAGS_BY_TYPE.items()},
+        "positive_only_tags": sorted(POSITIVE_ONLY_TAGS),
+        "concern_signal_tags": sorted(CONCERN_SIGNAL_TAGS),
+        "form_errors": errors or [],
+        "mismatch_warning": mismatch,
+        "today_date_iso": date.today().isoformat(),
+        "min_date_iso": (base - timedelta(days=1)).isoformat(),
+        "edit_window_hours": int(WelfareObservation.edit_window().total_seconds() // 3600),
+    }
+
+
+def _apply_cleaned(obs, cleaned):
+    obs.note_type = cleaned["note_type"]
+    obs.tags = cleaned["tags"]
+    obs.observation_date = cleaned["observation_date"]
+    obs.observation_text = cleaned["observation_text"]
+    obs.action_taken = cleaned["action_taken"]
+    obs.severity = cleaned["severity"]
+    obs.concern_type = cleaned["concern_type"]
+    obs.parent_contacted = cleaned["parent_contacted"]
+    obs.follow_up_required = cleaned["follow_up_required"]
+    obs.follow_up_date = cleaned["follow_up_date"]
+
+
+def _snapshot(obs):
+    """Human-readable values of the tracked fields, keyed by label."""
+    snap = {}
+    for field, label in _TRACKED_FIELDS:
+        value = getattr(obs, field)
+        if field == "student_id":
+            value = f"{obs.student.first_name} {obs.student.last_name} ({obs.student.class_name})"
+        elif field == "note_type":
+            value = obs.type_label
+        elif field == "severity":
+            value = obs.get_severity_display()
+        elif field == "tags":
+            value = ", ".join(value or []) or None
+        elif isinstance(value, bool):
+            value = "Yes" if value else "No"
+        elif hasattr(value, "isoformat"):
+            value = value.isoformat()
+        snap[label] = value
+    return snap
+
+
+def _finalize_submission(request, obs):
+    """Move a note from draft/new to submitted: lock safeguarding notes,
+    audit, escalate and create follow-up tasks."""
+    from audit.models import log_event
+
+    obs.status = WelfareNoteStatus.SUBMITTED
+    obs.submitted_at = timezone.now()
+    obs.is_locked = obs.is_safeguarding
+    if obs.parent_contacted and not obs.parent_contact_datetime:
+        obs.parent_contact_datetime = timezone.now()
+    obs.save()
+
+    log_event(
+        actor=request.user,
+        action_type="welfare_observation_created",
+        model_name="WelfareObservation",
+        object_id=obs.pk,
+        description=f"{obs.type_label} welfare note submitted for {obs.student} ({obs.severity})",
+        after={
+            "student_id": obs.student_id,
+            "note_type": obs.note_type,
+            "tags": obs.tags,
+            "concern_type": obs.concern_type,
+            "severity": obs.severity,
+            "observation_date": str(obs.observation_date),
+            "parent_contacted": obs.parent_contacted,
+            "follow_up_required": obs.follow_up_required,
+        },
+        request=request,
+    )
+
+    if obs.is_safeguarding or obs.severity in (WelfareSeverity.HIGH, WelfareSeverity.CRITICAL):
+        _escalate_severity(obs, request, obs.severity)
+        try:
+            from tasks.services import generate_welfare_alert_task
+            generate_welfare_alert_task(obs)
+        except Exception:
+            pass
+    if obs.follow_up_required:
+        try:
+            from tasks.services import generate_welfare_followup_task
+            generate_welfare_followup_task(obs)
+        except Exception:
+            pass
+
+
+def _submitted_message(request, obs_list):
+    obs = obs_list[0]
+    count = len(obs_list)
+    noun = "note" if count == 1 else f"{count} notes"
+    if obs.is_safeguarding:
+        messages.warning(request, "Safeguarding note sent to the Safeguarding Lead and Head of School.")
+    elif obs.severity in (WelfareSeverity.HIGH, WelfareSeverity.CRITICAL):
+        from .models import hod_role_for_class
+        _role, hod_name = hod_role_for_class(obs.student.class_name)
+        extra = " and HOS" if obs.severity == WelfareSeverity.CRITICAL else ""
+        messages.warning(request, f"Welfare {noun} submitted and escalated to {hod_name}{extra}.")
+    else:
+        hours = int(WelfareObservation.edit_window().total_seconds() // 3600)
+        messages.success(request, f"Welfare {noun} submitted. You can correct it for the next {hours} hours.")
+
+
 class WelfareSubmitView(DepartmentScopedMixin, RoleRequiredMixin, TemplateView):
     template_name = "welfare/submit.html"
     allowed_roles = [UserRole.TEACHER, UserRole.ECD_HOD, UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD, UserRole.SUPER_ADMIN]
@@ -376,231 +697,96 @@ class WelfareSubmitView(DepartmentScopedMixin, RoleRequiredMixin, TemplateView):
         self._check_teacher_department()
         return auth_resp
 
-    def get_context_data(self, **kwargs):
-        from students.models import Student
-        from academics.models import Department, GradeClass
-        ctx = super().get_context_data(**kwargs)
-        ctx["welfare_tab"] = "submit"
-        ctx["severity_choices"] = WelfareSeverity.choices
-        ctx["concern_type_choices"] = WelfareConcernType.choices
-        ctx["can_see_hod_dashboard"] = self.request.user.has_perm("welfare.can_review_observation")
+    def _students(self):
+        if self._is_unified():
+            class_names = self._get_all_welfare_classes()
+        else:
+            class_names = self._get_dept_classes(self._get_department())
+        return _students_for_user(self.request.user, class_names)
 
+    def _page_context(self):
+        from academics.models import Department
         department = self._get_department()
-        is_unified = self._is_unified()
-        is_ecd = (department == Department.ECD) if department else False
-        ctx["department"] = department
-        ctx["is_unified_welfare"] = is_unified
-        ctx["is_ecd_welfare"] = is_ecd
-        ctx["page_title"] = "New Welfare Note"
+        return {
+            "welfare_tab": "submit",
+            "can_see_hod_dashboard": self.request.user.has_perm("welfare.can_review_observation"),
+            "department": department,
+            "is_unified_welfare": self._is_unified(),
+            "is_ecd_welfare": (department == Department.ECD) if department else False,
+            "page_title": "Add welfare note",
+        }
 
-        # Filter classes by department (or all in unified mode)
-        if is_unified:
-            dept_class_names = self._get_all_welfare_classes()
-        else:
-            dept_classes = GradeClass.objects.filter(
-                department=department
-            ).values_list("name", flat=True).distinct()
-            dept_class_names = sorted(dept_classes)
-
-        all_students = Student.objects.filter(is_archived=False)
-        if self.request.user.role == UserRole.TEACHER:
-            my_classes = get_teacher_assigned_classes(self.request.user)
-            # Intersect teacher's classes with department classes
-            valid_classes = sorted(set(my_classes) & set(dept_class_names))
-            students = all_students.filter(class_name__in=valid_classes)
-            available_classes = valid_classes
-        else:
-            # HODs / Admins see only department classes (or all in unified)
-            students = all_students.filter(class_name__in=dept_class_names)
-            available_classes = dept_class_names
-
-        ctx["students"] = students.order_by("class_name", "last_name")
-        ctx["available_classes"] = available_classes
-        ctx["today_date"] = date.today().strftime("%d %B %Y")
-        ctx["today_date_iso"] = date.today().strftime("%Y-%m-%d")
-        from datetime import timedelta
-        ctx["yesterday_iso"] = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(self._page_context())
+        student_id = self.request.GET.get("student", "")
+        ctx.update(_note_form_context(
+            mode="new",
+            students=self._students(),
+            initial=_note_initial(student_id=int(student_id) if student_id.isdigit() else None),
+        ))
         return ctx
 
     def post(self, request, *args, **kwargs):
+        from django.shortcuts import render
+        data = _read_note_form(request)
+        final = request.POST.get("action") != "draft"
+        students = self._students()
+        errors, cleaned = _validate_note_form(
+            data, allowed_students=students, earliest_date=date.today(), final=final, mode="new",
+        )
+        if errors:
+            ctx = self._page_context()
+            ctx.update(_note_form_context(
+                mode="new", students=students, initial=_note_initial(data=data), errors=errors,
+                mismatch=cleaned["mismatch"] if errors == [cleaned["mismatch"]] else "",
+            ))
+            return render(request, self.template_name, ctx, status=400)
+
         from students.models import Student
-        from academics.models import Department
-        from django.utils import timezone
-
-        department = self._get_department()
-        is_unified = self._is_unified()
-        is_ecd = (department == Department.ECD) if department else False
-        submit_redirect = "welfare:submit"
-
-        student_id = request.POST.get("student")
-        concern_type = request.POST.get("concern_type")
-        severity = request.POST.get("severity", WelfareSeverity.LOW)
-        obs_date = request.POST.get("observation_date") or date.today()
-        obs_text = request.POST.get("observation_text", "").strip()
-        action_taken = request.POST.get("action_taken", "").strip()
-
-        # FR-WEL-002: Validate observation date — defaults to today, max 1 day backdate
-        from datetime import timedelta
-        try:
-            obs_date_parsed = date.fromisoformat(obs_date) if isinstance(obs_date, str) else obs_date
-        except (ValueError, TypeError):
-            messages.error(request, "Invalid observation date format.")
-            return redirect(submit_redirect)
-
-        today = date.today()
-        yesterday = today - timedelta(days=1)
-        if obs_date_parsed < yesterday:
-            messages.error(request, "Observation date cannot be more than 1 day in the past. Please correct the date.")
-            return redirect(submit_redirect)
-        if obs_date_parsed > today:
-            messages.error(request, "Observation date cannot be in the future. Please correct the date.")
-            return redirect(submit_redirect)
-        obs_date = obs_date_parsed
-
-        parent_contacted = request.POST.get("parent_contacted") == "on"
-        parent_contact_datetime = None
-        follow_up_required = request.POST.get("follow_up_required") == "on"
-        follow_up_date = request.POST.get("follow_up_date") or None
-
-        # FR-WEL-003: Capture the "Other" concern description and prepend to observation_text
-        other_desc = request.POST.get("other_concern_description", "").strip()
-        if concern_type == "other" and other_desc:
-            obs_text = f"Other concern description: {other_desc}\n\n{obs_text}" if obs_text else f"Other concern description: {other_desc}"
-        elif concern_type == "other" and not other_desc:
-            messages.error(request, "Please describe the concern when selecting 'Other' as the concern type.")
-            return redirect(submit_redirect)
-
-        if not obs_text:
-            messages.error(request, "Please provide observation details.")
-            return redirect(submit_redirect)
-
-        # FR-WEL-001: All mandatory fields must be completed
-        if not concern_type:
-            messages.error(request, "Please select a concern type.")
-            return redirect(submit_redirect)
-        if not severity:
-            messages.error(request, "Please select a severity level.")
-            return redirect(submit_redirect)
-        if not action_taken:
-            messages.error(request, "Please describe the action taken today.")
-            return redirect(submit_redirect)
-        if not parent_contacted:
-            messages.error(request, "Please confirm whether the parent was contacted (toggle required).")
-            return redirect(submit_redirect)
-
-        if parent_contacted:
-            contact_date = request.POST.get("parent_contact_date")
-            contact_time = request.POST.get("parent_contact_time")
-            if contact_date and contact_time:
-                from datetime import datetime
-                parent_contact_datetime = datetime.strptime(f"{contact_date} {contact_time}", "%Y-%m-%d %H:%M")
+        created = []
+        for student in Student.objects.filter(pk__in=cleaned["student_ids"]):
+            obs = WelfareObservation(
+                student=student, submitted_by=request.user,
+                status=WelfareNoteStatus.DRAFT,
+            )
+            _apply_cleaned(obs, cleaned)
+            if final:
+                _finalize_submission(request, obs)
             else:
-                parent_contact_datetime = timezone.now()
+                obs.save()
+            created.append(obs)
 
-        try:
-            student = Student.objects.get(pk=student_id)
-        except Student.DoesNotExist:
-            messages.error(request, "Invalid student selected.")
-            return redirect(submit_redirect)
+        if not final:
+            messages.success(request, "Draft saved. Only you can see it until you submit it.")
+            return redirect("welfare:edit", pk=created[0].pk) if len(created) == 1 else redirect("welfare:list")
+        _submitted_message(request, created)
+        return redirect("welfare:detail", pk=created[0].pk)
 
-        # Validate student belongs to the correct department (or any in unified)
-        if not is_unified:
-            from academics.models import GradeClass
-            student_dept = GradeClass.objects.filter(name=student.class_name).values_list("department", flat=True).first()
-            if student_dept and student_dept != department:
-                messages.error(request, f"Selected student does not belong to {'ECD' if is_ecd else 'Primary'} classes.")
-                return redirect(submit_redirect)
 
-        if request.user.role == UserRole.TEACHER:
-            my_classes = get_teacher_assigned_classes(request.user)
-            if student.class_name not in my_classes:
-                messages.error(request, "You can only submit welfare observations for your assigned class(es).")
-                return redirect(submit_redirect)
-
-        obs = WelfareObservation.objects.create(
-            student=student,
-            submitted_by=request.user,
-            concern_type=concern_type,
-            severity=severity,
-            observation_date=obs_date,
-            observation_text=obs_text,
-            action_taken=action_taken,
-            parent_contacted=parent_contacted,
-            parent_contact_datetime=parent_contact_datetime,
-            follow_up_required=follow_up_required,
-            follow_up_date=follow_up_date,
-            is_locked=severity == WelfareSeverity.CRITICAL,
-        )
-
-        # FR-AUD-003: Log welfare observation submission
-        from audit.models import log_event
-        log_event(
-            actor=request.user,
-            action_type="welfare_observation_created",
-            model_name="WelfareObservation",
-            object_id=obs.pk,
-            description=f"Welfare observation created for {student} - {severity} severity {concern_type}",
-            after={
-                "student_id": student.pk,
-                "concern_type": concern_type,
-                "severity": severity,
-                "observation_date": str(obs_date),
-                "parent_contacted": parent_contacted,
-                "follow_up_required": follow_up_required,
-            },
-            request=request
-        )
-
-        # Auto-escalate High/Critical → notify relevant HOD (+ HOS if Critical)
-        if severity in [WelfareSeverity.HIGH, WelfareSeverity.CRITICAL]:
-            _escalate_severity(obs, request, severity)
-            try:
-                from tasks.services import generate_welfare_alert_task
-                generate_welfare_alert_task(obs)
-            except Exception:
-                pass
-            hod_name = "ECD HOD" if is_ecd else "Primary HOD"
-            if severity == WelfareSeverity.CRITICAL:
-                messages.warning(
-                    request,
-                    f"Critical observation submitted and escalated to {hod_name} and HOS."
-                )
-            else:
-                messages.warning(
-                    request,
-                    f"High severity observation submitted and escalated to {hod_name}."
-                )
-        else:
-            messages.success(request, "Welfare observation submitted.")
-
-        if follow_up_required:
-            try:
-                from tasks.services import generate_welfare_followup_task
-                generate_welfare_followup_task(obs)
-            except Exception:
-                pass
-
-        return redirect("welfare:detail", pk=obs.pk)
+def _safeguarding_recipients():
+    """Head of School plus everyone holding the Safeguarding Lead permission."""
+    from django.db.models import Q
+    from users.models import User
+    perm = Q(groups__permissions__codename="view_safeguarding_note") | Q(
+        user_permissions__codename="view_safeguarding_note"
+    )
+    return User.objects.filter(
+        Q(role=UserRole.HEAD_OF_SCHOOL) | perm, is_active=True,
+    ).distinct()
 
 
 def _escalate_severity(obs: WelfareObservation, request, severity):
     """Send in-app notifications and emails to relevant roles according to FRD escalation rules.
-    Determines ECD vs Primary from the student's class_name via GradeClass."""
+    Safeguarding notes go only to the Safeguarding Lead and HOS — never the HOD —
+    and the notification carries no note content."""
     from communications.email_service import dispatch_notification
     from communications.models import Notification, NotificationCategory
     from users.models import User
-    from academics.models import Department, GradeClass
-    from django.utils import timezone
+    from .models import hod_role_for_class
     import datetime
 
-    # Determine department from student's class
-    dept = GradeClass.objects.filter(name=obs.student.class_name).values_list("department", flat=True).first()
-    if dept == Department.ECD:
-        hod_role = UserRole.ECD_HOD
-        hod_label = "ECD HOD"
-    else:
-        hod_role = UserRole.PRIMARY_HOD
-        hod_label = "Primary HOD"
+    hod_role, hod_label = hod_role_for_class(obs.student.class_name)
 
     roles_to_notify = []
     urgency = "normal"
@@ -617,15 +803,25 @@ def _escalate_severity(obs: WelfareObservation, request, severity):
         roles_to_notify = [hod_role, UserRole.HEAD_OF_SCHOOL]
         urgency = "critical"
 
-    if roles_to_notify:
+    if obs.is_safeguarding:
+        recipients = _safeguarding_recipients()
+    elif roles_to_notify:
         recipients = User.objects.filter(
             role__in=roles_to_notify,
             is_active=True,
         )
+    else:
+        recipients = User.objects.none()
 
-        for user in recipients:
+    for user in recipients:
+        if obs.is_safeguarding:
+            title = f"Safeguarding note: {obs.student}"
+            message = (
+                "A safeguarding note has been recorded. Open it in Hodari to read it. "
+                "Its content is not included in notifications."
+            )
+        else:
             title = f"{severity.capitalize()} welfare observation: {obs.student}"
-
             if severity == WelfareSeverity.HIGH:
                 message = f"{obs.observation_text[:300]}\n\nACTION REQUIRED: Parent contact required today."
             elif severity == WelfareSeverity.CRITICAL:
@@ -633,23 +829,23 @@ def _escalate_severity(obs: WelfareObservation, request, severity):
             else:
                 message = obs.observation_text[:500]
 
-            # Create in-app notification
-            Notification.objects.create(
-                recipient=user,
-                category=NotificationCategory.WELFARE,
-                title=title,
-                body=message,
-                link=f"/welfare/{obs.pk}/"
-            )
+        # Create in-app notification
+        Notification.objects.create(
+            recipient=user,
+            category=NotificationCategory.WELFARE,
+            title=title,
+            body=message,
+            link=f"/welfare/{obs.pk}/"
+        )
 
-            dispatch_notification(
-                user=user,
-                title=title,
-                message=message,
-                link=f"/welfare/{obs.pk}/",
-                actor=request.user
-            )
-    
+        dispatch_notification(
+            user=user,
+            title=title,
+            message=message,
+            link=f"/welfare/{obs.pk}/",
+            actor=request.user
+        )
+
     # Set automatic follow-up reminders based on severity
     if severity == WelfareSeverity.LOW:
         # 5-day follow-up reminder for teacher
@@ -669,160 +865,263 @@ def _escalate_severity(obs: WelfareObservation, request, severity):
 
 class WelfareDetailView(RoleRequiredMixin, DetailView):
     template_name = "welfare/detail.html"
-    model = WelfareObservation
     context_object_name = "obs"
     allowed_roles = [UserRole.ECD_HOD, UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN, UserRole.TEACHER]
-    required_permission = "welfare.view_welfareobservation"
-
-    def get_object(self, queryset=None):
-        obs = super().get_object(queryset)
-        # FR-WEL-003: Block cross-department access to welfare detail
-        _assert_observation_department_match(self.request.user, obs)
-        return obs
+    required_permissions_any = ["welfare.view_welfareobservation", "welfare.add_welfareobservation"]
 
     def get_queryset(self):
-        qs = super().get_queryset().select_related("student", "submitted_by", "reviewed_by")
-        if self.request.user.role == UserRole.TEACHER:
-            qs = qs.filter(submitted_by=self.request.user)
-        return qs
+        return WelfareObservation.all_objects.select_related("student", "submitted_by", "reviewed_by")
+
+    def get(self, request, *args, **kwargs):
+        from django.shortcuts import render
+        self.object = self.get_object()
+        obs = self.object
+        if obs.follow_up_of_id:
+            return redirect("welfare:detail", pk=obs.follow_up_of_id)
+        if not can_view_observation(request.user, obs):
+            # The author of a safeguarding note cannot reopen it, but can
+            # still add a follow-up correction for the Safeguarding Lead.
+            if obs.is_safeguarding and obs.submitted_by_id == request.user.pk:
+                return render(request, "welfare/safeguarding_sent.html", {
+                    "obs": obs,
+                    "follow_up_count": WelfareObservation.all_objects.filter(follow_up_of=obs).count(),
+                    "can_see_hod_dashboard": request.user.has_perm("welfare.can_review_observation"),
+                })
+            raise PermissionDenied("You do not have access to this welfare note.")
+        if obs.is_draft:
+            return redirect("welfare:edit", pk=obs.pk)
+        return self.render_to_response(self.get_context_data(object=obs))
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        obs = self.object
+        user = self.request.user
         # NFR-PDPA-006: Log access to welfare record
         from audit.view_audit import log_sensitive_access
         log_sensitive_access(
-            self.request, "WelfareObservation", self.object.pk, "welfare",
-            description=f"Welfare record viewed for {self.object.student} (severity: {self.object.severity})"
+            self.request, "WelfareObservation", obs.pk, "welfare",
+            description=f"Welfare record viewed for {obs.student} (type: {obs.note_type}, severity: {obs.severity})"
         )
-        can_review = self.request.user.has_perm("welfare.can_review_observation")
+        can_review = user.has_perm("welfare.can_review_observation")
         ctx["can_see_hod_dashboard"] = can_review
         ctx["welfare_tab"] = "detail"
-        ctx["can_review"] = can_review
-        ctx["is_incident_locked"] = self.object.hod_status == "resolved"
-        
-        # Acknowledgment check
+        if obs.is_safeguarding:
+            ctx["can_review"] = can_view_safeguarding(user)
+        else:
+            ctx["can_review"] = can_review
+        ctx["is_incident_locked"] = obs.hod_status == "resolved"
+
         from .models import WelfareAcknowledgment
         ctx["user_acknowledged"] = WelfareAcknowledgment.objects.filter(
-            observation=self.object, user=self.request.user
+            observation=obs, user=user
         ).exists()
-        ctx["needs_acknowledgment"] = self.object.severity in [WelfareSeverity.HIGH, WelfareSeverity.CRITICAL]
-        ctx["user"] = self.request.user
-        
-        # Check if this is an ECD welfare observation
+        ctx["needs_acknowledgment"] = obs.is_safeguarding or obs.severity in [WelfareSeverity.HIGH, WelfareSeverity.CRITICAL]
+        ctx["user"] = user
+
+        edit_block = obs.edit_block_reason(user)
+        ctx["can_edit"] = not edit_block
+        ctx["edit_block_reason"] = edit_block
+        ctx["is_author"] = obs.submitted_by_id == user.pk
+        ctx["revisions"] = obs.revisions.select_related("edited_by")
+        ctx["follow_ups"] = WelfareObservation.all_objects.filter(
+            follow_up_of=obs
+        ).select_related("submitted_by").order_by("created_at")
+        ctx["can_add_follow_up"] = obs.is_safeguarding
+
         from academics.models import GradeClass, Department
-        student_dept = GradeClass.objects.filter(name=self.object.student.class_name).values_list("department", flat=True).first()
+        student_dept = GradeClass.objects.filter(name=obs.student.class_name).values_list("department", flat=True).first()
         ctx["is_ecd_welfare"] = (student_dept == Department.ECD)
         return ctx
 
 
 class WelfareEditView(RoleRequiredMixin, View):
-    """
-    FR-WEL-002: Teacher can edit their own welfare observation within 24 hours,
-    before HOD review. Only action_taken and follow_up fields are editable.
-    Critical entries are locked immediately and cannot be edited.
+    """Edit a draft, or correct a submitted note.
+
+    - Drafts: the author edits freely, then submits or deletes the draft.
+    - Submitted notes: the author may correct within the correction window
+      (before HOD review); a Super Admin may correct any time. A reason is
+      required and every change is kept as a WelfareObservationRevision.
+    - Safeguarding notes are never editable once submitted.
     """
     allowed_roles = [UserRole.TEACHER, UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD]
-    required_permission = "welfare.change_welfareobservation"
+    required_permissions_any = ["welfare.add_welfareobservation", "welfare.change_welfareobservation"]
+
+    def _load(self, request, pk):
+        obs = get_object_or_404(WelfareObservation.all_objects.select_related("student"), pk=pk)
+        block = obs.edit_block_reason(request.user)
+        if block:
+            if obs.is_draft:
+                raise PermissionDenied(block)
+            messages.error(request, block)
+            return obs, redirect("welfare:detail", pk=pk)
+        return obs, None
+
+    def _students(self, request, obs):
+        students = _students_for_user(request.user)
+        # The note's current child stays selectable even if the teacher has
+        # since moved classes, so an unrelated edit can still be saved.
+        from students.models import Student
+        return (students | Student.objects.filter(pk=obs.student_id)).distinct().order_by("class_name", "last_name")
+
+    def _render(self, request, obs, *, initial, errors=None, mismatch="", status=200):
+        from django.shortcuts import render
+        mode = "draft" if obs.is_draft else "correct"
+        ctx = _note_form_context(
+            mode=mode, students=self._students(request, obs), initial=initial, obs=obs,
+            errors=errors, mismatch=mismatch,
+        )
+        ctx.update({
+            "welfare_tab": "submit" if obs.is_draft else "detail",
+            "page_title": "Edit draft" if obs.is_draft else "Correct welfare note",
+            "can_see_hod_dashboard": request.user.has_perm("welfare.can_review_observation"),
+            "is_unified_welfare": True,
+        })
+        return render(request, "welfare/submit.html", ctx, status=status)
 
     def get(self, request, pk):
-        from django.shortcuts import render
-        obs = get_object_or_404(WelfareObservation, pk=pk)
-        # FR-WEL-003: Block cross-department edit access
-        _assert_observation_department_match(request.user, obs)
-
-        # Only the submitting teacher can edit (SA can edit any)
-        if request.user.role == UserRole.TEACHER and obs.submitted_by != request.user:
-            raise PermissionDenied("You can only edit your own welfare observations.")
-
-        # Critical entries are locked immediately
-        if obs.is_locked or obs.severity == WelfareSeverity.CRITICAL:
-            messages.error(request, "Critical welfare observations cannot be edited after submission.")
-            return redirect("welfare:detail", pk=pk)
-
-        # Already reviewed by HOD — no longer editable
-        if obs.hod_status != "pending":
-            messages.error(request, "This observation has been reviewed and can no longer be edited.")
-            return redirect("welfare:detail", pk=pk)
-
-        # 24-hour window check
-        from django.utils import timezone as _tz
-        from datetime import timedelta
-        if obs.created_at < _tz.now() - timedelta(hours=24):
-            messages.error(request, "The 24-hour edit window has expired.")
-            return redirect("welfare:detail", pk=pk)
-
-        ctx = {
-            "obs": obs,
-            "severity_choices": WelfareSeverity.choices,
-            "concern_type_choices": WelfareConcernType.choices,
-        }
-        return render(request, "welfare/edit.html", ctx)
+        obs, response = self._load(request, pk)
+        if response:
+            return response
+        return self._render(request, obs, initial=_note_initial(obs=obs))
 
     def post(self, request, pk):
-        obs = get_object_or_404(WelfareObservation, pk=pk)
-        # FR-WEL-003: Block cross-department edit access
-        _assert_observation_department_match(request.user, obs)
-
-        # Only the submitting teacher can edit (SA can edit any)
-        if request.user.role == UserRole.TEACHER and obs.submitted_by != request.user:
-            raise PermissionDenied("You can only edit your own welfare observations.")
-
-        # Critical entries are locked immediately
-        if obs.is_locked or obs.severity == WelfareSeverity.CRITICAL:
-            messages.error(request, "Critical welfare observations cannot be edited after submission.")
-            return redirect("welfare:detail", pk=pk)
-
-        # Already reviewed by HOD — no longer editable
-        if obs.hod_status != "pending":
-            messages.error(request, "This observation has been reviewed and can no longer be edited.")
-            return redirect("welfare:detail", pk=pk)
-
-        # 24-hour window check
-        from django.utils import timezone as _tz
-        from datetime import timedelta
-        if obs.created_at < _tz.now() - timedelta(hours=24):
-            messages.error(request, "The 24-hour edit window has expired.")
-            return redirect("welfare:detail", pk=pk)
-
-        # Only action_taken and follow_up fields are editable
-        action_taken = request.POST.get("action_taken", "").strip()
-        follow_up_required = request.POST.get("follow_up_required") == "on"
-        follow_up_date = request.POST.get("follow_up_date") or None
-
-        if not action_taken:
-            messages.error(request, "Please describe the action taken today.")
-            return redirect("welfare:edit", pk=pk)
-
-        before_action = obs.action_taken
-        before_follow_up = obs.follow_up_required
-        before_follow_up_date = obs.follow_up_date
-
-        obs.action_taken = action_taken
-        obs.follow_up_required = follow_up_required
-        obs.follow_up_date = follow_up_date
-        obs.save(update_fields=["action_taken", "follow_up_required", "follow_up_date", "updated_at"])
-
         from audit.models import log_event
+        obs, response = self._load(request, pk)
+        if response:
+            return response
+        action = request.POST.get("action", "")
+
+        if obs.is_draft and action == "delete_draft":
+            log_event(
+                actor=request.user, action_type="welfare_draft_deleted",
+                model_name="WelfareObservation", object_id=obs.pk,
+                description=f"Welfare draft deleted for {obs.student}", request=request,
+            )
+            obs.delete()
+            messages.success(request, "Draft deleted.")
+            return redirect("welfare:list")
+
+        data = _read_note_form(request)
+        mode = "draft" if obs.is_draft else "correct"
+        final = not (obs.is_draft and action == "draft")
+        errors, cleaned = _validate_note_form(
+            data, allowed_students=self._students(request, obs),
+            earliest_date=obs.created_at.date(), final=final, mode=mode,
+        )
+        if errors:
+            return self._render(
+                request, obs, initial=_note_initial(data=data), errors=errors,
+                mismatch=cleaned["mismatch"] if errors == [cleaned["mismatch"]] else "", status=400,
+            )
+
+        if obs.is_draft:
+            obs.student_id = cleaned["student_ids"][0]
+            _apply_cleaned(obs, cleaned)
+            if action == "draft":
+                obs.save()
+                messages.success(request, "Draft saved.")
+                return redirect("welfare:edit", pk=obs.pk)
+            _finalize_submission(request, obs)
+            _submitted_message(request, [obs])
+            return redirect("welfare:detail", pk=obs.pk)
+
+        # ── Correction of a submitted note ──
+        before = _snapshot(obs)
+        old_severity = obs.severity
+        obs.student_id = cleaned["student_ids"][0]
+        _apply_cleaned(obs, cleaned)
+        from students.models import Student
+        obs.student = Student.objects.get(pk=obs.student_id)
+        after = _snapshot(obs)
+        changes = {
+            field: {"from": before[field], "to": after[field]}
+            for field in before if before[field] != after[field]
+        }
+        if not changes:
+            messages.info(request, "No changes to save.")
+            return redirect("welfare:detail", pk=obs.pk)
+
+        from .models import WelfareObservationRevision
+        obs.last_edited_by = request.user
+        obs.last_edited_at = timezone.now()
+        obs.save()
+        WelfareObservationRevision.objects.create(
+            observation=obs, edited_by=request.user,
+            reason=data["edit_reason"],
+            changes=changes,
+        )
         log_event(
             actor=request.user,
             action_type="welfare_observation_edited",
             model_name="WelfareObservation",
             object_id=obs.pk,
-            description=f"Teacher edited welfare observation for {obs.student}",
-            before={
-                "action_taken": before_action,
-                "follow_up_required": before_follow_up,
-                "follow_up_date": str(before_follow_up_date) if before_follow_up_date else None,
-            },
-            after={
-                "action_taken": action_taken,
-                "follow_up_required": follow_up_required,
-                "follow_up_date": str(follow_up_date) if follow_up_date else None,
-            },
+            description=f"Welfare note corrected for {obs.student}: {data['edit_reason']}",
+            before={f: c["from"] for f, c in changes.items()},
+            after={f: c["to"] for f, c in changes.items()},
             request=request,
         )
+        if obs.severity in (WelfareSeverity.HIGH, WelfareSeverity.CRITICAL) and old_severity not in (
+            WelfareSeverity.HIGH, WelfareSeverity.CRITICAL
+        ):
+            _escalate_severity(obs, request, obs.severity)
 
-        messages.success(request, "Welfare observation updated.")
+        messages.success(request, "Correction saved. The original wording is kept in the note's history.")
+        return redirect("welfare:detail", pk=obs.pk)
+
+
+class WelfareFollowUpView(RoleRequiredMixin, View):
+    """Add a follow-up (correction) to a submitted safeguarding note.
+
+    Safeguarding notes are locked, so any correction — by the author or the
+    Safeguarding Lead — is recorded as a separate note linked to the original,
+    visible only to the Safeguarding Lead and HOS.
+    """
+    required_permissions_any = ["welfare.add_welfareobservation", "welfare.view_safeguarding_note"]
+
+    def post(self, request, pk):
+        from audit.models import log_event
+        obs = get_object_or_404(WelfareObservation.all_objects, pk=pk)
+        if not obs.is_safeguarding or obs.is_draft or obs.follow_up_of_id:
+            raise PermissionDenied("Follow-up notes can only be added to safeguarding notes.")
+        if obs.submitted_by_id != request.user.pk and not can_view_safeguarding(request.user):
+            raise PermissionDenied("You do not have access to this safeguarding note.")
+        text = request.POST.get("follow_up_text", "").strip()
+        if not text:
+            messages.error(request, "Please write the follow-up or correction.")
+            return redirect("welfare:detail", pk=pk)
+
+        now = timezone.now()
+        follow_up = WelfareObservation.all_objects.create(
+            student=obs.student,
+            submitted_by=request.user,
+            note_type=WelfareNoteType.SAFEGUARDING,
+            concern_type=WelfareConcernType.OTHER,
+            severity=WelfareSeverity.CRITICAL,
+            observation_date=date.today(),
+            observation_text=text,
+            status=WelfareNoteStatus.SUBMITTED,
+            submitted_at=now,
+            is_locked=True,
+            follow_up_of=obs,
+        )
+        log_event(
+            actor=request.user,
+            action_type="welfare_safeguarding_follow_up",
+            model_name="WelfareObservation",
+            object_id=obs.pk,
+            description=f"Follow-up note #{follow_up.pk} added to safeguarding note for {obs.student}",
+            request=request,
+        )
+        from communications.email_service import dispatch_notification
+        for user in _safeguarding_recipients().exclude(pk=request.user.pk):
+            dispatch_notification(
+                user=user,
+                title=f"Safeguarding follow-up: {obs.student}",
+                message="A follow-up has been added to a safeguarding note. Open it in Hodari to read it.",
+                link=f"/welfare/{obs.pk}/",
+                actor=request.user,
+            )
+        messages.success(request, "Follow-up added and sent to the Safeguarding Lead.")
         return redirect("welfare:detail", pk=pk)
 
 
@@ -845,6 +1144,9 @@ class WelfareHODDashboardView(DepartmentScopedMixin, RoleRequiredMixin, Template
         from attendance.models import AttendanceEntry, AttendanceStatus
 
         ctx = super().get_context_data(**kwargs)
+        # Every welfare figure on this dashboard respects note visibility
+        # (e.g. HODs never see safeguarding notes).
+        visible = visible_observations(self.request.user, WelfareObservation.objects.all())
         ctx["welfare_tab"] = "hod_dashboard"
         ctx["can_see_hod_dashboard"] = True  # This view is only accessible to HOD+ roles
 
@@ -855,7 +1157,7 @@ class WelfareHODDashboardView(DepartmentScopedMixin, RoleRequiredMixin, Template
         ctx["is_unified_welfare"] = is_unified
         ctx["is_ecd_welfare"] = is_ecd
         ctx["page_title"] = "Welfare Dashboard"
-        ctx["dept_label"] = "All Departments" if is_unified else ("ECD" if is_ecd else "Primary")
+        ctx["dept_label"] = "All Departments" if is_unified else Department(department).label
 
         # FR-WEL-008: HOS sees per-ECD-class aggregate breakdown
         is_hos = self.request.user.role == UserRole.HEAD_OF_SCHOOL
@@ -866,7 +1168,7 @@ class WelfareHODDashboardView(DepartmentScopedMixin, RoleRequiredMixin, Template
             ).values_list("name", flat=True))
             class_grid = []
             for cls_name in ecd_classes:
-                cls_obs = WelfareObservation.objects.filter(student__class_name=cls_name)
+                cls_obs = visible.filter(student__class_name=cls_name)
                 total = cls_obs.count()
                 sev = dict(Counter(cls_obs.values_list("severity", flat=True)))
                 concern = dict(Counter(cls_obs.values_list("concern_type", flat=True)))
@@ -899,7 +1201,7 @@ class WelfareHODDashboardView(DepartmentScopedMixin, RoleRequiredMixin, Template
         month_start = today.replace(day=1)
 
         # ── WELFARE DATA ──────────────────────────────────────────────
-        week_obs = WelfareObservation.objects.filter(
+        week_obs = visible.filter(
             observation_date__gte=week_start,
             observation_date__lte=week_end,
             student__class_name__in=dept_class_names,
@@ -910,23 +1212,23 @@ class WelfareHODDashboardView(DepartmentScopedMixin, RoleRequiredMixin, Template
         ctx["concern_type_counts"] = dict(Counter(week_obs.values_list("concern_type", flat=True)))
 
         # Welfare totals for KPI cards
-        welfare_total = WelfareObservation.objects.filter(
+        welfare_total = visible.filter(
             student__class_name__in=dept_class_names
         ).count()
-        welfare_open = WelfareObservation.objects.filter(
+        welfare_open = visible.filter(
             hod_status__in=["pending", "in_progress"],
             student__class_name__in=dept_class_names,
         ).count()
-        welfare_critical = WelfareObservation.objects.filter(
+        welfare_critical = visible.filter(
             severity__in=["high", "critical"],
             hod_status__in=["pending", "in_progress"],
             student__class_name__in=dept_class_names,
         ).count()
-        welfare_resolved = WelfareObservation.objects.filter(
+        welfare_resolved = visible.filter(
             hod_status="resolved",
             student__class_name__in=dept_class_names,
         ).count()
-        welfare_this_month = WelfareObservation.objects.filter(
+        welfare_this_month = visible.filter(
             observation_date__gte=month_start,
             student__class_name__in=dept_class_names,
         ).count()
@@ -939,20 +1241,22 @@ class WelfareHODDashboardView(DepartmentScopedMixin, RoleRequiredMixin, Template
         ctx["welfare_resolution_pct"] = round((welfare_resolved / welfare_total * 100) if welfare_total else 0)
 
         # FR-WEL-004: Open entries requiring HOD action
-        ctx["open_entries"] = WelfareObservation.objects.filter(
+        ctx["open_entries"] = visible.filter(
             hod_status__in=["pending", "in_progress"],
             student__class_name__in=dept_class_names,
         ).select_related("student", "submitted_by").order_by("-severity", "-observation_date")[:15]
 
         # FR-WEL-005: Children with open welfare concerns
         children_with_open = Student.objects.filter(
-            welfare_observations__hod_status__in=["pending", "in_progress"],
-            class_name__in=dept_class_names,
-        ).distinct()
+            pk__in=visible.filter(
+                hod_status__in=["pending", "in_progress"],
+                student__class_name__in=dept_class_names,
+            ).values("student_id"),
+        )
 
         children_data = []
         # Batch-fetch latest open observation per child to avoid N+1
-        open_obs = WelfareObservation.objects.filter(
+        open_obs = visible.filter(
             hod_status__in=["pending", "in_progress"],
             student__in=children_with_open,
         ).select_related("student").order_by("-severity", "-observation_date")
@@ -975,14 +1279,14 @@ class WelfareHODDashboardView(DepartmentScopedMixin, RoleRequiredMixin, Template
 
         # FR-WEL-006: Flag children not contacted after High/Critical entries
         one_day_ago = timezone.now() - datetime.timedelta(days=1)
-        ctx["uncontacted_critical"] = WelfareObservation.objects.filter(
+        ctx["uncontacted_critical"] = visible.filter(
             severity__in=["high", "critical"],
             parent_contacted=False,
             created_at__lt=one_day_ago,
             student__class_name__in=dept_class_names,
         ).select_related("student", "submitted_by")
 
-        ctx["resolved_entries"] = WelfareObservation.objects.filter(
+        ctx["resolved_entries"] = visible.filter(
             hod_status="resolved",
             student__class_name__in=dept_class_names,
         ).select_related("student", "submitted_by", "reviewed_by").order_by("-reviewed_at")[:10]
@@ -1068,7 +1372,7 @@ class WelfareHODDashboardView(DepartmentScopedMixin, RoleRequiredMixin, Template
             else:
                 me = ms.replace(month=ms.month + 1)
 
-            w_count = WelfareObservation.objects.filter(
+            w_count = visible.filter(
                 observation_date__gte=ms, observation_date__lt=me,
                 student__class_name__in=dept_class_names,
             ).count()
@@ -1100,6 +1404,8 @@ class WelfareHODReviewView(RoleRequiredMixin, View):
         obs = get_object_or_404(WelfareObservation, pk=pk)
         # FR-WEL-004: Block cross-department HOD review
         _assert_observation_department_match(request.user, obs)
+        if not can_view_observation(request.user, obs):
+            raise PermissionDenied("You do not have access to this welfare note.")
         is_locked = obs.hod_status == "resolved"
 
         if is_locked:
@@ -1248,6 +1554,8 @@ class WelfareAcknowledgeView(RoleRequiredMixin, View):
         obs = get_object_or_404(WelfareObservation, pk=pk)
         # FR-WEL-004: Block cross-department acknowledgment
         _assert_observation_department_match(request.user, obs)
+        if not can_view_observation(request.user, obs):
+            raise PermissionDenied("You do not have access to this welfare note.")
         
         # Check if user already acknowledged
         if WelfareAcknowledgment.objects.filter(observation=obs, user=request.user).exists():

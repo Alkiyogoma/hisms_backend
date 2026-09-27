@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admission form</title>
+<style>
+  body{margin:0;font-family:system-ui,sans-serif;background:#F2F4F8;color:#171A21;display:grid;place-items:center;min-height:100vh;padding:16px;box-sizing:border-box}
+  .box{background:#fff;border:1px solid #DCE1EB;border-radius:12px;padding:28px;max-width:460px}
+  h1{font-size:20px;margin:0 0 8px} p{color:#5C6575;font-size:14px;line-height:1.5;margin:0}
+  @media (prefers-color-scheme: dark){body{background:#12151B;color:#E8EAF0}.box{background:#1B1F27;border-color:#2C323D}p{color:#A3AAB8}}
+</style>
+</head>
+<body>
+  <div class="box">
+    {% if expired %}
+      <h1>This link has expired</h1>
+      <p>For your child's privacy, admission form links only work for a limited time. Please contact the school's admissions office and ask them to send you a new link.</p>
+    {% else %}
+      <h1>This link isn't valid</h1>
+      <p>It may have been replaced by a newer link. Please use the most recent email from the school, or contact the admissions office.</p>
+    {% endif %}
+  </div>
+</body>
+</html>

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Send admission form to parent &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Admissions{% endblock %}
+
+{% block content %}
+{% include "admissions/_top_tabs.html" %}
+<div class="card" style="max-width:640px;margin:0 auto;padding:26px 28px">
+  <div class="card-title" style="margin:0 0 6px">Send the admission form to a parent</div>
+  <p class="muted" style="font-size:13px;margin:0 0 18px">
+    Enter the parent's details and we'll email them a secure link. They fill in the learner and family details,
+    upload the documents and submit; the admission invoice is generated automatically. The application appears in the
+    pipeline at the admission-form stage, showing whether the form is sent, being filled in, or submitted.
+  </p>
+  {% if errors %}
+    <div role="alert" style="padding:10px 12px;border:1px solid rgba(220,38,38,.25);background:#FEF2F2;color:#B91C1C;border-radius:8px;font-size:13px;margin-bottom:14px">
+      <ul style="margin:0;padding-left:18px">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+    </div>
+  {% endif %}
+  <form method="post">
+    {% csrf_token %}
+    <div class="hf2-group">
+      <label class="hf2-label" for="pname">Parent / guardian name <span style="color:var(--red)">*</span></label>
+      <input id="pname" name="parent_full_name" class="hf2-input" value="{{ values.parent_full_name }}" required>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-top:14px">
+      <div class="hf2-group">
+        <label class="hf2-label" for="pemail">Email <span style="color:var(--red)">*</span></label>
+        <input id="pemail" name="parent_email" type="email" class="hf2-input" value="{{ values.parent_email }}" required>
+      </div>
+      <div class="hf2-group">
+        <label class="hf2-label" for="pphone">Phone <span style="color:var(--red)">*</span></label>
+        <input id="pphone" name="parent_phone" class="hf2-input" value="{{ values.parent_phone }}" required>
+      </div>
+    </div>
+    <div class="hf2-group" style="margin-top:14px">
+      <label class="hf2-label" for="pgrade">Grade <span class="muted" style="font-weight:400">(optional — the parent can choose)</span></label>
+      <select id="pgrade" name="grade" class="hf2-select">
+        <option value="">Let the parent choose</option>
+        {% for g in grades %}<option value="{{ g }}" {% if values.grade == g %}selected{% endif %}>{{ g }}</option>{% endfor %}
+      </select>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:24px">
+      <a href="{% url 'admissions:new_inquiry' %}" class="hf-btn hf-btn-secondary" style="text-decoration:none">Back</a>
+      <button type="submit" class="hf-btn hf-btn-primary">Send form link</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

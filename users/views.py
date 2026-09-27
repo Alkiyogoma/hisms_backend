@@ -99,7 +99,13 @@ class HISMSAuthenticationForm(AuthenticationForm):
 
         **AuthenticationForm.error_messages,
 
-        'invalid_login': "Email or password incorrect",
+        # Deliberately the same whether the account is unknown or the password
+        # is wrong, so the login form can't be used to discover accounts.
+        # (FRD AUTH-002 wording, plus a hint that usernames work too.)
+        'invalid_login': (
+            "Email or password incorrect. You can sign in with your username "
+            "(e.g. ebenezer.robert) or your school email. Passwords are case-sensitive."
+        ),
 
     }
 
@@ -238,10 +244,15 @@ class HISMSLoginView(LoginView):
         if username:
 
             from users.models import User
+            from users.backends import find_user_by_login
 
             try:
 
-                user = User.objects.get(username=username)
+                user = find_user_by_login(username)
+
+                if user is None:
+
+                    raise User.DoesNotExist
 
                 # FRD: deactivated accounts must not be counted toward lockout
 
@@ -433,9 +444,9 @@ class HISMSLoginAPIView(View):
             return JsonResponse({"ok": False, "error": "Email and password are required."}, status=400)
 
         from users.models import User
-        try:
-            user_obj = User.objects.get(email=email)
-        except User.DoesNotExist:
+        from users.backends import find_user_by_login
+        user_obj = find_user_by_login(email)
+        if user_obj is None:
             return JsonResponse({"ok": False, "error": "Email or password incorrect."}, status=401)
 
         # Role gate

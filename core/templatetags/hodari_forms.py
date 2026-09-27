@@ -172,7 +172,7 @@ def format_parent_notes(value):
             html.append(f'<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)"><div style="font-weight:600;font-size:12px;margin-bottom:4px;color:var(--text-primary)">Notes</div><div style="font-size:12.5px;color:var(--text-secondary);white-space:pre-wrap">{conditional_escape(notes)}</div></div>')
         return mark_safe("\n".join(html))
 
-    if via not in ("parent_form", "parent_portal_wizard"):
+    if via not in ("parent_form", "parent_portal_wizard", "parent_link"):
         return mark_safe(f'<div style="white-space:pre-wrap">{conditional_escape(str(value))}</div>')
 
     html = []
@@ -273,6 +273,6 @@ def has_parent_submission(value):
         return False
     try:
         data = json.loads(value)
-        return data.get("submitted_via") in ("parent_portal_wizard", "parent_form")
+        return data.get("submitted_via") in ("parent_portal_wizard", "parent_form", "parent_link")
     except (json.JSONDecodeError, TypeError):
         return False

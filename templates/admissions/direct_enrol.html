@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Direct enrolment &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Admissions{% endblock %}
+
+{% block extra_head %}
+<style>
+  .de-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+  .de-section { font-size: 11px; font-weight: 700; letter-spacing: .7px; color: var(--text-muted); text-transform: uppercase; padding-bottom: 8px; border-bottom: 1px solid var(--border); margin: 26px 0 16px; }
+  .de-error { color: var(--red, #B91C1C); font-size: 12px; margin-top: 4px; }
+  .de-help { color: var(--text-muted); font-size: 11.5px; margin-top: 3px; }
+  .de-banner { padding: 12px 14px; border-radius: 8px; font-size: 13px; background: var(--bg-page); border: 1px solid var(--border); color: var(--text-secondary); }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "admissions/_top_tabs.html" %}
+<div class="card" style="max-width:960px;margin:0 auto;padding:26px 28px">
+  <div class="card-title" style="margin:0 0 6px">Enrol a learner directly</div>
+  <div class="de-banner">
+    For transfers, mid-year entry, staff children and returning learners. This skips the inquiry, assessment and
+    assessment fee, but creates the same student record, guardian and parent-portal account as a normal enrolment,
+    and notifies Finance to set up term fees. The reason, and who enrolled the learner and when, are recorded for review
+    under <a href="{% url 'admissions:direct_enrolments' %}">Direct enrolments</a>.
+  </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="de-error" role="alert" style="margin-top:16px;padding:10px 12px;border:1px solid rgba(220,38,38,.25);background:#FEF2F2;border-radius:8px">
+        {% for e in form.non_field_errors %}{{ e }}{% endfor %}
+        {% if duplicate_warning and user.role == 'super_admin' %}
+          <label style="display:flex;gap:8px;align-items:center;margin-top:8px;color:var(--text-primary)">
+            <input type="checkbox" name="override_duplicate" value="on"> This is a different child — enrol anyway (Super Admin override)
+          </label>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    <div class="de-section">Why is this learner being enrolled directly?</div>
+    <div class="de-grid">
+      {% include "admissions/_de_field.html" with field=form.reason %}
+      <div style="grid-column:span 2">{% include "admissions/_de_field.html" with field=form.reason_note %}</div>
+    </div>
+
+    <div class="de-section">Learner</div>
+    <div class="de-grid">
+      {% include "admissions/_de_field.html" with field=form.first_name %}
+      {% include "admissions/_de_field.html" with field=form.last_name %}
+      {% include "admissions/_de_field.html" with field=form.preferred_name %}
+      {% include "admissions/_de_field.html" with field=form.date_of_birth %}
+      {% include "admissions/_de_field.html" with field=form.gender %}
+      {% include "admissions/_de_field.html" with field=form.nationality %}
+      {% include "admissions/_de_field.html" with field=form.religion %}
+      {% include "admissions/_de_field.html" with field=form.blood_type %}
+      {% include "admissions/_de_field.html" with field=form.previous_school %}
+      <div style="grid-column:1/-1">{% include "admissions/_de_field.html" with field=form.allergies_medical %}</div>
+    </div>
+
+    <div class="de-section">Class placement</div>
+    <div class="de-grid">
+      {% include "admissions/_de_field.html" with field=form.class_name %}
+      {% include "admissions/_de_field.html" with field=form.enrolment_date %}
+    </div>
+
+    <div class="de-section">Parent / guardian</div>
+    <div class="de-grid">
+      {% include "admissions/_de_field.html" with field=form.parent_full_name %}
+      {% include "admissions/_de_field.html" with field=form.parent_relationship %}
+      {% include "admissions/_de_field.html" with field=form.parent_phone %}
+      {% include "admissions/_de_field.html" with field=form.parent_email %}
+      {% include "admissions/_de_field.html" with field=form.parent_invoice_name %}
+    </div>
+
+    <div class="de-section">Consent</div>
+    <label style="display:flex;gap:10px;align-items:flex-start;font-size:13px">
+      {{ form.pdpa_consent }} <span>{{ form.pdpa_consent.label }}</span>
+    </label>
+    {% for e in form.pdpa_consent.errors %}<div class="de-error">{{ e }}</div>{% endfor %}
+    <input type="hidden" name="pdpa_consent_version" value="v1.0">
+    <label style="display:flex;gap:10px;align-items:flex-start;font-size:13px;margin-top:10px">
+      {{ form.confirm_sibling }} <span>{{ form.confirm_sibling.label }}</span>
+    </label>
+
+    <div style="display:flex;justify-content:space-between;margin-top:28px">
+      <a href="{% url 'admissions:pipeline' %}" class="hf-btn hf-btn-secondary" style="text-decoration:none">Cancel</a>
+      <button type="submit" class="hf-btn hf-btn-primary">Enrol learner</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
