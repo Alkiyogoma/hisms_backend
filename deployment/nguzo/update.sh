@@ -14,7 +14,7 @@ echo "==> 1/6 Pulling latest development"
 git -C "$APP" fetch origin
 # Hard reset to remote development. Safe: .env is gitignored, so it is NOT touched.
 # (If you keep hand edits on the server, use 'git -C $APP pull' instead.)
-git -C "$APP" pull origin/development
+git -C "$APP" pull
 
 echo "==> 2/6 Ensuring ownership"
 chown -R "$APPUSER:$APPUSER" "$APP"
