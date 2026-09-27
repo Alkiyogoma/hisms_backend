@@ -10,11 +10,11 @@ APP=/var/www/hodari/hisms_backend
 VENV=/var/www/hodari/venv
 APPUSER=hodari
 
-echo "==> 1/6 Pulling latest main"
+echo "==> 1/6 Pulling latest development"
 git -C "$APP" fetch origin
-# Hard reset to remote main. Safe: .env is gitignored, so it is NOT touched.
+# Hard reset to remote development. Safe: .env is gitignored, so it is NOT touched.
 # (If you keep hand edits on the server, use 'git -C $APP pull' instead.)
-git -C "$APP" reset --hard origin/main
+git -C "$APP" pull origin/development
 
 echo "==> 2/6 Ensuring ownership"
 chown -R "$APPUSER:$APPUSER" "$APP"
