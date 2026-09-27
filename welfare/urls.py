@@ -11,6 +11,7 @@ urlpatterns = [
     path("student-incidents/", views.WelfareStudentIncidentsView.as_view(department="all"), name="student_incidents"),
     path("<int:pk>/", views.WelfareDetailView.as_view(), name="detail"),
     path("<int:pk>/edit/", views.WelfareEditView.as_view(), name="edit"),
+    path("<int:pk>/follow-up/", views.WelfareFollowUpView.as_view(), name="follow_up"),
     path("<int:pk>/review/", views.WelfareHODReviewView.as_view(), name="hod_review"),
     path("<int:pk>/confirm/", views.WelfareParentConfirmView.as_view(), name="parent_confirm"),
     path("<int:pk>/acknowledge/", views.WelfareAcknowledgeView.as_view(), name="acknowledge"),

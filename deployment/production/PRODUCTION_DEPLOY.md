@@ -227,19 +227,21 @@ paths stay valid:
 mv $LIVE $OLD && mv $NEW $LIVE
 ```
 
-**Only if** step 3.1 showed `ExecStart` using a gunicorn `--config` file inside
-`$LIVE`: point it at the production config via a drop-in (the original unit
-file is not edited). Copy your `ExecStart=` line from 3.1 and change only the
-`--config` path to `$LIVE/deployment/production/gunicorn_config.py`:
+**Required:** the `hodari` service currently loads
+`deployment/gunicorn_config.py`. In the repo that file is set up for a
+different site (port `8008`, different log paths), so production must be pointed
+at `deployment/production/gunicorn_config.py` (port `8007`, same settings the
+live site runs today). This adds a systemd override; the original unit file is
+not edited:
 
 ```bash
-systemctl edit hodari
+mkdir -p /etc/systemd/system/hodari.service.d && printf '[Service]\nExecStart=\nExecStart=/opt/hodari/venv/bin/gunicorn config.wsgi:application --config /opt/hodari/hisms_backend/deployment/production/gunicorn_config.py\n' > /etc/systemd/system/hodari.service.d/production-gunicorn.conf
 ```
 
-```ini
-[Service]
-ExecStart=
-ExecStart=/opt/hodari/venv/bin/gunicorn config.wsgi:application --config /opt/hodari/hisms_backend/deployment/production/gunicorn_config.py
+Check it took effect — the last `ExecStart` must show `deployment/production/`:
+
+```bash
+systemctl daemon-reload && systemctl cat hodari | grep -A1 ExecStart
 ```
 
 Apply migrations and static files, then start:
@@ -282,10 +284,10 @@ systemctl stop hodari hodari-celery hodari-celery-beat
 mv $LIVE ${LIVE}.git-failed && mv $OLD $LIVE
 ```
 
-If you added a drop-in in 3.7, remove it:
+Remove the override from 3.7 so the old files use their old gunicorn config:
 
 ```bash
-rm -rf /etc/systemd/system/hodari.service.d && systemctl daemon-reload
+rm /etc/systemd/system/hodari.service.d/production-gunicorn.conf && systemctl daemon-reload
 ```
 
 ```bash

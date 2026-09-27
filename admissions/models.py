@@ -46,6 +46,19 @@ class ApplicantStatus(models.TextChoices):
     FLAGGED_FOR_REVIEW = "flagged_for_review", "Flagged for review"
 
 
+class EntryRoute(models.TextChoices):
+    PIPELINE = "pipeline", "Admissions pipeline"
+    DIRECT = "direct", "Direct enrolment"
+    PARENT_LINK = "parent_link", "Parent completed form via link"
+
+
+class DirectEnrolmentReason(models.TextChoices):
+    TRANSFER = "transfer", "Transfer from another school"
+    MID_YEAR = "mid_year", "Mid-year entry"
+    STAFF_CHILD = "staff_child", "Staff child"
+    RETURNING = "returning", "Returning learner"
+
+
 # Common schools in Dar es Salaam area — used by get_previous_school_choices()
 COMMON_SCHOOLS = [
     "Aga Khan Primary School",
@@ -205,7 +218,9 @@ class Applicant(TimeStampedModel):
     parent_email = models.EmailField(blank=True)
     parent_invoice_name = models.CharField(max_length=150, blank=True)
     child_full_name = models.CharField(max_length=150)
-    child_date_of_birth = models.DateField()
+    # Null only while a parent-link application is waiting for the parent to
+    # fill in the form; every form still requires it.
+    child_date_of_birth = models.DateField(null=True)
     grade_applying_for = models.CharField(max_length=32)
     previous_school = models.CharField(max_length=120, blank=True)
     previous_school_other = models.CharField(max_length=120, blank=True, help_text="Free-text when 'Other' is selected")
@@ -265,6 +280,17 @@ class Applicant(TimeStampedModel):
         help_text="Conditions for conditional admission (recorded when HOS selects 'Conditional')",
     )
 
+    # Direct enrolment: learner added without inquiry/assessment. The reason
+    # and note are kept so leadership can review these records later; who did
+    # it and when is in the timeline entry and audit log.
+    entry_route = models.CharField(
+        max_length=20, choices=EntryRoute.choices, default=EntryRoute.PIPELINE, db_index=True,
+    )
+    direct_enrolment_reason = models.CharField(
+        max_length=20, choices=DirectEnrolmentReason.choices, blank=True,
+    )
+    direct_enrolment_note = models.TextField(blank=True)
+
     enrolled_student = models.OneToOneField(
         "students.Student",
         on_delete=models.SET_NULL,
@@ -300,6 +326,7 @@ class Applicant(TimeStampedModel):
             ("upload_applicant_photo", "Can upload applicant photo"),
             ("transition_applicant_status", "Can transition applicant status"),
             ("view_assessment_calendar", "Can view assessment calendar"),
+            ("direct_enrol", "Can enrol a learner directly, skipping assessment"),
         ]
 
     def save(self, *args, **kwargs):
@@ -364,6 +391,21 @@ class ApplicantDocumentType(models.TextChoices):
     CLEARANCE_FORM = "clearance_form", "Clearance form (previous school)"
     ADMISSION_FORM = "admission_form", "Completed admission form"
     FEE_ARRANGEMENT_PROOF = "fee_arrangement_proof", "Proof of fee payment arrangement"
+    # Uploaded by parents on the online admission form. Useful records, but
+    # not part of ENROLMENT_REQUIRED_DOCUMENTS.
+    PREVIOUS_REPORT = "previous_report", "Previous school report"
+    STUDENT_PHOTO = "student_photo", "Passport photo of the learner"
+    PASSPORT_PERMIT = "passport_permit", "Passport or residence permit"
+    PARENT_ID = "parent_id", "Parent national ID"
+
+
+# Documents that must be received before enrolment can be completed (FR-ADM-024).
+ENROLMENT_REQUIRED_DOCUMENTS = (
+    ApplicantDocumentType.BIRTH_CERTIFICATE,
+    ApplicantDocumentType.CLEARANCE_FORM,
+    ApplicantDocumentType.ADMISSION_FORM,
+    ApplicantDocumentType.FEE_ARRANGEMENT_PROOF,
+)
 
 
 class ApplicantDocumentReceipt(TimeStampedModel):
@@ -468,3 +510,53 @@ class EnrolmentChecklist(TimeStampedModel):
     def __str__(self):
         return f"Enrolment checklist for {self.applicant_id}"
 
+
+
+class AdmissionFormInviteStatus(models.TextChoices):
+    SENT = "sent", "Form sent"
+    IN_PROGRESS = "in_progress", "Parent filling in"
+    SUBMITTED = "submitted", "Submitted by parent"
+    CHANGES_REQUESTED = "changes_requested", "Changes requested"
+    ACCEPTED = "accepted", "Accepted"
+
+
+class AdmissionFormInvite(TimeStampedModel):
+    """A secure link that lets a parent complete the admission form without
+    an account. Only a SHA-256 hash of the token is stored; the token itself
+    exists only in the link emailed to the parent."""
+    applicant = models.OneToOneField(Applicant, on_delete=models.CASCADE, related_name="form_invite")
+    token_hash = models.CharField(max_length=64, unique=True)
+    status = models.CharField(
+        max_length=20, choices=AdmissionFormInviteStatus.choices,
+        default=AdmissionFormInviteStatus.SENT, db_index=True,
+    )
+    draft_data = models.JSONField(default=dict, blank=True)
+    expires_at = models.DateTimeField()
+    sent_at = models.DateTimeField()
+    opened_at = models.DateTimeField(null=True, blank=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_message = models.TextField(blank=True, help_text="What the parent was asked to fix or add.")
+    created_by = models.ForeignKey("users.User", on_delete=models.PROTECT, related_name="+")
+    reviewed_by = models.ForeignKey("users.User", on_delete=models.PROTECT, null=True, blank=True, related_name="+")
+
+    @staticmethod
+    def hash_token(token):
+        import hashlib
+        return hashlib.sha256(token.encode()).hexdigest()
+
+    @property
+    def is_expired(self):
+        from django.utils import timezone
+        return timezone.now() > self.expires_at
+
+    @property
+    def parent_can_edit(self):
+        return self.status in (
+            AdmissionFormInviteStatus.SENT,
+            AdmissionFormInviteStatus.IN_PROGRESS,
+            AdmissionFormInviteStatus.CHANGES_REQUESTED,
+        ) and not self.is_expired
+
+    def __str__(self):
+        return f"Admission form link for applicant {self.applicant_id} ({self.status})"

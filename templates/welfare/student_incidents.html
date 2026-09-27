@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Student Incidents &mdash; {{ brand.school_name }}{% endblock %}
-{% block topbar_greeting %}Student Incidents{% endblock %}
+{% block title %}Welfare overview &mdash; {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Welfare overview{% endblock %}
 
 {% block extra_head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
@@ -70,14 +70,14 @@
 {% include "welfare/_top_tabs.html" %}
 
 <div class="section-hdr">
-  <span class="section-title">Student Incidents</span>
+  <span class="section-title">Welfare overview</span>
   <span class="chip chip-blue">{{ total_count }} total</span>
 </div>
 
 <!-- Key Metrics -->
 <div class="metrics si-grid">
   <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff);cursor:default">
-    <div class="mc-lbl-row"><span class="mc-lbl">Total Incidents</span></div>
+    <div class="mc-lbl-row"><span class="mc-lbl">Total notes</span></div>
     <div class="mc-val" style="color:#023AA5">{{ total_count }}</div>
     <div class="mc-sub" style="color:#5A697D">All recorded incidents</div>
   </div>
@@ -118,6 +118,7 @@
         <option value="">All departments</option>
         <option value="ecd" {% if filter_department == 'ecd' %}selected{% endif %}>ECD</option>
         <option value="primary" {% if filter_department == 'primary' %}selected{% endif %}>Primary</option>
+        <option value="lower_secondary" {% if filter_department == 'lower_secondary' %}selected{% endif %}>Lower Secondary</option>
       </select>
     </div>
     {% endif %}
@@ -167,7 +168,7 @@
 <div class="si-charts">
   <div class="si-card">
     <div class="si-card-header">
-      <span class="si-card-title">Incident Trend</span>
+      <span class="si-card-title">Notes over time</span>
       <span style="font-size:11px;color:var(--text-muted)">Last 6 months</span>
     </div>
     <div class="si-card-body">
@@ -196,7 +197,7 @@
   </div>
   <div class="si-card">
     <div class="si-card-header">
-      <span class="si-card-title">Most Incidents</span>
+      <span class="si-card-title">Most notes</span>
       <span style="font-size:11px;color:var(--text-muted)">Students with highest frequency</span>
     </div>
     <div class="si-card-body">
@@ -213,7 +214,7 @@
           {% endfor %}
         </ul>
       {% else %}
-        {% include '_partials/empty_state.html' with icon='users' icon_color='grey' title='No data available' desc='Incident data will appear here.' %}
+        {% include '_partials/empty_state.html' with icon='users' icon_color='grey' title='No data available' desc='Welfare data will appear here.' %}
       {% endif %}
     </div>
   </div>
@@ -222,7 +223,7 @@
 <!-- Recent Incidents Table -->
 <div class="si-card" style="margin-bottom:24px">
   <div class="si-card-header">
-    <span class="si-card-title">Recent Incidents</span>
+    <span class="si-card-title">Recent notes</span>
     <span class="chip chip-blue">{{ total_filtered }} record{{ total_filtered|pluralize }}</span>
   </div>
   {% if recent_incidents %}
@@ -233,8 +234,8 @@
           <th>Date</th>
           <th>Student</th>
           <th>Class</th>
-          <th>Severity</th>
-          <th>Concern</th>
+          <th>Type</th>
+          <th>Tags</th>
           <th>Observation</th>
           <th>Status</th>
           <th></th>
@@ -247,17 +248,9 @@
           <td style="font-weight:600"><a href="{% url 'students:detail' inc.student.pk %}" style="text-decoration:none;color:var(--hodari-blue)">{{ inc.student.first_name }} {{ inc.student.last_name }}</a></td>
           <td>{{ inc.student.class_name }}</td>
           <td>
-            {% if inc.severity == 'critical' %}
-              <span class="si-chip si-chip-red">Critical</span>
-            {% elif inc.severity == 'high' %}
-              <span class="si-chip si-chip-amber">High</span>
-            {% elif inc.severity == 'medium' %}
-              <span class="si-chip si-chip-blue">Medium</span>
-            {% else %}
-              <span class="si-chip si-chip-grey">Low</span>
-            {% endif %}
+            <span class="si-chip {% if inc.is_safeguarding %}si-chip-red{% elif inc.note_type == 'concern' %}si-chip-amber{% elif inc.note_type == 'positive' %}si-chip-green{% else %}si-chip-blue{% endif %}">{{ inc.type_label }}{% if inc.note_type == 'concern' %} &middot; {{ inc.severity|capfirst }}{% endif %}</span>
           </td>
-          <td>{{ inc.get_concern_type_display }}</td>
+          <td>{{ inc.tags|join:", "|default:"—" }}</td>
           <td><span class="si-observation-text" title="{{ inc.observation_text }}">{{ inc.observation_text|truncatewords:15 }}</span></td>
           <td>
             {% if inc.hod_status == 'resolved' %}
@@ -300,7 +293,7 @@
 
   {% else %}
   <div class="si-empty">
-    {% include '_partials/empty_state.html' with icon='search' icon_color='grey' title='No incidents match your filters' desc='Try adjusting your search criteria.' %}
+    {% include '_partials/empty_state.html' with icon='search' icon_color='grey' title='No notes match your filters' desc='Try adjusting your search criteria.' %}
   </div>
   {% endif %}
 </div>
@@ -322,7 +315,7 @@
       data: {
         labels: monthlyTrend.map(function(d) { return d.month; }),
         datasets: [{
-          label: 'Incidents',
+          label: 'Notes',
           data: monthlyTrend.map(function(d) { return d.count; }),
           backgroundColor: '#023AA5',
           borderRadius: 6,
@@ -437,7 +430,7 @@
         data: {
           labels: concLabels,
           datasets: [{
-            label: 'Incidents',
+            label: 'Notes',
             data: concValues,
             backgroundColor: concColors,
             borderRadius: 6,

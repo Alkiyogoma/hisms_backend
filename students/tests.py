@@ -91,3 +91,39 @@ class StudentListViewPermissionTests(TestCase):
         """Finance Officer should have view_student by default."""
         result = self._get_response(self.finance)
         self.assertIsNotNone(result, "Finance Officer should have default view_student permission")
+
+
+class StudentDataExportTests(TestCase):
+    """PDPA export: every section must query real model fields. The view swallows
+    FieldErrors per section, so a bad field name silently exports an empty list."""
+
+    def test_export_includes_welfare_discipline_and_academic_records(self):
+        import json
+        from datetime import date
+        from academics.models import AcademicYear, ExamScore, ReportCard, Term
+        from discipline.models import DisciplineIncident
+        from welfare.models import WelfareObservation
+
+        admin = User.objects.create_superuser(username="dpo", email="dpo@hodari.edu", password="Pass123!",
+                                              role=UserRole.SUPER_ADMIN)
+        student = Student.objects.create(admission_no="HCS-X-001", first_name="Asha", last_name="Mushi",
+                                         gender="female", class_name="Grade 5")
+        term = Term.objects.create(academic_year=AcademicYear.objects.create(name="2026", is_current=True),
+                                   name="Term 1", start_date=date(2026, 1, 10), end_date=date(2026, 4, 5))
+        WelfareObservation.objects.create(student=student, submitted_by=admin, note_type="concern",
+                                          concern_type="health", severity="low",
+                                          observation_date=date(2026, 2, 1), observation_text="Frequent headaches")
+        DisciplineIncident.objects.create(student=student, reported_by=admin, severity="low",
+                                          summary="Late to class", incident_date=date(2026, 2, 2))
+        ExamScore.objects.create(student=student, term=term, subject_name="Mathematics", exam_type="midterm", score=78,
+                                 entered_by=admin)
+        ReportCard.objects.create(student=student, term=term, generated_by=admin)
+
+        self.client.force_login(admin)
+        resp = self.client.get(reverse("students:data_export", args=[student.pk]))
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertEqual([w["observation_text"] for w in data["welfare_observations"]], ["Frequent headaches"])
+        self.assertEqual([d["summary"] for d in data["discipline_incidents"]], ["Late to class"])
+        self.assertEqual([e["subject_name"] for e in data["exam_scores"]], ["Mathematics"])
+        self.assertEqual(len(data["report_cards"]), 1)

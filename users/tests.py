@@ -267,3 +267,37 @@ class LoginFlowIntegrationTests(TestCase):
         self.assertIn(response.status_code, [302, 303])
         self.user.refresh_from_db()
         self.assertEqual(self.user.failed_login_attempts, 0)
+
+
+class EmailOrUsernameLoginTests(TestCase):
+    """Staff can sign in with their username or their school email; the same
+    password works for both, and failures never reveal whether an account exists."""
+
+    def setUp(self):
+        self.user = _create_user("ebenezer.robert", "CorrectPass123!")  # email ebenezer.robert@hodari.edu
+        self.login_url = reverse("login")
+
+    def test_login_with_username(self):
+        resp = self.client.post(self.login_url, {"username": "ebenezer.robert", "password": "CorrectPass123!"})
+        self.assertIn(resp.status_code, [302, 303])
+
+    def test_login_with_email_any_case(self):
+        resp = self.client.post(self.login_url, {"username": " Ebenezer.Robert@HODARI.edu ", "password": "CorrectPass123!"})
+        self.assertIn(resp.status_code, [302, 303])
+        self.assertEqual(int(self.client.session["_auth_user_id"]), self.user.pk)
+
+    def test_wrong_password_via_email_counts_toward_lockout(self):
+        self.client.post(self.login_url, {"username": "ebenezer.robert@hodari.edu", "password": "nope"})
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.failed_login_attempts, 1)
+
+    def test_unknown_account_and_wrong_password_look_the_same(self):
+        wrong_pw = self.client.post(self.login_url, {"username": "ebenezer.robert@hodari.edu", "password": "nope"})
+        unknown = self.client.post(self.login_url, {"username": "nobody@hodari.edu", "password": "nope"})
+        for resp in (wrong_pw, unknown):
+            self.assertContains(resp, "Email or password incorrect. You can sign in with your username")
+
+    def test_login_field_label_matches_what_is_accepted(self):
+        resp = self.client.get(self.login_url)
+        self.assertContains(resp, "Username or school email")
+        self.assertNotContains(resp, 'placeholder="you@school.com"')

@@ -248,9 +248,15 @@ class StudentDetailView(RoleRequiredMixin, DetailView):
             is_archived=False
         ).exclude(id=student.id).distinct()
         
-        # Welfare incidents
-        from welfare.models import WelfareObservation
-        welfare_incidents = WelfareObservation.objects.filter(student=student).select_related('submitted_by', 'reviewed_by').order_by('-observation_date')
+        # Welfare notes — same visibility rules as the welfare module:
+        # concerns/health only for class teacher, HOD and leadership;
+        # safeguarding never on the profile.
+        from welfare.models import WelfareObservation, WelfareNoteType
+        from welfare.visibility import visible_observations
+        welfare_incidents = visible_observations(
+            self.request.user,
+            WelfareObservation.objects.filter(student=student).exclude(note_type=WelfareNoteType.SAFEGUARDING),
+        ).select_related('submitted_by', 'reviewed_by').order_by('-observation_date')
         
         # Discipline/behaviour incidents
         from discipline.models import DisciplineIncident
@@ -466,14 +472,12 @@ class StudentDetailView(RoleRequiredMixin, DetailView):
             }
         
         # Evaluate stats BEFORE slicing the queryset — single aggregated query
-        welfare_agg = WelfareObservation.objects.filter(student=student).aggregate(
+        welfare_stats = welfare_incidents.aggregate(
             total=Count('id'),
-            critical=Count('id', filter=Q(severity='critical')),
-            high=Count('id', filter=Q(severity='high')),
-            medium=Count('id', filter=Q(severity='medium')),
-            low=Count('id', filter=Q(severity='low')),
+            positive=Count('id', filter=Q(note_type=WelfareNoteType.POSITIVE)),
+            observation=Count('id', filter=Q(note_type=WelfareNoteType.OBSERVATION)),
+            concern=Count('id', filter=Q(note_type=WelfareNoteType.CONCERN)),
         )
-        welfare_stats = welfare_agg
 
         # Computed age from date_of_birth
         from datetime import date as date_cls
@@ -524,11 +528,8 @@ class StudentDetailView(RoleRequiredMixin, DetailView):
             "attendance_data": attendance_data,
             "welfare_incidents": list(welfare_incidents[:10]),
             "welfare_stats": welfare_stats,
-            "welfare_type_counts": {
-                "positive": welfare_incidents.filter(severity="low", concern_type="other").count(),
-                "observation": welfare_incidents.exclude(concern_type="other").filter(severity__in=["low", "medium"]).count(),
-                "concern": welfare_incidents.filter(severity__in=["high", "critical"]).count() + welfare_incidents.filter(severity="medium", concern_type__in=["behavioral", "health", "attendance", "academic", "home_situation"]).count(),
-            },
+            "can_view_welfare": self.request.user.has_perm("welfare.view_welfareobservation")
+                or self.request.user.has_perm("welfare.add_welfareobservation"),
             "discipline_incidents": list(discipline_incidents[:5]),
             "discipline_stats": discipline_incidents.aggregate(
                 total=Count('id'),
@@ -1240,7 +1241,8 @@ class StudentDataExportView(RoleRequiredMixin, View):
             from welfare.models import WelfareObservation
             welfare = list(
                 WelfareObservation.objects.filter(student=student).values(
-                    "observation_date", "concern_type", "severity", "description", "status"
+                    "observation_date", "note_type", "concern_type", "severity",
+                    "observation_text", "action_taken", "status"
                 )
             )
         except Exception:
@@ -1251,7 +1253,7 @@ class StudentDataExportView(RoleRequiredMixin, View):
             from discipline.models import DisciplineIncident
             discipline = list(
                 DisciplineIncident.objects.filter(student=student).values(
-                    "created_at", "incident_type", "severity", "description", "status"
+                    "incident_date", "severity", "summary", "action_taken", "status", "created_at"
                 )
             )
         except Exception:
@@ -1263,7 +1265,7 @@ class StudentDataExportView(RoleRequiredMixin, View):
             from academics.models import ExamScore
             exam_scores = list(
                 ExamScore.objects.filter(student=student).values(
-                    "term__name", "subject_name", "exam_type__name", "score", "status"
+                    "term__name", "subject_name", "exam_type", "score", "max_score", "status"
                 )
             )
         except Exception:
@@ -1274,7 +1276,7 @@ class StudentDataExportView(RoleRequiredMixin, View):
             from academics.models import ReportCard
             report_cards = list(
                 ReportCard.objects.filter(student=student).values(
-                    "term__name", "overall_average", "grade", "status", "published_at"
+                    "term__name", "overall_average", "status", "published_at"
                 )
             )
         except Exception:

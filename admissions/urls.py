@@ -2,6 +2,11 @@ from django.urls import path
 
 from admissions.views import (
     AdmissionsPipelineView,
+    DirectEnrolmentListView,
+    DirectEnrolmentView,
+    ParentFormLinkView,
+    ParentFormReviewView,
+    SendParentFormView,
     AssessmentListView,
     AssessmentReportView,
     ApplicantDecisionView,
@@ -52,6 +57,12 @@ urlpatterns = [
     path("inquire/", ParentInquiryView.as_view(), name="parent_inquiry"),
 
     path("new/", InquiryCreateView.as_view(), name="new_inquiry"),
+    path("direct-enrol/", DirectEnrolmentView.as_view(), name="direct_enrol"),
+    path("direct-enrolments/", DirectEnrolmentListView.as_view(), name="direct_enrolments"),
+    path("send-form/", SendParentFormView.as_view(), name="send_parent_form"),
+    path("<int:pk>/parent-form/", ParentFormReviewView.as_view(), name="parent_form_review"),
+    # Public: parent completes the admission form from the emailed link.
+    path("form/<str:token>/", ParentFormLinkView.as_view(), name="parent_form"),
     path("applicant/<int:pk>/", ApplicantDetailView.as_view(), name="detail"),
     path("applicant/<int:pk>/edit/", InquiryEditView.as_view(), name="edit_inquiry"),
     path("<int:pk>/transition/", ApplicantTransitionView.as_view(), name="transition"),

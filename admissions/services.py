@@ -12,7 +12,9 @@ from admissions.models import (
     ApplicantStatus,
     ApplicantTimelineEntry,
     AssessmentSchedule,
+    ENROLMENT_REQUIRED_DOCUMENTS,
     EnrolmentChecklist,
+    InquiryChannel,
 )
 from students.models import GuardianRelationship, ParentGuardian, Student, StudentGuardian, PDPAConsentLog
 from students.services import generate_admission_number
@@ -281,7 +283,7 @@ def transition_applicant_status(
 
 @transaction.atomic
 def ensure_default_documents(applicant: Applicant) -> None:
-    for dt, _label in ApplicantDocumentType.choices:
+    for dt in ENROLMENT_REQUIRED_DOCUMENTS:
         ApplicantDocumentReceipt.objects.get_or_create(applicant=applicant, document_type=dt)
 
 
@@ -798,30 +800,39 @@ def ensure_admission_grades() -> int:
 
 
 @transaction.atomic
-def complete_enrolment(*, applicant: Applicant, actor, override_duplicate: bool = False, pdpa_consent_given: bool = False, pdpa_consent_version: str = "", confirm_sibling: bool = False) -> Student:
+def complete_enrolment(*, applicant: Applicant, actor, override_duplicate: bool = False, pdpa_consent_given: bool = False, pdpa_consent_version: str = "", confirm_sibling: bool = False, direct: bool = False, student_details: dict | None = None) -> Student:
+    """Create the Student (plus guardian and parent-portal account) for an applicant.
+
+    ``direct=True`` is used by ``direct_enrol``: the learner skipped the
+    assessment pipeline, so the invoice/document gates are not applied, but
+    PDPA consent, class capacity and duplicate checks still are.
+    ``student_details`` fills the extra Student fields captured on the
+    direct-enrolment form (gender, nationality, enrolment date, ...).
+    """
 
     ensure_default_documents(applicant)
     checklist = ensure_enrolment_checklist(applicant)
 
-    # FR-ADM-031: Enrolment requires invoice paid
-    if applicant.status not in (ApplicantStatus.INVOICE_PAID, ApplicantStatus.ENROLLED):
-        raise ValidationError("Enrolment cannot be completed until the admission invoice has been paid in full.")
+    if not direct:
+        # FR-ADM-031: Enrolment requires invoice paid
+        if applicant.status not in (ApplicantStatus.INVOICE_PAID, ApplicantStatus.ENROLLED):
+            raise ValidationError("Enrolment cannot be completed until the admission invoice has been paid in full.")
 
-    # FR-ADM-024 prerequisites: all docs + orientation visit complete.
-    required_types = {dt for dt, _label in ApplicantDocumentType.choices}
-    received_types = set(
-        applicant.documents.filter(is_received=True).values_list("document_type", flat=True)
-    )
-    missing = required_types - received_types
-    if missing:
-        raise ValidationError("Enrolment cannot be completed until all required documents are received.")
+        # FR-ADM-024 prerequisites: all docs + orientation visit complete.
+        required_types = set(ENROLMENT_REQUIRED_DOCUMENTS)
+        received_types = set(
+            applicant.documents.filter(is_received=True).values_list("document_type", flat=True)
+        )
+        missing = required_types - received_types
+        if missing:
+            raise ValidationError("Enrolment cannot be completed until all required documents are received.")
 
-    # FR-ADM-022 sequencing: clearance form must be received before issuing admission package.
-    clearance = applicant.documents.filter(
-        document_type=ApplicantDocumentType.CLEARANCE_FORM, is_received=True
-    ).exists()
-    if not clearance:
-        raise ValidationError("Clearance form must be received before enrolment completion.")
+        # FR-ADM-022 sequencing: clearance form must be received before issuing admission package.
+        clearance = applicant.documents.filter(
+            document_type=ApplicantDocumentType.CLEARANCE_FORM, is_received=True
+        ).exists()
+        if not clearance:
+            raise ValidationError("Clearance form must be received before enrolment completion.")
 
     # FR-PDPA-001: Mandatory PDPA consent
     if not pdpa_consent_given:
@@ -866,6 +877,11 @@ def complete_enrolment(*, applicant: Applicant, actor, override_duplicate: bool 
 
     from academics.utils import get_current_academic_year
     ay = get_current_academic_year()
+    if student_details is None:
+        # Parent filled the online admission form: carry its learner details
+        # (gender, nationality, religion, medical) onto the student record.
+        from admissions.parent_form import student_details_from_form
+        student_details = student_details_from_form(applicant)
     student = Student.objects.create(
 
         admission_no=generate_admission_number(),
@@ -876,6 +892,7 @@ def complete_enrolment(*, applicant: Applicant, actor, override_duplicate: bool 
         stream_name="",
         photo=applicant.photo,
         academic_year=ay,
+        **(student_details or {}),
     )
 
     from audit.models import log_event
@@ -1140,12 +1157,27 @@ def complete_enrolment(*, applicant: Applicant, actor, override_duplicate: bool 
                 description=f"Student {student.admission_no} linked as sibling to {sib.admission_no}",
             )
 
-    transition_applicant_status(
-        applicant=applicant,
-        to_status=ApplicantStatus.ENROLLED,
-        actor=actor,
-        reason=f"Enrolled and student record created ({student.admission_no}).",
-    )
+    if direct:
+        # Direct enrolment jumps straight to Enrolled; the pipeline's
+        # transition rules don't apply, but the timeline still records it.
+        from_status = applicant.status
+        applicant.status = ApplicantStatus.ENROLLED
+        applicant.save(update_fields=["status", "updated_at"])
+        ApplicantTimelineEntry.objects.create(
+            applicant=applicant, from_status=from_status, to_status=ApplicantStatus.ENROLLED,
+            actor=actor,
+            reason=(
+                f"Direct enrolment ({applicant.get_direct_enrolment_reason_display()}): "
+                f"{applicant.direct_enrolment_note or 'no note'}. Student {student.admission_no} created."
+            ),
+        )
+    else:
+        transition_applicant_status(
+            applicant=applicant,
+            to_status=ApplicantStatus.ENROLLED,
+            actor=actor,
+            reason=f"Enrolled and student record created ({student.admission_no}).",
+        )
 
     # E21: Welcome email to parent on enrolment
     parent_email = (applicant.parent_email or "").strip() or None
@@ -1193,6 +1225,247 @@ def complete_enrolment(*, applicant: Applicant, actor, override_duplicate: bool 
         )
 
     return student
+
+
+STUDENT_DETAIL_FIELDS = (
+    "preferred_name", "gender", "nationality", "religion", "blood_type",
+    "allergies_medical", "enrolment_date",
+)
+
+
+@transaction.atomic
+def direct_enrol(*, actor, reason: str, note: str, child: dict, parent: dict,
+                 pdpa_consent_version: str, override_duplicate: bool = False,
+                 confirm_sibling: bool = False) -> Student:
+    """Enrol a learner without the inquiry → assessment → fee pipeline.
+
+    For transfers, mid-year entry, staff children and returning learners.
+    An Applicant record (entry_route="direct") is still created so the
+    enrolment appears in admissions with who did it, when and why, and so the
+    guardian/parent-portal/fee hand-off is identical to a normal enrolment.
+    """
+    from admissions.models import DirectEnrolmentReason, EntryRoute
+    if reason not in DirectEnrolmentReason.values:
+        raise ValidationError("Choose why this learner is being enrolled directly.")
+    if not actor.has_perm("admissions.direct_enrol") and getattr(actor, "role", None) != UserRole.SUPER_ADMIN:
+        raise ValidationError("You do not have permission to enrol learners directly.")
+
+    full_name = f"{child['first_name'].strip()} {child['last_name'].strip()}"
+    applicant = Applicant(
+        parent_full_name=parent["full_name"],
+        parent_phone=parent["phone"],
+        parent_email=parent.get("email", ""),
+        parent_relationship=parent.get("relationship", ""),
+        parent_invoice_name=parent.get("invoice_name", ""),
+        child_full_name=full_name,
+        child_date_of_birth=child["date_of_birth"],
+        grade_applying_for=child["class_name"],
+        previous_school=child.get("previous_school", ""),
+        inquiry_channel=InquiryChannel.WALK_IN,
+        status=ApplicantStatus.INQUIRY_RECEIVED,
+        entry_route=EntryRoute.DIRECT,
+        direct_enrolment_reason=reason,
+        direct_enrolment_note=note,
+    )
+    applicant.full_clean()
+    applicant.save()
+
+    student = complete_enrolment(
+        applicant=applicant, actor=actor, direct=True,
+        override_duplicate=override_duplicate,
+        pdpa_consent_given=True, pdpa_consent_version=pdpa_consent_version,
+        confirm_sibling=confirm_sibling,
+        student_details={k: child[k] for k in STUDENT_DETAIL_FIELDS if child.get(k) not in (None, "")},
+    )
+    # _split_name only guesses; the form captured first/last name exactly.
+    Student.objects.filter(pk=student.pk).update(
+        first_name=child["first_name"].strip(), last_name=child["last_name"].strip()
+    )
+    student.refresh_from_db()
+
+    from audit.models import log_event
+    log_event(
+        actor=actor,
+        action_type="DIRECT_ENROLMENT",
+        model_name="Student",
+        object_id=student.pk,
+        description=(
+            f"{student.first_name} {student.last_name} ({student.admission_no}) enrolled directly "
+            f"into {student.class_name}. Reason: {applicant.get_direct_enrolment_reason_display()}. "
+            f"Note: {note or '-'}"
+        ),
+        after={"applicant_id": applicant.pk, "reason": reason, "note": note, "class_name": student.class_name},
+    )
+    return student
+
+
+@transaction.atomic
+def generate_admission_invoice(*, applicant: Applicant, actor, reason: str = "generated by staff (walk-in)",
+                               mark_documents_received: bool = False):
+    """Create the ADM- admission invoice from the admission form's choices,
+    move the applicant to Invoice generated, notify Finance and email the
+    parent. Returns (invoice, created); an existing invoice is returned as-is."""
+    import json
+    from finance.models import Invoice, InvoiceLineItem, InvoiceStatus, FinancePeriod
+    from communications.email_service import dispatch_notification
+    from users.models import User
+    from core.models import SchoolSettings
+
+    existing = Invoice.objects.filter(applicant=applicant, invoice_number__startswith="ADM-").first()
+    if existing:
+        return existing, False
+
+    settings = SchoolSettings.get_settings()
+    admission_fee = settings.admission_fee or 700000
+    development_fee = 700000
+    checkpoint_fee = 300000
+    stem_fee = 180000
+    breakfast_fee = 300000
+    uniform_prices = {"polo": 20000, "sweater": 25000, "tee": 15000}
+    uniform_labels = {"polo": "Polo T-shirt (white / blue / yellow)", "sweater": "Hodari sweater", "tee": "Sports team T-shirt (red / blue / green)"}
+    ECD_GRADES = ["Pre-KG", "Kindergarten", "Preschool", "ABC"]
+    UPPER_GRADES = ["Grade 7", "Grade 8", "Grade 9"]
+
+    def tuition_for(g):
+        if g in ECD_GRADES:
+            return 3200000
+        if g in UPPER_GRADES:
+            return 3800000
+        return 3500000
+
+    children_data = []
+    try:
+        notes = json.loads(applicant.notes or "{}")
+        children_data = notes.get("children", [])
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    if not children_data:
+        children_data = [{"name": applicant.child_full_name, "grade": applicant.grade_applying_for, "isNew": True, "breakfast": False, "stem": False, "uniform": {}}]
+
+    line_items = []
+    for ch in children_data:
+        ch_name = ch.get("name") or applicant.child_full_name
+        ch_grade = ch.get("grade") or applicant.grade_applying_for
+        is_new = ch.get("isNew", True)
+        has_stem = ch.get("stem", False)
+        has_breakfast = ch.get("breakfast", False)
+        uniforms = ch.get("uniform", {})
+
+        line_items.append({"description": f"Tuition — Term 1 ({ch_name} · {ch_grade})", "amount": tuition_for(ch_grade)})
+        line_items.append({"description": f"Development fee (annual) — {ch_name}", "amount": development_fee})
+        if is_new:
+            line_items.append({"description": f"Admission fee (one-time) — {ch_name}", "amount": admission_fee})
+        if ch_grade == "Grade 6":
+            line_items.append({"description": f"Cambridge Checkpoint — {ch_name}", "amount": checkpoint_fee})
+        if has_stem:
+            line_items.append({"description": f"STEM — Term 1 ({ch_name})", "amount": stem_fee})
+        if has_breakfast:
+            line_items.append({"description": f"Breakfast — Term 1 ({ch_name})", "amount": breakfast_fee})
+        for uk, price in uniform_prices.items():
+            qty = int(uniforms.get(uk) or 0)
+            if qty > 0:
+                line_items.append({"description": f"{uniform_labels[uk]} × {qty} ({ch_name})", "amount": price * qty})
+
+    total_due = sum(li["amount"] for li in line_items)
+    if total_due == 0:
+        total_due = admission_fee
+        line_items = [{"description": f"Admission Fee for {applicant.child_full_name}", "amount": admission_fee}]
+
+    period = FinancePeriod.objects.filter(is_reconciled=False).first()
+    inv_no = f"ADM-{applicant.id:04d}-{timezone.now().strftime('%y%m%d')}"
+
+    invoice = Invoice.objects.create(
+        applicant=applicant,
+        amount_due=total_due,
+        total_due=total_due,
+        due_date=timezone.now().date() + timezone.timedelta(days=14),
+        status=InvoiceStatus.UNPAID,
+        period=period,
+        invoice_number=inv_no,
+    )
+    for li in line_items:
+        InvoiceLineItem.objects.create(
+            invoice=invoice,
+            description=li["description"],
+            amount=li["amount"],
+        )
+
+    try:
+        if applicant.status in (ApplicantStatus.ADMITTED, ApplicantStatus.CONDITIONAL):
+            transition_applicant_status(
+                applicant=applicant,
+                to_status=ApplicantStatus.FORM_SUBMITTED,
+                actor=actor,
+                reason="Parent submitted admission form online.",
+            )
+        transition_applicant_status(
+            applicant=applicant,
+            to_status=ApplicantStatus.INVOICE_GENERATED,
+            actor=actor,
+            reason=f"Invoice {inv_no} {reason}.",
+        )
+    except Exception:
+        pass
+
+    ensure_default_documents(applicant)
+    if mark_documents_received:
+        applicant.documents.filter(document_type__in=[
+            "birth_certificate", "clearance_form", "admission_form", "fee_arrangement_proof"
+        ]).update(is_received=True, received_by=actor)
+
+    fo_users = User.objects.filter(role=UserRole.FINANCE_OFFICER, is_active=True)
+    for fo in fo_users:
+        dispatch_notification(
+            user=fo, title="Admission Invoice Generated",
+            message=f"Invoice {inv_no} (TZS {total_due:,.0f}) generated for {applicant.child_full_name}.",
+            link=f"/admissions/applicant/{applicant.pk}/", actor=None,
+        )
+
+    # E07: Admission invoice email to parent (DB template)
+    parent_email = (applicant.parent_email or "").strip() or None
+    if parent_email:
+        from core.email_templates import send_dynamic_email
+        contact = settings.get_admissions_contact()
+        e07_context = {
+            "parent_name": applicant.parent_full_name or "Parent/Guardian",
+            "child_name": applicant.child_full_name,
+            "ref": applicant.reference_number,
+            "reference_number": applicant.reference_number,
+            "invoice_number": inv_no,
+            "currency": "TZS",
+            "amount_due": f"{total_due:,.0f}",
+            "due_date": invoice.due_date.strftime("%d %B %Y") if invoice.due_date else "",
+            "admissions_email": settings.admissions_email or "admissions@hodari.ac.tz",
+            "admissions_whatsapp": contact.get("whatsapp") or contact.get("phone", ""),
+            "contact_phone": contact.get("phone", ""),
+            "school_name": settings.school_name or "Hodari Christian School",
+        }
+        e07_sent = send_dynamic_email(
+            template_type="admission_fee_invoice",
+            to_email=parent_email,
+            context=e07_context,
+        )
+        if not e07_sent:
+            dispatch_notification(
+                user=None, title="Admission Fee Invoice Generated",
+                message=(
+                    f"Dear {applicant.parent_full_name},\n\n"
+                    f"An admission fee invoice has been generated for {applicant.child_full_name}.\n\n"
+                    f"Invoice Number: {inv_no}\n"
+                    f"Amount Due: TZS {admission_fee:,.0f}\n"
+                    f"Due Date: {invoice.due_date.strftime('%d %B %Y') if invoice.due_date else ''}\n\n"
+                    f"Payment can be made via Bank Transfer (DTB 0225556001 or CRDB 0150829302900) "
+                    f"or Mobile Money ({contact.get('phone', '')}). Please send proof of payment "
+                    f"to {settings.admissions_email or 'admissions@hodari.ac.tz'}.\n\n"
+                    f"Finance Office\n{settings.school_name}"
+                ),
+                link=f"/admissions/applicant/{applicant.pk}/",
+                actor=None, external_email=parent_email,
+            )
+
+
+    return invoice, True
 
 
 @transaction.atomic
@@ -1270,7 +1543,9 @@ def get_critical_actions() -> list[dict]:
     apps_admitted = Applicant.objects.filter(
         status__in=[ApplicantStatus.ADMITTED, ApplicantStatus.CONDITIONAL]
     ).annotate(
-        missing_doc_count=Count("documents", filter=Q(documents__is_received=False))
+        missing_doc_count=Count("documents", filter=Q(
+            documents__is_received=False, documents__document_type__in=ENROLMENT_REQUIRED_DOCUMENTS,
+        ))
     ).filter(missing_doc_count__gt=0)
     for app in apps_admitted:
         actions.append({

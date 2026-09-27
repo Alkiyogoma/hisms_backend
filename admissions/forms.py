@@ -2,7 +2,8 @@ from django import forms
 import re
 
 from academics.models import Department, GradeClass
-from admissions.models import Applicant, ApplicantStatus, InquiryChannel, get_previous_school_choices
+from admissions.models import Applicant, ApplicantStatus, DirectEnrolmentReason, InquiryChannel, get_previous_school_choices
+from students.models import Student
 
 
 def _strip_html(value):
@@ -314,3 +315,77 @@ class ApplicantFilterForm(forms.Form):
         if dept:
             grades_qs = grades_qs.filter(department__iexact=dept)
         self.fields["grade"].choices = [("", "All grades")] + [(g.name, g.name) for g in grades_qs]
+
+
+class DirectEnrolmentForm(forms.Form):
+    """Enrol a learner directly (no inquiry, assessment or assessment fee).
+
+    Captures everything a pipeline enrolment would end up with: the learner's
+    personal details for the student record and statutory returns, class
+    placement (which drives fee structure), and the primary guardian.
+    """
+    # Why
+    reason = forms.ChoiceField(choices=[("", "Select a reason")] + list(DirectEnrolmentReason.choices), label="Reason for direct enrolment")
+    reason_note = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 2}), label="Details",
+        help_text="e.g. which school they are transferring from, or which staff member is the parent.",
+    )
+
+    # Learner
+    first_name = forms.CharField(max_length=100)
+    last_name = forms.CharField(max_length=100)
+    preferred_name = forms.CharField(max_length=100, required=False)
+    date_of_birth = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))
+    gender = forms.ChoiceField(choices=[("", "Select")] + Student._meta.get_field("gender").choices)
+    nationality = forms.CharField(max_length=64)
+    religion = forms.CharField(max_length=64, required=False)
+    blood_type = forms.ChoiceField(choices=[("", "Unknown")] + Student._meta.get_field("blood_type").choices, required=False)
+    allergies_medical = forms.CharField(widget=forms.Textarea(attrs={"rows": 2}), required=False, label="Allergies / medical notes")
+    previous_school = forms.CharField(max_length=120, required=False)
+
+    # Placement
+    class_name = forms.ChoiceField(label="Class")
+    enrolment_date = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))
+
+    # Primary guardian
+    parent_full_name = forms.CharField(max_length=150, label="Parent / guardian full name")
+    parent_relationship = forms.ChoiceField(
+        choices=[("father", "Father"), ("mother", "Mother"), ("guardian", "Guardian"), ("legal_guardian", "Legal guardian"), ("other", "Other")],
+        label="Relationship",
+    )
+    parent_phone = forms.CharField(max_length=32, label="Phone")
+    parent_email = forms.EmailField(required=False, label="Email")
+    parent_invoice_name = forms.CharField(max_length=150, required=False, label="Name on invoices")
+
+    pdpa_consent = forms.BooleanField(
+        label="The parent/guardian has given consent for the school to hold this data (PDPA).",
+    )
+    override_duplicate = forms.BooleanField(required=False, widget=forms.HiddenInput)
+    confirm_sibling = forms.BooleanField(required=False, label="Link as sibling of existing learners with the same guardian")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from datetime import date
+        self.fields["class_name"].choices = [("", "Select class")] + [
+            (g.name, g.name) for g in GradeClass.objects.order_by("sort_order", "name")
+        ]
+        self.fields["enrolment_date"].initial = date.today()
+        for name, field in self.fields.items():
+            w = field.widget
+            if isinstance(w, forms.CheckboxInput) or isinstance(w, forms.HiddenInput):
+                continue
+            css = "hf2-select" if isinstance(w, forms.Select) else "hf2-textarea" if isinstance(w, forms.Textarea) else "hf2-input"
+            w.attrs.setdefault("class", css)
+
+    def clean(self):
+        cleaned = super().clean()
+        for name in ("first_name", "last_name", "preferred_name", "nationality", "religion",
+                     "allergies_medical", "previous_school", "parent_full_name", "parent_invoice_name", "reason_note"):
+            if cleaned.get(name):
+                cleaned[name] = _strip_html(cleaned[name])
+        if cleaned.get("reason") == "transfer" and not cleaned.get("previous_school"):
+            self.add_error("previous_school", "Enter the school the learner is transferring from.")
+        dob, start = cleaned.get("date_of_birth"), cleaned.get("enrolment_date")
+        if dob and start and dob >= start:
+            self.add_error("date_of_birth", "Date of birth must be before the enrolment date.")
+        return cleaned

@@ -38,6 +38,12 @@ fail() { echo "ERROR: $*" >&2; exit 1; }
 [[ -x "$VENV/bin/python" ]] || fail "virtualenv not found at $VENV (set VENV=...)"
 [[ -f "$APP/.env" ]] || fail "$APP/.env is missing"
 
+# The hodari unit must load the production gunicorn config (port 8007), not
+# deployment/gunicorn_config.py -- see PRODUCTION_DEPLOY.md step 3.7.
+if ! systemctl cat hodari 2>/dev/null | grep -q "deployment/production/gunicorn_config.py"; then
+  fail "hodari.service does not use deployment/production/gunicorn_config.py (PRODUCTION_DEPLOY.md step 3.7)"
+fi
+
 echo "==> App: $APP   venv: $VENV   user: $APPUSER   branch: $BRANCH"
 
 # --- 1. Preflight -------------------------------------------------------------

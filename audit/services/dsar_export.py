@@ -234,7 +234,7 @@ def export_student_data(student) -> dict[str, Any]:
         from welfare.models import WelfareObservation
 
         data["welfare_records"] = _safe_qs_to_list(
-            WelfareObservation.objects.filter(student=student).order_by("-created_at"),
+            WelfareObservation.all_objects.filter(student=student).order_by("-created_at"),
             [
                 "id", "observation_type", "description", "severity",
                 "action_taken", "observed_by_id", "created_at",

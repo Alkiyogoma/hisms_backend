@@ -81,6 +81,42 @@
         {% endif %}
       </div>
 
+      {% with invite=applicant.form_invite %}{% if invite %}
+      <div class="card" style="margin-top:16px" id="parent-form">
+        <div class="card-title" style="margin-bottom:10px">Parent admission form</div>
+        <div class="info-row"><div class="info-lbl">Status</div><div class="info-val">
+          <span class="chip {% if invite.status == 'submitted' %}chip-amber{% elif invite.status == 'accepted' %}chip-green{% elif invite.status == 'changes_requested' %}chip-red{% else %}chip-blue{% endif %}">{{ invite.get_status_display }}</span>
+          {% if invite.is_expired and invite.parent_can_edit is False and invite.status != 'submitted' and invite.status != 'accepted' %}<span class="chip chip-grey">Link expired</span>{% endif %}
+        </div></div>
+        <div class="info-row"><div class="info-lbl">Link sent</div><div class="info-val">{{ invite.sent_at|date:"d M Y, H:i" }} to {{ applicant.parent_email }}</div></div>
+        {% if invite.opened_at %}<div class="info-row"><div class="info-lbl">First opened</div><div class="info-val">{{ invite.opened_at|date:"d M Y, H:i" }}</div></div>{% endif %}
+        {% if invite.submitted_at %}<div class="info-row"><div class="info-lbl">Submitted</div><div class="info-val">{{ invite.submitted_at|date:"d M Y, H:i" }}</div></div>{% endif %}
+        {% if invite.review_message %}<div class="info-row"><div class="info-lbl">Last request</div><div class="info-val">{{ invite.review_message }}</div></div>{% endif %}
+        {% has_perm user "admissions.change_applicant" as can_review_form %}
+        {% if can_review_form %}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+          {% if invite.status == 'submitted' %}
+          <form method="post" action="{% url 'admissions:parent_form_review' applicant.pk %}">{% csrf_token %}
+            <button type="submit" name="action" value="accept" class="btn-primary" style="padding:6px 12px;font-size:12px">Accept form</button>
+          </form>
+          {% endif %}
+          {% if invite.status != 'accepted' and invite.status != 'submitted' %}
+          <form method="post" action="{% url 'admissions:parent_form_review' applicant.pk %}">{% csrf_token %}
+            <button type="submit" name="action" value="resend" class="btn-secondary" style="padding:6px 12px;font-size:12px">Resend link</button>
+          </form>
+          {% endif %}
+        </div>
+        {% if invite.status == 'submitted' or invite.status == 'changes_requested' %}
+        <form method="post" action="{% url 'admissions:parent_form_review' applicant.pk %}" style="margin-top:12px">{% csrf_token %}
+          <label class="hf2-label" for="rcMsg">Ask the parent for something missing</label>
+          <textarea id="rcMsg" name="message" class="hf2-textarea" rows="2" style="width:100%" placeholder="e.g. The birth certificate photo is blurred — please upload it again." required></textarea>
+          <button type="submit" name="action" value="request_changes" class="btn-secondary" style="padding:6px 12px;font-size:12px;margin-top:6px">Request changes</button>
+        </form>
+        {% endif %}
+        {% endif %}
+      </div>
+      {% endif %}{% endwith %}
+
       <div class="card" style="margin-top:16px">
         <div class="card-title">Parent / Guardian</div>
         <div class="info-row"><div class="info-lbl">Name</div><div class="info-val">{{ applicant.parent_full_name }}</div></div>

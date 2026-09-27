@@ -1,5 +1,6 @@
 import re
 import threading
+from datetime import timedelta
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -9,6 +10,7 @@ from django.urls import reverse_lazy
 from django.views.generic import CreateView, UpdateView, TemplateView
 from django.views import View
 from django.http import JsonResponse
+from django.utils import timezone
 
 
 def _strip_html(value):
@@ -24,7 +26,22 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from admissions.forms_workflow import AssessmentScheduleForm, AssessmentResultForm, HodReviewForm, MeetingScheduleForm
 from academics.models import GradeClass
-from admissions.models import Applicant, ApplicantDocumentType, ApplicantStatus, AssessmentSchedule, ApplicantTimelineEntry
+from core.models import SchoolSettings
+from admissions.models import (
+    ENROLMENT_REQUIRED_DOCUMENTS, Applicant, ApplicantDocumentType, ApplicantStatus,
+    AssessmentSchedule, ApplicantTimelineEntry,
+)
+
+
+def _document_rows(documents_by_type):
+    """Required enrolment documents always; optional ones (uploaded by parents
+    on the online form) only when a file was actually provided."""
+    rows = []
+    for dt, label in ApplicantDocumentType.choices:
+        doc = documents_by_type.get(dt)
+        if dt in ENROLMENT_REQUIRED_DOCUMENTS or (doc and doc.file):
+            rows.append({"key": dt, "label": label, "doc": doc, "required": dt in ENROLMENT_REQUIRED_DOCUMENTS})
+    return rows
 from admissions.services import (
     complete_enrolment,
     confirm_assessment_fee_paid,
@@ -33,6 +50,7 @@ from admissions.services import (
     get_allowed_transition_targets,
     mark_orientation_visit_completed,
     mark_logistics_sent,
+    revert_applicant_from_enrolled,
     schedule_assessment,
     sign_off_assessment_result,
     submit_hos_review,
@@ -207,8 +225,10 @@ class AdmissionsPipelineView(AdmissionsCountsMixin, PermissionCacheMixin, Admiss
                         
                 # FLAG_5: missing_document
                 if applicant.status == ApplicantStatus.ADMITTED:
-                    required_count = len(ApplicantDocumentType.choices)
-                    received_count = applicant.documents.filter(is_received=True).count()
+                    required_count = len(ENROLMENT_REQUIRED_DOCUMENTS)
+                    received_count = applicant.documents.filter(
+                        is_received=True, document_type__in=ENROLMENT_REQUIRED_DOCUMENTS,
+                    ).count()
                     if received_count < required_count:
                         flags.append("missing_document")
 
@@ -722,10 +742,7 @@ class ApplicantDetailView(AdmissionsCountsMixin, PermissionCacheMixin, Admission
             d.document_type: d for d in applicant.documents.all()
         }
         ctx["document_types"] = ApplicantDocumentType.choices
-        ctx["document_rows"] = [
-            {"key": dt, "label": label, "doc": ctx["documents_by_type"].get(dt)}
-            for dt, label in ApplicantDocumentType.choices
-        ]
+        ctx["document_rows"] = _document_rows(ctx["documents_by_type"])
         ctx["checklist"] = getattr(applicant, "enrolment_checklist", None)
         ctx["admissions_tab"] = "applicant"
 
@@ -1262,7 +1279,7 @@ class ApplicantTransitionView(HtmxRequiredMixin, PermissionCacheMixin, Admission
                             "portal_link": "/parent/admission-form/",
                             "portal_username": portal_username,
                             "portal_password": portal_password or "Contact admissions for your password",
-                            "offer_expiry_date": (timezone.now() + timezone.timedelta(days=14)).strftime("%d %B %Y"),
+                            "offer_expiry_date": (timezone.now() + timedelta(days=14)).strftime("%d %B %Y"),
                             "term_start_date": "See school calendar",
                             "breakfast_fee": f"{_ss.breakfast_fee:,.0f}" if hasattr(_ss, 'breakfast_fee') else "300,000",
                             "transport_provider": "Upanga Transport Company",
@@ -1938,7 +1955,7 @@ class ApplicantDecisionView(HtmxRequiredMixin, PermissionCacheMixin, AdmissionsR
                             "portal_link": "/parent/admission-form/",
                             "portal_username": portal_username,
                             "portal_password": portal_password or "Contact admissions for your password",
-                            "offer_expiry_date": (timezone.now() + timezone.timedelta(days=14)).strftime("%d %B %Y"),
+                            "offer_expiry_date": (timezone.now() + timedelta(days=14)).strftime("%d %B %Y"),
                             "term_start_date": "See school calendar",
                             "breakfast_fee": f"{_ss.breakfast_fee:,.0f}" if hasattr(_ss, 'breakfast_fee') else "300,000",
                             "transport_provider": "Upanga Transport Company",
@@ -2199,10 +2216,7 @@ class ToggleDocumentView(HtmxRequiredMixin, PermissionCacheMixin, AdmissionsRole
         ensure_default_documents(applicant)
         ctx["documents_by_type"] = {d.document_type: d for d in applicant.documents.all()}
         ctx["document_types"] = ApplicantDocumentType.choices
-        ctx["document_rows"] = [
-            {"key": dt, "label": label, "doc": ctx["documents_by_type"].get(dt)}
-            for dt, label in ApplicantDocumentType.choices
-        ]
+        ctx["document_rows"] = _document_rows(ctx["documents_by_type"])
         return ctx
 
 
@@ -2225,7 +2239,9 @@ class CompleteEnrolmentView(HtmxRequiredMixin, PermissionCacheMixin, AdmissionsR
         from admissions.services import ensure_default_documents, ensure_enrolment_checklist
         ensure_default_documents(applicant)
         checklist = ensure_enrolment_checklist(applicant)
-        missing_docs = applicant.documents.filter(is_received=False).exists()
+        missing_docs = applicant.documents.filter(
+            is_received=False, document_type__in=ENROLMENT_REQUIRED_DOCUMENTS,
+        ).exists()
         if missing_docs:
             msg = "All checklist items must be completed before enrolment can be finalized."
             messages.error(request, msg)
@@ -2281,10 +2297,7 @@ class CompleteEnrolmentView(HtmxRequiredMixin, PermissionCacheMixin, AdmissionsR
         ctx["checklist"] = checklist
         ctx["documents_by_type"] = {d.document_type: d for d in applicant.documents.all()}
         ctx["document_types"] = ApplicantDocumentType.choices
-        ctx["document_rows"] = [
-            {"key": dt, "label": label, "doc": ctx["documents_by_type"].get(dt)}
-            for dt, label in ApplicantDocumentType.choices
-        ]
+        ctx["document_rows"] = _document_rows(ctx["documents_by_type"])
 
         from finance.models import Invoice
         ctx["admission_invoice"] = Invoice.objects.filter(
@@ -2622,7 +2635,7 @@ class AssessmentReportView(AdmissionsRoleRequiredMixin, View):
     def _get_assessment(self, pk):
         return get_object_or_404(
             AssessmentSchedule.objects.select_related(
-                'applicant', 'applicant__parent_user',
+                'applicant',
             ),
             applicant_id=pk,
         )
@@ -3076,162 +3089,16 @@ class AdminGenerateInvoiceView(AdmissionsRoleRequiredMixin, View):
             messages.error(request, "Applicant is not at the form_submitted stage.")
             return redirect("admissions:detail", pk=pk)
 
-        existing = Invoice.objects.filter(applicant=applicant, invoice_number__startswith="ADM-").first()
-        if existing:
-            messages.info(request, f"Invoice {existing.invoice_number} already exists.")
-            return redirect("admissions:detail", pk=pk)
-
-        settings = SchoolSettings.get_settings()
-        admission_fee = settings.admission_fee or 700000
-        development_fee = 700000
-        checkpoint_fee = 300000
-        stem_fee = 180000
-        breakfast_fee = 300000
-        uniform_prices = {"polo": 20000, "sweater": 25000, "tee": 15000}
-        uniform_labels = {"polo": "Polo T-shirt (white / blue / yellow)", "sweater": "Hodari sweater", "tee": "Sports team T-shirt (red / blue / green)"}
-        ECD_GRADES = ["Pre-KG", "Kindergarten", "Preschool", "ABC"]
-        UPPER_GRADES = ["Grade 7", "Grade 8", "Grade 9"]
-
-        def tuition_for(g):
-            if g in ECD_GRADES:
-                return 3200000
-            if g in UPPER_GRADES:
-                return 3800000
-            return 3500000
-
-        children_data = []
-        try:
-            notes = json.loads(applicant.notes or "{}")
-            children_data = notes.get("children", [])
-        except (json.JSONDecodeError, ValueError):
-            pass
-
-        if not children_data:
-            children_data = [{"name": applicant.child_full_name, "grade": applicant.grade_applying_for, "isNew": True, "breakfast": False, "stem": False, "uniform": {}}]
-
-        line_items = []
-        for ch in children_data:
-            ch_name = ch.get("name") or applicant.child_full_name
-            ch_grade = ch.get("grade") or applicant.grade_applying_for
-            is_new = ch.get("isNew", True)
-            has_stem = ch.get("stem", False)
-            has_breakfast = ch.get("breakfast", False)
-            uniforms = ch.get("uniform", {})
-
-            line_items.append({"description": f"Tuition — Term 1 ({ch_name} · {ch_grade})", "amount": tuition_for(ch_grade)})
-            line_items.append({"description": f"Development fee (annual) — {ch_name}", "amount": development_fee})
-            if is_new:
-                line_items.append({"description": f"Admission fee (one-time) — {ch_name}", "amount": admission_fee})
-            if ch_grade == "Grade 6":
-                line_items.append({"description": f"Cambridge Checkpoint — {ch_name}", "amount": checkpoint_fee})
-            if has_stem:
-                line_items.append({"description": f"STEM — Term 1 ({ch_name})", "amount": stem_fee})
-            if has_breakfast:
-                line_items.append({"description": f"Breakfast — Term 1 ({ch_name})", "amount": breakfast_fee})
-            for uk, price in uniform_prices.items():
-                qty = int(uniforms.get(uk) or 0)
-                if qty > 0:
-                    line_items.append({"description": f"{uniform_labels[uk]} × {qty} ({ch_name})", "amount": price * qty})
-
-        total_due = sum(li["amount"] for li in line_items)
-        if total_due == 0:
-            total_due = admission_fee
-            line_items = [{"description": f"Admission Fee for {applicant.child_full_name}", "amount": admission_fee}]
-
-        period = FinancePeriod.objects.filter(is_reconciled=False).first()
-        inv_no = f"ADM-{applicant.id:04d}-{timezone.now().strftime('%y%m%d')}"
-
-        invoice = Invoice.objects.create(
-            applicant=applicant,
-            amount_due=total_due,
-            total_due=total_due,
-            due_date=timezone.now().date() + timezone.timedelta(days=14),
-            status=InvoiceStatus.UNPAID,
-            period=period,
-            invoice_number=inv_no,
+        from admissions.services import generate_admission_invoice
+        invoice, created = generate_admission_invoice(
+            applicant=applicant, actor=request.user, mark_documents_received=True,
         )
-        for li in line_items:
-            InvoiceLineItem.objects.create(
-                invoice=invoice,
-                description=li["description"],
-                amount=li["amount"],
-            )
-
-        try:
-            if applicant.status in (ApplicantStatus.ADMITTED, ApplicantStatus.CONDITIONAL):
-                transition_applicant_status(
-                    applicant=applicant,
-                    to_status=ApplicantStatus.FORM_SUBMITTED,
-                    actor=request.user,
-                    reason="Parent submitted admission form online.",
-                )
-            transition_applicant_status(
-                applicant=applicant,
-                to_status=ApplicantStatus.INVOICE_GENERATED,
-                actor=request.user,
-                reason=f"Invoice {inv_no} generated by staff (walk-in).",
-            )
-        except Exception:
-            pass
-
-        ensure_default_documents(applicant)
-        applicant.documents.filter(document_type__in=[
-            "birth_certificate", "clearance_form", "admission_form", "fee_arrangement_proof"
-        ]).update(is_received=True, received_by=request.user)
-
-        fo_users = User.objects.filter(role=UserRole.FINANCE_OFFICER, is_active=True)
-        for fo in fo_users:
-            dispatch_notification(
-                user=fo, title="Admission Invoice Generated",
-                message=f"Invoice {inv_no} (TZS {total_due:,.0f}) generated for {applicant.child_full_name}.",
-                link=f"/admissions/applicant/{applicant.pk}/", actor=None,
-            )
-
-        # E07: Admission invoice email to parent (DB template)
-        parent_email = (applicant.parent_email or "").strip() or None
-        if parent_email:
-            from core.email_templates import send_dynamic_email
-            contact = settings.get_admissions_contact()
-            e07_context = {
-                "parent_name": applicant.parent_full_name or "Parent/Guardian",
-                "child_name": applicant.child_full_name,
-                "ref": applicant.reference_number,
-                "reference_number": applicant.reference_number,
-                "invoice_number": inv_no,
-                "currency": "TZS",
-                "amount_due": f"{total_due:,.0f}",
-                "due_date": invoice.due_date.strftime("%d %B %Y") if invoice.due_date else "",
-                "admissions_email": settings.admissions_email or "admissions@hodari.ac.tz",
-                "admissions_whatsapp": contact.get("whatsapp") or contact.get("phone", ""),
-                "contact_phone": contact.get("phone", ""),
-                "school_name": settings.school_name or "Hodari Christian School",
-            }
-            e07_sent = send_dynamic_email(
-                template_type="admission_fee_invoice",
-                to_email=parent_email,
-                context=e07_context,
-            )
-            if not e07_sent:
-                dispatch_notification(
-                    user=None, title="Admission Fee Invoice Generated",
-                    message=(
-                        f"Dear {applicant.parent_full_name},\n\n"
-                        f"An admission fee invoice has been generated for {applicant.child_full_name}.\n\n"
-                        f"Invoice Number: {inv_no}\n"
-                        f"Amount Due: TZS {admission_fee:,.0f}\n"
-                        f"Due Date: {invoice.due_date.strftime('%d %B %Y') if invoice.due_date else ''}\n\n"
-                        f"Payment can be made via Bank Transfer (DTB 0225556001 or CRDB 0150829302900) "
-                        f"or Mobile Money ({contact.get('phone', '')}). Please send proof of payment "
-                        f"to {settings.admissions_email or 'admissions@hodari.ac.tz'}.\n\n"
-                        f"Finance Office\n{settings.school_name}"
-                    ),
-                    link=f"/admissions/applicant/{applicant.pk}/",
-                    actor=None, external_email=parent_email,
-                )
-
+        if not created:
+            messages.info(request, f"Invoice {invoice.invoice_number} already exists.")
+            return redirect("admissions:detail", pk=pk)
         messages.success(
             request,
-            f"Invoice {inv_no} generated (TZS {admission_fee:,.0f}). Due by {invoice.due_date.strftime('%d %B %Y')}."
+            f"Invoice {invoice.invoice_number} generated (TZS {invoice.total_due:,.0f}). Due by {invoice.due_date.strftime('%d %B %Y')}."
         )
         return redirect("admissions:detail", pk=pk)
 
@@ -3347,3 +3214,230 @@ class AdminGenerateInvoiceView(AdmissionsRoleRequiredMixin, View):
         ctx["school_name"] = settings_obj.school_name or "Hodari Christian School"
         ctx["academic_year"] = "2026\u20132027"
         return ctx
+
+
+class DirectEnrolmentView(AdmissionsCountsMixin, PermissionCacheMixin, AdmissionsRoleRequiredMixin, TemplateView):
+    """Enrol a learner directly — transfer, mid-year entry, staff child or
+    returning learner — skipping the inquiry, assessment and assessment fee.
+    Admin Officer / HOS / Super Admin (``admissions.direct_enrol``)."""
+    template_name = "admissions/direct_enrol.html"
+    required_permission = "admissions.direct_enrol"
+
+    def get_context_data(self, **kwargs):
+        from admissions.forms import DirectEnrolmentForm
+        ctx = super().get_context_data(**kwargs)
+        ctx["form"] = kwargs.get("form") or DirectEnrolmentForm()
+        ctx["admissions_tab"] = "direct_enrol"
+        ctx["duplicate_warning"] = kwargs.get("duplicate_warning", "")
+        return ctx
+
+    def post(self, request, *args, **kwargs):
+        from admissions.forms import DirectEnrolmentForm
+        from admissions.services import direct_enrol
+        form = DirectEnrolmentForm(request.POST)
+        if not form.is_valid():
+            return self.render_to_response(self.get_context_data(form=form), status=400)
+        d = form.cleaned_data
+        try:
+            student = direct_enrol(
+                actor=request.user,
+                reason=d["reason"],
+                note=d["reason_note"],
+                child={
+                    "first_name": d["first_name"], "last_name": d["last_name"],
+                    "preferred_name": d["preferred_name"], "date_of_birth": d["date_of_birth"],
+                    "gender": d["gender"], "nationality": d["nationality"], "religion": d["religion"],
+                    "blood_type": d["blood_type"], "allergies_medical": d["allergies_medical"],
+                    "previous_school": d["previous_school"], "class_name": d["class_name"],
+                    "enrolment_date": d["enrolment_date"],
+                },
+                parent={
+                    "full_name": d["parent_full_name"], "phone": d["parent_phone"],
+                    "email": d["parent_email"], "relationship": d["parent_relationship"],
+                    "invoice_name": d["parent_invoice_name"],
+                },
+                pdpa_consent_version=request.POST.get("pdpa_consent_version", "").strip() or "v1.0",
+                override_duplicate=d["override_duplicate"] and request.user.role == UserRole.SUPER_ADMIN,
+                confirm_sibling=d["confirm_sibling"],
+            )
+        except ValidationError as e:
+            msg = e.messages[0] if hasattr(e, "messages") else str(e)
+            form.add_error(None, msg)
+            return self.render_to_response(
+                self.get_context_data(form=form, duplicate_warning=msg if msg.startswith("Duplicate") else ""),
+                status=400,
+            )
+        messages.success(
+            request,
+            f"{student.first_name} {student.last_name} enrolled directly into {student.class_name} "
+            f"({student.admission_no}). Finance has been notified to set up fees.",
+        )
+        return redirect("students:detail", pk=student.pk)
+
+
+class DirectEnrolmentListView(AdmissionsCountsMixin, PermissionCacheMixin, AdmissionsRoleRequiredMixin, TemplateView):
+    """Review list of every direct enrolment: who, when, why."""
+    template_name = "admissions/direct_enrolments.html"
+    required_permission = "admissions.view_applicant"
+
+    def get_context_data(self, **kwargs):
+        from admissions.models import ApplicantTimelineEntry, EntryRoute
+        ctx = super().get_context_data(**kwargs)
+        applicants = list(
+            Applicant.objects.filter(entry_route=EntryRoute.DIRECT)
+            .select_related("enrolled_student").order_by("-created_at")
+        )
+        entries = {
+            e.applicant_id: e for e in ApplicantTimelineEntry.objects.filter(
+                applicant__in=applicants, to_status=ApplicantStatus.ENROLLED,
+            ).select_related("actor").order_by("created_at")
+        }
+        ctx["rows"] = [{"applicant": a, "entry": entries.get(a.pk)} for a in applicants]
+        ctx["admissions_tab"] = "direct_enrolments"
+        return ctx
+
+
+class SendParentFormView(AdmissionsCountsMixin, PermissionCacheMixin, AdmissionsRoleRequiredMixin, TemplateView):
+    """Start an application with just the parent's contact details and email
+    them a secure link to complete the admission form themselves."""
+    template_name = "admissions/send_parent_form.html"
+    required_permission = "admissions.add_applicant"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["admissions_tab"] = "new_inquiry"
+        ctx["grades"] = list(GradeClass.objects.order_by("sort_order", "name").values_list("name", flat=True))
+        ctx["values"] = kwargs.get("values", {})
+        ctx["errors"] = kwargs.get("errors", [])
+        return ctx
+
+    def post(self, request, *args, **kwargs):
+        from django.core.validators import validate_email
+        from admissions.parent_form import start_parent_form
+        values = {k: _strip_html(request.POST.get(k, "")) for k in ("parent_full_name", "parent_email", "parent_phone", "grade")}
+        errors = []
+        if not values["parent_full_name"]:
+            errors.append("Enter the parent's name.")
+        try:
+            validate_email(values["parent_email"])
+        except ValidationError:
+            errors.append("Enter a valid email address — the form link is sent there.")
+        if not values["parent_phone"]:
+            errors.append("Enter the parent's phone number.")
+        if values["grade"] and not GradeClass.objects.filter(name=values["grade"]).exists():
+            errors.append("Choose a valid grade, or leave it for the parent to choose.")
+        if errors:
+            return self.render_to_response(self.get_context_data(values=values, errors=errors), status=400)
+        applicant, _token = start_parent_form(actor=request.user, **values)
+        messages.success(
+            request,
+            f"Admission form link sent to {applicant.parent_email}. The application will show "
+            "\"Parent filling in\" until they submit it.",
+        )
+        return redirect("admissions:detail", pk=applicant.pk)
+
+
+class ParentFormReviewView(PermissionCacheMixin, AdmissionsRoleRequiredMixin, View):
+    """Staff actions on a parent-link form: resend link, request changes, accept."""
+    required_permission = "admissions.change_applicant"
+
+    def post(self, request, pk):
+        from admissions.parent_form import accept_parent_form, request_changes, resend_link
+        applicant = get_object_or_404(Applicant, pk=pk)
+        invite = getattr(applicant, "form_invite", None)
+        if invite is None:
+            messages.error(request, "This application was not started with a parent form link.")
+            return redirect("admissions:detail", pk=pk)
+        action = request.POST.get("action")
+        try:
+            if action == "resend":
+                resend_link(invite=invite, actor=request.user)
+                messages.success(request, f"A new form link was sent to {applicant.parent_email}. The old link no longer works.")
+            elif action == "request_changes":
+                request_changes(invite=invite, actor=request.user, message=_strip_html(request.POST.get("message", "")))
+                messages.success(request, "The form was re-opened and the parent was emailed what to change.")
+            elif action == "accept":
+                accept_parent_form(invite=invite, actor=request.user)
+                messages.success(request, "Form accepted. The uploaded documents are marked as received.")
+            else:
+                messages.error(request, "Unknown action.")
+        except ValidationError as e:
+            messages.error(request, " ".join(e.messages))
+        return redirect("admissions:detail", pk=pk)
+
+
+class ParentFormLinkView(View):
+    """Public admission form reached from the emailed link. No login: the
+    unguessable token in the URL is the credential."""
+
+    def _context(self, invite):
+        import json as _json
+        from admissions.models import AdmissionFormInviteStatus
+        applicant = invite.applicant
+        draft = dict(invite.draft_data or {})
+        if not draft:
+            draft = {
+                "children": [{
+                    "name": "" if applicant.child_full_name == "Awaiting parent form" else applicant.child_full_name,
+                    "grade": applicant.grade_applying_for, "dob": "", "gender": "", "nationality": "Tanzanian",
+                    "religion": "", "prevSchool": "", "languages": "", "disabilities": "", "allergies": "",
+                    "isNew": True, "health": "", "meds": "", "sen": "", "physician": "", "physicianPhone": "",
+                    "hospital": "", "hospitalPhone": "", "insurance": "", "breakfast": False, "stem": False,
+                    "uniform": {"polo": 0, "sweater": 0, "tee": 0},
+                }],
+            }
+        applicant.child_full_name = draft["children"][0].get("name") or ""
+        return {
+            "applicant": applicant,
+            "link_mode": True,
+            "submit_url": self.request.path,
+            "form_submitted": not invite.parent_can_edit,
+            "saved_form_data": _json.dumps(draft).replace("</", "<\\/"),
+            "uploaded_json": _json.dumps(draft.get("uploaded") or {}).replace("</", "<\\/"),
+            "review_message": invite.review_message if invite.status == AdmissionFormInviteStatus.CHANGES_REQUESTED else "",
+            "grade_options_json": _json.dumps(
+                list(GradeClass.objects.order_by("sort_order", "name").values_list("name", flat=True))
+            ),
+        }
+
+    def _invite_or_none(self, token):
+        from admissions.parent_form import find_invite
+        return find_invite(token)
+
+    def get(self, request, token):
+        from admissions.parent_form import mark_opened
+        invite = self._invite_or_none(token)
+        if invite is None:
+            return render(request, "admissions/parent_form_unavailable.html", {"expired": False}, status=404)
+        if invite.is_expired and invite.status in ("sent", "in_progress", "changes_requested"):
+            return render(request, "admissions/parent_form_unavailable.html", {"expired": True}, status=410)
+        mark_opened(invite)
+        return render(request, "parent_portal/admission_form.html", self._context(invite))
+
+    def post(self, request, token):
+        import json as _json
+        from admissions.parent_form import save_parent_draft, submit_parent_form
+        invite = self._invite_or_none(token)
+        if invite is None:
+            return JsonResponse({"ok": False, "error": "This link is not valid. Please contact the school office."}, status=404)
+        if not invite.parent_can_edit:
+            return JsonResponse({"ok": False, "error": "This form has already been submitted or the link has expired."}, status=400)
+        try:
+            data = _json.loads(request.POST.get("data", "{}"))
+            if not isinstance(data, dict):
+                raise ValueError
+        except ValueError:
+            return JsonResponse({"ok": False, "error": "Invalid form data."}, status=400)
+        try:
+            if request.POST.get("action") == "save_draft":
+                uploaded = save_parent_draft(invite=invite, data=data, files=request.FILES)
+                return JsonResponse({"ok": True, "uploaded": uploaded})
+            if request.POST.get("action") == "submit_admission":
+                invoice = submit_parent_form(invite=invite, data=data, files=request.FILES)
+                return JsonResponse({
+                    "ok": True, "ref": invite.applicant.reference_number,
+                    "invoice": invoice.invoice_number, "total": float(invoice.total_due),
+                })
+        except ValidationError as e:
+            return JsonResponse({"ok": False, "error": " ".join(e.messages)}, status=400)
+        return JsonResponse({"ok": False, "error": "Invalid action."}, status=400)

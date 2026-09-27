@@ -13,6 +13,9 @@
   <a href="{% url 'admissions:new_inquiry' %}" class="sub-tab {% if admissions_tab == 'new_inquiry' %}active{% endif %}">New inquiry</a>
   {% endif %}
   {% if perms.admissions.view_applicant %}
+  <a href="{% url 'admissions:direct_enrolments' %}" class="sub-tab {% if admissions_tab == 'direct_enrolments' or admissions_tab == 'direct_enrol' %}active{% endif %}">Direct enrolments</a>
+  {% endif %}
+  {% if perms.admissions.view_applicant %}
   <a href="{% url 'admissions:actions_needed' %}" class="sub-tab {% if admissions_tab == 'actions' %}active{% endif %}">Action Center <span class="sub-tab-count blue">{{ critical_action_count|default:"0" }}</span></a>
   {% endif %}
   {% if perms.admissions.view_applicant %}

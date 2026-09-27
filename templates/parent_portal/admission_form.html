@@ -304,6 +304,7 @@ details.menu-d summary{cursor:pointer;font-size:13px;font-weight:600;color:var(-
 
 <div class="nav"><div class="nav-in">
   <button class="btn s" id="back">Back</button>
+  {% if link_mode %}<button class="btn s" id="saveLater" type="button">Save and finish later</button>{% endif %}
   <button class="mtotal" id="mtotal"></button>
   <div class="tag">"The courage to stand out"</div>
   <button class="btn p" id="next">Continue</button>
@@ -314,11 +315,15 @@ details.menu-d summary{cursor:pointer;font-size:13px;font-weight:600;color:var(-
 
 <script>
 var CSRF = '{{ csrf_token }}';
-var SUBMIT_URL = '{% url "parent_portal:admission_form" %}';
+var SUBMIT_URL = {% if submit_url %}'{{ submit_url|escapejs }}'{% else %}'{% url "parent_portal:admission_form" %}'{% endif %};
+/* Link mode: a parent completing the form from an emailed link (no account). */
+var LINK_MODE = {% if link_mode %}true{% else %}false{% endif %};
+var UPLOADED = {{ uploaded_json|default:"{}"|safe }};
+var REVIEW_MESSAGE = '{{ review_message|default:""|escapejs }}';
 
 /* ============ fee book ============ */
-var ECD = ['Pre-KG','Kindergarten','Preschool','ABC'];
-var GRADES = ECD.concat(Array.from({length:9},function(_,i){return 'Grade '+(i+1)}));
+var ECD = ['Pre-KG','Pre-K','Kindergarten','KG','Preschool','Pre-School','ABC'];
+var GRADES = {% if grade_options_json %}{{ grade_options_json|safe }}{% else %}['Pre-KG','Kindergarten','Preschool','ABC'].concat(Array.from({length:9},function(_,i){return 'Grade '+(i+1)})){% endif %};
 var FEE = {
   tuition: function(g){ return ECD.indexOf(g)!==-1 ? 3200000 : (['Grade 7','Grade 8','Grade 9'].indexOf(g)!==-1 ? 3800000 : 3500000); },
   development: 700000, admission: 700000, checkpoint: 300000,
@@ -397,6 +402,8 @@ try {
   if(_d.consent) S.consent = _d.consent;
   if(_d.signature !== undefined) S.signature = _d.signature;
   if(_d.signDate !== undefined) S.signDate = _d.signDate;
+  if(_d.secondGuardian) S.secondGuardian = true;
+  if(LINK_MODE && typeof _d.step === 'number' && _d.step < 10) S.step = _d.step;
 } catch(e) {}
 {% endif %}
 
@@ -433,7 +440,9 @@ function set(path,val){
 /* ============ steps ============ */
 function stepStudents(){
   return '<p class="eyebrow">Admission form · Section 1 of 9</p><h1 class="step-t">Student information</h1>'+
-  '<p class="lede">This is Hodari\'s admission form, completed online. It takes about fifteen minutes, and at the end you\'ll receive an invoice for Term 1 that you can download and pay. Your child\'s name and grade came from the offer letter — check them, and add any brothers or sisters joining at the same time.</p>'+
+  '<p class="lede">'+(LINK_MODE
+    ? 'This is Hodari\'s admission form, completed online. It takes about fifteen minutes, and you can save it and come back later using the link in your email. When you submit it you\'ll receive an invoice for Term 1 that you can download and pay.'
+    : 'This is Hodari\'s admission form, completed online. It takes about fifteen minutes, and at the end you\'ll receive an invoice for Term 1 that you can download and pay. Your child\'s name and grade came from the offer letter — check them, and add any brothers or sisters joining at the same time.')+'</p>'+
   S.children.map(function(c,i){
   return '<div class="child">'+
     '<div class="child-h"><div class="pip">'+(i+1)+'</div><h3>'+(c.name?esc(c.name):'Student '+(i+1))+'</h3>'+
@@ -457,7 +466,8 @@ function stepStudents(){
     '</div>'+
   '</div>';
   }).join('')+
-  '<button class="addbtn" data-act="addchild">+ Add another child</button>';
+  (LINK_MODE ? '<p class="hint" style="margin-top:10px">Applying for more than one child? Ask the school office for a separate form for each child.</p>'
+             : '<button class="addbtn" data-act="addchild">+ Add another child</button>');
 }
 
 function stepParents(){
@@ -578,16 +588,35 @@ function stepOptions(){
     '<div class="d">Routes cost between '+money(400000)+' and '+money(600000)+' a term. Call Upanga Transport Company on 0711 729 572 — the school does not invoice for it.</div></div></div>';
 }
 
-function stepDocs(){
-  var docs = [['birth','Child\u2019s birth certificate','A clear photo of the original is fine'],
+var PORTAL_DOCS = [['birth','Child\u2019s birth certificate','A clear photo of the original is fine'],
     ['clearance','Clearance form from previous school','Ask the previous school\u2019s office to issue this'],
     ['photo','Passport photo of the student','We print the ID cards here — one photo is enough'],
     ['nid','Parent National ID','Front side, for the parent signing this form']];
+var LINK_DOCS = [['birth','Child\u2019s birth certificate','A clear photo of the original is fine'],
+    ['report','Most recent report from the previous school','Needed unless this is the child\u2019s first school'],
+    ['photo','Passport photo of the child','We print the ID cards here — one photo is enough'],
+    ['passport','Passport or residence permit','Needed if the child is not Tanzanian'],
+    ['clearance','Clearance form from previous school','Optional now — the school needs it before the first day']];
+function docList(){ return LINK_MODE ? LINK_DOCS : PORTAL_DOCS; }
+/* Same rules as admissions.parent_form.required_uploads */
+function requiredDocs(){
+  if(!LINK_MODE) return PORTAL_DOCS.map(function(d){return d[0]});
+  var c = S.children[0] || {}; var keys = ['birth','photo'];
+  var prev = String(c.prevSchool||'').trim().toLowerCase();
+  if(prev && ['none','n/a','na','-'].indexOf(prev)===-1) keys.push('report');
+  var nat = String(c.nationality||'').trim().toLowerCase();
+  if(nat && ['tanzanian','tanzania'].indexOf(nat)===-1) keys.push('passport');
+  return keys;
+}
+function haveDoc(k){ return !!(S.files[k] || UPLOADED[k]); }
+function stepDocs(){
+  var docs = docList(); var req = requiredDocs();
   return '<p class="eyebrow">Admission form · Section 6 of 9</p><h1 class="step-t">Upload documents</h1>'+
-  '<p class="lede">All four documents are required to complete the enrolment. You can take a photo of each document with your phone.</p>'+
+  '<p class="lede">'+(LINK_MODE ? 'Documents marked required must be uploaded before you can submit. You can take a photo of each document with your phone, and save the form to finish later.' : 'All four documents are required to complete the enrolment. You can take a photo of each document with your phone.')+'</p>'+
   '<div class="stack">'+docs.map(function(d){
     var f = S.files[d[0]];
-    var fname = f ? f.name : '';
+    var fname = f ? f.name : (UPLOADED[d[0]] ? UPLOADED[d[0]] + ' (saved)' : '');
+    if(LINK_MODE) d = [d[0], d[1] + (req.indexOf(d[0])!==-1 ? '' : ' <span class="opt">optional</span>'), d[2]];
     return '<div class="up '+(fname?'ok':'')+'"><div class="n"><b>'+d[1]+'</b><span>'+d[2]+'</span></div>'+
     (fname?'<div class="got">'+esc(fname)+'</div>':'')+
     '<label class="pick">'+(fname?'Replace':'Choose file')+'<input type="file" data-file="'+d[0]+'" accept="image/*,.pdf"></label>'+
@@ -767,7 +796,7 @@ function invoiceHTML(){
   '</div>'+
   '<div class="notes">'+
     '<b>Quote '+S.ref+' as the payment reference</b> so we can match your transfer to your children straight away.<br><br>'+
-    'The 300,000 assessment fee is already paid and is not charged again. Tuition covers lunch, books, stationery and school events. Breakfast and STEM are charged per term and continue automatically until you tell us otherwise. School trips are billed separately when they come up. <b>School transport is paid directly to Upanga Transport Company on 0711 729 572</b>, and trousers, dresses and sports shorts are bought from Rockdove Kids Empire on 0717 419 498. Fees paid are not refundable.'+
+    (LINK_MODE ? '' : 'The 300,000 assessment fee is already paid and is not charged again. ')+'Tuition covers lunch, books, stationery and school events. Breakfast and STEM are charged per term and continue automatically until you tell us otherwise. School trips are billed separately when they come up. <b>School transport is paid directly to Upanga Transport Company on 0711 729 572</b>, and trousers, dresses and sports shorts are bought from Rockdove Kids Empire on 0717 419 498. Fees paid are not refundable.'+
   '</div>'+
   '<div class="sheet-foot"><span class="tag">"The courage to stand out"</span></div>'+
 '</div>';
@@ -794,18 +823,18 @@ function renderAside(){
     body += '<div class="lgroup">'+esc(c.name||'Student '+(i+1))+' · '+esc(c.grade)+'</div>';
     childLines(c).forEach(function(l){ body += '<div class="li"><span>'+esc(l.l)+'</span><span>'+money(l.a).replace('TSh ','')+'</span></div>'; });
   });
-  body += '<div class="li dim" style="margin-top:10px"><span>Assessment fee</span><span>already paid</span></div>'+
-           '<div class="li dim"><span>Transport</span><span>paid to vendor</span></div>';
-  var fileLabels = {birth:'Birth certificate',clearance:'Clearance form',photo:'Passport photo',nid:'Parent NID'};
-  var fileCount = Object.keys(S.files).filter(function(k){return S.files[k]}).length;
+  body += (LINK_MODE ? '' : '<div class="li dim" style="margin-top:10px"><span>Assessment fee</span><span>already paid</span></div>')+
+           '<div class="li dim"'+(LINK_MODE?' style="margin-top:10px"':'')+'><span>Transport</span><span>paid to vendor</span></div>';
+  var fileLabels = {birth:'Birth certificate',clearance:'Clearance form',photo:'Passport photo',nid:'Parent NID',report:'School report',passport:'Passport / permit'};
+  var fileCount = Object.keys(fileLabels).filter(function(k){return haveDoc(k)}).length;
   if(fileCount > 0){
     body += '<div class="lgroup" style="margin-top:14px">Documents uploaded</div>';
     Object.keys(fileLabels).forEach(function(k){
-      if(S.files[k]) body += '<div class="li"><span>'+fileLabels[k]+'</span><span style="color:#22C55E">✓</span></div>';
+      if(haveDoc(k)) body += '<div class="li"><span>'+fileLabels[k]+'</span><span style="color:#22C55E">✓</span></div>';
     });
   } else if(S.step >= 6){
     body += '<div class="lgroup" style="margin-top:14px">Documents</div>'+
-      '<div class="li dim"><span>4 files required</span><span>none yet</span></div>';
+      '<div class="li dim"><span>'+requiredDocs().length+' files required</span><span>none yet</span></div>';
   }
   $('#aside').innerHTML = '<div class="ledger">'+
     '<div class="ledger-h"><div class="k">Total due at enrolment</div><div class="v">'+money(grandTotal())+'</div></div>'+
@@ -845,7 +874,8 @@ function validate(){
     }
   });
   if(S.step===6){
-    var missing = [['birth','Child\'s birth certificate'],['clearance','Clearance form'],['photo','Passport photo'],['nid','Parent National ID']].filter(function(d){return !S.files[d[0]]});
+    var req = requiredDocs();
+    var missing = docList().filter(function(d){return req.indexOf(d[0])!==-1 && !haveDoc(d[0])}).map(function(d){return [d[0], d[1].replace('\u2019',"'")]});
     if(missing.length){
       missing.forEach(function(d){
         var box = document.querySelector('[data-err="files.'+d[0]+'"]');
@@ -881,6 +911,14 @@ function render(){
   if(last){ $('#print-root').innerHTML = invoiceHTML(); }
   window.scrollTo({top:0,behavior:'smooth'});
   $('#panel').focus({preventScroll:true});
+  if(REVIEW_MESSAGE && !FORM_SUBMITTED){
+    var rb=document.createElement('div');
+    rb.style.cssText='padding:14px 18px;background:#FFFBEB;border:1px solid #F59E0B;border-radius:10px;margin-bottom:16px;font-size:13px;color:#92400E';
+    rb.innerHTML='<b>The school asked for a few changes:</b><br>';
+    rb.appendChild(document.createTextNode(REVIEW_MESSAGE));
+    $('#panel').prepend(rb);
+  }
+  if(LINK_MODE){ var sv=$('#saveLater'); if(sv) sv.style.display = (FORM_SUBMITTED || last) ? 'none' : ''; }
   if(FORM_SUBMITTED){
     $('#panel').querySelectorAll('input,textarea,select').forEach(function(el){el.disabled=true;el.readOnly=true;});
     $('#back').style.display='none';
@@ -937,15 +975,7 @@ $('#next').onclick = function(){
   if(S.step === 9){
     $('#next').disabled = true;
     $('#next').textContent = 'Submitting\u2026';
-    var fd = new FormData();
-    fd.append('action', 'submit_admission');
-    var payload = JSON.parse(JSON.stringify(S));
-    payload.files = {};
-    Object.keys(S.files).forEach(function(k){ payload.files[k] = S.files[k] ? S.files[k].name : ''; });
-    fd.append('data', JSON.stringify(payload));
-    Object.keys(S.files).forEach(function(k){
-      if(S.files[k]) fd.append('file_' + k, S.files[k]);
-    });
+    var fd = buildFormData('submit_admission');
     fetch(SUBMIT_URL, {
       method: 'POST',
       headers: {'X-CSRFToken': CSRF},
@@ -971,6 +1001,31 @@ $('#next').onclick = function(){
 
   S.step++; render();
 };
+function buildFormData(action){
+  var fd = new FormData();
+  fd.append('action', action);
+  var payload = JSON.parse(JSON.stringify(S));
+  payload.files = {};
+  Object.keys(S.files).forEach(function(k){ payload.files[k] = S.files[k] ? S.files[k].name : ''; });
+  fd.append('data', JSON.stringify(payload));
+  Object.keys(S.files).forEach(function(k){
+    if(S.files[k]) fd.append('file_' + k, S.files[k]);
+  });
+  return fd;
+}
+if(LINK_MODE && $('#saveLater')){
+  $('#saveLater').onclick = function(){
+    var btn = $('#saveLater'); btn.disabled = true;
+    fetch(SUBMIT_URL, {method:'POST', headers:{'X-CSRFToken': CSRF}, body: buildFormData('save_draft')})
+      .then(function(r){ return r.json(); }).then(function(d){
+        btn.disabled = false;
+        if(d.ok){
+          UPLOADED = d.uploaded || UPLOADED; S.files = {}; render();
+          toast('Saved. Use the same link from your email to come back and finish.');
+        } else { toast(d.error || 'Could not save. Please try again.'); }
+      }).catch(function(){ btn.disabled = false; toast('Network error. Please check your connection and try again.'); });
+  };
+}
 $('#back').onclick = function(){ if(S.step>0){ S.step--; render(); } };
 $('#mtotal').onclick = function(){ $('#aside').classList.toggle('open'); };
 

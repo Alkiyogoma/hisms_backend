@@ -38,6 +38,12 @@
               </div>
               {% endif %}
 
+              {% if item.applicant.entry_route == "parent_link" %}{% with inv=item.applicant.form_invite %}{% if inv %}
+                <div style="margin-top:5px">
+                  <span class="k-flag {% if inv.status == 'submitted' %}kf-amber{% elif inv.status == 'accepted' %}kf-green{% elif inv.status == 'changes_requested' %}kf-red{% else %}kf-blue{% endif %}">{{ inv.get_status_display }}</span>
+                </div>
+              {% endif %}{% endwith %}{% endif %}
+
               {% if column.key == "meeting_scheduled" and item.applicant.assessment %}
                 <div style="margin-top:5px">
                   <span class="k-flag kf-blue">{{ item.applicant.assessment.scheduled_date }} {{ item.applicant.assessment.scheduled_time|time:"H:i" }}</span>

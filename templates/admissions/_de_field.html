@@ -1,0 +1,6 @@
+<div class="hf2-group">
+  <label class="hf2-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span style="color:var(--red)">*</span>{% endif %}</label>
+  {{ field }}
+  {% if field.help_text %}<div class="de-help">{{ field.help_text }}</div>{% endif %}
+  {% for e in field.errors %}<div class="de-error">{{ e }}</div>{% endfor %}
+</div>

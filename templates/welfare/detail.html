@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load static hodari_forms %}
-{% block title %}Welfare Observation #{{ obs.id }} — {{ brand.school_name }}{% endblock %}
+{% block title %}Welfare note #{{ obs.id }} — {{ brand.school_name }}{% endblock %}
 
 {% block extra_head %}
 {% include "includes/hodari_print_styles.html" %}
@@ -74,7 +74,7 @@
     <!-- Form Header -->
     <div class="form-header">
       <div>
-        <h1 class="form-title">Welfare Observation</h1>
+        <h1 class="form-title">Welfare note</h1>
         <div class="form-subtitle">Student Welfare Record &middot; Ref: #{{ obs.id }}</div>
       </div>
       <div style="text-align: right">
@@ -85,9 +85,12 @@
             Print Form
           </button>
         </div>
-        <div class="chip hide-on-print {% if obs.severity == 'critical' %}chip-red{% elif obs.severity == 'high' %}chip-amber{% else %}chip-blue{% endif %}" style="font-size: 12px; padding: 4px 14px;">
-          {{ obs.get_severity_display|upper }} SEVERITY
+        <div class="chip hide-on-print {% if obs.is_safeguarding %}chip-red{% elif obs.note_type == 'concern' %}chip-amber{% elif obs.note_type == 'positive' %}chip-green{% else %}chip-blue{% endif %}" style="font-size: 12px; padding: 4px 14px;">
+          {{ obs.type_label|upper }}{% if obs.note_type == 'concern' %} &middot; {{ obs.get_severity_display|upper }}{% endif %}
         </div>
+        {% if obs.was_edited %}
+        <div class="hide-on-print" style="font-size:11px;color:var(--text-muted);margin-top:6px">Edited {{ obs.last_edited_at|date:"d M Y, H:i" }}</div>
+        {% endif %}
       </div>
     </div>
 
@@ -97,10 +100,13 @@
       <div class="data-item"><span class="data-label">Class/Grade</span><span class="data-value">{{ obs.student.class_name }}</span></div>
       <div class="data-item"><span class="data-label">Date of Observation</span><span class="data-value">{{ obs.observation_date|date:"F d, Y" }}</span></div>
       
-      <div class="data-item"><span class="data-label">Concern Type</span><span class="data-value">{{ obs.get_concern_type_display }}</span></div>
+      <div class="data-item"><span class="data-label">Note type</span><span class="data-value">{{ obs.type_label }}</span></div>
       <div class="data-item"><span class="data-label">Reporting Teacher</span><span class="data-value">{% if obs.submitted_by.staff_profile %}{{ obs.submitted_by.staff_profile.full_name }}{% else %}{{ obs.submitted_by.get_full_name|default:obs.submitted_by.username }}{% endif %}</span></div>
-      <div class="data-item"><span class="data-label">Submitted</span><span class="data-value">{{ obs.created_at|date:"d M Y, H:i" }}</span></div>
+      <div class="data-item"><span class="data-label">Submitted</span><span class="data-value">{{ obs.submitted_at|default:obs.created_at|date:"d M Y, H:i" }}</span></div>
     </div>
+    {% if obs.tags %}
+    <div class="tag-cloud">{% for t in obs.tags %}<span class="tag tag-blue">{{ t }}</span>{% endfor %}</div>
+    {% endif %}
 
     <!-- Acknowledgment Section (for high/critical observations) -->
     {% if needs_acknowledgment %}
@@ -108,6 +114,7 @@
       <div class="form-section-title">Required Acknowledgments</div>
       <div class="incident-box">
         <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+          {% if not obs.is_safeguarding %}
           <div style="flex: 1; min-width: 200px;">
             <div style="font-size:11px; font-weight:700; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">Department HOD</div>
             <div style="display: flex; align-items: center; gap: 8px;">
@@ -124,7 +131,8 @@
               {% endif %}
             </div>
           </div>
-          {% if obs.severity == 'critical' %}
+          {% endif %}
+          {% if obs.severity == 'critical' or obs.is_safeguarding %}
           <div style="flex:1; min-width:200px;">
             <div style="font-size:11px; font-weight:700; color: var(--text-muted); margin-bottom:6px; text-transform: uppercase; letter-spacing: 0.05em;">Head of School</div>
             <div style="display: flex; align-items: center; gap:8px;">
@@ -205,6 +213,55 @@
     </div>
     {% endif %}
 
+    <!-- Safeguarding follow-ups (corrections are added, never edited in) -->
+    {% if obs.is_safeguarding %}
+    <div class="form-section">
+      <div class="form-section-title">Follow-up notes</div>
+      {% for fu in follow_ups %}
+        <div class="incident-box" style="font-size:14px;padding:16px 18px;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:6px;white-space:normal">
+            {{ fu.created_at|date:"d M Y, H:i" }} &middot; {% if fu.submitted_by.staff_profile %}{{ fu.submitted_by.staff_profile.full_name }}{% else %}{{ fu.submitted_by.get_full_name|default:fu.submitted_by.username }}{% endif %}
+          </div>{{ fu.observation_text }}</div>
+      {% empty %}
+        <div style="font-size:13px;color:var(--text-muted);margin-bottom:10px">No follow-up notes yet.</div>
+      {% endfor %}
+      <form method="post" action="{% url 'welfare:follow_up' obs.pk %}" style="margin-top:12px">
+        {% csrf_token %}
+        <label class="hf2-label" for="followUpText">Add a follow-up or correction</label>
+        <textarea name="follow_up_text" id="followUpText" class="hf2-textarea" rows="3" style="width:100%" required
+                  placeholder="The original note stays as it is. Write the correction or new information here."></textarea>
+        <div style="display:flex;justify-content:flex-end;margin-top:10px">
+          <button type="submit" class="btn-primary">Add follow-up</button>
+        </div>
+      </form>
+    </div>
+    {% endif %}
+
+    <!-- Correction history: who changed what, when; original wording kept -->
+    {% if revisions %}
+    <div class="form-section">
+      <div class="form-section-title">Correction history</div>
+      {% for rev in revisions %}
+        <div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;font-size:13px">
+          <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+            <b>{% if rev.edited_by.staff_profile %}{{ rev.edited_by.staff_profile.full_name }}{% else %}{{ rev.edited_by.get_full_name|default:rev.edited_by.username }}{% endif %}</b>
+            <span style="color:var(--text-muted)">{{ rev.created_at|date:"d M Y, H:i" }}</span>
+          </div>
+          {% if rev.reason %}<div style="color:var(--text-secondary);margin-bottom:8px">Reason: {{ rev.reason }}</div>{% endif %}
+          <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+            {% for field, change in rev.changes.items %}
+            <tr style="border-top:1px solid var(--border)">
+              <td style="padding:6px 8px 6px 0;color:var(--text-muted);white-space:nowrap;vertical-align:top">{{ field }}</td>
+              <td style="padding:6px 8px;vertical-align:top;white-space:pre-wrap"><s style="color:#B91C1C">{{ change.from|default_if_none:"—" }}</s></td>
+              <td style="padding:6px 0 6px 8px;vertical-align:top;white-space:pre-wrap;color:#166534">{{ change.to|default_if_none:"—" }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
     <!-- Administrative Review — FR-WEL-004: visible only to HOD/HOS/SA, not teachers -->
     {% if can_review %}
     {% if obs.hod_notes or obs.hod_status == 'resolved' %}
@@ -231,13 +288,16 @@
 
   <!-- Actions -->
   <div class="hf2-actions" style="display: flex; justify-content: space-between; align-items: center;">
-    <a href="{% url 'welfare:list' %}" class="btn-secondary">&larr; Back to Case List</a>
+    <a href="{% url 'welfare:list' %}" class="btn-secondary">&larr; Back to welfare notes</a>
     <div style="display: flex; gap: 10px;">
-      {% if user == obs.submitted_by and not obs.is_locked and obs.severity != 'critical' and obs.hod_status == 'pending' %}
-      <a href="{% url 'welfare:edit' obs.pk %}" class="btn-secondary" style="border-color:#F59E0B;color:#92400E">
+      {% if can_edit %}
+      <a href="{% url 'welfare:edit' obs.pk %}" class="btn-secondary" style="border-color:#F59E0B;color:#92400E"
+         {% if is_author and obs.correction_deadline %}title="You can correct this note until {{ obs.correction_deadline|date:'d M Y, H:i' }}"{% endif %}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        Edit Observation
+        Correct note
       </a>
+      {% elif is_author and edit_block_reason %}
+      <span style="font-size:12px;color:var(--text-muted);max-width:280px;align-self:center">{{ edit_block_reason }}</span>
       {% endif %}
       <button onclick="window.print()" class="btn-secondary">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
