@@ -274,25 +274,25 @@ class EmailOrUsernameLoginTests(TestCase):
     password works for both, and failures never reveal whether an account exists."""
 
     def setUp(self):
-        self.user = _create_user("ebenezer.robert", "CorrectPass123!")  # email ebenezer.robert@hodari.edu
+        self.user = _create_user("your.username", "CorrectPass123!")  # email your.username@hodari.edu
         self.login_url = reverse("login")
 
     def test_login_with_username(self):
-        resp = self.client.post(self.login_url, {"username": "ebenezer.robert", "password": "CorrectPass123!"})
+        resp = self.client.post(self.login_url, {"username": "your.username", "password": "CorrectPass123!"})
         self.assertIn(resp.status_code, [302, 303])
 
     def test_login_with_email_any_case(self):
-        resp = self.client.post(self.login_url, {"username": " Ebenezer.Robert@HODARI.edu ", "password": "CorrectPass123!"})
+        resp = self.client.post(self.login_url, {"username": " your.username@HODARI.edu ", "password": "CorrectPass123!"})
         self.assertIn(resp.status_code, [302, 303])
         self.assertEqual(int(self.client.session["_auth_user_id"]), self.user.pk)
 
     def test_wrong_password_via_email_counts_toward_lockout(self):
-        self.client.post(self.login_url, {"username": "ebenezer.robert@hodari.edu", "password": "nope"})
+        self.client.post(self.login_url, {"username": "your.username@hodari.edu", "password": "nope"})
         self.user.refresh_from_db()
         self.assertEqual(self.user.failed_login_attempts, 1)
 
     def test_unknown_account_and_wrong_password_look_the_same(self):
-        wrong_pw = self.client.post(self.login_url, {"username": "ebenezer.robert@hodari.edu", "password": "nope"})
+        wrong_pw = self.client.post(self.login_url, {"username": "your.username@hodari.edu", "password": "nope"})
         unknown = self.client.post(self.login_url, {"username": "nobody@hodari.edu", "password": "nope"})
         for resp in (wrong_pw, unknown):
             self.assertContains(resp, "Email or password incorrect. You can sign in with your username")

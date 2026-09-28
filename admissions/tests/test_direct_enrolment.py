@@ -99,3 +99,22 @@ class DirectEnrolmentTests(TestCase):
         resp = self.client.post(reverse("admissions:direct_enrol"), self.payload())
         self.assertEqual(resp.status_code, 403)
         self.assertFalse(Student.objects.exists())
+
+
+class StudentsPageAddButtonTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.officer = make_user("office2", UserRole.ADMIN_OFFICER)
+        cls.teacher = make_user("teach2", UserRole.TEACHER)
+
+    def test_students_list_shows_add_student_for_authorised_staff(self):
+        self.client.force_login(self.officer)
+        resp = self.client.get(reverse("students:list"))
+        self.assertContains(resp, reverse("admissions:direct_enrol"))
+        self.assertRedirects(self.client.get(reverse("students:create")), reverse("admissions:direct_enrol"),
+                             fetch_redirect_response=False)
+
+    def test_teacher_does_not_see_add_student(self):
+        self.client.force_login(self.teacher)
+        resp = self.client.get(reverse("students:list"))
+        self.assertNotContains(resp, reverse("admissions:direct_enrol"))
