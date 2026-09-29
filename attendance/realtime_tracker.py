@@ -14,7 +14,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.utils import timezone
 
-from attendance.models import AttendanceEntry
+from attendance.models import PRESENT_STATUSES, AttendanceEntry
 from students.models import Student
 
 logger = logging.getLogger(__name__)
@@ -223,7 +223,7 @@ class RealTimeTracker:
             checked_in=Count('id', filter=Q(check_in_time__isnull=False)),
             checked_out=Count('id', filter=Q(check_out_time__isnull=False)),
             absent=Count('id', filter=Q(status='absent')),
-            present=Count('id', filter=Q(status='present')),
+            present=Count('id', filter=Q(status__in=PRESENT_STATUSES)),
         )
 
         total_students_q = Student.objects.filter(status='active')

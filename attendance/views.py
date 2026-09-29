@@ -356,9 +356,11 @@ class AttendanceTodayView(RoleRequiredMixin, TemplateView):
 
         # Summary counts (FR-ATT-003)
         total_expected = students.count()
-        present = entries.filter(status=AttendanceStatus.PRESENT).count()
-        absent = entries.filter(status=AttendanceStatus.ABSENT).count()
         late = entries.filter(status=AttendanceStatus.LATE).count()
+        # Late learners are in school, so they count as present; the Late
+        # card shows how many of those present arrived late.
+        present = entries.filter(status=AttendanceStatus.PRESENT).count() + late
+        absent = entries.filter(status=AttendanceStatus.ABSENT).count()
         excused = entries.filter(status=AttendanceStatus.EXCUSED).count()
         unconfirmed = total_expected - len(entries)
         

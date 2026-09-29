@@ -23,7 +23,7 @@ from django.conf import settings
 from django.db.models import Q, Count, Avg
 from django.core.cache import cache
 
-from .models import AttendanceEntry, NotificationLog, Message
+from .models import PRESENT_STATUSES, AttendanceEntry, NotificationLog, Message
 from students.models import Student
 
 logger = logging.getLogger(__name__)
@@ -139,7 +139,7 @@ class MonitoringService:
             total = entries.count()
             checkin_count = entries.filter(check_in_time__isnull=False).count()
             checkout_count = entries.filter(check_out_time__isnull=False).count()
-            present = entries.filter(status='present').count()
+            present = entries.filter(status__in=PRESENT_STATUSES).count()
             absent = entries.filter(status='absent').count()
             
             # Calculate success rate (entries with both checkin and checkout)
@@ -437,7 +437,7 @@ class MonitoringService:
                 'daily_summary': {
                     'total_students': today_students,
                     'attendance_records': today_entries.count(),
-                    'present': today_entries.filter(status='present').count(),
+                    'present': today_entries.filter(status__in=PRESENT_STATUSES).count(),
                     'absent': today_entries.filter(status='absent').count(),
                 },
                 'daily_notifications': {

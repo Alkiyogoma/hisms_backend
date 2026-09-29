@@ -1327,7 +1327,8 @@ class WelfareHODDashboardView(DepartmentScopedMixin, RoleRequiredMixin, Template
         )
 
         today_total = attendance_today.count()
-        today_present = attendance_today.filter(status=AttendanceStatus.PRESENT).count()
+        # Late learners are in school, so they count as present.
+        today_present = attendance_today.filter(status__in=[AttendanceStatus.PRESENT, AttendanceStatus.LATE]).count()
         today_absent = attendance_today.filter(status=AttendanceStatus.ABSENT).count()
         today_late = attendance_today.filter(status=AttendanceStatus.LATE).count()
         today_excused = attendance_today.filter(status=AttendanceStatus.EXCUSED).count()

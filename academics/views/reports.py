@@ -254,14 +254,15 @@ def _build_report_card_context(report):
     """
     ctx = {"report": report, "student": report.student}
 
-    from attendance.models import AttendanceEntry, AttendanceStatus
+    from attendance.models import PRESENT_STATUSES, AttendanceEntry, AttendanceStatus
     term = report.term
     att_filter = {"student": report.student}
     if term and term.start_date and term.end_date:
         att_filter["date__range"] = (term.start_date, term.end_date)
     entries = AttendanceEntry.objects.filter(**att_filter)
     ctx["attendance"] = {
-        "present": entries.filter(status=AttendanceStatus.PRESENT).count(),
+        # Present includes late; "late" is shown as "of which late".
+        "present": entries.filter(status__in=PRESENT_STATUSES).count(),
         "absent": entries.filter(status=AttendanceStatus.ABSENT).count(),
         "late": entries.filter(status=AttendanceStatus.LATE).count(),
     }

@@ -14,7 +14,7 @@ from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.contrib.auth.models import AnonymousUser
 
-from attendance.models import AttendanceEntry
+from attendance.models import PRESENT_STATUSES, AttendanceEntry
 from students.models import Student
 
 logger = logging.getLogger(__name__)
@@ -248,7 +248,7 @@ class AttendanceConsumer(AsyncWebsocketConsumer):
         checked_in = today_entries.filter(check_in_time__isnull=False).count()
         checked_out = today_entries.filter(check_out_time__isnull=False).count()
         absent = today_entries.filter(status="absent").count()
-        present = today_entries.filter(status="present").count()
+        present = today_entries.filter(status__in=PRESENT_STATUSES).count()
         
         # Get total active students for percentage calculation
         total_students = Student.objects.filter(status="active")
@@ -386,7 +386,7 @@ class ClassAttendanceConsumer(AsyncWebsocketConsumer):
         checked_in = today_entries.filter(check_in_time__isnull=False).count()
         checked_out = today_entries.filter(check_out_time__isnull=False).count()
         absent = today_entries.filter(status="absent").count()
-        present = today_entries.filter(status="present").count()
+        present = today_entries.filter(status__in=PRESENT_STATUSES).count()
         
         total_students = Student.objects.filter(
             status="active",

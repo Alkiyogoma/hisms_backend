@@ -336,7 +336,7 @@ def get_attendance_summary(student, academic_year) -> dict:
     Days present, absent, late to date across all terms, pulled from Attendance module.
     Gated behind PTC_SHOW_ATTENDANCE_SUMMARY feature flag.
     """
-    from attendance.models import AttendanceEntry, AttendanceStatus
+    from attendance.models import PRESENT_STATUSES, AttendanceEntry, AttendanceStatus
     from academics.models import Term
 
     terms = Term.objects.filter(academic_year=academic_year)
@@ -352,12 +352,12 @@ def get_attendance_summary(student, academic_year) -> dict:
         date__range=[earliest, today],
     )
 
-    present = entries.filter(status=AttendanceStatus.PRESENT).count()
-    absent = entries.filter(status=AttendanceStatus.ABSENT).count()
     late = entries.filter(status=AttendanceStatus.LATE).count()
-    total = present + absent + late
+    present = entries.filter(status__in=PRESENT_STATUSES).count()  # includes late
+    absent = entries.filter(status=AttendanceStatus.ABSENT).count()
+    total = present + absent
 
-    rate = round(((present + late) / total) * 100, 1) if total > 0 else 0
+    rate = round((present / total) * 100, 1) if total > 0 else 0
 
     return {
         "present": present,

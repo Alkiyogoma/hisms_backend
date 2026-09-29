@@ -7,7 +7,7 @@
   <div class="metric-compact" style="background:linear-gradient(135deg,#EEF9F0,#fff)">
     <div class="mc-lbl-row"><span class="mc-lbl">Present</span></div>
     <div class="mc-val" style="color:#059669">{{ summary.present|default:"0" }}</div>
-    <div class="mc-sub" style="color:#059669">{% if summary.total %}{{ summary.present_pct }}% of expected{% else %}No data{% endif %}</div>
+    <div class="mc-sub" style="color:#059669">{% if summary.total %}{{ summary.present_pct }}% of expected{% if summary.late %} &middot; incl. {{ summary.late }} late{% endif %}{% else %}No data{% endif %}</div>
   </div>
   <div class="metric-compact" style="background:linear-gradient(135deg,#FFF0F0,#fff)">
     <div class="mc-lbl-row"><span class="mc-lbl">Absent</span></div>
@@ -17,7 +17,7 @@
   <div class="metric-compact" style="background:linear-gradient(135deg,#FFF8ED,#fff)">
     <div class="mc-lbl-row"><span class="mc-lbl">Late</span></div>
     <div class="mc-val" style="color:#B45309">{{ summary.late|default:"0" }}</div>
-    <div class="mc-sub" style="color:#B45309">Verified reasons</div>
+    <div class="mc-sub" style="color:#B45309">Included in Present</div>
   </div>
   <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
     <div class="mc-lbl-row"><span class="mc-lbl">Enrolled</span></div>
