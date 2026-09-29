@@ -118,3 +118,24 @@ class StudentsPageAddButtonTests(TestCase):
         self.client.force_login(self.teacher)
         resp = self.client.get(reverse("students:list"))
         self.assertNotContains(resp, reverse("admissions:direct_enrol"))
+
+
+class AddStudentPermissionTests(TestCase):
+    """The Add student button and direct enrolment follow Students ›
+    "Can add student", so it can be granted/removed in Role Management."""
+
+    def test_removing_add_student_hides_button_and_blocks_form(self):
+        officer = make_user("office3", UserRole.ADMIN_OFFICER)
+        Group.objects.get(name=f"role_{UserRole.ADMIN_OFFICER}").permissions.remove(
+            Permission.objects.get(codename="add_student", content_type__app_label="students")
+        )
+        officer = User.objects.get(pk=officer.pk)
+        self.client.force_login(officer)
+        self.assertNotContains(self.client.get(reverse("students:list")), reverse("admissions:direct_enrol"))
+        self.assertEqual(self.client.get(reverse("admissions:direct_enrol")).status_code, 403)
+
+    def test_teacher_granted_add_student_can_enrol(self):
+        teacher = make_user("teach3", UserRole.TEACHER)
+        teacher.user_permissions.add(Permission.objects.get(codename="add_student", content_type__app_label="students"))
+        self.client.force_login(User.objects.get(pk=teacher.pk))
+        self.assertEqual(self.client.get(reverse("admissions:direct_enrol")).status_code, 200)

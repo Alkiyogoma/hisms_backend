@@ -134,9 +134,9 @@
           {% endif %}
           {% if obs.severity == 'critical' or obs.is_safeguarding %}
           <div style="flex:1; min-width:200px;">
-            <div style="font-size:11px; font-weight:700; color: var(--text-muted); margin-bottom:6px; text-transform: uppercase; letter-spacing: 0.05em;">Head of School</div>
+            <div style="font-size:11px; font-weight:700; color: var(--text-muted); margin-bottom:6px; text-transform: uppercase; letter-spacing: 0.05em;">{% if obs.is_safeguarding %}Safeguarding sign-off{% else %}Head of School{% endif %}</div>
             <div style="display: flex; align-items: center; gap:8px;">
-              {% if obs.is_hos_acknowledged %}
+              {% if obs.is_safeguarding and obs.is_safeguarding_acknowledged or not obs.is_safeguarding and obs.is_hos_acknowledged %}
               <span style="display:inline-flex;align-items:center;gap:6px;background:#DCFCE7;color:#166534;padding:6px 14px;border-radius:6px;font-weight:700;font-size:12px;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
                 Acknowledged

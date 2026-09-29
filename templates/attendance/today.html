@@ -35,7 +35,12 @@ if ('serviceWorker' in navigator) {
   </div>
 </div>
 <div class="section-hdr">
-  <span class="section-title">Daily attendance</span>
+  <div>
+      <span class="section-title">Daily attendance</span>
+      <p class="print-hide" style="margin:-6px 0 12px;font-size:13px;color:var(--text-muted)">
+        This view displays attendance data for reporting and monitoring purposes only.
+      </p>
+  </div>
   <div style="display:flex; gap:10px; align-items:center" class="print-hide">
     <span class="chip chip-blue">85% Attendance Threshold</span>
     <button onclick="window.print()" class="hf-btn hf-btn-secondary" style="font-size:12px">
@@ -44,9 +49,6 @@ if ('serviceWorker' in navigator) {
     </button>
   </div>
 </div>
-<p class="print-hide" style="margin:-6px 0 12px;font-size:13px;color:var(--text-muted)">
-  This view displays attendance data for reporting and monitoring purposes only.
-</p>
 
 <!-- Summary Metrics Grid -->
 {% include "attendance/_metrics.html" %}

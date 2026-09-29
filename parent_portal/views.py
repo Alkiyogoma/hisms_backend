@@ -18,7 +18,7 @@ from django.views import View
 from academics.models import (
     GradeClass, ExamScore, ReportCard, ReportCardStatus, ExamTypeConfiguration, Subject, Term,
 )
-from attendance.models import AttendanceEntry, AttendanceStatus
+from attendance.models import PRESENT_STATUSES, AttendanceEntry, AttendanceStatus
 from core.models import TimeStampedModel
 from students.models import Student, StudentStatus, StudentGuardian, ParentGuardian, GuardianRelationship
 from users.models import User, UserRole
@@ -124,9 +124,9 @@ class ParentDashboardView(RoleRequiredMixin, TemplateView):
                 attendance_summary[sid] = {"present": 0, "absent": 0, "late": 0, "excused": 0, "total": 0}
             status = entry["status"]
             attendance_summary[sid]["total"] += 1
-            if status == AttendanceStatus.PRESENT:
+            if status in PRESENT_STATUSES:  # late learners are present too
                 attendance_summary[sid]["present"] += 1
-            elif status == AttendanceStatus.ABSENT:
+            if status == AttendanceStatus.ABSENT:
                 attendance_summary[sid]["absent"] += 1
             elif status == AttendanceStatus.LATE:
                 attendance_summary[sid]["late"] += 1

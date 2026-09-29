@@ -234,7 +234,7 @@ class WelfareObservation(TimeStampedModel):
         ordering = ["-observation_date", "-created_at"]
         permissions = [
             ("can_review_observation", "Can review and approve welfare observations"),
-            ("view_safeguarding_note", "Can view safeguarding notes (Safeguarding Lead)"),
+            ("view_safeguarding_note", "Can view safeguarding notes (a child may be at risk of harm)"),
         ]
         indexes = [
             models.Index(fields=["student", "observation_date"]),
@@ -325,10 +325,17 @@ class WelfareObservation(TimeStampedModel):
         from users.models import UserRole
         return self.acknowledgments.filter(user__role=UserRole.HEAD_OF_SCHOOL).exists()
     
+    def is_safeguarding_acknowledged(self):
+        """Signed off by someone holding the safeguarding permission."""
+        return any(
+            ack.user.has_perm("welfare.view_safeguarding_note")
+            for ack in self.acknowledgments.select_related("user")
+        )
+
     def is_fully_acknowledged(self):
         if self.is_safeguarding:
-            # Safeguarding notes never go to the HOD; HOS sign-off is enough.
-            return self.is_hos_acknowledged()
+            # Safeguarding notes never go to the HOD; a safeguarding sign-off is enough.
+            return self.is_safeguarding_acknowledged()
         if self.severity == WelfareSeverity.CRITICAL:
             return self.is_hod_acknowledged() and self.is_hos_acknowledged()
         elif self.severity == WelfareSeverity.HIGH:

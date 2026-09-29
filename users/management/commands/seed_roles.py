@@ -2,8 +2,13 @@
 Management command: seed default RoleConfig entries and permissions.
 
 Run:
-    python manage.py seed_roles
-    python manage.py seed_roles --reset   # Reset all roles to defaults
+    python manage.py seed_roles           # Add missing default permissions (never removes any)
+    python manage.py seed_roles --prune   # Also take away permissions that aren't in the defaults
+    python manage.py seed_roles --reset   # Reset all roles to exactly the defaults
+
+By default this is add-only, so it is safe on a live system: permissions an
+admin has granted in Role Management are kept. --prune and --reset only
+unlink permissions from roles; they never delete Permission records.
 """
 
 from django.core.management.base import BaseCommand
@@ -26,13 +31,22 @@ class Command(BaseCommand):
             action="store_true",
             help="Clear all existing permissions from role groups before seeding.",
         )
+        parser.add_argument(
+            "--prune",
+            action="store_true",
+            help="Remove permissions from role groups that aren't in the defaults "
+                 "(drops permissions granted in Role Management).",
+        )
 
     def handle(self, *args, **options):
         reset = options["reset"]
+        prune = options["prune"]
         total_perms = 0
 
         for role_value, meta in DEFAULT_ROLE_CONFIGS.items():
-            role_config, created = RoleConfig.objects.update_or_create(
+            # get_or_create: never overwrite labels/departments/active flags
+            # that an admin has edited in Role Management.
+            role_config, created = RoleConfig.objects.get_or_create(
                 role=role_value,
                 defaults={
                     "label": meta["label"],
@@ -43,7 +57,7 @@ class Command(BaseCommand):
                     "is_active": True,
                 },
             )
-            status = "CREATED" if created else "UPDATED"
+            status = "CREATED" if created else "KEPT"
             self.stdout.write(f"  {status}: {meta['label']}")
 
             # Get or create the auth Group for this role
@@ -64,15 +78,20 @@ class Command(BaseCommand):
             to_add = target - existing
             to_remove = existing - target
 
-            if to_remove:
-                group.permissions.filter(codename__in=to_remove).delete()
+            # Unlink only — calling .delete() here used to delete the
+            # Permission rows themselves, stripping them from every role/user.
+            if to_remove and prune:
+                group.permissions.remove(*group.permissions.filter(codename__in=to_remove))
 
             if to_add:
                 new_perms = Permission.objects.filter(codename__in=to_add)
                 group.permissions.add(*new_perms)
 
-            # Also set on the RoleConfig M2M
-            role_config.permissions.set(group.permissions.all())
+            # Keep the RoleConfig M2M in step with the group
+            if reset or prune:
+                role_config.permissions.set(group.permissions.all())
+            else:
+                role_config.permissions.add(*group.permissions.all())
 
             count = group.permissions.count()
             total_perms += count

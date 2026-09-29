@@ -6,6 +6,9 @@
   {% if perms.welfare.view_welfareobservation %}
   <a href="{% url 'welfare:list' %}" class="sub-tab {% if welfare_tab == 'list' %}active{% endif %}">Notes</a>
   {% endif %}
+  {% if perms.welfare.view_safeguarding_note %}
+  <a href="{% url 'welfare:student_incidents' %}?note_type=safeguarding" class="sub-tab {% if welfare_tab == 'safeguarding' %}active{% endif %}">Safeguarding</a>
+  {% endif %}
   {% if perms.welfare.add_welfareobservation %}
   <a href="{% url 'welfare:submit' %}" class="sub-tab {% if welfare_tab == 'submit' %}active{% endif %}">+ Add note</a>
   {% endif %}

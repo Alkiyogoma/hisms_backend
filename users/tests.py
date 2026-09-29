@@ -301,3 +301,36 @@ class EmailOrUsernameLoginTests(TestCase):
         resp = self.client.get(self.login_url)
         self.assertContains(resp, "Username or school email")
         self.assertNotContains(resp, 'placeholder="you@school.com"')
+
+
+class SeedRolesIsSafeOnLiveDataTests(TestCase):
+    """seed_roles must never delete Permission rows or drop permissions an
+    admin granted in Role Management, unless explicitly asked to prune."""
+
+    def test_default_run_adds_but_never_removes(self):
+        from django.contrib.auth.models import Group, Permission
+        from django.core.management import call_command
+        call_command("seed_roles", stdout=open("/dev/null", "w"))
+        group = Group.objects.get(name="role_teacher")
+        extra = Permission.objects.get(codename="add_student", content_type__app_label="students")
+        group.permissions.add(extra)  # admin grants it in Role Management
+        missing = Permission.objects.get(codename="add_welfareobservation")
+        group.permissions.remove(missing)
+
+        call_command("seed_roles", stdout=open("/dev/null", "w"))
+        self.assertTrue(group.permissions.filter(pk=extra.pk).exists())   # kept
+        self.assertTrue(group.permissions.filter(pk=missing.pk).exists())  # re-added
+
+        call_command("seed_roles", "--prune", stdout=open("/dev/null", "w"))
+        self.assertFalse(group.permissions.filter(pk=extra.pk).exists())   # unlinked...
+        self.assertTrue(Permission.objects.filter(pk=extra.pk).exists())   # ...not deleted
+        self.assertTrue(Group.objects.get(name="role_admin_officer").permissions.filter(pk=extra.pk).exists())
+
+    def test_role_labels_edited_in_ui_are_kept(self):
+        from django.core.management import call_command
+        from users.role_models import RoleConfig
+        call_command("seed_roles", stdout=open("/dev/null", "w"))
+        RoleConfig.objects.filter(role="teacher").update(label="Class Teacher", is_active=False)
+        call_command("seed_roles", stdout=open("/dev/null", "w"))
+        rc = RoleConfig.objects.get(role="teacher")
+        self.assertEqual((rc.label, rc.is_active), ("Class Teacher", False))

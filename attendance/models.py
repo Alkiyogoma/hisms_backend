@@ -18,6 +18,12 @@ class AttendanceStatus(models.TextChoices):
     EXCUSED = "excused", "Excused"
 
 
+# Statuses that count as "present" in every total, rate and report: a learner
+# marked Late is in school. Reports that also show Late list it as
+# "of which late", never as a separate share of the total.
+PRESENT_STATUSES = (AttendanceStatus.PRESENT, AttendanceStatus.LATE)
+
+
 class AttendanceEntry(TimeStampedModel):
     date = models.DateField(db_index=True)
     student = models.ForeignKey("students.Student", on_delete=models.PROTECT, related_name="attendance_entries")

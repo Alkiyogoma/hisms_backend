@@ -327,7 +327,7 @@ class DirectEnrolmentForm(forms.Form):
     # Why
     reason = forms.ChoiceField(choices=[("", "Select a reason")] + list(DirectEnrolmentReason.choices), label="Reason for direct enrolment")
     reason_note = forms.CharField(
-        widget=forms.Textarea(attrs={"rows": 2}), label="Details",
+        widget=forms.Textarea(attrs={"rows": 1}), label="Details",
         help_text="e.g. which school they are transferring from, or which staff member is the parent.",
     )
 

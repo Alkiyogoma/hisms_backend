@@ -15,7 +15,7 @@ import json
 from datetime import datetime, timedelta
 
 from .services import OTPService, AttendanceService, StudentSearchService, QRCodeService, correct_attendance
-from .models import AttendanceEntry, Message
+from .models import PRESENT_STATUSES, AttendanceEntry, Message
 from students.models import Student, ParentGuardian
 from core.teacher_context import get_teacher_assigned_classes
 from core.utils import is_school_day
@@ -410,7 +410,7 @@ def attendance_statistics(request):
         total_students = student_qs.count()
         
         checkin_count = entry_qs.filter(
-            status='present',
+            status__in=PRESENT_STATUSES,
             check_in_time__isnull=False
         ).count()
         

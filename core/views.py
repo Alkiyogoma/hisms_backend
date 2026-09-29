@@ -14,7 +14,7 @@ from users.models import UserRole
 
 from academics.models import LessonPlan, LessonPlanStatus, Term, GradeClass, Department, ReportCard, ReportCardStatus, ExamScore
 from admissions.models import Applicant, ApplicantStatus
-from attendance.models import AttendanceEntry, AttendanceStatus
+from attendance.models import PRESENT_STATUSES, AttendanceEntry, AttendanceStatus
 from audit.models import AuditLog
 from discipline.models import DisciplineIncident
 from finance.models import Invoice, Payment
@@ -23,6 +23,7 @@ from students.models import Student, StudentStatus, StudentGuardian
 from users.models import User, UserRole
 from timetable.models import TimetableSlot, Weekday
 from welfare.models import WelfareObservation, WelfareSeverity
+
 from events.models import CalendarEvent
 from core.teacher_context import is_ecd_teacher
 
@@ -281,7 +282,7 @@ class HOSDashboardView(RoleRequiredMixin, TemplateView):
         # 1. School overview metrics — batch into fewer queries
         from django.db.models import Count, Q, Case, When, Value, IntegerField
         active_count = Student.objects.filter(status=StudentStatus.ACTIVE).count()
-        present_today = AttendanceEntry.objects.filter(date=today, status=AttendanceStatus.PRESENT).count()
+        present_today = AttendanceEntry.objects.filter(date=today, status__in=PRESENT_STATUSES).count()
         att_pct = round(present_today / active_count * 100) if active_count else 0
 
         # Lesson plan counts in one query
@@ -355,7 +356,7 @@ class HOSDashboardView(RoleRequiredMixin, TemplateView):
             .values_list('class_name', 'cnt')
         )
         class_present_counts = dict(
-            AttendanceEntry.objects.filter(date=today, status=AttendanceStatus.PRESENT)
+            AttendanceEntry.objects.filter(date=today, status__in=PRESENT_STATUSES)
             .values('student__class_name')
             .annotate(cnt=Count('id'))
             .values_list('student__class_name', 'cnt')
@@ -993,7 +994,7 @@ class PrimaryHODDashboardView(RoleRequiredMixin, TemplateView):
             .values_list('class_name', 'cnt')
         )
         class_present_counts = dict(
-            AttendanceEntry.objects.filter(date=today, student__class_name__in=dept_classes, status=AttendanceStatus.PRESENT)
+            AttendanceEntry.objects.filter(date=today, student__class_name__in=dept_classes, status__in=PRESENT_STATUSES)
             .values('student__class_name')
             .annotate(cnt=Count('id'))
             .values_list('student__class_name', 'cnt')
@@ -1244,7 +1245,7 @@ class ECDHODDashboardView(RoleRequiredMixin, TemplateView):
             .values_list('class_name', 'cnt')
         )
         class_present_counts = dict(
-            AttendanceEntry.objects.filter(date=today, student__class_name__in=ecd_classes, status=AttendanceStatus.PRESENT)
+            AttendanceEntry.objects.filter(date=today, student__class_name__in=ecd_classes, status__in=PRESENT_STATUSES)
             .values('student__class_name')
             .annotate(cnt=Count('id'))
             .values_list('student__class_name', 'cnt')
@@ -1519,7 +1520,7 @@ class TeacherDashboardView(RoleRequiredMixin, TemplateView):
         
         # Attendance Today Summary (for the top metrics)
         if att_classes:
-            att_present = AttendanceEntry.objects.filter(date=today, student__class_name__in=att_classes, status=AttendanceStatus.PRESENT).count()
+            att_present = AttendanceEntry.objects.filter(date=today, student__class_name__in=att_classes, status__in=PRESENT_STATUSES).count()
             att_total = Student.objects.filter(class_name__in=att_classes, status=StudentStatus.ACTIVE).count()
         else:
             att_present = 0
@@ -1556,7 +1557,7 @@ class TeacherDashboardView(RoleRequiredMixin, TemplateView):
                 .values_list('student__class_name', 'cnt')
             )
             cls_present_counts = dict(
-                AttendanceEntry.objects.filter(date=today, student__class_name__in=att_classes, status=AttendanceStatus.PRESENT)
+                AttendanceEntry.objects.filter(date=today, student__class_name__in=att_classes, status__in=PRESENT_STATUSES)
                 .values('student__class_name')
                 .annotate(cnt=Count('id'))
                 .values_list('student__class_name', 'cnt')

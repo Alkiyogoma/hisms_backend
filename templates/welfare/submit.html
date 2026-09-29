@@ -150,7 +150,7 @@
     <!-- Safeguarding banner -->
     <div class="sg-banner" id="sgBanner" style="display:none">
       <div>
-        <b>This note goes straight to the Safeguarding Lead.</b>
+        <b>This note goes straight to staff with safeguarding access.</b>
         Record exactly what you saw or heard. Do not investigate or promise the child secrecy.
         Once sent you cannot reopen it; corrections are added as follow-up notes.
       </div>
@@ -357,10 +357,10 @@
       items: [
         {text: "Class teachers of the child", no: true},
         {text: "Head of Department", no: true},
-        {text: "Safeguarding Lead and Head of School", yes: true},
+        {text: "Staff with safeguarding access", yes: true},
         {text: "Parents", no: true}
       ],
-      note: "Safeguarding records are restricted to the Safeguarding Lead and Head of School. The author cannot reopen the note after sending it."
+      note: "Safeguarding records can only be read by staff given safeguarding access in Role Management. The author cannot reopen the note after sending it."
     }
   };
 
@@ -407,7 +407,7 @@
     document.getElementById("actionLabel").innerHTML = (t === "safeguarding" ? "What did you do immediately?" : "Action taken today") + ' <span style="color:var(--red)">*</span>';
     document.getElementById("kidHint").textContent = !MULTI_CHILD || t === "safeguarding" ? "One child per note." : "Search by name. You can add more than one child.";
     var btn = document.getElementById("submitBtn");
-    if (MODE !== "correct") btn.textContent = t === "safeguarding" ? "Send to Safeguarding Lead" : "Submit note";
+    if (MODE !== "correct") btn.textContent = t === "safeguarding" ? "Send safeguarding note" : "Submit note";
     var draftBtn = document.getElementById("draftBtn");
     if (draftBtn) draftBtn.style.display = t === "safeguarding" ? "none" : "";
     if ((t === "safeguarding" || !MULTI_CHILD) && selectedKids.length > 1) {

@@ -20,7 +20,7 @@ from django.conf import settings
 import logging
 import json
 
-from .models import AttendanceEntry, NotificationLog
+from .models import PRESENT_STATUSES, AttendanceEntry, NotificationLog
 from students.models import Student
 
 logger = logging.getLogger(__name__)
@@ -62,7 +62,7 @@ class ReportingService:
             
             # Calculate statistics
             total_entries = entries.count()
-            present = entries.filter(status='present').count()
+            present = entries.filter(status__in=PRESENT_STATUSES).count()
             absent = entries.filter(status='absent').count()
             checked_in = entries.filter(check_in_time__isnull=False).count()
             checked_out = entries.filter(check_out_time__isnull=False).count()
@@ -172,7 +172,7 @@ class ReportingService:
                     }
                 
                 student_stats[student_id]['total'] += 1
-                if entry.status == 'present':
+                if entry.status in PRESENT_STATUSES:
                     student_stats[student_id]['present'] += 1
                 else:
                     student_stats[student_id]['absent'] += 1
@@ -267,7 +267,7 @@ class ReportingService:
             # Calculate class statistics
             total_students = class_students.count()
             total_records = entries.count()
-            present_count = entries.filter(status='present').count()
+            present_count = entries.filter(status__in=PRESENT_STATUSES).count()
             absent_count = entries.filter(status='absent').count()
             checked_in_count = entries.filter(check_in_time__isnull=False).count()
             checked_out_count = entries.filter(check_out_time__isnull=False).count()
@@ -289,7 +289,7 @@ class ReportingService:
             student_details = []
             for student in class_students:
                 student_entries = entries.filter(student=student)
-                student_present = student_entries.filter(status='present').count()
+                student_present = student_entries.filter(status__in=PRESENT_STATUSES).count()
                 student_attendance_rate = (student_present / student_entries.count() * 100) if student_entries.count() > 0 else 0
                 
                 student_details.append({
@@ -467,7 +467,7 @@ class ReportingService:
                     continue
                 
                 # Calculate attendance rate
-                present_count = entries.filter(status='present').count()
+                present_count = entries.filter(status__in=PRESENT_STATUSES).count()
                 attendance_rate = present_count / entries.count()
                 
                 # Generate alerts based on threshold
@@ -523,7 +523,7 @@ class ReportingService:
             if entries.count() == 0:
                 return []
             
-            present_count = entries.filter(status='present').count()
+            present_count = entries.filter(status__in=PRESENT_STATUSES).count()
             attendance_rate = present_count / entries.count()
             
             alerts = []
@@ -579,7 +579,7 @@ class ReportingService:
                     weekly_stats[week_key] = {'present': 0, 'absent': 0, 'total': 0}
                 
                 weekly_stats[week_key]['total'] += 1
-                if entry.status == 'present':
+                if entry.status in PRESENT_STATUSES:
                     weekly_stats[week_key]['present'] += 1
                 else:
                     weekly_stats[week_key]['absent'] += 1
@@ -734,7 +734,7 @@ class ReportingService:
                 day_key = entry.date.isoformat()
                 if day_key in daily_stats:
                     daily_stats[day_key]['total'] += 1
-                    if entry.status == 'present':
+                    if entry.status in PRESENT_STATUSES:
                         daily_stats[day_key]['present'] += 1
                     else:
                         daily_stats[day_key]['absent'] += 1
@@ -822,7 +822,7 @@ class ReportingService:
                 if not entries.exists():
                     continue
 
-                present_count = entries.filter(status='present').count()
+                present_count = entries.filter(status__in=PRESENT_STATUSES).count()
                 rate = present_count / entries.count()
 
                 alert = {
@@ -889,7 +889,7 @@ class ReportingService:
                 entries.values('class_name')
                 .annotate(
                     total=Count('id'),
-                    present=Count('id', filter=Q(status='present')),
+                    present=Count('id', filter=Q(status__in=PRESENT_STATUSES)),
                     absent=Count('id', filter=Q(status='absent')),
                 )
                 .order_by('class_name')

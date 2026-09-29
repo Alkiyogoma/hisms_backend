@@ -18,6 +18,7 @@ from users.models import UserRole
 
 logger = logging.getLogger(__name__)
 
+from attendance.models import PRESENT_STATUSES
 from .models import GuardianRelationship, ParentGuardian, Student, StudentGuardian, StudentStatus, PDPAConsentLog
 from .forms import StudentCreateForm, StudentPhotoUploadForm
 from .services import generate_admission_number
@@ -269,7 +270,7 @@ class StudentDetailView(RoleRequiredMixin, DetailView):
         attendance_data = list(recent_qs)
         attendance_stats = {
             'total': len(attendance_data),
-            'present': sum(1 for a in attendance_data if a.status == 'present'),
+            'present': sum(1 for a in attendance_data if a.status in PRESENT_STATUSES),  # includes late
             'absent': sum(1 for a in attendance_data if a.status == 'absent'),
             'late': sum(1 for a in attendance_data if a.status == 'late'),
         }
@@ -609,7 +610,7 @@ class StudentCreateView(RoleRequiredMixin, TemplateView):
     def get(self, request, *args, **kwargs):
         # Authorised staff enrol directly (transfer, staff child, ...);
         # everyone else starts an inquiry in the admissions pipeline.
-        if request.user.has_perm("admissions.direct_enrol") or request.user.role == UserRole.SUPER_ADMIN:
+        if request.user.has_perm("students.add_student") or request.user.role == UserRole.SUPER_ADMIN:
             return redirect("admissions:direct_enrol")
         return redirect("admissions:new_inquiry")
 

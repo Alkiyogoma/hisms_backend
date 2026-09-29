@@ -132,7 +132,6 @@ ROLE_DEFAULT_PERMISSIONS = {
     # ── SUPER ADMIN ──────────────────────────────────────────
     # Full system access: ALL 448 permissions on all modules.
     UserRole.SUPER_ADMIN: [
-        "direct_enrol",
         "add_abcgeneralassignment", "change_abcgeneralassignment", "delete_abcgeneralassignment", "view_abcgeneralassignment",
         "add_abcinternalexam", "change_abcinternalexam", "delete_abcinternalexam", "view_abcinternalexam",
         "add_abcpaceprogress", "change_abcpaceprogress", "delete_abcpaceprogress", "view_abcpaceprogress",
@@ -269,7 +268,6 @@ ROLE_DEFAULT_PERMISSIONS = {
     # ── HEAD OF SCHOOL ───────────────────────────────────────
     # School-wide read + sign-off + status updates. No direct data creation.
     UserRole.HEAD_OF_SCHOOL: [
-        "direct_enrol",  # Admissions — direct enrolment (transfer, staff child, ...)
         # Review approvals — HOD sign-off
         "can_review_incident", "can_review_lessonplan", "can_review_observation",
         # Academics — read all, sign off reports
@@ -550,7 +548,6 @@ ROLE_DEFAULT_PERMISSIONS = {
     # ── ADMIN OFFICER ────────────────────────────────────────
     # Admissions, enrolment, staff records, comms, events, timetable.
     UserRole.ADMIN_OFFICER: [
-        "direct_enrol",  # Admissions — direct enrolment (transfer, staff child, ...)
         # Academics — read
         "view_academicyear", "view_term", "view_subject", "view_gradeclass",
         "view_examscore",
