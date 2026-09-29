@@ -100,10 +100,8 @@
     <div class="card" style="margin-bottom:20px">
         <div class="card-title">Attendance Thresholds</div>
         <div class="form-grid">
-            {% field form.attendance_threshold_warn label="Warning (%)" hint="Students below this receive a warning
-            notification." %}
-            {% field form.attendance_threshold_critical label="Critical (%)" hint="Students below this are flagged as
-            critically absent." %}
+            {% field form.attendance_threshold_warn label="Warning (%)" hint="Students below this receive a warning notification." %}
+            {% field form.attendance_threshold_critical label="Critical (%)" hint="Students below this are flagged as critically absent." %}
         </div>
     </div>
 
@@ -169,8 +167,7 @@
         <div class="card-title">Email (SMTP)</div>
         <div class="form-grid">
             <div>
-                {% field form.email_backend hint="Use 'django.core.mail.backends.smtp.EmailBackend' for real email
-                delivery." %}
+                {% field form.email_backend hint="Use 'django.core.mail.backends.smtp.EmailBackend' for real email delivery." %}
                 {% field form.email_host hint="SMTP server hostname (e.g. smtp.gmail.com)" %}
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
                     {% field form.email_port label="Port" %}
@@ -248,8 +245,7 @@
                 <tr>
                     <td style="font-weight:600">{{ gc.name }}</td>
                     <td><span
-                            class="chip {% if gc.department == 'ECD' %}chip-amber{% elif gc.department == 'PRIMARY' %}chip-blue{% else %}chip-grey{% endif %}">{{
-                            gc.get_department_display }}</span></td>
+                            class="chip {% if gc.department == 'ECD' %}chip-amber{% elif gc.department == 'PRIMARY' %}chip-blue{% else %}chip-grey{% endif %}">{{ gc.get_department_display }}</span></td>
                     <td>{{ gc.max_capacity }}</td>
                     <td style="text-align:right;white-space:nowrap">
                         {% if can_edit_class %}
@@ -265,9 +261,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="4" style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with
-                        title='No classes yet' desc='Add the first class to get started.' icon='users' icon_color='blue'
-                        %}</td>
+                    <td colspan="4" style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with title='No classes yet' desc='Add the first class to get started.' icon='users' icon_color='blue' %}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -372,14 +366,11 @@
                 <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;flex-wrap:wrap">
                     <span style="font-weight:600;font-size:14px">{{ ay.name }}</span>
                     {% if ay.is_current %}<span class="chip chip-blue" style="font-size:11px">Current</span>{% endif %}
-                    {% if ay.is_published %}<span class="chip chip-green" style="font-size:11px">Published</span>{%
-                    endif %}
+                    {% if ay.is_published %}<span class="chip chip-green" style="font-size:11px">Published</span>{% endif %}
                     <span style="font-size:12px;color:var(--text-muted);white-space:nowrap">
-                        {% if ay.start_date and ay.end_date %}{{ ay.start_date|date:"d M Y" }} – {{ ay.end_date|date:"d
-                        M Y" }}{% else %}<span style="color:var(--hodari-gold,#D97706)">⚠ No dates</span>{% endif %}
+                        {% if ay.start_date and ay.end_date %}{{ ay.start_date|date:"d M Y" }} – {{ ay.end_date|date:"d M Y" }}{% else %}<span style="color:var(--hodari-gold,#D97706)">⚠ No dates</span>{% endif %}
                     </span>
-                    <span style="font-size:12px;color:var(--text-muted);white-space:nowrap">{{ ay.terms.count }} term{{
-                        ay.terms.count|pluralize }}</span>
+                    <span style="font-size:12px;color:var(--text-muted);white-space:nowrap">{{ ay.terms.count }} term{{ ay.terms.count|pluralize }}</span>
                 </div>
                 <div style="display:flex;gap:4px">
                     {% if ay.end_date and ay.end_date|date:'Y-m-d' < today_iso %} <span
@@ -402,8 +393,7 @@
                 </div>
             </div>
             {% empty %}
-            <div style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with title='No academic
-                years yet' desc='Click + Add Year to get started.' icon='calendar' icon_color='blue' %}</div>
+            <div style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with title='No academic years yet' desc='Click + Add Year to get started.' icon='calendar' icon_color='blue' %}</div>
             {% endfor %}
         </div>
     </div>
@@ -429,29 +419,23 @@
                     <span style="font-weight:600;font-size:13px">{{ term.name }}</span>
                     {% if term.is_locked %}<span class="chip chip-grey" style="font-size:10px">Locked</span>{% endif %}
                     <span style="font-size:12px;color:var(--text-muted)">
-                        {% if term.start_date and term.end_date %}{{ term.start_date|date:"d M Y" }} – {{
-                        term.end_date|date:"d M Y" }}{% else %}No dates{% endif %}
+                        {% if term.start_date and term.end_date %}{{ term.start_date|date:"d M Y" }} – {{ term.end_date|date:"d M Y" }}{% else %}No dates{% endif %}
                     </span>
                     {% if term.midterm_exam_start_date or term.endterm_exam_start_date or term.quiz_start_date %}
                     <span style="font-size:11px;color:var(--hodari-blue)">
                         {% if term.quiz_start_date %}Q:{{ term.quiz_start_date|date:"d M" }}{% endif %}
-                        {% if term.midterm_exam_start_date %} MT:{{ term.midterm_exam_start_date|date:"d M" }}{% endif
-                        %}
-                        {% if term.endterm_exam_start_date %} ET:{{ term.endterm_exam_start_date|date:"d M" }}{% endif
-                        %}
+                        {% if term.midterm_exam_start_date %} MT:{{ term.midterm_exam_start_date|date:"d M" }}{% endif %}
+                        {% if term.endterm_exam_start_date %} ET:{{ term.endterm_exam_start_date|date:"d M" }}{% endif %}
                     </span>
                     {% endif %}
                     {% if term.quiz_grade_marking_end_date %}
-                    <span style="font-size:11px;color:var(--green,#16A34A)">Q Mark:{{
-                        term.quiz_grade_marking_end_date|date:"d M" }}</span>
+                    <span style="font-size:11px;color:var(--green,#16A34A)">Q Mark:{{ term.quiz_grade_marking_end_date|date:"d M" }}</span>
                     {% endif %}
                     {% if term.midterm_grade_marking_end_date %}
-                    <span style="font-size:11px;color:var(--green,#16A34A)">MT Mark:{{
-                        term.midterm_grade_marking_end_date|date:"d M" }}</span>
+                    <span style="font-size:11px;color:var(--green,#16A34A)">MT Mark:{{ term.midterm_grade_marking_end_date|date:"d M" }}</span>
                     {% endif %}
                     {% if term.endterm_grade_marking_end_date %}
-                    <span style="font-size:11px;color:var(--green,#16A34A)">ET Mark:{{
-                        term.endterm_grade_marking_end_date|date:"d M" }}</span>
+                    <span style="font-size:11px;color:var(--green,#16A34A)">ET Mark:{{ term.endterm_grade_marking_end_date|date:"d M" }}</span>
                     {% endif %}
                 </div>
                 <div style="display:flex;gap:4px">
@@ -468,8 +452,7 @@
             {% endfor %}
             {% endif %}
             {% empty %}
-            <div style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with title='No terms
-                yet' desc='Create an academic year first, then add terms.' icon='calendar' icon_color='grey' %}</div>
+            <div style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with title='No terms yet' desc='Create an academic year first, then add terms.' icon='calendar' icon_color='grey' %}</div>
             {% endfor %}
         </div>
     </div>
@@ -794,8 +777,7 @@
                     <td>{{ ms.max_file_size_mb }} MB</td>
                     <td>{{ ms.max_total_size_mb }} MB</td>
                     <td>{{ ms.max_files }}</td>
-                    <td>{% if ms.duplicate_check %}<span class="chip chip-green" style="font-size:10px">On</span>{% else
-                        %}<span class="chip chip-grey" style="font-size:10px">Off</span>{% endif %}</td>
+                    <td>{% if ms.duplicate_check %}<span class="chip chip-green" style="font-size:10px">On</span>{% else %}<span class="chip chip-grey" style="font-size:10px">Off</span>{% endif %}</td>
                     <td style="text-align:right;white-space:nowrap">
                         <button type="button" class="btn-secondary btn-sm"
                             onclick="openEditMediaModal('{{ ms.area }}','{{ ms.allowed_extensions|escapejs }}','{{ ms.max_file_size_mb }}','{{ ms.max_total_size_mb }}','{{ ms.max_files }}',{% if ms.duplicate_check %}true{% else %}false{% endif %},{% if ms.is_active %}true{% else %}false{% endif %},'{{ ms.min_width }}','{{ ms.min_height }}')">Edit</button>
@@ -1248,8 +1230,7 @@
                     <td
                         style="font-size:12px;color:var(--text-secondary);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
                         {{ item.description|truncatewords:12|default:"N/A" }}</td>
-                    <td>{% if item.is_required %}<span class="chip chip-green" style="font-size:10px">Required</span>{%
-                        else %}<span class="chip chip-grey" style="font-size:10px">Optional</span>{% endif %}</td>
+                    <td>{% if item.is_required %}<span class="chip chip-green" style="font-size:10px">Required</span>{% else %}<span class="chip chip-grey" style="font-size:10px">Optional</span>{% endif %}</td>
                     <td style="text-align:right;white-space:nowrap">
                         <button type="button" class="btn-secondary btn-sm"
                             onclick="openEditChecklistModal('{{ item.pk }}','{{ item.item_name|escapejs }}','{{ item.description|escapejs }}','{{ item.step }}',{% if item.is_required %}true{% else %}false{% endif %},'{{ item.order }}')">Edit</button>
@@ -1260,9 +1241,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with
-                        title='No induction checklist items yet' desc='Add the first item to get started.' icon='doc'
-                        icon_color='blue' %}</td>
+                    <td colspan="6" style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with title='No induction checklist items yet' desc='Add the first item to get started.' icon='doc' icon_color='blue' %}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -1391,12 +1370,9 @@
                     <td
                         style="font-size:12px;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
                         {{ tpl.subject|truncatewords:8|default:"--" }}</td>
-                    <td>{% if tpl.html_body %}<span class="chip chip-green" style="font-size:10px">Set</span>{% else
-                        %}<span class="chip chip-grey" style="font-size:10px">None</span>{% endif %}</td>
-                    <td>{% if tpl.plain_body %}<span class="chip chip-green" style="font-size:10px">Set</span>{% else
-                        %}<span class="chip chip-grey" style="font-size:10px">None</span>{% endif %}</td>
-                    <td>{% if tpl.is_enabled %}<span class="chip chip-green" style="font-size:10px">Enabled</span>{%
-                        else %}<span class="chip chip-amber" style="font-size:10px">Disabled</span>{% endif %}</td>
+                    <td>{% if tpl.html_body %}<span class="chip chip-green" style="font-size:10px">Set</span>{% else %}<span class="chip chip-grey" style="font-size:10px">None</span>{% endif %}</td>
+                    <td>{% if tpl.plain_body %}<span class="chip chip-green" style="font-size:10px">Set</span>{% else %}<span class="chip chip-grey" style="font-size:10px">None</span>{% endif %}</td>
+                    <td>{% if tpl.is_enabled %}<span class="chip chip-green" style="font-size:10px">Enabled</span>{% else %}<span class="chip chip-amber" style="font-size:10px">Disabled</span>{% endif %}</td>
                     <td style="text-align:right;white-space:nowrap">
                         {% if can_edit_email_templates %}
                         <button type="button" class="btn-secondary btn-sm"
@@ -1413,9 +1389,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with
-                        title='No email templates yet' desc='Templates will be seeded automatically on first visit.'
-                        icon='mail' icon_color='blue' %}</td>
+                    <td colspan="6" style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with title='No email templates yet' desc='Templates will be seeded automatically on first visit.' icon='mail' icon_color='blue' %}</td>
                 </tr>
                 {% endfor %}
             </tbody>

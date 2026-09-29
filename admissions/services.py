@@ -1247,7 +1247,7 @@ def direct_enrol(*, actor, reason: str, note: str, child: dict, parent: dict,
     from admissions.models import DirectEnrolmentReason, EntryRoute
     if reason not in DirectEnrolmentReason.values:
         raise ValidationError("Choose why this learner is being enrolled directly.")
-    if not actor.has_perm("admissions.direct_enrol") and getattr(actor, "role", None) != UserRole.SUPER_ADMIN:
+    if not actor.has_perm("students.add_student") and getattr(actor, "role", None) != UserRole.SUPER_ADMIN:
         raise ValidationError("You do not have permission to enrol learners directly.")
 
     full_name = f"{child['first_name'].strip()} {child['last_name'].strip()}"

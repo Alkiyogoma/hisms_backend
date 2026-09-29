@@ -314,3 +314,50 @@ class PageSmokeTests(WelfareTestBase):
         resp = self.client.get(reverse("welfare:hod_dashboard"))
         self.assertEqual(resp.status_code, 200)
         self.assertNotIn(sg, list(resp.context["open_entries"]))
+
+
+class SafeguardingPermissionTests(WelfareTestBase):
+    """Only users holding "Can view safeguarding notes" see safeguarding notes —
+    no role gets them automatically."""
+
+    def setUp(self):
+        self.sg = self.note(self.pupil8, self.class_teacher8, "safeguarding", severity="critical", is_locked=True)
+        self.perm = Permission.objects.get(codename="view_safeguarding_note")
+
+    def test_head_of_school_without_permission_cannot_see(self):
+        Group.objects.get(name=f"role_{UserRole.HEAD_OF_SCHOOL}").permissions.remove(self.perm)
+        hos = User.objects.get(pk=self.hos.pk)
+        self.assertNotIn(self.sg, visible_observations(hos, WelfareObservation.objects.all()))
+        self.client.force_login(hos)
+        self.assertEqual(self.client.get(reverse("welfare:detail", args=[self.sg.pk])).status_code, 403)
+
+    def test_any_user_granted_permission_sees_and_signs_off(self):
+        lead = self.subject_teacher8
+        lead.user_permissions.add(self.perm)
+        lead = User.objects.get(pk=lead.pk)
+        self.client.force_login(lead)
+        overview = self.client.get(reverse("welfare:student_incidents") + "?note_type=safeguarding")
+        self.assertIn(self.sg, list(overview.context["recent_incidents"]))
+        self.assertContains(overview, ">Safeguarding</a>")
+        self.assertContains(self.client.get(reverse("welfare:detail", args=[self.sg.pk])), "safeguarding text")
+        self.client.post(reverse("welfare:acknowledge", args=[self.sg.pk]))
+        self.sg.refresh_from_db()
+        self.assertTrue(self.sg.is_safeguarding_acknowledged())
+
+    def test_safeguarding_tab_hidden_without_permission(self):
+        self.client.force_login(self.class_teacher8)
+        resp = self.client.get(reverse("welfare:list"))
+        self.assertNotContains(resp, "?note_type=safeguarding")
+
+
+class SafeguardingGrantMigrationTests(TestCase):
+    def test_migration_grants_head_of_school_without_removing_anything(self):
+        import importlib
+        from django.apps import apps as global_apps
+        mig = importlib.import_module("welfare.migrations.0015_grant_safeguarding_to_head_of_school")
+        group = Group.objects.create(name="role_head_of_school")
+        keep = Permission.objects.get(codename="add_student", content_type__app_label="students")
+        group.permissions.add(keep)
+        mig.grant(global_apps, None)
+        codenames = set(group.permissions.values_list("codename", flat=True))
+        self.assertEqual(codenames, {"add_student", "view_safeguarding_note"})

@@ -7,7 +7,7 @@
 <div class="card">
   <div class="card-title-row" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
     <div class="card-title" style="margin:0">Direct enrolments</div>
-    {% if perms.admissions.direct_enrol %}
+    {% if perms.students.add_student %}
       <a href="{% url 'admissions:direct_enrol' %}" class="hf-btn hf-btn-primary" style="text-decoration:none">+ Enrol a learner directly</a>
     {% endif %}
   </div>

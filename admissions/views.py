@@ -3219,9 +3219,9 @@ class AdminGenerateInvoiceView(AdmissionsRoleRequiredMixin, View):
 class DirectEnrolmentView(AdmissionsCountsMixin, PermissionCacheMixin, AdmissionsRoleRequiredMixin, TemplateView):
     """Enrol a learner directly — transfer, mid-year entry, staff child or
     returning learner — skipping the inquiry, assessment and assessment fee.
-    Admin Officer / HOS / Super Admin (``admissions.direct_enrol``)."""
+    Needs the Students › "Can add student" permission."""
     template_name = "admissions/direct_enrol.html"
-    required_permission = "admissions.direct_enrol"
+    required_permission = "students.add_student"
 
     def get_context_data(self, **kwargs):
         from admissions.forms import DirectEnrolmentForm

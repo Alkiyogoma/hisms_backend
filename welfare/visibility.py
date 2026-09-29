@@ -3,8 +3,9 @@ Who may read which welfare note. One set of rules, used by the welfare module
 and by the student profile, so a note is never more visible in one place than
 the other.
 
-- Safeguarding notes: Safeguarding Lead (``welfare.view_safeguarding_note``)
-  and Head of School only. Not HODs, not class teachers, not the author once
+- Safeguarding notes: only users holding ``welfare.view_safeguarding_note``
+  ("Can view safeguarding notes", assigned in Role Management). No role —
+  not even Head of School or Super Admin — sees them without it. Not HODs, not class teachers, not the author once
   submitted (the author keeps a content-free view to add follow-ups).
 - Concerns, and any note tagged Health: the child's class teacher, the HOD of
   the child's department, and leadership (HOS / Super Admin). The author
@@ -33,7 +34,7 @@ def _hod_department(user):
 def can_view_safeguarding(user):
     return (
         user.is_authenticated
-        and (user.role == UserRole.HEAD_OF_SCHOOL or user.has_perm("welfare.view_safeguarding_note"))
+        and user.has_perm("welfare.view_safeguarding_note")
     )
 
 

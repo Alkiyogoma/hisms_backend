@@ -609,7 +609,7 @@ class StudentCreateView(RoleRequiredMixin, TemplateView):
     def get(self, request, *args, **kwargs):
         # Authorised staff enrol directly (transfer, staff child, ...);
         # everyone else starts an inquiry in the admissions pipeline.
-        if request.user.has_perm("admissions.direct_enrol") or request.user.role == UserRole.SUPER_ADMIN:
+        if request.user.has_perm("students.add_student") or request.user.role == UserRole.SUPER_ADMIN:
             return redirect("admissions:direct_enrol")
         return redirect("admissions:new_inquiry")
 

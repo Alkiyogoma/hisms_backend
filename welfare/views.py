@@ -55,7 +55,7 @@ class WelfareStudentIncidentsView(DepartmentScopedMixin, RoleRequiredMixin, Temp
     when department="all" is passed via as_view()."""
     template_name = "welfare/student_incidents.html"
     allowed_roles = [UserRole.TEACHER, UserRole.ECD_HOD, UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
-    required_permission = "welfare.view_welfareobservation"
+    required_permissions_any = ["welfare.view_welfareobservation", "welfare.view_safeguarding_note"]
 
     def dispatch(self, request, *args, **kwargs):
         # Let LoginRequiredMixin redirect anonymous users first
@@ -141,6 +141,7 @@ class WelfareStudentIncidentsView(DepartmentScopedMixin, RoleRequiredMixin, Temp
         if note_type:
             if note_type in WelfareNoteType.values:
                 qs = qs.filter(note_type=note_type)
+        ctx["welfare_tab"] = "safeguarding" if note_type == WelfareNoteType.SAFEGUARDING else "student_incidents"
         if status:
             qs = qs.filter(hod_status=status)
         if class_name:
@@ -674,7 +675,7 @@ def _submitted_message(request, obs_list):
     count = len(obs_list)
     noun = "note" if count == 1 else f"{count} notes"
     if obs.is_safeguarding:
-        messages.warning(request, "Safeguarding note sent to the Safeguarding Lead and Head of School.")
+        messages.warning(request, "Safeguarding note sent to staff with safeguarding access.")
     elif obs.severity in (WelfareSeverity.HIGH, WelfareSeverity.CRITICAL):
         from .models import hod_role_for_class
         _role, hod_name = hod_role_for_class(obs.student.class_name)
@@ -765,20 +766,20 @@ class WelfareSubmitView(DepartmentScopedMixin, RoleRequiredMixin, TemplateView):
 
 
 def _safeguarding_recipients():
-    """Head of School plus everyone holding the Safeguarding Lead permission."""
+    """Everyone holding the safeguarding permission (active users only)."""
     from django.db.models import Q
     from users.models import User
     perm = Q(groups__permissions__codename="view_safeguarding_note") | Q(
         user_permissions__codename="view_safeguarding_note"
     )
     return User.objects.filter(
-        Q(role=UserRole.HEAD_OF_SCHOOL) | perm, is_active=True,
+        perm, is_active=True,
     ).distinct()
 
 
 def _escalate_severity(obs: WelfareObservation, request, severity):
     """Send in-app notifications and emails to relevant roles according to FRD escalation rules.
-    Safeguarding notes go only to the Safeguarding Lead and HOS — never the HOD —
+    Safeguarding notes go only to users with the safeguarding permission — never the HOD —
     and the notification carries no note content."""
     from communications.email_service import dispatch_notification
     from communications.models import Notification, NotificationCategory
@@ -867,7 +868,9 @@ class WelfareDetailView(RoleRequiredMixin, DetailView):
     template_name = "welfare/detail.html"
     context_object_name = "obs"
     allowed_roles = [UserRole.ECD_HOD, UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN, UserRole.TEACHER]
-    required_permissions_any = ["welfare.view_welfareobservation", "welfare.add_welfareobservation"]
+    required_permissions_any = [
+        "welfare.view_welfareobservation", "welfare.add_welfareobservation", "welfare.view_safeguarding_note",
+    ]
 
     def get_queryset(self):
         return WelfareObservation.all_objects.select_related("student", "submitted_by", "reviewed_by")
@@ -1074,7 +1077,7 @@ class WelfareFollowUpView(RoleRequiredMixin, View):
 
     Safeguarding notes are locked, so any correction — by the author or the
     Safeguarding Lead — is recorded as a separate note linked to the original,
-    visible only to the Safeguarding Lead and HOS.
+    visible only to users with the safeguarding permission.
     """
     required_permissions_any = ["welfare.add_welfareobservation", "welfare.view_safeguarding_note"]
 
@@ -1121,7 +1124,7 @@ class WelfareFollowUpView(RoleRequiredMixin, View):
                 link=f"/welfare/{obs.pk}/",
                 actor=request.user,
             )
-        messages.success(request, "Follow-up added and sent to the Safeguarding Lead.")
+        messages.success(request, "Follow-up added and sent to staff with safeguarding access.")
         return redirect("welfare:detail", pk=pk)
 
 
@@ -1546,16 +1549,26 @@ class WelfareParentConfirmView(RoleRequiredMixin, View):
 class WelfareAcknowledgeView(RoleRequiredMixin, View):
     """Allow HOD and HOS to acknowledge high/critical welfare observations."""
     allowed_roles = [UserRole.ECD_HOD, UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
-    required_permission = "welfare.can_review_observation"
+    # Safeguarding notes are signed off by whoever holds the safeguarding
+    # permission; everything else by HOD/HOS reviewers. Object-level access is
+    # checked in post() via can_view_observation.
+    required_permissions_any = ["welfare.can_review_observation", "welfare.view_safeguarding_note"]
 
     def post(self, request, pk):
         from .models import WelfareAcknowledgment
         
         obs = get_object_or_404(WelfareObservation, pk=pk)
-        # FR-WEL-004: Block cross-department acknowledgment
-        _assert_observation_department_match(request.user, obs)
-        if not can_view_observation(request.user, obs):
-            raise PermissionDenied("You do not have access to this welfare note.")
+        if obs.is_safeguarding:
+            # Permission-only: whoever holds the safeguarding permission signs off.
+            if not can_view_safeguarding(request.user):
+                raise PermissionDenied("You do not have access to safeguarding notes.")
+        else:
+            if not request.user.has_perm("welfare.can_review_observation"):
+                raise PermissionDenied("You cannot acknowledge welfare notes.")
+            # FR-WEL-004: Block cross-department acknowledgment
+            _assert_observation_department_match(request.user, obs)
+            if not can_view_observation(request.user, obs):
+                raise PermissionDenied("You do not have access to this welfare note.")
         
         # Check if user already acknowledged
         if WelfareAcknowledgment.objects.filter(observation=obs, user=request.user).exists():

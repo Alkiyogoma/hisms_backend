@@ -326,7 +326,6 @@ class Applicant(TimeStampedModel):
             ("upload_applicant_photo", "Can upload applicant photo"),
             ("transition_applicant_status", "Can transition applicant status"),
             ("view_assessment_calendar", "Can view assessment calendar"),
-            ("direct_enrol", "Can enrol a learner directly, skipping assessment"),
         ]
 
     def save(self, *args, **kwargs):
