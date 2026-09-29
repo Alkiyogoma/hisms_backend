@@ -104,7 +104,7 @@ class HISMSAuthenticationForm(AuthenticationForm):
         # (FRD AUTH-002 wording, plus a hint that usernames work too.)
         'invalid_login': (
             "Email or password incorrect. You can sign in with your username "
-            "(e.g. ebenezer.robert) or your school email. Passwords are case-sensitive."
+            "(e.g. your.username) or your school email. Passwords are case-sensitive."
         ),
 
     }

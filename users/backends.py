@@ -1,5 +1,5 @@
 """
-Staff sign in with either their username (e.g. ``ebenezer.robert``) or their
+Staff sign in with either their username (e.g. ``your.username``) or their
 school email address; the same password works for both.
 """
 from django.contrib.auth.backends import ModelBackend

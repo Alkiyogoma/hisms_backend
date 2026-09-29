@@ -35,9 +35,11 @@ def _build_user_perms(user):
         return cached
 
     perms = set()
-    perms.add("*")  # wildcard for super admin check below
 
+    # Only Super Admin gets the wildcard. (It used to be added for every user,
+    # which made every {% has_perm %} check in templates pass for everyone.)
     if user.is_superuser or getattr(user, "role", None) == "super_admin":
+        perms.add("*")
         setattr(user, cache_attr, perms)
         return perms
 

@@ -170,7 +170,7 @@
     </div>
     {% empty %}
     <div id="empty-grid-state" style="grid-column:1 / -1">
-      {% include '_partials/empty_state.html' with title='No student records yet' desc='Enroll students via the Admissions Pipeline or Bulk Import.' icon='users' action_url='/admissions/' action_text='Admissions Pipeline' %}
+      {% include '_partials/empty_state.html' with title='No student records yet' desc='Enrol students via the Admissions Pipeline, Add student (direct enrolment) or Bulk Import.' icon='users' action_url='/students/add/' action_text='Add student' %}
     </div>
     {% endfor %}
   </div>
