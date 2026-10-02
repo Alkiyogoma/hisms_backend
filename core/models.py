@@ -168,18 +168,7 @@ class SchoolSettings(TimeStampedModel):
     pass_mark = models.PositiveIntegerField(default=50)
     enable_auto_report_generation = models.BooleanField(default=False)
 
-    # Email (SMTP)
-    email_backend = models.CharField(
-        max_length=255,
-        default="django.core.mail.backends.console.EmailBackend",
-        help_text="Django email backend. Use 'django.core.mail.backends.smtp.EmailBackend' for real SMTP.",
-    )
-    email_host = models.CharField(max_length=255, default="smtp.gmail.com")
-    email_port = models.PositiveIntegerField(default=587)
-    email_use_tls = models.BooleanField(default=True)
-    email_host_user = models.CharField(max_length=255, blank=True, default="")
-    email_host_password = models.CharField(max_length=255, blank=True, default="")
-    default_from_email = models.EmailField(default="noreply@hodari.ac.tz")
+    # Email (SMTP) is configured in the server's .env (see config/settings.py), not here.
 
     # WhatsApp
     whatsapp_api_key = models.CharField(max_length=255, blank=True, null=True)

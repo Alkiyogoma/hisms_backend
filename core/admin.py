@@ -64,7 +64,7 @@ class MediaSettingsAdmin(admin.ModelAdmin):
 
 @admin.register(SchoolSettings)
 class SchoolSettingsAdmin(admin.ModelAdmin):
-    list_display = ("school_name", "email_host", "email_host_user", "email_backend")
+    list_display = ("school_name",)
     readonly_fields = ("created_at", "updated_at")
 
     fieldsets = (
@@ -76,9 +76,6 @@ class SchoolSettingsAdmin(admin.ModelAdmin):
         }),
         ("Notifications", {
             "fields": ("send_absentee_sms", "sms_sender_id", "enable_online_inquiry", "enable_auto_report_generation"),
-        }),
-        ("Email (SMTP)", {
-            "fields": ("email_backend", "email_host", "email_port", "email_use_tls", "email_host_user", "email_host_password", "default_from_email"),
         }),
         ("WhatsApp", {
             "fields": ("whatsapp_sender_id",),

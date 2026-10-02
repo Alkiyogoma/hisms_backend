@@ -296,22 +296,26 @@ CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60  # 25 minutes soft limit
 CELERY_WORKER_PREFETCH_MULTIPLIER = 4
 CELERY_WORKER_MAX_TASKS_PER_CHILD = 1000
 
-# Email Configuration for Notifications
-# Default: JSON file backend only under DEBUG (local).  In production the
-# DatabaseEmailBackend reads SMTP config from SchoolSettings (DB) and falls
-# back to EMAIL_HOST below, so real emails are always attempted on the server.
+# Email (SMTP) — configured only here, from environment variables (.env).
+# Locally (DEBUG) messages go to sent_emails.json; on the server they are sent
+# through SMTP. For Google Workspace use smtp.gmail.com, port 587 + TLS, the
+# full mailbox address as EMAIL_HOST_USER and a 16-character App Password.
 _DEFAULT_EMAIL_BACKEND = (
     'core.json_email_backend.JsonFileEmailBackend'
     if bool(os.getenv("DJANGO_DEBUG", "1") == "1")
-    else 'core.email_backend.DatabaseEmailBackend'
+    else 'django.core.mail.backends.smtp.EmailBackend'
 )
 EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', _DEFAULT_EMAIL_BACKEND)
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
-EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 'yes')
+# Port 465 uses implicit SSL; Django refuses TLS and SSL together.
+EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'True' if EMAIL_PORT == 465 else 'False').lower() in ('true', '1', 'yes')
+EMAIL_USE_TLS = (not EMAIL_USE_SSL) and os.getenv('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 'yes')
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@hodari.ac.tz')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '').replace(' ', '')  # App Passwords are often pasted with spaces
+EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', '20'))
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'noreply@hodari.ac.tz')
+SERVER_EMAIL = os.getenv('SERVER_EMAIL', DEFAULT_FROM_EMAIL)  # sender of error emails to ADMINS
 
 # --- Task failure alerting (Celery task_failure signal) ---
 # Email recipients for scheduled task failure alerts.

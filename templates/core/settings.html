@@ -243,17 +243,17 @@
     <input type="hidden" name="action" value="save_messaging">
 
     <div class="card">
-        <div class="set-head"><div class="card-title">Email (SMTP)</div></div>
-        <div class="set-grid-2">
-            {% field form.email_backend hint="Turn this on, fill in the SMTP details, save, then use Send test email above." %}
-            {% field form.default_from_email %}
-            {% field form.email_host hint="SMTP server, e.g. smtp.gmail.com" %}
-            <div class="set-grid-2">
-                {% field form.email_port label="Port" %}
-                <div class="set-field" style="padding-top:30px">{% field form.email_use_tls label="Use TLS" %}</div>
+        <div class="set-head">
+            <div>
+                <div class="card-title">Email (SMTP)</div>
+                <div class="set-head-desc">Set in the server's <code>.env</code> file (EMAIL_HOST, EMAIL_PORT, EMAIL_USE_TLS, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD, DEFAULT_FROM_EMAIL), then restart the app. Not editable here.</div>
             </div>
-            {% field form.email_host_user hint="SMTP username or email address" %}
-            {% field form.email_host_password label="SMTP password" hint="For Gmail, use an App Password (Google Account > Security > App passwords)." %}
+        </div>
+        <div class="set-grid-2">
+            <div class="set-field"><label class="form-label">SMTP server</label><div class="set-readonly">{% if email_delivery.host %}{{ email_delivery.host }}:{{ email_delivery.port }}{% else %}Not set{% endif %}</div></div>
+            <div class="set-field"><label class="form-label">Encryption</label><div class="set-readonly">{{ email_delivery.security|default:"Not set" }}</div></div>
+            <div class="set-field"><label class="form-label">SMTP username</label><div class="set-readonly">{{ email_delivery.user|default:"Not set" }}</div></div>
+            <div class="set-field"><label class="form-label">Send from</label><div class="set-readonly">{{ email_delivery.from_email|default:"Not set" }}</div></div>
         </div>
     </div>
 

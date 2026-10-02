@@ -99,39 +99,47 @@ class SeedAndResetTests(TestCase):
 class DeliveryTests(TestCase):
     @override_settings(EMAIL_BACKEND="django.core.mail.backends.console.EmailBackend", DEBUG=False)
     def test_console_backend_is_reported_as_not_sent(self):
-        s = SchoolSettings.get_settings()
-        s.email_backend = "django.core.mail.backends.console.EmailBackend"
-        s.save()
         self.assertFalse(send_email_safe("a@x.test", "S", "B"))
         log = EmailSendLog.objects.get()
         self.assertFalse(log.success)
         self.assertIn("Not configured", log.error_message)
 
-    @override_settings(EMAIL_BACKEND="django.core.mail.backends.console.EmailBackend")
-    def test_smtp_saved_in_settings_wins_over_console_env(self):
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend", EMAIL_HOST="smtp.example.test",
+                       EMAIL_PORT=465, EMAIL_USE_SSL=True, EMAIL_USE_TLS=False, EMAIL_HOST_USER="u",
+                       EMAIL_HOST_PASSWORD="p", DEFAULT_FROM_EMAIL="office@example.test")
+    def test_smtp_comes_from_env_settings(self):
         from core.email_backend import resolve_delivery
-        s = SchoolSettings.get_settings()
-        s.email_backend = "django.core.mail.backends.smtp.EmailBackend"
-        s.email_host, s.email_port, s.email_host_user, s.email_host_password = "smtp.example.test", 465, "u", "p"
-        s.default_from_email = "office@example.test"
-        s.save()
         conn, from_email, info = resolve_delivery()
         self.assertEqual(info["mode"], "smtp")
+        self.assertTrue(info["delivering"])
+        self.assertEqual((info["host"], info["port"], info["security"], info["user"]), ("smtp.example.test", 465, "SSL", "u"))
+        self.assertNotIn("p", info.values())
         self.assertTrue(conn.use_ssl)
+        self.assertEqual((conn.username, conn.password), ("u", "p"))
         self.assertEqual(from_email, "office@example.test")
 
-    def test_messaging_form_keeps_password_and_requires_smtp_details(self):
+    @override_settings(EMAIL_BACKEND="core.email_backend.DatabaseEmailBackend", EMAIL_HOST="smtp.example.test",
+                       EMAIL_PORT=587, EMAIL_USE_TLS=True, EMAIL_HOST_USER="u", EMAIL_HOST_PASSWORD="p")
+    def test_legacy_database_backend_name_uses_env_smtp(self):
+        from core.email_backend import resolve_delivery
+        conn, _from, info = resolve_delivery()
+        self.assertEqual(info["mode"], "smtp")
+        self.assertEqual((conn.host, conn.port, conn.use_tls, conn.username), ("smtp.example.test", 587, True, "u"))
+
+    def test_messaging_form_has_no_smtp_fields(self):
         from core.forms import SchoolSettingsMessagingForm
-        s = SchoolSettings.get_settings()
-        s.email_host_password = "secret"
-        s.save()
-        base = {"email_backend": SchoolSettingsMessagingForm.SMTP, "email_host": "smtp.example.test",
-                "email_port": 587, "email_use_tls": "on", "email_host_user": "u", "email_host_password": "",
-                "default_from_email": "o@example.test", "whatsapp_sender_id": "H",
-                "admissions_phone": "1", "admissions_email": "a@example.test", "admissions_whatsapp": "1"}
-        form = SchoolSettingsMessagingForm(base, instance=s)
-        self.assertTrue(form.is_valid(), form.errors)
-        self.assertEqual(form.save().email_host_password, "secret")
-        self.assertNotIn("secret", str(SchoolSettingsMessagingForm(instance=s)["email_host_password"]))
-        bad = SchoolSettingsMessagingForm({**base, "email_host_user": ""}, instance=s)
-        self.assertFalse(bad.is_valid())
+        self.assertFalse({f for f in SchoolSettingsMessagingForm().fields if f.startswith("email_") or f == "default_from_email"})
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend", EMAIL_HOST="smtp.gmail.com",
+                       EMAIL_PORT=587, EMAIL_USE_TLS=True, EMAIL_HOST_USER="noreply@example.test",
+                       EMAIL_HOST_PASSWORD="app-pass-secret", DEFAULT_FROM_EMAIL="noreply@example.test")
+    def test_settings_page_shows_env_smtp_without_password(self):
+        admin = User.objects.create_superuser(username="sa", email="sa@example.test", password="pw-12345!",
+                                              role=UserRole.SUPER_ADMIN)
+        self.client.force_login(admin)
+        html = self.client.get(reverse("core:school_settings") + "?tab=messaging").content.decode()
+        self.assertIn("smtp.gmail.com:587", html)
+        self.assertIn("STARTTLS", html)
+        self.assertIn("noreply@example.test", html)
+        self.assertNotIn("app-pass-secret", html)
+        self.assertNotIn('name="email_host"', html)

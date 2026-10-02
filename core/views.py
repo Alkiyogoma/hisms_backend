@@ -2028,9 +2028,7 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
             form = SchoolSettingsMessagingForm(request.POST, instance=self._get_settings())
             if form.is_valid():
                 form.save()
-                # Every send reads these settings from the database (core.email_backend.resolve_delivery),
-                # so they apply to all server processes at once; nothing to patch at runtime.
-                messages.success(request, "Email settings updated successfully.")
+                messages.success(request, "Messaging settings updated successfully.")
             else:
                 messages.error(request, "Please correct the errors below.")
             return redirect(f"{reverse_lazy('core:school_settings')}?tab=messaging")
