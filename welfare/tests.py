@@ -94,10 +94,42 @@ class WelfareTestBase(TestCase):
             "note_type": "observation", "students": [self.pupil8.pk],
             "observation_date": date.today().isoformat(),
             "observation_text": "Quiet at break.", "action_taken": "Checked in with her.",
-            "parent_contacted": "on", "action": "submit",
+            "action": "submit",  # parent contact is optional: unticked by default
         }
         data.update(overrides)
         return data
+
+
+class ParentContactOptionalTests(WelfareTestBase):
+    def setUp(self):
+        self.client.force_login(self.class_teacher8)
+        self.url = reverse("welfare:submit")
+
+    def test_note_saves_without_parent_contact(self):
+        resp = self.client.post(self.url, self.form())
+        self.assertNotEqual(resp.status_code, 400, getattr(resp, "content", b"")[:300])
+        obs = WelfareObservation.all_objects.get()
+        self.assertFalse(obs.parent_contacted)
+        self.assertIsNone(obs.parent_contact_datetime)
+        self.assertEqual(obs.status, WelfareNoteStatus.SUBMITTED)
+
+    def test_ticked_without_time_is_rejected(self):
+        resp = self.client.post(self.url, self.form(parent_contacted="on"))
+        self.assertEqual(resp.status_code, 400)
+        self.assertFalse(WelfareObservation.all_objects.exists())
+
+    def test_ticked_with_time_saves_it(self):
+        when = (timezone.localtime() - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M")
+        self.client.post(self.url, self.form(parent_contacted="on", parent_contact_datetime=when))
+        obs = WelfareObservation.all_objects.get()
+        self.assertTrue(obs.parent_contacted)
+        self.assertIsNotNone(obs.parent_contact_datetime)
+
+    def test_form_has_optional_checkbox_and_hidden_details(self):
+        html = self.client.get(self.url).content.decode()
+        self.assertIn('id="parentContacted"', html)
+        self.assertNotIn('name="parent_contacted" id="parentContacted" required', html)
+        self.assertIn('id="parentDetails" style="display:none', html)
 
 
 class Grade8SearchTests(WelfareTestBase):

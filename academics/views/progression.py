@@ -572,13 +572,10 @@ class ProgressionHODReviewListView(RoleRequiredMixin, TemplateView):
     page_size = 50
 
     def _hod_department(self, user):
-        if user.role == UserRole.PRIMARY_HOD:
-            return "PRIMARY"
-        if user.role == UserRole.ECD_HOD:
-            return "ECD"
-        if user.role == UserRole.LOWER_SECONDARY_HOD:
-            return "LOWER_SECONDARY"
-        return None  # HOS/Super Admin see all
+        """Departments the HOD heads (all of them), or None for HOS/Super Admin."""
+        if user.is_school_wide:
+            return None
+        return user.section_departments or None
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -599,7 +596,7 @@ class ProgressionHODReviewListView(RoleRequiredMixin, TemplateView):
             )
             if dept:
                 grade_names = GradeClass.objects.filter(
-                    department__iexact=dept
+                    department__in=dept
                 ).values_list("name", flat=True)
                 class_list = sorted(grade_names)
                 base = base.filter(student__class_name__in=list(grade_names))
@@ -647,16 +644,10 @@ class ProgressionHODReviewActionView(RoleRequiredMixin, View):
 
     def post(self, request, case_id):
         case = get_object_or_404(ProgressionCase, pk=case_id)
-        hod_dept = None
-        if request.user.role == UserRole.PRIMARY_HOD:
-            hod_dept = "PRIMARY"
-        elif request.user.role == UserRole.ECD_HOD:
-            hod_dept = "ECD"
-        elif request.user.role == UserRole.LOWER_SECONDARY_HOD:
-            hod_dept = "LOWER_SECONDARY"
+        hod_dept = None if request.user.is_school_wide else (request.user.section_departments or None)
         if hod_dept:
             grade_names = GradeClass.objects.filter(
-                department=hod_dept
+                department__in=hod_dept
             ).values_list("name", flat=True)
             if case.student.class_name not in list(grade_names):
                 log_event(
@@ -742,17 +733,11 @@ class ProgressionHODBulkApproveView(RoleRequiredMixin, View):
             messages.warning(request, "No cases selected for bulk approval.")
             return redirect(reverse("academics:progression_hod_review") + f"?config_id={config_id}")
 
-        dept = None
-        if request.user.role == UserRole.PRIMARY_HOD:
-            dept = "PRIMARY"
-        elif request.user.role == UserRole.ECD_HOD:
-            dept = "ECD"
-        elif request.user.role == UserRole.LOWER_SECONDARY_HOD:
-            dept = "LOWER_SECONDARY"
+        dept = None if request.user.is_school_wide else (request.user.section_departments or None)
 
         selected = ProgressionCase.objects.filter(pk__in=case_ids, progression_config=config)
         if dept:
-            grade_names = GradeClass.objects.filter(department__iexact=dept).values_list("name", flat=True)
+            grade_names = GradeClass.objects.filter(department__in=dept).values_list("name", flat=True)
             selected = selected.filter(student__class_name__in=list(grade_names))
 
         rejected = []

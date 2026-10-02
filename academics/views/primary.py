@@ -1,5 +1,5 @@
 import re
-from decimal import Decimal
+from decimal import Decimal, DecimalException
 
 from django.conf import settings
 from django.contrib import messages
@@ -296,7 +296,7 @@ class ScoreCorrectionHistoryView(RoleRequiredMixin, TemplateView):
         logs = AuditLog.objects.filter(action_type="EXAM_SCORE_CORRECTED").select_related('actor').order_by("-created_at")
         
         # Filter by department if HOD
-        if self.request.user.role == UserRole.PRIMARY_HOD:
+        if self.request.user.has_role(UserRole.PRIMARY_HOD):
             # We'd need to filter by student class, but logs only store object_id.
             # For simplicity, we show all for now, or we could join with ExamScore.
             pass
@@ -531,12 +531,12 @@ class PrimaryScoreAPIView(RoleRequiredMixin, View):
         if request.user.role == UserRole.TEACHER:
             from core.teacher_context import get_teacher_assigned_classes_from_tca
             return student.class_name in get_teacher_assigned_classes_from_tca(request.user)
-        if request.user.role in [UserRole.PRIMARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]:
+        if request.user.has_role(UserRole.PRIMARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN):
             return True
         return False
 
     def get(self, request, student_id):
-        if request.user.role not in [UserRole.TEACHER, UserRole.PRIMARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]:
+        if not request.user.has_role(UserRole.TEACHER, UserRole.PRIMARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN):
             return JsonResponse({"error": "Permission denied"}, status=403)
 
         term_id = request.GET.get("term")
@@ -570,7 +570,7 @@ class PrimaryScoreAPIView(RoleRequiredMixin, View):
         })
 
     def post(self, request, student_id):
-        if request.user.role not in [UserRole.TEACHER, UserRole.PRIMARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]:
+        if not request.user.has_role(UserRole.TEACHER, UserRole.PRIMARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN):
             return JsonResponse({"error": "Permission denied"}, status=403)
 
         try:
@@ -1099,12 +1099,12 @@ class LowerSecondaryScoreAPIView(RoleRequiredMixin, View):
         if request.user.role == UserRole.TEACHER:
             from core.teacher_context import get_teacher_assigned_classes_from_tca
             return student.class_name in get_teacher_assigned_classes_from_tca(request.user)
-        if request.user.role in [UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]:
+        if request.user.has_role(UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN):
             return True
         return False
 
     def get(self, request, student_id):
-        if request.user.role not in [UserRole.TEACHER, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]:
+        if not request.user.has_role(UserRole.TEACHER, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN):
             return JsonResponse({"error": "Permission denied"}, status=403)
 
         term_id = request.GET.get("term")
@@ -1134,7 +1134,7 @@ class LowerSecondaryScoreAPIView(RoleRequiredMixin, View):
         return JsonResponse({"scores": score_data, "report_card_status": rc_status})
 
     def post(self, request, student_id):
-        if request.user.role not in [UserRole.TEACHER, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]:
+        if not request.user.has_role(UserRole.TEACHER, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN):
             return JsonResponse({"error": "Permission denied"}, status=403)
 
         try:

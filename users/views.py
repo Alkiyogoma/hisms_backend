@@ -16,7 +16,7 @@ from django.contrib.auth.forms import AuthenticationForm
 
 from django.contrib.auth.views import LoginView, PasswordChangeView, PasswordChangeDoneView
 
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 
 from django.http import JsonResponse
 
@@ -348,9 +348,19 @@ class HISMSLoginView(LoginView):
 
                         self._alert_super_admin_lockout(user)
 
+                    else:
+
+                        form.errors.pop('__all__', None)
+
+                        form.add_error(None, "Incorrect password. Passwords are case-sensitive.")
+
             except User.DoesNotExist:
 
-                pass  # Don't reveal existence
+                # Deliberately distinguishes "not found" from "wrong password"
+                # (product decision), at the cost of revealing which accounts exist.
+                if form.errors.get('__all__'):
+                    form.errors.pop('__all__', None)
+                    form.add_error(None, "No account was found for that username or email.")
 
         # Move non-field credential errors to password field for inline display
 

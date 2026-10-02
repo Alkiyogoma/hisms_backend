@@ -56,7 +56,7 @@ class TaskPermission(IsAuthenticated):
         if user.role == UserRole.SUPER_ADMIN:
             return queryset
         
-        elif user.role in (UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD):
+        elif user.has_role(UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD):
             return queryset.filter(
                 Q(assigned_to=user) |
                 Q(created_by=user)
@@ -97,7 +97,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         if user.role == UserRole.SUPER_ADMIN:
             return Task.objects.all()
         
-        elif user.role in (UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD):
+        elif user.has_role(UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD):
             return Task.objects.filter(
                 Q(assigned_to=user) |
                 Q(created_by=user)

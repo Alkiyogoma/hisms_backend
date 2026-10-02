@@ -8,6 +8,7 @@ edit them from Settings > Email Templates. This module provides:
 """
 
 import logging
+import re
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -107,10 +108,98 @@ def _p(text, size="14px", color="#6b7280", mb="24px", bold=False):
 
 # ── Email sending ─────────────────────────────────────────────────────
 
+class EmailSendResult:
+    """Outcome of send_dynamic_email().
+
+    Truthy whenever the template system handled the email: sent, deliberately
+    not sent because the template is switched off, or attempted and failed
+    (the failure is logged in EmailSendLog). Falsy only when no template
+    exists at all. Callers use ``if not result:`` to decide whether to send a
+    hard-coded fallback, so this stops a switched-off email from going out
+    through the fallback. Use ``result.sent`` to know it actually went out.
+    """
+    SENT, DISABLED, FAILED, MISSING = "sent", "disabled", "failed", "missing"
+
+    def __init__(self, status, detail=""):
+        self.status = status
+        self.detail = detail
+
+    @property
+    def sent(self):
+        return self.status == self.SENT
+
+    @property
+    def disabled(self):
+        return self.status == self.DISABLED
+
+    def __bool__(self):
+        return self.status != self.MISSING
+
+    def __repr__(self):
+        return f"<EmailSendResult {self.status}{': ' + self.detail if self.detail else ''}>"
+
+
+def is_template_enabled(template_type):
+    """False only when an admin has switched this email off."""
+    from core.models import EmailTemplate
+    return not EmailTemplate.objects.filter(template_type=template_type, is_enabled=False).exists()
+
+
+_FILTER_ARG_VAR = re.compile(r"\|\s*[a-z_]+\s*:\s*([A-Za-z_]\w*)")
+
+
+class _Blank(str):
+    """Renders as "" and survives attribute/key lookups (user.username -> "")."""
+    do_not_call_in_templates = True
+    alters_data = False
+
+    def __new__(cls):
+        return super().__new__(cls, "")
+
+    def __getattr__(self, name):
+        if name.startswith("__"):
+            raise AttributeError(name)
+        return self
+
+    def __getitem__(self, key):
+        return self
+
+
+def _render_parts(tpl_like, context):
+    """Render subject/html/plain for a template (model or default dict)."""
+    from django.template import Context, Template
+    get = (lambda f: getattr(tpl_like, f, "") or "") if not isinstance(tpl_like, dict) else (lambda f: tpl_like.get(f) or "")
+    # Django raises (rather than printing nothing) when a *filter argument*
+    # names a variable that isn't in the context, e.g. {{ x|default:ref }}
+    # without "ref". That used to abort the whole email, so the caller's
+    # broad except swallowed it and nothing was sent. Treat those as blank.
+    context = dict(context)
+    source = " ".join(get(f) for f in ("subject", "html_body", "plain_body"))
+    for name in set(_FILTER_ARG_VAR.findall(source)):
+        if name not in context and name not in ("True", "False", "None"):
+            context[name] = _Blank()
+    ctx = Context(context)
+    subject = Template(get("subject")).render(ctx)
+    html_src = get("html_body") or _plain_to_html(get("plain_body"))
+    html_body = Template(html_src).render(ctx) if html_src else ""
+    plain_body = Template(get("plain_body")).render(ctx) if get("plain_body") else subject
+    return subject, html_body, plain_body
+
+
 def send_dynamic_email(template_type, to_email, context, actor=None, extra_subject=""):
+    """Render the admin-editable template ``template_type`` and send it.
+
+    - Disabled template  -> nothing is sent (result is truthy, ``.disabled``).
+    - Missing template   -> defaults are re-seeded, then it is sent.
+    - Broken template (bad syntax after an edit) -> the shipped default
+      wording is used instead, so the email still goes out, and the error is logged.
+    """
     from core.models import EmailTemplate
     from communications.email_service import send_email_safe
     from django.conf import settings as django_settings
+
+    if not to_email:
+        return EmailSendResult(EmailSendResult.FAILED, "no recipient")
 
     # Resolve absolute URLs for template branding even if the caller omitted them.
     context = dict(context)
@@ -119,38 +208,47 @@ def send_dynamic_email(template_type, to_email, context, actor=None, extra_subje
     if not _static.startswith('/'):
         _static = '/' + _static
     context.setdefault("static_url", _static)
+    if "school_name" not in context:
+        try:
+            from core.models import SchoolSettings
+            context["school_name"] = SchoolSettings.get_settings().school_name or ""
+        except Exception:
+            pass
 
     # Auto-resolve portal_link to an absolute URL if it's a relative path.
     _pl = context.get("portal_link", "")
     if _pl and _pl.startswith("/"):
         context["portal_link"] = context["site_url"].rstrip("/") + _pl
 
-    try:
-        tpl = EmailTemplate.objects.get(template_type=template_type)
-    except EmailTemplate.DoesNotExist:
-        logger.warning("EmailTemplate '%s' not found in DB. Falling back.", template_type)
-        return False
+    tpl = EmailTemplate.objects.filter(template_type=template_type).first()
+    if tpl is None:
+        seed_default_templates()
+        tpl = EmailTemplate.objects.filter(template_type=template_type).first()
+    if tpl is None:
+        logger.warning("EmailTemplate '%s' does not exist and has no default.", template_type)
+        return EmailSendResult(EmailSendResult.MISSING)
 
     if not tpl.is_enabled:
-        logger.info("EmailTemplate '%s' is disabled. Skipping.", template_type)
-        return False
+        logger.info("EmailTemplate '%s' is switched off; not sending to %s.", template_type, to_email)
+        return EmailSendResult(EmailSendResult.DISABLED)
 
-    subject = tpl.render_subject(context)
+    try:
+        subject, html_body, plain_body = _render_parts(tpl, context)
+    except Exception as exc:
+        logger.error("EmailTemplate '%s' failed to render (%s); using the default wording.", template_type, exc)
+        default = default_template(template_type)
+        try:
+            if default is None:
+                raise exc
+            subject, html_body, plain_body = _render_parts(default, context)
+        except Exception as exc2:
+            logger.error("Default wording for '%s' also failed to render: %s", template_type, exc2)
+            return EmailSendResult(EmailSendResult.FAILED, f"template error: {exc2}")
+
     if extra_subject:
         subject = f"{extra_subject} {subject}"
 
-    html_body = tpl.render_html(context) if tpl.html_body else None
-    if not html_body and tpl.plain_body:
-        html_body = _plain_to_html(tpl.plain_body)
-        if html_body:
-            from django.template import Template, Context
-            try:
-                html_body = Template(html_body).render(Context(context))
-            except Exception:
-                pass
-    plain_body = tpl.render_plain(context) if tpl.plain_body else subject
-
-    return send_email_safe(
+    ok = send_email_safe(
         to_email=to_email,
         subject=subject,
         body=plain_body,
@@ -158,6 +256,7 @@ def send_dynamic_email(template_type, to_email, context, actor=None, extra_subje
         actor=actor,
         action_type=template_type.upper(),
     )
+    return EmailSendResult(EmailSendResult.SENT if ok else EmailSendResult.FAILED)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
@@ -181,16 +280,8 @@ def _plain_to_html(plain_text):
 
 # ── Seed defaults ─────────────────────────────────────────────────────
 
-_seeded = False
-
-def seed_default_templates():
-    global _seeded
-    if _seeded:
-        return 0
-    _seeded = True
-
-    from core.models import EmailTemplate
-
+def _build_defaults():
+    """The shipped content of every email template, keyed by nothing; one dict each."""
     defaults = [
         # ── Staff: Account Activation ──
         {
@@ -762,7 +853,7 @@ def seed_default_templates():
         {
             "template_type": "admission_offer_letter",
             "name": "Admission Offer Letter (E15)",
-            "subject": "Congratulations — a place for {{ child_name }} at {{ school_name|default:Hodari }}",
+            "subject": "Congratulations — a place for {{ child_name }} at {{ school_name|default:'Hodari' }}",
             "html_body": _brand(
                 "Offer of a Place",
                 _p("Dear <strong>{{ parent_name }}</strong>,", mb="8px")
@@ -1382,30 +1473,62 @@ def seed_default_templates():
         },
     ]
 
-    created_count = 0
-    updated_count = 0
     for tpl_data in defaults:
         html_file = tpl_data.pop("html_file", None)
         if html_file and "html_body" not in tpl_data:
             tpl_data["html_body"] = _read_template_file(html_file)
+        if not tpl_data.get("html_body") and tpl_data.get("plain_body"):
+            tpl_data["html_body"] = _plain_to_html(tpl_data["plain_body"])
+    return defaults
 
-        tpl, created = EmailTemplate.objects.get_or_create(
-            template_type=tpl_data["template_type"],
-            defaults={**tpl_data, "is_default": True, "is_enabled": True},
-        )
-        if created:
+
+def default_template(template_type):
+    """Shipped content for one template type (dict), or None."""
+    return next((d for d in _build_defaults() if d["template_type"] == template_type), None)
+
+
+_refreshed_defaults = False
+
+
+def seed_default_templates():
+    """Create any missing templates (enabled) and keep untouched defaults current.
+
+    Safe to call often: templates an admin has edited (is_default=False) are
+    never overwritten, and missing ones are always recreated (the old version
+    skipped this after the first call in a process, so a "Reset" deleted the
+    template for good and that email stopped going out).
+    """
+    global _refreshed_defaults
+    from core.models import EmailTemplate
+
+    existing = {t.template_type: t for t in EmailTemplate.objects.all()}
+    created_count = 0
+    for tpl_data in _build_defaults():
+        tpl = existing.get(tpl_data["template_type"])
+        if tpl is None:
+            EmailTemplate.objects.create(**tpl_data, is_default=True, is_enabled=True)
             created_count += 1
-        else:
-            new_html = tpl_data.get("html_body", "")
-            if new_html and tpl.html_body != new_html:
-                tpl.html_body = new_html
-                tpl.save(update_fields=["html_body"])
-                updated_count += 1
-            elif not tpl.html_body and tpl.plain_body:
-                tpl.html_body = _plain_to_html(tpl.plain_body)
-                tpl.save(update_fields=["html_body"])
-                updated_count += 1
-
-    if updated_count:
-        logger.info("Updated html_body for %d existing templates.", updated_count)
+        elif not _refreshed_defaults and tpl.is_default:
+            # Pick up improved shipped wording, only for templates nobody has edited.
+            changed = [f for f in ("subject", "html_body", "plain_body")
+                       if tpl_data.get(f) and getattr(tpl, f) != tpl_data[f]]
+            if changed:
+                for f in changed:
+                    setattr(tpl, f, tpl_data[f])
+                tpl.save(update_fields=changed + ["updated_at"])
+    _refreshed_defaults = True
     return created_count
+
+
+def reset_template(template_type):
+    """Restore one template to its shipped content (keeps its on/off setting)."""
+    from core.models import EmailTemplate
+    data = default_template(template_type)
+    if data is None:
+        return None
+    tpl, _ = EmailTemplate.objects.get_or_create(template_type=template_type, defaults={"name": data["name"]})
+    for f in ("name", "subject", "html_body", "plain_body"):
+        setattr(tpl, f, data.get(f, ""))
+    tpl.is_default = True
+    tpl.save()
+    return tpl

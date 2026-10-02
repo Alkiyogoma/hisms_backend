@@ -2198,12 +2198,16 @@ class ToggleDocumentView(HtmxRequiredMixin, PermissionCacheMixin, AdmissionsRole
                     to_email=parent_email,
                     context=tpl_context,
                 )
-            dispatch_notification(
-                user=None, title="Document Received",
-                message=f"Dear {applicant.parent_full_name}, your {doc_label} for {applicant.child_full_name}'s application has been received and processed.",
-                link=None, actor=request.user,
-                external_email=parent_email, phone=parent_phone,
-            )
+            else:
+                # No email on file: SMS only. (With an email, the templated
+                # message above is the only one — this used to send a second,
+                # un-switchable copy.)
+                dispatch_notification(
+                    user=None, title="Document Received",
+                    message=f"Dear {applicant.parent_full_name}, your {doc_label} for {applicant.child_full_name}'s application has been received and processed.",
+                    link=None, actor=request.user,
+                    external_email=None, phone=parent_phone,
+                )
         except ValidationError as e:
             msg = e.messages[0] if hasattr(e, 'messages') else str(e).strip("[]' ")
             messages.error(request, msg)

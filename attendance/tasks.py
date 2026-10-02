@@ -13,6 +13,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
 import logging
+from datetime import datetime
 
 from .models import Message, NotificationLog, OtpCode
 from .notification_service import NotificationService
@@ -99,10 +100,25 @@ def send_email_notification(self, notification_id: int):
                 context=tpl_context,
             )
             if db_sent:
-                notification.delivery_status = 'sent'
-                notification.sent_at = timezone.now()
-                notification.save(update_fields=['delivery_status', 'sent_at'])
+                notification.delivery_status = 'sent' if db_sent.sent else 'failed'
+                notification.error_message = (
+                    "" if db_sent.sent else
+                    "Not sent: the OTP email is switched off in Settings." if db_sent.disabled else
+                    "Email delivery failed; see the email send log."
+                )
+                notification.sent_at = timezone.now() if db_sent.sent else None
+                notification.save(update_fields=['delivery_status', 'sent_at', 'error_message'])
                 return
+
+        # Check-in / check-out emails honour their template's on/off switch.
+        from core.email_templates import is_template_enabled
+        tpl_type = {'checkin': 'checkin_notification', 'checkout': 'checkout_notification'}.get(
+            notification.notification_type)
+        if tpl_type and not is_template_enabled(tpl_type):
+            notification.delivery_status = 'failed'
+            notification.error_message = "Not sent: this email is switched off in Settings > Email Templates."
+            notification.save(update_fields=['delivery_status', 'error_message'])
+            return
 
         # Fallback to static
         if notification.notification_type == 'checkin':
@@ -114,14 +130,15 @@ def send_email_notification(self, notification_id: int):
         else:
             subject = "Hodari Christian School Notification"
         
-        # Send email
-        send_mail(
+        # Send email through the configured delivery (Settings > Email & WhatsApp)
+        from communications.email_service import send_email_safe
+        if not send_email_safe(
+            to_email=notification.recipient_email,
             subject=subject,
-            message=notification.message,
-            from_email=NotificationService.EMAIL_FROM,
-            recipient_list=[notification.recipient_email],
-            fail_silently=False,
-        )
+            body=notification.message,
+            action_type=(tpl_type or notification.notification_type).upper(),
+        ):
+            raise RuntimeError("Email delivery failed; see the email send log.")
         
         # Mark as sent
         notification.delivery_status = 'sent'

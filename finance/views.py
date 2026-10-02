@@ -16,6 +16,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.generic import CreateView, DetailView, ListView, TemplateView, View
 
+from academics.models import Term
 from core.permissions import RoleRequiredMixin
 from users.models import UserRole
 
@@ -1590,7 +1591,12 @@ class SendInvoiceReminderView(RoleRequiredMixin, View):
                     link=detail_url,
                     actor=request.user
                 )
-            messages.success(request, f"Reminder sent to {primary_guardian.guardian.full_name}.")
+            if db_sent.disabled:
+                messages.warning(request, "The fee reminder email is switched off in Settings > Email Templates, so no email was sent.")
+            elif db_sent and not db_sent.sent:
+                messages.error(request, "The reminder email could not be delivered. Check Settings > Email & WhatsApp.")
+            else:
+                messages.success(request, f"Reminder sent to {primary_guardian.guardian.full_name}.")
         else:
             messages.error(request, "Primary guardian contact not found.")
 

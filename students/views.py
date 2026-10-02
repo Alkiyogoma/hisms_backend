@@ -39,13 +39,8 @@ def _hod_departments(user):
     admin can override a role's departments live via the Role Management UI. Falls back
     to the role's default department, then to staff_profile.department.
     """
-    from users.role_models import RoleConfig
-    rc = RoleConfig.objects.filter(role=user.role, is_active=True).first()
-    if rc and rc.departments:
-        return list(rc.departments)
-    default = HOD_ROLE_DEPARTMENT.get(user.role)
-    if default:
-        return [default]
+    if user.section_departments:
+        return list(user.section_departments)  # all HOD roles held (incl. additional)
     sp_dept = getattr(getattr(user, "staff_profile", None), "department", "")
     return [sp_dept] if sp_dept else []
 
@@ -979,7 +974,7 @@ class GuardianListView(RoleRequiredMixin, ListView):
                 qs = qs.filter(studentguardian__student_id__in=my_student_ids).distinct()
             else:
                 qs = qs.none()
-        elif user.role in {UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD}:
+        elif user.has_role(UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD):
             my_depts = _hod_departments(user)
             if my_depts:
                 from academics.models import GradeClass

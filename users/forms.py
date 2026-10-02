@@ -510,7 +510,7 @@ class UserCreateForm(StaffAssignmentFieldsMixin, forms.ModelForm):
             actor=self.request.user if self.request else None,
         )
         if db_result:
-            return True
+            return db_result.sent  # False when switched off or delivery failed
 
         # Fallback to static template
         try:

@@ -583,7 +583,7 @@ class WeeklyFocusEditView(RoleRequiredMixin, TemplateView):
             return redirect("communications:weekly_focus_edit", pk=pk)
 
         # Re-submit after edit (reset status for teacher, direct publish for HOD)
-        if request.user.role in (UserRole.ECD_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN):
+        if request.user.has_role(UserRole.ECD_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN):
             entry.status = WeeklyFocusStatus.APPROVED
             entry.is_published = True
             entry.published_at = timezone.now()

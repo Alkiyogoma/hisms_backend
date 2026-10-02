@@ -129,7 +129,11 @@
       {% empty %}
         <div style="padding:24px;text-align:center">{% include '_partials/empty_state.html' with title='No classes scheduled for today' desc='Check the full timetable for your weekly schedule.' icon='calendar' icon_color='grey' %}</div>
       {% endfor %}
-      <div style="margin-top:12px"><a href="/timetable/" class="section-link">View full timetable →</a></div>
+      <div style="margin-top:12px">
+        {% if my_timetable %}<button type="button" class="section-link" style="background:none;border:0;padding:0;cursor:pointer" data-hui-open="myWeekTimetable">View my full week →</button>
+        {% else %}<a href="/timetable/" class="section-link">View full timetable →</a>{% endif %}
+      </div>
+      {% include "dashboards/_my_week_drawer.html" %}
     </div>
 
     {% if is_ecd_teacher %}

@@ -176,7 +176,7 @@ class RoleRequiredMixin(LoginRequiredMixin):
 
         # Role-based fallback (only for views with no permission requirement).
 
-        if self.allowed_roles and request.user.role not in self.allowed_roles:
+        if self.allowed_roles and not request.user.has_role(*self.allowed_roles):
 
             # Custom roles fall through to permission-based check below
 

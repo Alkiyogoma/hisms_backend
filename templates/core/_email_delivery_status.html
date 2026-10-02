@@ -1,0 +1,17 @@
+{# Shows whether email is actually being delivered, with an optional "send test" form. #}
+<div class="set-banner {% if email_delivery.delivering %}ok{% else %}bad{% endif %}">
+    <div>
+        <strong>Email delivery:</strong>
+        {% if email_delivery.delivering %}working through {{ email_delivery.detail }}{% else %}{{ email_delivery.detail }}{% endif %}
+    </div>
+    {% if show_test %}
+    <form method="post" action="?tab=messaging">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="send_test_email">
+        <input type="email" name="test_to" class="hf-input" value="{{ request.user.email }}" placeholder="name@example.com" aria-label="Send test email to" required>
+        <c-button type="submit" size="sm" variant="secondary">Send test email</c-button>
+    </form>
+    {% elif not email_delivery.delivering %}
+    <a href="?tab=messaging" class="btn btn-secondary btn-sm" style="margin-left:auto">Set up email</a>
+    {% endif %}
+</div>

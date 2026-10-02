@@ -22,13 +22,9 @@ from .models import WelfareConcernType, WelfareNoteType
 LEADERSHIP_ROLES = {UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL}
 
 
-def _hod_department(user):
-    from academics.models import Department
-    return {
-        UserRole.ECD_HOD: Department.ECD,
-        UserRole.PRIMARY_HOD: Department.PRIMARY,
-        UserRole.LOWER_SECONDARY_HOD: Department.LOWER_SECONDARY,
-    }.get(user.role)
+def _hod_departments(user):
+    """Every department the user heads (a user may head more than one section)."""
+    return user.section_departments
 
 
 def can_view_safeguarding(user):
@@ -39,7 +35,7 @@ def can_view_safeguarding(user):
 
 
 def is_leadership(user):
-    return user.role in LEADERSHIP_ROLES or user.is_superuser
+    return user.has_role(*LEADERSHIP_ROLES) or user.is_superuser
 
 
 def class_teacher_classes(user):
@@ -81,10 +77,10 @@ def visible_observations(user, qs):
     own = Q(submitted_by=user) & not_safeguarding
     sensitive = _sensitive_q()
 
-    dept = _hod_department(user)
-    if dept:
+    depts = _hod_departments(user)
+    if depts:
         from academics.models import GradeClass
-        dept_classes = GradeClass.objects.filter(department=dept).values_list("name", flat=True)
+        dept_classes = GradeClass.objects.filter(department__in=depts).values_list("name", flat=True)
         in_dept = Q(student__class_name__in=list(dept_classes)) & not_safeguarding
         return qs.filter(in_dept | own | allowed_safeguarding)
 

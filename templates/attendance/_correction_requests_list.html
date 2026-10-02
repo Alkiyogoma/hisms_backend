@@ -1,0 +1,37 @@
+{% if notice %}<div class="alert alert-success" style="margin-bottom:12px; font-size:13px">{{ notice }}</div>{% endif %}
+{% if error %}<div class="alert alert-error" style="margin-bottom:12px; font-size:13px">{{ error }}</div>{% endif %}
+
+<div class="section-title" style="margin:0 0 8px">Pending ({{ pending|length }})</div>
+{% for r in pending %}
+<form hx-post="{% url 'attendance:correction_requests' %}" hx-target="#corrDrawerBody" hx-swap="innerHTML"
+      style="padding:12px 0; border-top:1px solid var(--border)">
+  {% csrf_token %}
+  <input type="hidden" name="request_id" value="{{ r.pk }}">
+  <div style="font-weight:600; font-size:13px">{{ r.student.get_full_name }} <span style="font-weight:400; color:var(--text-muted)">&middot; {{ r.student.class_name }}</span></div>
+  <div style="font-size:12px; margin:2px 0 6px">
+    {{ r.date|date:"D d M Y" }} &rarr; <span class="chip chip-blue" style="font-size:10px">{{ r.get_requested_status_display }}</span>
+  </div>
+  <div style="font-size:13px; margin-bottom:4px">&ldquo;{{ r.reason }}&rdquo;</div>
+  <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px">
+    Requested by {{ r.requested_by.get_full_name|default:r.requested_by.username }} &middot; {{ r.created_at|date:"d M H:i" }}
+  </div>
+  <input type="text" name="note" class="hf2-input" placeholder="Note to the teacher (optional)" style="margin-bottom:8px">
+  <div style="display:flex; gap:8px">
+    <c-button type="submit" size="sm" name="decision" value="approve">Approve &amp; apply</c-button>
+    <c-button type="submit" size="sm" variant="secondary" name="decision" value="reject">Reject</c-button>
+  </div>
+</form>
+{% empty %}
+<c-empty-state title="No pending requests" desc="Teachers' correction requests will appear here." />
+{% endfor %}
+
+{% if resolved %}
+<div class="section-title" style="margin:20px 0 8px">Recently resolved</div>
+{% for r in resolved %}
+<div style="padding:8px 0; border-top:1px solid var(--border); font-size:12px">
+  <strong>{{ r.student.get_full_name }}</strong> &middot; {{ r.date|date:"d M" }} &rarr; {{ r.get_requested_status_display }}
+  <span class="chip {% if r.status == 'approved' %}chip-green{% else %}chip-grey{% endif %}" style="font-size:10px; margin-left:4px">{{ r.get_status_display }}</span>
+  <div style="color:var(--text-muted)">by {{ r.resolved_by.get_full_name|default:r.resolved_by.username }} &middot; {{ r.resolved_at|date:"d M H:i" }}{% if r.resolution_note %} &middot; {{ r.resolution_note }}{% endif %}</div>
+</div>
+{% endfor %}
+{% endif %}

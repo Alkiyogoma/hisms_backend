@@ -59,7 +59,7 @@ class TimetableView(RoleRequiredMixin, TemplateView):
         ).order_by("start_time")
 
         # Non-admin users only see published timetable
-        if user.role not in {UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD, UserRole.ADMIN_OFFICER}:
+        if not user.has_role(UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD, UserRole.ADMIN_OFFICER):
             slots_qs = slots_qs.filter(is_published=True)
 
         # FR-TT-004: HODs see all timetable but their department is the default filter

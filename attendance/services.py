@@ -12,10 +12,11 @@ from django.core.exceptions import ValidationError
 
 from users.models import UserRole
 
-from .models import OtpCode, Message, NotificationLog, AttendanceEntry
+from .models import OtpCode, Message, NotificationLog, AttendanceEntry, AttendanceStatus
 from students.models import Student, ParentGuardian, LaravelParent
 
 from audit.models import log_event
+from .policy import AttendanceWindowError, check_can_modify
 from core.utils import is_school_day
 
 
@@ -847,7 +848,18 @@ def correct_attendance(actor, entry, status, reason):
             'message': 'Correction reason is required'
         }
 
+    # Locked registers can only be corrected by a super admin.
+    try:
+        check_can_modify(actor, entry.date)
+    except AttendanceWindowError as exc:
+        return {'success': False, 'message': exc.message, 'error_code': exc.code.upper()}
+
     original_status = entry.status
+    before = {
+        "status": entry.status,
+        "marked_by": entry.marked_by_id,
+        "marked_at": entry.marked_at.isoformat() if entry.marked_at else None,
+    }
 
     # Update entry with correction — preserve original_status for audit trail
     entry.status = status
@@ -868,6 +880,8 @@ def correct_attendance(actor, entry, status, reason):
                 f"Attendance corrected: {original_status} \u2192 {status} for "
                 f"{entry.student_id} on {entry.date}. Reason: {reason}"
             ),
+            before=before,
+            after={"status": status, "reason": str(reason).strip()},
         )
     except Exception:
         pass  # Never block correction on audit log failure
@@ -907,6 +921,11 @@ def create_excused_absence(actor, student, date, reason):
     if not reason or not str(reason).strip():
         return {'success': False, 'message': 'Excuse reason is required'}
 
+    try:
+        is_override = check_can_modify(actor, date)
+    except AttendanceWindowError as exc:
+        return {'success': False, 'message': exc.message, 'error_code': exc.code.upper()}
+
     entry, created = AttendanceEntry.objects.get_or_create(
         student=student,
         date=date,
@@ -918,11 +937,18 @@ def create_excused_absence(actor, student, date, reason):
         }
     )
 
+    before = None
     if not created:
+        before = {"status": entry.status, "reason": entry.reason, "marked_by": entry.marked_by_id}
+        if is_override and entry.status != AttendanceStatus.EXCUSED:
+            entry.original_status = entry.original_status or entry.status
+            entry.corrected_by = actor
+            entry.corrected_at = timezone.now()
+            entry.correction_reason = str(reason).strip()
         entry.status = AttendanceStatus.EXCUSED
         entry.reason = str(reason).strip()
         entry.marked_by = actor
-        entry.save(update_fields=['status', 'reason', 'marked_by', 'updated_at'])
+        entry.save()
 
     try:
         log_event(
@@ -931,6 +957,7 @@ def create_excused_absence(actor, student, date, reason):
             model_name="AttendanceEntry",
             object_id=entry.pk,
             description=f"Excused absence for {student.get_full_name()} on {date}. Reason: {reason}",
+            before=before,
             after={"student": student.pk, "date": str(date), "reason": str(reason).strip()},
         )
     except Exception:
@@ -1010,7 +1037,10 @@ def mark_attendance(actor=None, student=None, date=None, status=None, student_id
         }
 
     if date is None:
-        date = timezone.now().date()
+        date = timezone.localdate()
+
+    # Today only, 00:00-18:00; after that only a super admin (audited below).
+    is_override = check_can_modify(marking_user, date)
 
     entry, created = AttendanceEntry.objects.get_or_create(
         student=student,
@@ -1022,19 +1052,32 @@ def mark_attendance(actor=None, student=None, date=None, status=None, student_id
         }
     )
 
+    before = None
     if not created:
+        before = {"status": entry.status, "marked_by": entry.marked_by_id,
+                  "marked_at": entry.marked_at.isoformat() if entry.marked_at else None}
+        if is_override and (status or entry.status) != entry.status:
+            entry.original_status = entry.original_status or entry.status
+            entry.corrected_by = marking_user
+            entry.corrected_at = timezone.now()
+            entry.correction_reason = "Edited by super admin after the register locked."
         entry.status = status or entry.status
         entry.marked_by = marking_user
+        entry.marked_at = timezone.now()
         entry.save()
 
     try:
         log_event(
             actor=marking_user,
-            action_type="ATTENDANCE_MARKED",
+            action_type="ATTENDANCE_OVERRIDE" if is_override else "ATTENDANCE_MARKED",
             model_name="AttendanceEntry",
             object_id=entry.pk,
-            description=f"Attendance marked: {status} for {student.get_full_name()} on {date}",
-            after={"student": student.pk, "date": str(date), "status": status},
+            description=(
+                f"Attendance {'changed after lock' if is_override else 'marked'}: "
+                f"{status} for {student.get_full_name()} on {date}"
+            ),
+            before=before,
+            after={"student": student.pk, "date": str(date), "status": entry.status},
         )
     except Exception:
         pass

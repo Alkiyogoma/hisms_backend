@@ -1,0 +1,22 @@
+{% if my_timetable %}
+<c-drawer id="myWeekTimetable" title="My teaching week" subtitle="{{ my_timetable.lessons_this_week }} lessons, Monday to Friday">
+  {% for day in my_timetable.week %}
+    <div class="section-title" style="margin:{% if forloop.first %}0{% else %}16px{% endif %} 0 6px">
+      {{ day.name }}{% if day.is_today %} <span class="chip chip-blue" style="font-size:10px; margin-left:4px">Today</span>{% endif %}
+    </div>
+    {% for slot in day.slots %}
+      <div class="trow">
+        <div>
+          <div class="trow-name">{{ slot.start_time|time:"H:i" }} &ndash; {{ slot.end_time|time:"H:i" }}</div>
+          <div class="trow-sub">{{ slot.subject_name }} &middot; {{ slot.class_name }}{% if slot.room %} &middot; {{ slot.room.name }}{% endif %}</div>
+        </div>
+      </div>
+    {% empty %}
+      <div style="font-size:12px; color:var(--text-muted); padding:4px 0">No lessons</div>
+    {% endfor %}
+  {% endfor %}
+  <c-slot name="footer">
+    <c-button variant="secondary" href="/timetable/">Open school timetable</c-button>
+  </c-slot>
+</c-drawer>
+{% endif %}

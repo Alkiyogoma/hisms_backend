@@ -29,6 +29,7 @@
 {% endblock %}
 
 {% block content %}
+{% include "dashboards/_my_timetable.html" %}
 <div id="hos-dashboard" hx-trigger="every 60s" hx-get="." hx-select="#hos-dashboard" hx-swap="outerHTML" hx-target="#hos-dashboard">
 <div class="section-hdr">
   <span class="section-title">School overview &middot; today</span>
