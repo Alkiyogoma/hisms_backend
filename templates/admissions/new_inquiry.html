@@ -201,31 +201,8 @@
                   {% field form.preferred_meeting_time %}
                 </div>
                 <div class="grid-2" style="margin-top:16px">
-                  <div>
-                    <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Target enrollment year</label>
-                    <select name="target_enrollment_year" style="width:100%;padding:10px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:14px">
-                      <option value="">Select year</option>
-                      {% for y in enrollment_years %}<option value="{{ y }}" {% if form.target_enrollment_year.value|stringformat:"s" == y|stringformat:"s" %}selected{% endif %}>{{ y }}</option>{% endfor %}
-                    </select>
-                  </div>
-                  <div>
-                    <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Target enrollment month</label>
-                    <select name="target_enrollment_month" style="width:100%;padding:10px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:14px">
-                      <option value="">Select month</option>
-                      <option value="1" {% if form.target_enrollment_month.value == 1 %}selected{% endif %}>January</option>
-                      <option value="2" {% if form.target_enrollment_month.value == 2 %}selected{% endif %}>February</option>
-                      <option value="3" {% if form.target_enrollment_month.value == 3 %}selected{% endif %}>March</option>
-                      <option value="4" {% if form.target_enrollment_month.value == 4 %}selected{% endif %}>April</option>
-                      <option value="5" {% if form.target_enrollment_month.value == 5 %}selected{% endif %}>May</option>
-                      <option value="6" {% if form.target_enrollment_month.value == 6 %}selected{% endif %}>June</option>
-                      <option value="7" {% if form.target_enrollment_month.value == 7 %}selected{% endif %}>July</option>
-                      <option value="8" {% if form.target_enrollment_month.value == 8 %}selected{% endif %}>August</option>
-                      <option value="9" {% if form.target_enrollment_month.value == 9 %}selected{% endif %}>September</option>
-                      <option value="10" {% if form.target_enrollment_month.value == 10 %}selected{% endif %}>October</option>
-                      <option value="11" {% if form.target_enrollment_month.value == 11 %}selected{% endif %}>November</option>
-                      <option value="12" {% if form.target_enrollment_month.value == 12 %}selected{% endif %}>December</option>
-                    </select>
-                  </div>
+                  {% field form.target_enrollment_year %}
+                  {% field form.target_enrollment_month %}
                 </div>
                 <div style="margin-top:16px">
                   {% field form.notes placeholder="Anything else you would like us to know" rows="3" span="full" %}

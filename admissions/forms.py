@@ -13,6 +13,51 @@ def _strip_html(value):
     return re.sub(r'<[^>]+>', '', value).strip()
 
 
+def _enrollment_year_choices(current=None):
+    """Current year plus the next three; keeps an out-of-range saved year selectable."""
+    from django.utils import timezone
+    this_year = timezone.now().year
+    years = list(range(this_year, this_year + 4))
+    if current and int(current) not in years:
+        years = sorted(years + [int(current)])
+    return [("", "Select year")] + [(y, str(y)) for y in years]
+
+
+ENROLLMENT_MONTH_CHOICES = [("", "Select month")] + [
+    (i, name) for i, name in enumerate(
+        ["January", "February", "March", "April", "May", "June", "July",
+         "August", "September", "October", "November", "December"], start=1)
+]
+
+
+def _setup_inquiry_choice_fields(form):
+    """Shared setup for the relationship and target-enrolment selects on inquiry forms."""
+    instance = form.instance if form.instance and form.instance.pk else None
+    form.fields["parent_relationship"] = forms.ChoiceField(
+        choices=[("", "Select relationship...")] + Applicant.PARENT_RELATIONSHIP_FORM_CHOICES,
+        required=False,
+        label="Relationship to student*",
+        widget=forms.Select(attrs={"class": "hf2-select"}),
+    )
+    if instance:
+        form.initial["parent_relationship"] = Applicant.normalize_parent_relationship(instance.parent_relationship)
+
+    form.fields["target_enrollment_year"] = forms.TypedChoiceField(
+        choices=_enrollment_year_choices(instance.target_enrollment_year if instance else None),
+        coerce=int,
+        empty_value=None,
+        required=False,
+        label="Target enrollment year",
+    )
+    form.fields["target_enrollment_month"] = forms.TypedChoiceField(
+        choices=ENROLLMENT_MONTH_CHOICES,
+        coerce=int,
+        empty_value=None,
+        required=False,
+        label="Target enrollment month",
+    )
+
+
 class ApplicantCreateForm(forms.ModelForm):
     applying_department = forms.ChoiceField(
         choices=[("", "Select department")]
@@ -118,11 +163,7 @@ class ApplicantCreateForm(forms.ModelForm):
         self.fields["child_full_name"].widget.attrs["placeholder"] = "Student's full name"
         self.fields["previous_school_other"].widget.attrs["placeholder"] = "Enter school name"
         self.fields["previous_school_other"].help_text = "Only required if 'Other' selected above."
-        self.fields["parent_relationship"].label = "Relationship to student*"
-        self.fields["parent_relationship"].widget = forms.Select(
-            attrs={"class": "hf2-select"},
-            choices=[("", "Select relationship...")] + Applicant.PARENT_RELATIONSHIP_CHOICES,
-        )
+        _setup_inquiry_choice_fields(self)
         self.fields["parent_relationship"].error_messages["required"] = "Please select the parent/guardian's relationship to the student."
         self.fields["sibling_details"].widget.attrs["placeholder"] = "Name and class of any siblings (if applicable)"
         self.fields["notes"].widget.attrs["placeholder"] = (
@@ -180,6 +221,10 @@ class ApplicantEditForm(forms.ModelForm):
         + [(d, lbl) for d, lbl in Department.choices if d != Department.ADMINISTRATION],
         required=True,
         label="Department applying to*",
+    )
+    current_grade = forms.CharField(
+        required=False, max_length=50, label="Current grade",
+        widget=forms.TextInput(attrs={"placeholder": "e.g. Grade 2"}),
     )
     class Meta:
         model = Applicant
@@ -241,11 +286,9 @@ class ApplicantEditForm(forms.ModelForm):
         self.fields["inquiry_channel"].label = "How did they hear about us? (Channel)*"
         self.fields["photo"].label = "Student Photo"
         self.fields["photo"].help_text = "Optional. High quality photo for the student file."
-        self.fields["parent_relationship"].label = "Relationship to student*"
-        self.fields["parent_relationship"].widget = forms.Select(
-            attrs={"class": "hf2-select"},
-            choices=[("", "Select relationship...")] + Applicant.PARENT_RELATIONSHIP_CHOICES,
-        )
+        _setup_inquiry_choice_fields(self)
+        if self.instance and self.instance.pk:
+            self.initial.setdefault("current_grade", self.instance.current_grade)
         self.fields["previous_school_other"].widget.attrs["placeholder"] = "Enter school name"
         self.fields["sibling_details"].widget.attrs["placeholder"] = "Name and class of any siblings (if applicable)"
         self.fields["notes"].widget.attrs["placeholder"] = (

@@ -246,6 +246,22 @@ class Applicant(TimeStampedModel):
         ("other", "Other"),
         ("Other", "Other"),
     ]
+    # Canonical options offered in forms. PARENT_RELATIONSHIP_CHOICES above also
+    # carries legacy capitalised spellings so existing rows still validate.
+    PARENT_RELATIONSHIP_FORM_CHOICES = [
+        ("father", "Father"),
+        ("mother", "Mother"),
+        ("guardian", "Guardian"),
+        ("legal_guardian", "Legal guardian"),
+        ("other", "Other"),
+    ]
+
+    @classmethod
+    def normalize_parent_relationship(cls, value):
+        """Map a stored/legacy relationship value (e.g. "Legal guardian") to its canonical key."""
+        key = (value or "").strip().lower().replace(" ", "_")
+        return key if key in dict(cls.PARENT_RELATIONSHIP_FORM_CHOICES) else ""
+
     parent_relationship = models.CharField(
         max_length=30,
         choices=PARENT_RELATIONSHIP_CHOICES,
@@ -363,6 +379,21 @@ class Applicant(TimeStampedModel):
         if GradeClass.objects.exists():
             if not GradeClass.objects.filter(name__iexact=self.grade_applying_for.strip()).exists():
                 raise ValidationError("Selected grade is not active. Please choose a valid grade from dropdown.")
+
+    def _inquiry_notes_data(self):
+        import json
+        try:
+            data = json.loads(self.notes) if self.notes else {}
+        except (ValueError, TypeError):
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    @property
+    def current_grade(self):
+        """Grade the child is currently in, captured at inquiry and stored in the notes JSON."""
+        data = self._inquiry_notes_data()
+        child = data.get("child") if isinstance(data.get("child"), dict) else {}
+        return (data.get("current_grade") or child.get("currentGrade") or "").strip()
 
     def __str__(self):
         return f"{self.child_full_name} ({self.get_status_display()})"

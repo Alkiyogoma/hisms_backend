@@ -7,6 +7,7 @@ Usage in templates:
   {% field form.grade placeholder="Grade 1" %}
   {% field form.notes rows=4 %}
 """
+import copy
 from django import template, forms
 from django.forms import CheckboxInput, DateInput, Select, Textarea, TextInput, TimeInput
 from django.utils.html import conditional_escape, format_html, mark_safe
@@ -72,7 +73,16 @@ def field(bound_field, placeholder=None, rows=None, label=None, hint=None, span=
     else:
         extra["class"] = _INPUT_CLASS
 
-    rendered = bound_field.as_widget(attrs=extra)
+    # Django renders the widget's own input_type before any attrs, so a "type"
+    # passed via attrs yields a duplicate attribute the browser ignores. Swap the
+    # type on a copy of the widget instead so date/time pickers actually appear.
+    input_type = extra.pop("type", None)
+    if input_type and getattr(widget, "input_type", None) != input_type:
+        widget = copy.copy(widget)
+        widget.input_type = input_type
+        rendered = bound_field.as_widget(widget=widget, attrs=extra)
+    else:
+        rendered = bound_field.as_widget(attrs=extra)
 
     return {
         "field": bound_field,
@@ -261,7 +271,7 @@ def month_name(value):
     """Convert month number (1-12) to name: {{ 8|month_name }} -> August"""
     try:
         return MONTH_NAMES[int(value)]
-    except (ValueError, IndexError):
+    except (TypeError, ValueError, IndexError):
         return ""
 
 

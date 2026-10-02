@@ -142,6 +142,9 @@
       <div class="card" style="margin-top:16px">
         <div class="card-title">Student Details</div>
         <div class="info-row"><div class="info-lbl">DOB</div><div class="info-val">{{ applicant.child_date_of_birth }}</div></div>
+        {% if applicant.current_grade %}
+        <div class="info-row"><div class="info-lbl">Current Grade</div><div class="info-val">{{ applicant.current_grade }}</div></div>
+        {% endif %}
         <div class="info-row"><div class="info-lbl">Previous School</div><div class="info-val">{{ applicant.previous_school|default:"N/A" }}</div></div>
         <div class="info-row">
           <div class="info-lbl">Sibling Enrolled</div>

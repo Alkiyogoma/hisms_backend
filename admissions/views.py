@@ -335,9 +335,6 @@ class InquiryCreateView(AdmissionsCountsMixin, PermissionCacheMixin, AdmissionsR
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        from django.utils import timezone
-        now = timezone.now()
-        ctx["enrollment_years"] = list(range(now.year, now.year + 4))
         # Repopulate non-model fields after a validation error
         if self.request.method == "POST":
             ctx["form_gender"] = self.request.POST.get("x_gender", "")
@@ -666,7 +663,7 @@ class InquiryEditView(PermissionCacheMixin, AdmissionsRoleRequiredMixin, UpdateV
         self.object.notes = json.dumps({
             "submitted_via": original.get("submitted_via", "staff_form"),
             "gender": original.get("gender", ""),
-            "current_grade": original.get("current_grade", ""),
+            "current_grade": (form.cleaned_data.get("current_grade") or "").strip(),
             "inquiry_notes": typed_notes,
             "additional_parents": additional_parents,
         })
