@@ -8,6 +8,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.views.generic import DetailView, ListView, TemplateView, View
 
 from core.permissions import RoleRequiredMixin, assert_role
@@ -433,6 +434,7 @@ def _read_note_form(request):
         "action_taken": post.get("action_taken", "").strip(),
         "severity": severity,
         "parent_contacted": post.get("parent_contacted") == "on",
+        "parent_contact_datetime": post.get("parent_contact_datetime", "").strip(),
         "follow_up_required": post.get("follow_up_required") == "on" or bool(post.get("review_date")),
         "follow_up_date": post.get("follow_up_date", "").strip() or post.get("review_date", "").strip(),
         "edit_reason": post.get("edit_reason", "").strip(),
@@ -493,9 +495,6 @@ def _validate_note_form(data, *, allowed_students, earliest_date, final, mode):
             errors.append("Please describe what happened.")
         if not cleaned["action_taken"]:
             errors.append("Please describe the action taken today.")
-        # Parents are not contacted by the teacher about safeguarding concerns.
-        if note_type != WelfareNoteType.SAFEGUARDING and not data["parent_contacted"]:
-            errors.append("Please confirm whether the parent was contacted (toggle required).")
         if mode == "correct" and not data["edit_reason"]:
             errors.append("Say briefly why you are correcting this note.")
 
@@ -503,7 +502,22 @@ def _validate_note_form(data, *, allowed_students, earliest_date, final, mode):
     cleaned["note_type"] = note_type
     cleaned["severity"] = data["severity"]
     cleaned["concern_type"] = concern_type_for_tags(data["tags"])
+    # Parent contact is optional. Only once it is ticked is "when" required.
     cleaned["parent_contacted"] = data["parent_contacted"]
+    cleaned["parent_contact_datetime"] = None
+    if data["parent_contacted"]:
+        raw = data["parent_contact_datetime"]
+        parsed = parse_datetime(raw) if raw else None
+        if parsed is None:
+            if final:
+                errors.append("Say when you spoke to the parent or guardian.")
+        else:
+            if timezone.is_naive(parsed):
+                parsed = timezone.make_aware(parsed)
+            if parsed > timezone.now() + timedelta(minutes=5):
+                errors.append("The parent contact time cannot be in the future.")
+            else:
+                cleaned["parent_contact_datetime"] = parsed
     cleaned["follow_up_required"] = data["follow_up_required"]
     try:
         cleaned["follow_up_date"] = date.fromisoformat(data["follow_up_date"]) if data["follow_up_date"] else None
@@ -546,6 +560,10 @@ def _note_initial(obs=None, data=None, student_id=None):
             "action_taken": obs.action_taken,
             "severity": obs.severity,
             "parent_contacted": obs.parent_contacted,
+            "parent_contact_datetime": (
+                timezone.localtime(obs.parent_contact_datetime).strftime("%Y-%m-%dT%H:%M")
+                if obs.parent_contact_datetime else ""
+            ),
             "follow_up_required": obs.follow_up_required,
             "follow_up_date": obs.follow_up_date.isoformat() if obs.follow_up_date else "",
             "edit_reason": "",
@@ -560,6 +578,7 @@ def _note_initial(obs=None, data=None, student_id=None):
         "action_taken": "",
         "severity": "",
         "parent_contacted": False,
+        "parent_contact_datetime": "",
         "follow_up_required": False,
         "follow_up_date": "",
         "edit_reason": "",
@@ -599,6 +618,7 @@ def _apply_cleaned(obs, cleaned):
     obs.severity = cleaned["severity"]
     obs.concern_type = cleaned["concern_type"]
     obs.parent_contacted = cleaned["parent_contacted"]
+    obs.parent_contact_datetime = cleaned["parent_contact_datetime"] if cleaned["parent_contacted"] else None
     obs.follow_up_required = cleaned["follow_up_required"]
     obs.follow_up_date = cleaned["follow_up_date"]
 

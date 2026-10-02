@@ -2,6 +2,8 @@ from django.urls import path
 
 from attendance.views import (
     AttendanceCorrectionView,
+    AttendanceCorrectionRequestCreateView,
+    AttendanceCorrectionRequestListView,
     AttendanceMarkView,
     AttendanceMarkAllView,
     AttendanceTodayView,
@@ -55,6 +57,8 @@ app_name = "attendance"
 urlpatterns = [
     # Web views
     path("", AttendanceTodayView.as_view(), name="today"),
+    path("correction-requests/", AttendanceCorrectionRequestListView.as_view(), name="correction_requests"),
+    path("correction-requests/new/", AttendanceCorrectionRequestCreateView.as_view(), name="request_correction"),
     
     # PWA
     path("pwa/sw.js", ServiceWorkerView.as_view(), name="pwa_sw"),

@@ -62,6 +62,52 @@ if ('serviceWorker' in navigator) {
   box-sizing: border-box;
 }
 </style>
+<div class="print-hide" style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; margin-bottom:12px">
+  {% if is_locked %}
+  <div style="flex:1 1 320px; padding:10px 14px; border-radius:8px; background:#FEF3C7; color:#92400E; font-size:13px">
+    {% if is_super_admin %}
+      This register is locked. As super admin you can still change records; every change is logged with the previous value.
+    {% else %}
+      This register is locked. Attendance can only be marked on the day, before {{ lock_hour }}:00. Use <strong>Request correction</strong> on a learner to ask the super admin for a change.
+    {% endif %}
+  </div>
+  {% elif date == max_date %}
+  <div style="flex:1 1 320px; font-size:12px; color:var(--text-muted)">Register open until {{ lock_hour }}:00 today.</div>
+  {% endif %}
+  {% if is_super_admin %}
+  <c-button variant="secondary" size="sm" id="openCorrectionRequests"
+    hx-get="{% url 'attendance:correction_requests' %}" hx-target="#hui-drawer-root" hx-swap="innerHTML">
+    Correction requests{% if pending_correction_count %} <span class="chip chip-amber" style="margin-left:6px; font-size:10px">{{ pending_correction_count }}</span>{% endif %}
+  </c-button>
+  {% endif %}
+</div>
+
+<c-modal id="reqCorrectionModal" title="Request a correction" size="sm">
+  <form id="reqCorrectionForm">
+    <input type="hidden" name="student_id">
+    <input type="hidden" name="date">
+    <p id="reqCorrectionWho" style="margin:0 0 12px; font-size:13px; color:var(--text-secondary)"></p>
+    <div class="hf2-group">
+      <label class="hf2-label" for="reqCorrectionStatus">Correct status</label>
+      <select name="status" id="reqCorrectionStatus" class="hf2-input" required>
+        <option value="present">Present</option>
+        <option value="late">Late</option>
+        <option value="absent">Absent</option>
+        <option value="excused">Excused</option>
+      </select>
+    </div>
+    <div class="hf2-group" style="margin-top:12px">
+      <label class="hf2-label" for="reqCorrectionReason">Reason <span style="color:var(--red)">*</span></label>
+      <textarea name="reason" id="reqCorrectionReason" class="hf2-textarea" rows="3" required
+        placeholder="e.g. Learner arrived after the register was taken"></textarea>
+    </div>
+    <div id="reqCorrectionError" class="field-error" style="display:none; margin-top:8px; color:var(--red); font-size:12px"></div>
+  </form>
+  <c-slot name="footer">
+    <c-button variant="secondary" data-hui-close>Cancel</c-button>
+    <c-button type="submit" form="reqCorrectionForm">Send to super admin</c-button>
+  </c-slot>
+</c-modal>
 <div class="card print-hide" style="margin-bottom:12px; padding:12px 16px">
   <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;">
     <div style="flex:0 0 220px; min-width:180px">
@@ -71,7 +117,7 @@ if ('serviceWorker' in navigator) {
     <form id="attendance-filters-form" method="get" style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin:0; padding:0">
       <div style="flex:0 0 180px; min-width:140px">
         <label class="hf-label" style="font-size:12px; margin-bottom:2px; display:block">Attendance Date</label>
-        <input id="attendance-date" type="date" name="date" class="hf-input" value="{{ date|date:'Y-m-d' }}" style="height:36px; font-size:13px">
+        <input id="attendance-date" type="date" name="date" class="hf-input" value="{{ date|date:'Y-m-d' }}" max="{{ max_date|date:'Y-m-d' }}" style="height:36px; font-size:13px">
       </div>
       <div style="flex:0 0 200px; min-width:150px">
         <label class="hf-label" style="font-size:12px; margin-bottom:2px; display:block">Select Class / Grade</label>
@@ -138,7 +184,7 @@ if ('serviceWorker' in navigator) {
             <div style="display:flex; align-items:center; gap:6px">
               <span>Status</span>
               {% if can_mark %}
-              <div style="display:flex; gap:4px" id="bulk-mark-btns" {% if is_locked %}style="opacity:0.4; pointer-events:none"{% endif %}>
+              <div style="display:flex; gap:4px" id="bulk-mark-btns" {% if is_locked and not is_super_admin %}style="opacity:0.4; pointer-events:none"{% endif %}>
                 <button type="button" class="chip chip-green" style="font-size:11px; padding:2px 10px; cursor:pointer; border:1px solid var(--green-bd, #B7DFBF)" onclick="markAllStudents('present')" title="Mark all as Present">All P</button>
                 <button type="button" class="chip chip-red" style="font-size:11px; padding:2px 10px; cursor:pointer; border:1px solid var(--red-bd, #FECACA)" onclick="markAllStudents('absent')" title="Mark all as Absent">All A</button>
               </div>
@@ -676,7 +722,16 @@ function postMark(studentId, date, status, reason) {
     method: 'POST',
     headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
     body: body
-  }).then(function(r) { return r.text(); }).then(function(html) {
+  }).then(function(r) {
+    if (!r.ok) {
+      return r.text().then(function(msg) {
+        showToast(msg || 'Could not save attendance.', 'error');
+        setTimeout(function() { location.reload(); }, 1500);
+        throw new Error(msg);
+      });
+    }
+    return r.text();
+  }).then(function(html) {
     var tmp = document.createElement('table');
     tmp.innerHTML = html;
     var newRow = tmp.querySelector('tr');
@@ -685,6 +740,44 @@ function postMark(studentId, date, status, reason) {
     document.dispatchEvent(new Event('attendance-updated'));
   });
 }
+
+function requestCorrection(studentId, date, name) {
+  var f = document.getElementById('reqCorrectionForm');
+  f.reset();
+  f.student_id.value = studentId;
+  f.date.value = date;
+  document.getElementById('reqCorrectionWho').textContent = name + ' \u00b7 ' + date;
+  document.getElementById('reqCorrectionError').style.display = 'none';
+  HodariUI.open('reqCorrectionModal');
+}
+
+document.getElementById('reqCorrectionForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  var f = this, err = document.getElementById('reqCorrectionError');
+  var body = new URLSearchParams(new FormData(f));
+  body.append('csrfmiddlewaretoken', getCsrfToken());
+  fetch("{% url 'attendance:request_correction' %}", { method: 'POST', body: body })
+    .then(function(r) { return r.ok ? null : r.text(); })
+    .then(function(msg) {
+      if (msg) { err.textContent = msg; err.style.display = 'block'; return; }
+      HodariUI.close('reqCorrectionModal');
+      showToast('Correction request sent to the super admin.', 'success');
+    });
+});
+
+// Super admin: corrections drawer. Reload the register after any approval so rows are current;
+// ?corrections=1 (used by the notification link) opens the drawer straight away.
+(function() {
+  var dirty = false;
+  document.body.addEventListener('att-corrections-changed', function() { dirty = true; });
+  document.body.addEventListener('hui:close', function(e) {
+    if (dirty && e.target.querySelector && e.target.querySelector('#corrDrawerBody')) location.reload();
+  });
+  var btn = document.getElementById('openCorrectionRequests');
+  if (btn && new URLSearchParams(location.search).get('corrections') === '1') {
+    window.addEventListener('load', function() { btn.click(); });
+  }
+})();
 
 function markAttendance(el, studentId, date, status) {
   var group = el.parentElement;

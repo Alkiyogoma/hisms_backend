@@ -281,7 +281,7 @@ class PTCScreenView(RoleRequiredMixin, TemplateView):
             ).exists()
             if not recent_log:
                 PTCGenerationLog.objects.create(student=student, class_teacher=user, ptc_window=ptc_window)
-        elif user.role in {UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD}:
+        elif user.has_role(UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD):
             from audit.models import log_event
             five_min_ago = timezone.now() - timedelta(minutes=5)
             recent_audit = PTCGenerationLog.objects.filter(
@@ -395,7 +395,7 @@ class PTCScreenView(RoleRequiredMixin, TemplateView):
         ctx["can_edit_attributes"] = _is_class_teacher(user, student.class_name)
         ctx["is_readonly"] = (
             not _is_class_teacher(user, student.class_name)
-            and user.role not in {UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD}
+            and not user.has_role(UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD)
         )
         return ctx
 

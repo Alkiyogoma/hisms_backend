@@ -84,6 +84,34 @@ class AttendanceEntry(TimeStampedModel):
         return f"{self.date} {self.student_id} {self.status}"
 
 
+class CorrectionRequestStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    APPROVED = "approved", "Approved"
+    REJECTED = "rejected", "Rejected"
+
+
+class AttendanceCorrectionRequest(TimeStampedModel):
+    """A teacher's request to change a locked (post-18:00 / past-day) record.
+    Only a super admin can approve it, which applies the audited correction."""
+    student = models.ForeignKey("students.Student", on_delete=models.CASCADE, related_name="attendance_correction_requests")
+    date = models.DateField(db_index=True)
+    requested_status = models.CharField(max_length=16, choices=AttendanceStatus.choices)
+    reason = models.TextField()
+    requested_by = models.ForeignKey("users.User", on_delete=models.PROTECT, related_name="attendance_correction_requests")
+    status = models.CharField(max_length=16, choices=CorrectionRequestStatus.choices,
+                              default=CorrectionRequestStatus.PENDING, db_index=True)
+    resolved_by = models.ForeignKey("users.User", on_delete=models.PROTECT, null=True, blank=True,
+                                    related_name="attendance_corrections_resolved")
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolution_note = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.student_id} {self.date} -> {self.requested_status} ({self.status})"
+
+
 class StaffAttendanceEntry(TimeStampedModel):
     date = models.DateField(db_index=True)
     staff = models.ForeignKey("hr.StaffProfile", on_delete=models.CASCADE, related_name="attendance_entries")

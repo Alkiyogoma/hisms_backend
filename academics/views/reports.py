@@ -48,6 +48,17 @@ from academics.models import (
 from academics.services import generate_class_reports, sign_off_report, calculate_progression_cases
 from audit.models import log_event
 from students.models import Student, StudentStatus, EnrollmentHistory
+
+
+def _export_students_for_user(user):
+    """Scope academic CSV exports: school-wide roles get everyone, section heads
+    get every section they head (e.g. Primary + Lower Secondary), others nothing."""
+    from core.scoping import hod_class_names
+    qs = Student.objects.filter(is_archived=False).order_by("class_name", "last_name")
+    if user.is_school_wide:
+        return qs
+    names = hod_class_names(user)
+    return qs.filter(class_name__in=names) if names else Student.objects.none()
 from users.models import UserRole
 from core.permissions import RoleRequiredMixin
 from core.teacher_context import get_teacher_assigned_classes, get_teacher_assigned_classes_from_tca, is_ecd_teacher
@@ -94,14 +105,10 @@ class HOSSignOffListView(RoleRequiredMixin, TemplateView):
             classes_qs = Student.objects.filter(is_archived=False).values_list("class_name", flat=True).distinct()
             
             # FR-ACAD-011: HOD Scoping
-            if self.request.user.role == UserRole.PRIMARY_HOD:
-                from academics.models import GradeClass, Department
-                primary_classes = GradeClass.objects.filter(department=Department.PRIMARY).values_list('name', flat=True)
-                classes_qs = classes_qs.filter(class_name__in=primary_classes)
-            elif self.request.user.role == UserRole.ECD_HOD:
-                from academics.models import GradeClass, Department
-                ecd_classes = GradeClass.objects.filter(department=Department.ECD).values_list('name', flat=True)
-                classes_qs = classes_qs.filter(class_name__in=ecd_classes)
+            from core.scoping import hod_class_names
+            section_classes = hod_class_names(self.request.user)
+            if section_classes is not None:
+                classes_qs = classes_qs.filter(class_name__in=section_classes)
             classes = list(classes_qs)
             # Batch fetch all report cards in one query instead of N*4 queries
             from collections import defaultdict
@@ -204,12 +211,12 @@ class ReportCardListView(RoleRequiredMixin, TemplateView):
         else:
             from academics.models import GradeClass, Department
             dept_ctx = Department.PRIMARY
-            if self.request.user.role in [UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL]:
+            if self.request.user.is_school_wide:
                 available = GradeClass.objects.all().values_list("name", flat=True)
-            elif self.request.user.role == UserRole.PRIMARY_HOD:
-                available = GradeClass.objects.filter(department=Department.PRIMARY).values_list("name", flat=True)
-            elif self.request.user.role == UserRole.ECD_HOD:
-                available = GradeClass.objects.filter(department=Department.ECD).values_list("name", flat=True)
+            elif self.request.user.section_departments:
+                available = GradeClass.objects.filter(
+                    department__in=self.request.user.section_departments
+                ).values_list("name", flat=True)
             else:
                 available = GradeClass.objects.filter(department=Department.PRIMARY).values_list("name", flat=True)
             ctx["available_classes"] = list(available)
@@ -396,7 +403,7 @@ class HOSSignOffActionView(RoleRequiredMixin, View):
     allowed_roles = [UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD]
     required_permission = "academics.change_reportcard"
     def post(self, request, *args, **kwargs):
-        if request.user.role not in {UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD}:
+        if not request.user.has_role(UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD):
             raise PermissionDenied()
             
         report_id = request.POST.get("report_id")
@@ -465,19 +472,16 @@ class ReportReviewQueueView(RoleRequiredMixin, TemplateView):
         dept_filter = self.request.GET.get("dept", "")
 
         # Determine allowed departments
-        if user.role == UserRole.PRIMARY_HOD:
-            allowed_depts = [Department.PRIMARY]
-        elif user.role == UserRole.ECD_HOD:
-            allowed_depts = [Department.ECD]
-        elif user.role == UserRole.LOWER_SECONDARY_HOD:
-            allowed_depts = [Department.LOWER_SECONDARY]
+        if user.section_departments and not user.is_school_wide:
+            allowed_depts = list(user.section_departments)
         else:
             allowed_depts = [Department.PRIMARY, Department.ECD, Department.LOWER_SECONDARY]
 
+        # The filter narrows within what the user may see; it never widens it.
         if dept_filter == "primary":
-            allowed_depts = [Department.PRIMARY]
+            allowed_depts = [d for d in allowed_depts if d == Department.PRIMARY]
         elif dept_filter == "ecd":
-            allowed_depts = [Department.ECD]
+            allowed_depts = [d for d in allowed_depts if d == Department.ECD]
         elif dept_filter == "lower_secondary":
             allowed_depts = [Department.LOWER_SECONDARY]
 
@@ -624,7 +628,7 @@ class ReportReviewQueueView(RoleRequiredMixin, TemplateView):
         try:
             if action == "ecd_hod_approve":
                 # ECD HOD approves ECD report before HOS sign-off
-                if request.user.role not in {UserRole.ECD_HOD, UserRole.SUPER_ADMIN}:
+                if not request.user.has_role(UserRole.ECD_HOD, UserRole.SUPER_ADMIN):
                     raise PermissionDenied("Only ECD HOD or Super Admin can approve ECD reports.")
                 if not report.is_ecd_report:
                     messages.error(request, "This action is only for ECD reports.")
@@ -643,7 +647,7 @@ class ReportReviewQueueView(RoleRequiredMixin, TemplateView):
                 messages.success(request, f"ECD report for {report.student.first_name} approved by HOD.")
             elif action == "reject":
                 # GRD-009: Only HOS, Super Admin, or HOD can reject reports.
-                if request.user.role not in {UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD}:
+                if not request.user.has_role(UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD):
                     raise PermissionDenied("Only HOS, Super Admin, or HOD can reject reports.")
                 reject_report_for_edit(report, request.user, reason=reason)
                 messages.success(request, f"Report for {report.student.first_name} returned for correction.")

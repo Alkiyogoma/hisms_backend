@@ -236,6 +236,12 @@
           <input type="checkbox" name="parent_contacted" id="parentContacted">
           <span>I have spoken to a parent or guardian about this</span>
         </label>
+        <div id="parentDetails" style="display:none;margin-top:12px">
+          <div class="hf2-group">
+            <label class="hf2-label" for="parentContactTime">When did you speak to them? <span style="color:var(--red)">*</span></label>
+            <input type="datetime-local" name="parent_contact_datetime" id="parentContactTime" class="hf2-input">
+          </div>
+        </div>
       </div>
 
       <!-- Follow-up -->
@@ -377,6 +383,8 @@
   if (INITIAL.severity) document.getElementById("severitySelect").value = INITIAL.severity;
   else document.getElementById("severitySelect").value = "medium";
   document.getElementById("parentContacted").checked = !!INITIAL.parent_contacted;
+  document.getElementById("parentContactTime").value = INITIAL.parent_contact_datetime || "";
+  syncParentDetails();
   document.getElementById("followUpRequired").checked = !!INITIAL.follow_up_required;
   document.getElementById("followUpDate").value = INITIAL.follow_up_date || "";
   document.getElementById("followUpDetails").style.display = INITIAL.follow_up_required ? "block" : "none";
@@ -570,6 +578,17 @@
   }
 
   // ── Toggles ──
+  function syncParentDetails() {
+    var on = document.getElementById("parentContacted").checked;
+    var time = document.getElementById("parentContactTime");
+    document.getElementById("parentDetails").style.display = on ? "block" : "none";
+    time.required = on;
+    if (on && !time.value) {
+      var n = new Date(); n.setMinutes(n.getMinutes() - n.getTimezoneOffset());
+      time.value = n.toISOString().slice(0, 16);
+    }
+  }
+  document.getElementById("parentContacted").addEventListener("change", syncParentDetails);
   document.getElementById("followUpRequired").addEventListener("change", function() {
     document.getElementById("followUpDetails").style.display = this.checked ? "block" : "none";
   });

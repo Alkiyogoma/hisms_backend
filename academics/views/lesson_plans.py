@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render, reverse
 from django.utils import timezone
 from django.views.generic import CreateView, UpdateView, TemplateView, View
@@ -58,14 +58,29 @@ from academics.grading_utils import (
 )
 
 
-def _is_hod_like(role: str) -> bool:
-    return role in {
-        UserRole.SUPER_ADMIN,
-        UserRole.HEAD_OF_SCHOOL,
-        UserRole.PRIMARY_HOD,
-        UserRole.ECD_HOD,
-        UserRole.LOWER_SECONDARY_HOD,
-    }
+_HOD_LIKE_ROLES = {
+    UserRole.SUPER_ADMIN,
+    UserRole.HEAD_OF_SCHOOL,
+    UserRole.PRIMARY_HOD,
+    UserRole.ECD_HOD,
+    UserRole.LOWER_SECONDARY_HOD,
+}
+
+
+def _is_hod_like(user_or_role) -> bool:
+    """Accepts a user (preferred: honours additional roles) or a role string."""
+    if hasattr(user_or_role, "has_role"):
+        return user_or_role.has_role(*_HOD_LIKE_ROLES)
+    return user_or_role in _HOD_LIKE_ROLES
+
+
+def _hod_departments(user):
+    """Departments a user may review as a section head, across *all* the HOD
+    roles they hold. Returns None for school-wide reviewers (super admin / HOS)
+    and an empty list when they hold no section-head role."""
+    if user.is_school_wide:
+        return None
+    return user.section_departments
 
 
 def _is_super_admin(user) -> bool:
@@ -100,7 +115,7 @@ class LessonPlanListView(RoleRequiredMixin, TemplateView):
         mine_qs = LessonPlan.objects.filter(teacher=user).select_related("term", "reviewed_by").prefetch_related("attachments").order_by("-created_at")
         queue = LessonPlan.objects.filter(status=LessonPlanStatus.SUBMITTED).select_related("teacher", "term").prefetch_related("attachments").order_by("submitted_at", "created_at")
 
-        if not _is_hod_like(role):
+        if not _is_hod_like(user):
             if date_from:
                 try:
                     mine_qs = mine_qs.filter(week_start_date__gte=_date.fromisoformat(date_from))
@@ -114,7 +129,7 @@ class LessonPlanListView(RoleRequiredMixin, TemplateView):
                 except (ValueError, TypeError):
                     pass
 
-        if not _is_hod_like(role):
+        if not _is_hod_like(user):
             mine_total = mine_qs.count()
             queue = LessonPlan.objects.filter(
                 teacher=user, status=LessonPlanStatus.SUBMITTED
@@ -136,7 +151,7 @@ class LessonPlanListView(RoleRequiredMixin, TemplateView):
 
         # Teacher filter (HODs/Admin only)
         selected_teacher = None
-        if _is_hod_like(role):
+        if _is_hod_like(user):
             from django.contrib.auth import get_user_model
             User = get_user_model()
             all_teachers = User.objects.filter(
@@ -179,14 +194,14 @@ class LessonPlanListView(RoleRequiredMixin, TemplateView):
             ctx["selected_teacher"] = selected_teacher
 
         # FR-ACAD-002: Detect teachers with MISSING plans (HODs/Admin only)
-        missing_teachers = _get_missing_plan_teachers() if _is_hod_like(role) else []
+        missing_teachers = _get_missing_plan_teachers() if _is_hod_like(user) else []
 
         # Subject×class heatmap for HODs
         heatmap_week_offset = int(self.request.GET.get("week", 0))
-        heatmap = _build_heatmap(role, week_offset=heatmap_week_offset) if _is_hod_like(role) else None
+        heatmap = _build_heatmap(user, week_offset=heatmap_week_offset) if _is_hod_like(user) else None
 
         # Stat counts: HODs see all plans (excluding drafts), teachers see only their own
-        if _is_hod_like(role):
+        if _is_hod_like(user):
             approved_count = LessonPlan.objects.filter(status=LessonPlanStatus.APPROVED).count()
             draft_count = 0
             submitted_count = LessonPlan.objects.filter(status=LessonPlanStatus.SUBMITTED).count()
@@ -237,9 +252,9 @@ class LessonPlanListView(RoleRequiredMixin, TemplateView):
 
         # My Submissions pagination
         # For HODs viewing submitted status, show queue (all submitted) instead of mine
-        if _is_hod_like(role) and status_filter == "submitted":
+        if _is_hod_like(user) and status_filter == "submitted":
             display_qs = queue
-        elif _is_hod_like(role):
+        elif _is_hod_like(user):
             display_qs = LessonPlan.objects.select_related("teacher", "term").prefetch_related("attachments").order_by("-created_at")
             # HODs should not see unsubmitted (draft) plans from other teachers
             if not status_filter or status_filter != "draft":
@@ -301,7 +316,7 @@ class LessonPlanListView(RoleRequiredMixin, TemplateView):
         ctx["academics_tab"] = "lesson_plans"
 
         # Recent plans for HOD/HOS review queue
-        if _is_hod_like(role):
+        if _is_hod_like(user):
             recent_plans = LessonPlan.objects.filter(
                 status__in=[LessonPlanStatus.SUBMITTED, LessonPlanStatus.APPROVED, LessonPlanStatus.REJECTED, LessonPlanStatus.REVISION_REQUESTED]
             ).select_related("teacher", "term").order_by("-updated_at")[:10]
@@ -830,11 +845,7 @@ class LessonPlanUpdateView(LessonPlanContextMixin, RoleRequiredMixin, UpdateView
             messages.info(request, "ECD teachers submit a Weekly Focus instead of lesson plans.")
             return redirect("communications:weekly_focus_submit")
         is_owner = plan.teacher_id == request.user.id
-        is_privileged = request.user.role in {
-            UserRole.SUPER_ADMIN, UserRole.PRIMARY_HOD,
-            UserRole.LOWER_SECONDARY_HOD, UserRole.ECD_HOD,
-            UserRole.HEAD_OF_SCHOOL,
-        }
+        is_privileged = _is_hod_like(request.user)
         if not is_owner and not is_privileged:
             raise PermissionDenied()
         # Teachers can edit DRAFT, REVISION_REQUESTED, or REJECTED. Privileged roles can edit any.
@@ -1164,11 +1175,7 @@ class LessonPlanAttachmentDeleteView(RoleRequiredMixin, LoginRequiredMixin, View
         plan = att.lesson_plan
 
         is_owner = plan.teacher_id == request.user.id
-        is_privileged = request.user.role in {
-            UserRole.SUPER_ADMIN, UserRole.PRIMARY_HOD,
-            UserRole.LOWER_SECONDARY_HOD, UserRole.ECD_HOD,
-            UserRole.HEAD_OF_SCHOOL,
-        }
+        is_privileged = _is_hod_like(request.user)
         if not is_owner and not is_privileged:
             raise PermissionDenied()
 
@@ -1204,11 +1211,7 @@ class LessonPlanDeleteView(RoleRequiredMixin, LoginRequiredMixin, View):
     def post(self, request, pk: int):
         plan = get_object_or_404(LessonPlan, pk=pk)
         is_owner = plan.teacher_id == request.user.id
-        is_privileged = request.user.role in {
-            UserRole.SUPER_ADMIN, UserRole.PRIMARY_HOD,
-            UserRole.LOWER_SECONDARY_HOD, UserRole.ECD_HOD,
-            UserRole.HEAD_OF_SCHOOL,
-        }
+        is_privileged = _is_hod_like(request.user)
         if not is_owner and not is_privileged:
             raise PermissionDenied()
         if plan.status not in {LessonPlanStatus.DRAFT, LessonPlanStatus.REJECTED, LessonPlanStatus.REVISION_REQUESTED}:
@@ -1342,7 +1345,10 @@ def _notify_hod_lesson_plan(plan, actor, event="submitted"):
     # Always include HOS so they have school-wide visibility
     hod_roles.append(UserRole.HEAD_OF_SCHOOL)
 
-    hods = User.objects.filter(role__in=hod_roles, is_active=True).distinct()
+    from django.db.models import Q
+    hods = User.objects.filter(
+        Q(role__in=hod_roles) | Q(extra_roles__role__in=hod_roles), is_active=True
+    ).distinct()
     for hod in hods:
         if event == "withdrawn":
             title = "Lesson plan withdrawn"
@@ -1359,7 +1365,7 @@ def _notify_hod_lesson_plan(plan, actor, event="submitted"):
         )
 
 
-def _build_heatmap(role, week_offset=0):
+def _build_heatmap(user, week_offset=0):
     """Build a subject×class coverage heatmap for the given role's department(s).
 
     Returns a dict with:
@@ -1372,13 +1378,8 @@ def _build_heatmap(role, week_offset=0):
     """
     from datetime import date, timedelta
 
-    if role == UserRole.ECD_HOD:
-        departments = [Department.ECD]
-    elif role == UserRole.PRIMARY_HOD:
-        departments = [Department.PRIMARY]
-    elif role == UserRole.LOWER_SECONDARY_HOD:
-        departments = [Department.LOWER_SECONDARY]
-    else:
+    departments = list(user.section_departments)
+    if user.is_school_wide or not departments:
         departments = [Department.PRIMARY, Department.LOWER_SECONDARY]
 
     classes = list(
@@ -1478,23 +1479,17 @@ class LessonPlanReviewView(RoleRequiredMixin, View):
             return redirect("academics:lesson_plans")
         
         # LP-REVIEW: HOD can only review plans from teachers in their department.
-        if request.user.role not in {UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL}:
-            from timetable.models import TimetableSlot
-            from academics.models import Department, GradeClass
-            if request.user.role == UserRole.PRIMARY_HOD:
-                allowed_depts = [Department.PRIMARY]
-            elif request.user.role == UserRole.ECD_HOD:
-                allowed_depts = [Department.ECD]
-            elif request.user.role == UserRole.LOWER_SECONDARY_HOD:
-                allowed_depts = [Department.LOWER_SECONDARY]
-            else:
+        allowed_depts = _hod_departments(request.user)
+        if allowed_depts is not None:
+            from academics.models import GradeClass
+            if not allowed_depts:
                 raise PermissionDenied()
             allowed_class_names = list(
                 GradeClass.objects.filter(department__in=allowed_depts).values_list("name", flat=True)
             )
             if plan.class_name not in allowed_class_names:
                 raise PermissionDenied("You can only review lesson plans from your department.")
-        
+
         form = LessonPlanReviewForm(request.POST)
         if not form.is_valid():
             messages.error(request, "Invalid review form.")
@@ -1559,7 +1554,7 @@ class LessonPlanComplianceView(RoleRequiredMixin, TemplateView):
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return redirect(f"{self.login_url}?next={request.path}")
-        if not _is_hod_like(request.user.role):
+        if not _is_hod_like(request.user):
             raise PermissionDenied()
         return TemplateView.dispatch(self, request, *args, **kwargs)
 
@@ -1592,14 +1587,12 @@ class LessonPlanComplianceView(RoleRequiredMixin, TemplateView):
 
         # Determine which teachers to show based on user role
         # ECD teachers only do Weekly Focus — never show them in lesson plan compliance
-        if user.role == UserRole.PRIMARY_HOD:
-            allowed_depts = [Department.PRIMARY]
-        elif user.role == UserRole.ECD_HOD:
-            # ECD has no lesson plans — redirect or show empty
-            allowed_depts = []
-        else:
+        if user.is_school_wide or not user.section_departments:
             # HOS / Super admin — Primary only (ECD excluded from lesson plans)
             allowed_depts = [Department.PRIMARY]
+        else:
+            # ECD has no lesson plans, so an ECD-only head sees an empty list
+            allowed_depts = [d for d in user.section_departments if d != Department.ECD]
 
         if dept_filter in ("primary", "ecd"):
             ctx["filter_dept"] = dept_filter
@@ -1809,14 +1802,11 @@ class LessonPlanReviewQueueView(RoleRequiredMixin, TemplateView):
             return ctx
         
         from academics.models import GradeClass, Department
-        if user.role == UserRole.PRIMARY_HOD:
-            dept_classes = list(GradeClass.objects.filter(department=Department.PRIMARY).values_list("name", flat=True))
-        elif user.role == UserRole.ECD_HOD:
-            dept_classes = list(GradeClass.objects.filter(department=Department.ECD).values_list("name", flat=True))
-        elif user.role == UserRole.LOWER_SECONDARY_HOD:
-            dept_classes = list(GradeClass.objects.filter(department=Department.LOWER_SECONDARY).values_list("name", flat=True))
+        hod_depts = _hod_departments(user)
+        if hod_depts:
+            dept_classes = list(GradeClass.objects.filter(department__in=hod_depts).values_list("name", flat=True))
         else:
-            dept_classes = None
+            dept_classes = None  # school-wide reviewers (and non-section roles)
 
         plans_qs = LessonPlan.objects.filter(term=term).select_related("teacher", "term", "reviewed_by").prefetch_related("attachments")
         
@@ -1895,7 +1885,7 @@ class LessonPlanProgressView(RoleRequiredMixin, TemplateView):
         ctx["academics_tab"] = "progress"
         
         if term:
-            if _is_hod_like(user.role):
+            if _is_hod_like(user):
                 # HOD sees department-wide stats
                 plans = LessonPlan.objects.filter(term=term)
             else:

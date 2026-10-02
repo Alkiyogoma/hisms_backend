@@ -6,6 +6,106 @@
 {% block topbar_greeting %}System{% endblock %}
 
 {% block extra_head %}
+<style>
+    /* ── Settings page layout (shared by every tab) ── */
+    .sub-nav .sub-tab { padding: 10px 13px; white-space: nowrap; flex-shrink: 0; }
+    .sub-nav::after { content: ""; flex: 0 0 16px; }           /* keep the last tab off the edge when scrolling */
+    .set-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+    .set-head .card-title { margin: 0; }
+    .set-head-desc { font-size: 12px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
+    .set-head + .table-wrap, .set-head + table { border-top: 1px solid var(--border); }
+    .card > .table-wrap { margin: 0 -20px -20px; }
+    .card > .table-wrap .h-table th:first-child, .card > .table-wrap .h-table td:first-child { padding-left: 20px; }
+    .card > .table-wrap .h-table th:last-child, .card > .table-wrap .h-table td:last-child { padding-right: 20px; }
+    .h-table td { vertical-align: middle; }
+    .h-table td .btn + .btn { margin-left: 6px; }
+
+    /* Form grids: fields line up row by row, help text never pushes the next column */
+    .set-form { display: flex; flex-direction: column; gap: 16px; }
+    .set-grid-2, .set-grid-3 { display: grid; gap: 16px; align-items: start; }
+    .set-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .set-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .set-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+    .set-field .form-label { margin: 0; }
+    .set-check { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-secondary); cursor: pointer; }
+    .set-grid-2 > .set-check, .set-grid-3 > .set-check { min-height: 40px; align-self: end; }
+    .set-check input { width: 16px; height: 16px; margin: 0; flex-shrink: 0; }
+    .set-toggles { display: flex; flex-direction: column; gap: 4px; }
+    .set-toggles .set-check { min-height: 32px; align-self: auto; }
+    .set-hint { font-size: 12px; color: var(--text-muted); margin: 0; }
+    .set-readonly { padding: 9px 12px; background: var(--bg-muted, #f9fafb); border: 1px solid var(--border); border-radius: 8px; font-size: 13px; color: var(--text-muted); }
+    .req { color: var(--red); }
+    .tpl-off td { background: var(--bg-muted, #f8fafc); }
+    .tpl-off td:not(:first-child) { opacity: .65; }
+    .tpl-toggle { margin: 0; }
+    .switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+    .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .switch-track { width: 34px; height: 20px; border-radius: 999px; background: #CBD5E1; position: relative; transition: background .15s; flex-shrink: 0; }
+    .switch-track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff;
+        box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .15s; }
+    .switch input:checked + .switch-track { background: var(--green, #16A34A); }
+    .switch input:checked + .switch-track::after { transform: translateX(14px); }
+    .switch input:focus-visible + .switch-track { outline: 2px solid var(--hodari-blue, #023AA5); outline-offset: 2px; }
+    .switch-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+    .set-banner { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 12px 16px; border-radius: 10px; margin-bottom: 16px; font-size: 13px; border: 1px solid; }
+    .set-banner.ok { background: #F0FDF4; border-color: #BBF7D0; color: #166534; }
+    .set-banner.bad { background: #FEF2F2; border-color: #FECACA; color: #991B1B; }
+    .set-banner form { display: flex; gap: 8px; align-items: center; margin-left: auto; }
+    .set-banner .hf-input { height: 32px; width: 240px; }
+    .set-page-form { display: flex; flex-direction: column; gap: 16px; }
+    .set-page-form > .card { margin: 0; }
+    .set-actions { display: flex; justify-content: flex-end; position: sticky; bottom: 0; padding: 12px 0;
+        background: linear-gradient(to top, var(--bg-page, #F4F6FA) 70%, transparent); }
+    .set-section-title { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted);
+        padding-top: 4px; border-top: 1px solid var(--border); margin-top: 4px; padding-top: 14px; }
+    .set-section-title:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+    .set-optional { text-transform: none; letter-spacing: 0; font-weight: 500; margin-left: 6px; }
+    .set-date-rows { display: flex; flex-direction: column; gap: 10px; }
+    .set-date-row { display: grid; grid-template-columns: 120px minmax(0,1fr) auto minmax(0,1fr); gap: 10px; align-items: center; }
+    .set-date-row > span { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
+    .set-date-row > em { font-style: normal; font-size: 12px; color: var(--text-muted); }
+
+    /* Academic years */
+    .set-summary { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0; margin-bottom: 16px;
+        background: var(--bg-card, #fff); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .set-summary-item { padding: 14px 20px; border-right: 1px solid var(--border); min-width: 160px; }
+    .set-summary-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
+    .set-summary-value { font-size: 18px; font-weight: 700; color: var(--text-primary); margin-top: 2px; }
+    .set-summary-sub { font-size: 12px; color: var(--text-muted); }
+    .set-summary-actions { margin-left: auto; display: flex; align-items: center; padding: 14px 20px; }
+    .set-year { padding: 0; margin-bottom: 16px; overflow: hidden; }
+    .set-year.is-current { border-color: rgba(2,58,165,.35); box-shadow: 0 0 0 1px rgba(2,58,165,.12); }
+    .set-year-head { list-style: none; cursor: pointer; display: grid; grid-template-columns: minmax(0,1fr) auto; grid-template-areas: "title actions" "meta actions";
+        column-gap: 16px; row-gap: 2px; align-items: center; padding: 16px 20px; }
+    .set-year-head::-webkit-details-marker { display: none; }
+    .set-year[open] .set-year-head { border-bottom: 1px solid var(--border); }
+    .set-year-title { grid-area: title; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .set-year-name { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+    .set-year-caret { color: var(--text-muted); transition: transform .15s; flex-shrink: 0; }
+    .set-year[open] .set-year-caret { transform: rotate(90deg); }
+    .set-year-meta { grid-area: meta; font-size: 12px; color: var(--text-muted); padding-left: 22px; }
+    .set-year-actions { grid-area: actions; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; cursor: default; }
+    .set-dot { margin: 0 6px; }
+    .set-warn { color: var(--amber, #D97706); font-weight: 500; }
+    .set-muted { color: var(--text-muted); font-size: 12px; }
+    .card.set-year > .set-year-body { margin: 0; border-radius: 0; }
+    .set-term-table { table-layout: fixed; width: 100%; }
+    .set-term-table th:first-child, .set-term-table td:first-child { padding-left: 20px; }
+    .set-term-table th:last-child, .set-term-table td:last-child { padding-right: 20px; }
+    .set-term-table tr.is-current td { background: rgba(2,58,165,.035); }
+    .set-cell-main { font-weight: 600; font-size: 13px; color: var(--text-primary); }
+    .set-cell-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .set-cell-chips { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+    .set-cell-chips:empty { display: none; }
+    .set-kv div { font-size: 12px; color: var(--text-secondary); line-height: 1.7; }
+    .set-kv span { display: inline-block; min-width: 64px; color: var(--text-muted); font-size: 11px; }
+    .set-empty-row { text-align: center; padding: 24px !important; color: var(--text-muted); font-size: 13px; }
+    @media (max-width: 1100px) {
+        .set-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .set-year-head { grid-template-columns: 1fr; grid-template-areas: "title" "meta" "actions"; }
+        .set-year-actions { justify-content: flex-start; padding-left: 22px; margin-top: 8px; }
+    }
+</style>
 {% if active_tab == 'email_templates' %}
 <style>
     .tpl-var-btn {
@@ -80,77 +180,54 @@
 {# ══════════════════════════════════════════════════════════════ #}
 {% if active_tab == 'system' %}
 
-<form method="post" action="?tab=system">
+<form method="post" action="?tab=system" class="set-page-form">
     {% csrf_token %}
-    <div class="card" style="margin-bottom:20px">
-        <div class="card-title">School Information</div>
-        <div class="form-grid">
-            <div class="form-group">
-                {% field form.school_name placeholder="e.g. {{ brand.school_name }}" %}
-            </div>
-            <div class="form-group">
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-                    {% field form.pass_mark label="Pass Mark (%)" %}
-                    {% field form.admission_fee %}
-                </div>
-            </div>
+    <div class="card">
+        <div class="set-head"><div class="card-title">School information</div></div>
+        <div class="set-grid-3">
+            {% field form.school_name placeholder="e.g. Hodari Christian School" %}
+            {% field form.pass_mark label="Pass mark (%)" %}
+            {% field form.admission_fee %}
         </div>
     </div>
 
-    <div class="card" style="margin-bottom:20px">
-        <div class="card-title">Attendance Thresholds</div>
-        <div class="form-grid">
-            {% field form.attendance_threshold_warn label="Warning (%)" hint="Students below this receive a warning notification." %}
-            {% field form.attendance_threshold_critical label="Critical (%)" hint="Students below this are flagged as critically absent." %}
+    <div class="card">
+        <div class="set-head"><div class="card-title">Attendance thresholds</div></div>
+        <div class="set-grid-2">
+            {% field form.attendance_threshold_warn label="Warning (%)" hint="Learners below this receive a warning notification." %}
+            {% field form.attendance_threshold_critical label="Critical (%)" hint="Learners below this are flagged as critically absent." %}
         </div>
     </div>
 
-    <div class="card" style="margin-bottom:20px">
-        <div class="card-title">SMS &amp; Notifications</div>
-        <div class="form-grid">
-            <div>
-                <div class="form-group">
-                    <label class="form-label">SMS API Key</label>
-                    <div
-                        style="padding:9px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;color:var(--text-muted)">
-                        Configured via <code>CLOUDSERVICE_API_KEY</code> or <code>HODARI_SMS_API_KEY</code> environment
-                        variable.
-                    </div>
-                </div>
-                {% field form.sms_sender_id %}
+    <div class="card">
+        <div class="set-head"><div class="card-title">SMS &amp; notifications</div></div>
+        <div class="set-grid-2">
+            <div class="set-field">
+                <label class="form-label">SMS API key</label>
+                <div class="set-readonly">Set with the <code>CLOUDSERVICE_API_KEY</code> or <code>HODARI_SMS_API_KEY</code> environment variable.</div>
             </div>
-            <div>
-                {% field form.send_absentee_sms %}
-                {% field form.enable_online_inquiry %}
-                {% field form.enable_auto_report_generation %}
-            </div>
+            {% field form.sms_sender_id %}
+        </div>
+        <div class="set-toggles" style="margin-top:12px">
+            {% field form.send_absentee_sms %}
+            {% field form.enable_online_inquiry %}
+            {% field form.enable_auto_report_generation %}
         </div>
     </div>
 
-    <div class="card" style="margin-bottom:20px">
-        <div class="card-title">Attendance PWA</div>
-        <div class="form-grid">
-            <div class="form-group">
-                {% field form.pwa_domain label="PWA Base URL" hint="Base URL for the Attendance PWA app." %}
-            </div>
-            <div class="form-group">
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-                    {% field form.pwa_version label="Version" hint="Increment to force PWA cache refresh." %}
-                    <div class="form-group">
-                        <label class="form-label">Preview</label>
-                        <div
-                            style="padding:9px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;color:var(--text-muted)">
-                            <a href="{{ form.pwa_domain.value|default:'https://testing.hodari.ac.tz:8443' }}/attendance/pwa/"
-                                target="_blank" style="color:#023AA5">Open PWA &rarr;</a>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <div class="card">
+        <div class="set-head">
+            <div class="card-title">Attendance PWA</div>
+            <a href="{{ form.pwa_domain.value|default:'https://testing.hodari.ac.tz:8443' }}/attendance/pwa/" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Open PWA &rarr;</a>
+        </div>
+        <div class="set-grid-2">
+            {% field form.pwa_domain label="PWA base URL" hint="Base URL for the Attendance PWA app." %}
+            {% field form.pwa_version label="Version" hint="Increase to force the app to refresh its cache." %}
         </div>
     </div>
 
-    <div class="form-actions">
-        <button type="submit" class="btn-primary">Save System Settings</button>
+    <div class="set-actions">
+        <c-button type="submit">Save system settings</c-button>
     </div>
 </form>
 
@@ -159,62 +236,54 @@
 {# ══════════════════════════════════════════════════════════════ #}
 {% elif active_tab == 'messaging' %}
 
-<form method="post" action="?tab=messaging">
+{% include "core/_email_delivery_status.html" with show_test=True %}
+
+<form method="post" action="?tab=messaging" class="set-page-form">
     {% csrf_token %}
     <input type="hidden" name="action" value="save_messaging">
 
-    <div class="card" style="margin-bottom:20px">
-        <div class="card-title">Email (SMTP)</div>
-        <div class="form-grid">
-            <div>
-                {% field form.email_backend hint="Use 'django.core.mail.backends.smtp.EmailBackend' for real email delivery." %}
-                {% field form.email_host hint="SMTP server hostname (e.g. smtp.gmail.com)" %}
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-                    {% field form.email_port label="Port" %}
-                    {% field form.email_use_tls %}
-                </div>
+    <div class="card">
+        <div class="set-head"><div class="card-title">Email (SMTP)</div></div>
+        <div class="set-grid-2">
+            {% field form.email_backend hint="Turn this on, fill in the SMTP details, save, then use Send test email above." %}
+            {% field form.default_from_email %}
+            {% field form.email_host hint="SMTP server, e.g. smtp.gmail.com" %}
+            <div class="set-grid-2">
+                {% field form.email_port label="Port" %}
+                <div class="set-field" style="padding-top:30px">{% field form.email_use_tls label="Use TLS" %}</div>
             </div>
-            <div>
-                {% field form.email_host_user hint="SMTP username or email address" %}
-                {% field form.email_host_password label="SMTP Password" %}
-                {% field form.default_from_email %}
-            </div>
+            {% field form.email_host_user hint="SMTP username or email address" %}
+            {% field form.email_host_password label="SMTP password" hint="For Gmail, use an App Password (Google Account > Security > App passwords)." %}
         </div>
     </div>
 
-    <div class="card" style="margin-bottom:20px">
-        <div class="card-title">WhatsApp</div>
-        <div class="form-grid">
-            <div>
-                <div class="form-group">
-                    <label class="form-label">WhatsApp API Key</label>
-                    <div
-                        style="padding:9px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;color:var(--text-muted)">
-                        Configured via environment variable (not stored in database).
-                    </div>
-                </div>
-                {% field form.whatsapp_sender_id %}
+    <div class="card">
+        <div class="set-head"><div class="card-title">WhatsApp</div></div>
+        <div class="set-grid-2">
+            <div class="set-field">
+                <label class="form-label">WhatsApp API key</label>
+                <div class="set-readonly">Set with an environment variable (not stored in the database).</div>
             </div>
+            {% field form.whatsapp_sender_id %}
         </div>
     </div>
 
-    <div class="card" style="margin-bottom:20px">
-        <div class="card-title">Admissions Contact Details</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">These appear in admission emails and SMS
-            sent to parents (meeting confirmations, inquiry receipts, assessment logistics, etc.).</div>
-        <div class="form-grid">
+    <div class="card">
+        <div class="set-head">
             <div>
-                {% field form.admissions_phone hint="Phone number shown in emails and SMS to parents." %}
-                {% field form.admissions_email hint="Reply-to address for all admission emails." %}
+                <div class="card-title">Admissions contact details</div>
+                <div class="set-head-desc">Shown in admission emails and SMS to parents (meeting confirmations, inquiry receipts, assessment logistics).</div>
             </div>
-            <div>
-                {% field form.admissions_whatsapp hint="WhatsApp number for proof-of-payment submissions." %}
-            </div>
+        </div>
+        <div class="set-grid-3">
+            {% field form.admissions_phone hint="Shown in emails and SMS to parents." %}
+            {% field form.admissions_email hint="Reply-to address for admission emails." %}
+            {% field form.admissions_whatsapp hint="For proof-of-payment submissions." %}
         </div>
     </div>
 
-    <div class="form-actions">
-        <button type="submit" class="btn-primary">Save Messaging Settings</button>
+    <div class="set-actions">
+        <c-button type="submit">Save messaging settings</c-button>
     </div>
 </form>
 
@@ -224,17 +293,18 @@
 {% elif active_tab == 'classes' and can_view_classes %}
 
 <div class="card">
-    <div class="card-title-row">
-        <div class="card-title" style="margin:0">Grade Classes</div>
-        {% if can_add_class %}
-        <button type="button" class="btn-primary btn-sm" onclick="openModal('classModal')">+ Add Class</button>
-        {% endif %}
+    <div class="set-head">
+        <div>
+            <div class="card-title">Grade classes</div>
+            <div class="set-head-desc">Classes in school order: ECD, Primary, then Lower Secondary.</div>
+        </div>
+        {% if can_add_class %}<c-button size="sm" onclick="openClassModal()">+ Add class</c-button>{% endif %}
     </div>
-    <div style="border-top:1px solid var(--border);margin-top:12px">
+    <div class="table-wrap">
         <table class="h-table">
             <thead>
                 <tr>
-                    <th>Class Name</th>
+                    <th>Class name</th>
                     <th>Department</th>
                     <th>Capacity</th>
                     <th style="text-align:right">Actions</th>
@@ -244,18 +314,16 @@
                 {% for gc in classes %}
                 <tr>
                     <td style="font-weight:600">{{ gc.name }}</td>
-                    <td><span
-                            class="chip {% if gc.department == 'ECD' %}chip-amber{% elif gc.department == 'PRIMARY' %}chip-blue{% else %}chip-grey{% endif %}">{{ gc.get_department_display }}</span></td>
+                    <td><span class="chip {% if gc.department == 'ECD' %}chip-amber{% elif gc.department == 'PRIMARY' %}chip-blue{% else %}chip-grey{% endif %}">{{ gc.get_department_display }}</span></td>
                     <td>{{ gc.max_capacity }}</td>
                     <td style="text-align:right;white-space:nowrap">
                         {% if can_edit_class %}
-                        <button type="button" class="btn-secondary btn-sm"
-                            onclick="openEditClassModal('{{ gc.pk }}','{{ gc.name|escapejs }}','{{ gc.department }}','{{ gc.max_capacity }}')">Edit</button>
+                        <c-button variant="secondary" size="sm"
+                            onclick="openClassModal({pk:'{{ gc.pk }}',name:'{{ gc.name|escapejs }}',dept:'{{ gc.department }}',cap:'{{ gc.max_capacity }}'})">Edit</c-button>
                         {% endif %}
                         {% if can_delete_class %}
-                        <button type="button" class="btn-secondary btn-sm"
-                            style="color:var(--red,#EF4444);margin-left:4px"
-                            onclick="confirmDeleteModal({title:'Delete Class?',body:'Are you sure you want to delete <strong>{{ gc.name }}</strong>?',detail:'This cannot be undone.',confirmText:'Delete Class',url:'?tab=classes',type:'danger',extraData:[{name:'action',value:'delete_class'},{name:'pk',value:'{{ gc.pk }}'}]})">Delete</button>
+                        <c-button variant="danger" size="sm"
+                            onclick="confirmDeleteModal({title:'Delete class?',body:'Delete <strong>{{ gc.name|escapejs }}</strong>?',detail:'This cannot be undone.',confirmText:'Delete class',url:'?tab=classes',type:'danger',extraData:[{name:'action',value:'delete_class'},{name:'pk',value:'{{ gc.pk }}'}]})">Delete</c-button>
                         {% endif %}
                     </td>
                 </tr>
@@ -269,475 +337,326 @@
     </div>
 </div>
 
-{# ── Add Class Modal ── #}
-<div id="classModal" class="settings-modal-overlay">
-    <div class="settings-modal">
-        <div class="settings-modal-header">
-            <h3>Add New Class</h3>
-            <button type="button" class="settings-modal-close" onclick="closeModal('classModal')">&times;</button>
+<c-modal id="classModal" title="Add class" size="sm">
+    <form method="post" action="?tab=classes" id="classForm" class="set-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_class">
+        <input type="hidden" name="pk">
+        <div class="set-field">
+            <label class="form-label" for="class_name">Class name <span class="req">*</span></label>
+            <input type="text" name="name" id="class_name" required class="hf-input" placeholder="e.g. Grade 1, Pre-K">
         </div>
-        <form method="post" action="?tab=classes" style="padding:0">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="add_class">
-            <div class="settings-modal-body">
-                <div class="form-group" style="margin:0">
-                    <label class="form-label">Class Name <span style="color:var(--red)">*</span></label>
-                    <input type="text" name="name" required class="hf-input"
-                        placeholder="e.g. Grade 1, Pre-K, ABC Class">
-                </div>
-                <div class="form-group" style="margin:0">
-                    <label class="form-label">Department <span style="color:var(--red)">*</span></label>
-                    <select name="department" class="hf-select" required>
-                        <option value="">Select Department</option>
-                        {% for value, label in departments %}
-                        <option value="{{ value }}">{{ label }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="form-group" style="margin:0">
-                    <label class="form-label">Max Capacity</label>
-                    <input type="number" name="max_capacity" value="25" min="1" required class="hf-input">
-                    <span class="form-help">Maximum number of students allowed.</span>
-                </div>
+        <div class="set-grid-2">
+            <div class="set-field">
+                <label class="form-label" for="class_dept">Department <span class="req">*</span></label>
+                <select name="department" id="class_dept" class="hf-select" required>
+                    <option value="">Select department</option>
+                    {% for value, label in departments %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+                </select>
             </div>
-            <div class="settings-modal-footer">
-                <button type="button" class="btn-secondary" onclick="closeModal('classModal')">Cancel</button>
-                <button type="submit" class="btn-primary">Add Class</button>
+            <div class="set-field">
+                <label class="form-label" for="class_cap">Max capacity</label>
+                <input type="number" name="max_capacity" id="class_cap" value="25" min="1" required class="hf-input">
             </div>
-        </form>
-    </div>
-</div>
-
-{# ── Edit Class Modal ── #}
-<div id="editClassModal" class="settings-modal-overlay">
-    <div class="settings-modal">
-        <div class="settings-modal-header">
-            <h3>Edit Class</h3>
-            <button type="button" class="settings-modal-close" onclick="closeModal('editClassModal')">&times;</button>
         </div>
-        <form method="post" action="?tab=classes" style="padding:0">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="edit_class">
-            <input type="hidden" name="pk" id="editClass_pk">
-            <div class="settings-modal-body">
-                <div class="form-group" style="margin:0">
-                    <label class="form-label">Class Name <span style="color:var(--red)">*</span></label>
-                    <input type="text" name="name" id="editClass_name" required class="hf-input">
-                </div>
-                <div class="form-group" style="margin:0">
-                    <label class="form-label">Department <span style="color:var(--red)">*</span></label>
-                    <select name="department" id="editClass_dept" class="hf-select" required>
-                        <option value="">Select Department</option>
-                        {% for value, label in departments %}
-                        <option value="{{ value }}">{{ label }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="form-group" style="margin:0">
-                    <label class="form-label">Max Capacity</label>
-                    <input type="number" name="max_capacity" id="editClass_cap" min="1" required class="hf-input">
-                </div>
-            </div>
-            <div class="settings-modal-footer">
-                <button type="button" class="btn-secondary" onclick="closeModal('editClassModal')">Cancel</button>
-                <button type="submit" class="btn-primary">Save Changes</button>
-            </div>
-        </form>
-    </div>
-</div>
+    </form>
+    <c-slot name="footer">
+        <c-button variant="secondary" data-hui-close>Cancel</c-button>
+        <c-button type="submit" form="classForm" id="classSubmit">Add class</c-button>
+    </c-slot>
+</c-modal>
 
 {# ══════════════════════════════════════════════════════════════ #}
 {# ACADEMIC YEAR & TERMS TAB #}
 {# ══════════════════════════════════════════════════════════════ #}
 {% elif active_tab == 'academic_year' %}
 
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
-
-    {# ── Academic Years ── #}
-    <div class="card">
-        <div class="card-title-row">
-            <div class="card-title" style="margin:0">Academic Years</div>
-            <button type="button" class="btn-primary btn-sm" onclick="openModal('ayModal')">+ Add Year</button>
-        </div>
-        <div style="border-top:1px solid var(--border);margin-top:12px">
-            {% for ay in academic_years %}
-            <div
-                style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);{% if ay.is_current %}background:rgba(2,58,165,.04){% endif %}">
-                <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;flex-wrap:wrap">
-                    <span style="font-weight:600;font-size:14px">{{ ay.name }}</span>
-                    {% if ay.is_current %}<span class="chip chip-blue" style="font-size:11px">Current</span>{% endif %}
-                    {% if ay.is_published %}<span class="chip chip-green" style="font-size:11px">Published</span>{% endif %}
-                    <span style="font-size:12px;color:var(--text-muted);white-space:nowrap">
-                        {% if ay.start_date and ay.end_date %}{{ ay.start_date|date:"d M Y" }} – {{ ay.end_date|date:"d M Y" }}{% else %}<span style="color:var(--hodari-gold,#D97706)">⚠ No dates</span>{% endif %}
-                    </span>
-                    <span style="font-size:12px;color:var(--text-muted);white-space:nowrap">{{ ay.terms.count }} term{{ ay.terms.count|pluralize }}</span>
-                </div>
-                <div style="display:flex;gap:4px">
-                    {% if ay.end_date and ay.end_date|date:'Y-m-d' < today_iso %} <span
-                        style="font-size:11px;color:var(--text-muted);padding:4px 8px;font-style:italic">Ended</span>
-                        {% else %}
-                        {% if perms.academics.change_academicyear %}
-                        {% if ay.is_published %}
-                        <button type="button" class="btn-secondary btn-sm"
-                            onclick="confirmDeleteModal({title:'Unpublish Year?',body:'Unpublish <strong>{{ ay.name }}</strong>?',detail:'After unpublishing, Head of School / Admin can edit terms again.',confirmText:'Unpublish',url:'?tab=academic_year',type:'warning',extraData:[{name:'action',value:'unpublish_academic_year'},{name:'pk',value:'{{ ay.pk }}'}]})">Unpublish</button>
-                        {% else %}
-                        <button type="button" class="btn-secondary btn-sm" style="color:var(--green,#16A34A)"
-                            onclick="confirmDeleteModal({title:'Publish Year?',body:'Publish <strong>{{ ay.name }}</strong>?',detail:'All terms must have start &amp; end dates. Publishing locks year dates/term count and term edits to Super Admin only.',confirmText:'Publish',url:'?tab=academic_year',type:'info',extraData:[{name:'action',value:'publish_academic_year'},{name:'pk',value:'{{ ay.pk }}'}]})">Publish</button>
-                        {% endif %}
-                        {% endif %}
-                        <button type="button" class="btn-secondary btn-sm"
-                            onclick="openEditAYModal('{{ ay.pk }}','{{ ay.name|escapejs }}','{{ ay.start_date|date:'Y-m-d'|default:'' }}','{{ ay.end_date|date:'Y-m-d'|default:'' }}',{{ ay.number_of_terms }},{% if ay.is_current %}true{% else %}false{% endif %})">Edit</button>
-                        <button type="button" class="btn-secondary btn-sm" style="color:var(--red,#EF4444)"
-                            onclick="confirmDeleteModal({title:'Delete Year?',body:'Are you sure you want to delete <strong>{{ ay.name }}</strong>?',detail:'Delete all terms first, then the year can be removed.',confirmText:'Delete Year',url:'?tab=academic_year',type:'danger',extraData:[{name:'action',value:'delete_academic_year'},{name:'pk',value:'{{ ay.pk }}'}]})">Delete</button>
-                        {% endif %}
-                </div>
-            </div>
-            {% empty %}
-            <div style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with title='No academic years yet' desc='Click + Add Year to get started.' icon='calendar' icon_color='blue' %}</div>
-            {% endfor %}
-        </div>
+{# ── Summary strip: what is current right now ── #}
+<div class="set-summary">
+    <div class="set-summary-item">
+        <div class="set-summary-label">Current year</div>
+        <div class="set-summary-value">{{ current_year_name|default:"Not set" }}</div>
     </div>
+    <div class="set-summary-item">
+        <div class="set-summary-label">Current term</div>
+        <div class="set-summary-value">{% if current_term %}{{ current_term.name }}{% else %}None{% endif %}</div>
+        {% if current_term.start_date and current_term.end_date %}<div class="set-summary-sub">{{ current_term.start_date|date:"d M" }} – {{ current_term.end_date|date:"d M Y" }}</div>{% endif %}
+    </div>
+    <div class="set-summary-item">
+        <div class="set-summary-label">Days remaining</div>
+        <div class="set-summary-value">{% if current_term %}{{ days_remaining }}{% else %}–{% endif %}</div>
+    </div>
+    <div class="set-summary-actions">
+        <c-button size="sm" onclick="openYearModal()">+ Add academic year</c-button>
+    </div>
+</div>
 
-    {# ── Terms ── #}
-    <div class="card">
-        <div class="card-title-row">
-            <div class="card-title" style="margin:0">Terms</div>
-            <button type="button" class="btn-primary btn-sm" onclick="openModal('termModal')">+ Add Term</button>
+{% for ay in academic_years %}
+<details class="card set-year{% if ay.is_current %} is-current{% endif %}" {% if not ay.is_ended or ay.is_current %}open{% endif %}>
+    <summary class="set-year-head">
+        <div class="set-year-title">
+            <svg class="set-year-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+            <span class="set-year-name">{{ ay.name }}</span>
+            {% if ay.is_current %}<span class="chip chip-blue">Current</span>{% endif %}
+            {% if ay.is_published %}<span class="chip chip-green">Published</span>{% else %}<span class="chip chip-grey">Draft</span>{% endif %}
+            {% if ay.is_ended %}<span class="chip chip-grey">Ended</span>{% endif %}
         </div>
-        <div style="border-top:1px solid var(--border);margin-top:12px">
-            {% for ay in academic_years %}
-            {% if ay.terms.all %}
-            <div style="padding:8px 16px 4px">
-                <div
-                    style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">
-                    {{ ay.name }}</div>
-            </div>
-            {% for term in ay.terms.all %}
-            <div
-                style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-bottom:1px solid var(--border)">
-                <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
-                    <span style="font-weight:600;font-size:13px">{{ term.name }}</span>
-                    {% if term.is_locked %}<span class="chip chip-grey" style="font-size:10px">Locked</span>{% endif %}
-                    <span style="font-size:12px;color:var(--text-muted)">
-                        {% if term.start_date and term.end_date %}{{ term.start_date|date:"d M Y" }} – {{ term.end_date|date:"d M Y" }}{% else %}No dates{% endif %}
-                    </span>
-                    {% if term.midterm_exam_start_date or term.endterm_exam_start_date or term.quiz_start_date %}
-                    <span style="font-size:11px;color:var(--hodari-blue)">
-                        {% if term.quiz_start_date %}Q:{{ term.quiz_start_date|date:"d M" }}{% endif %}
-                        {% if term.midterm_exam_start_date %} MT:{{ term.midterm_exam_start_date|date:"d M" }}{% endif %}
-                        {% if term.endterm_exam_start_date %} ET:{{ term.endterm_exam_start_date|date:"d M" }}{% endif %}
-                    </span>
-                    {% endif %}
-                    {% if term.quiz_grade_marking_end_date %}
-                    <span style="font-size:11px;color:var(--green,#16A34A)">Q Mark:{{ term.quiz_grade_marking_end_date|date:"d M" }}</span>
-                    {% endif %}
-                    {% if term.midterm_grade_marking_end_date %}
-                    <span style="font-size:11px;color:var(--green,#16A34A)">MT Mark:{{ term.midterm_grade_marking_end_date|date:"d M" }}</span>
-                    {% endif %}
-                    {% if term.endterm_grade_marking_end_date %}
-                    <span style="font-size:11px;color:var(--green,#16A34A)">ET Mark:{{ term.endterm_grade_marking_end_date|date:"d M" }}</span>
-                    {% endif %}
-                </div>
-                <div style="display:flex;gap:4px">
-                    {% if term.end_date and term.end_date|date:'Y-m-d' < today_iso %} <span
-                        style="font-size:11px;color:var(--text-muted);padding:4px 8px;font-style:italic">Ended</span>
-                        {% else %}
-                        <button type="button" class="btn-secondary btn-sm"
-                            onclick="openEditTermModal('{{ term.pk }}','{{ term.name|escapejs }}','{{ term.start_date|date:'Y-m-d'|default:'' }}','{{ term.end_date|date:'Y-m-d'|default:'' }}','{{ term.grading_deadline|date:'Y-m-d'|default:'' }}','{{ term.midterm_exam_start_date|date:'Y-m-d'|default:'' }}','{{ term.midterm_exam_end_date|date:'Y-m-d'|default:'' }}','{{ term.endterm_exam_start_date|date:'Y-m-d'|default:'' }}','{{ term.endterm_exam_end_date|date:'Y-m-d'|default:'' }}','{{ term.quiz_start_date|date:'Y-m-d'|default:'' }}','{{ term.quiz_end_date|date:'Y-m-d'|default:'' }}',{{ term.quiz_grade_marking_days|default:5 }},{{ term.midterm_grade_marking_days|default:10 }},{{ term.endterm_grade_marking_days|default:10 }})">Edit</button>
-                        <button type="button" class="btn-secondary btn-sm" style="color:var(--red,#EF4444)"
-                            onclick="confirmDeleteModal({title:'Delete Term?',body:'Are you sure you want to delete <strong>{{ term.name }}</strong>?',detail:'This cannot be undone.',confirmText:'Delete Term',url:'?tab=academic_year',type:'danger',extraData:[{name:'action',value:'delete_term'},{name:'pk',value:'{{ term.pk }}'}]})">Delete</button>
-                        {% endif %}
-                </div>
-            </div>
-            {% endfor %}
+        <div class="set-year-meta">
+            {% if ay.start_date and ay.end_date %}{{ ay.start_date|date:"d M Y" }} – {{ ay.end_date|date:"d M Y" }}{% else %}<span class="set-warn">No dates set</span>{% endif %}
+            <span class="set-dot">·</span>{{ ay.term_list|length }} of {{ ay.number_of_terms }} term{{ ay.number_of_terms|pluralize }}
+        </div>
+        {% if not ay.is_ended %}
+        <div class="set-year-actions" onclick="event.preventDefault()">
+            {% if perms.academics.change_academicyear %}
+            {% if ay.is_published %}
+            <c-button variant="secondary" size="sm"
+                onclick="confirmDeleteModal({title:'Unpublish year?',body:'Unpublish <strong>{{ ay.name|escapejs }}</strong>?',detail:'After unpublishing, Head of School / Admin can edit terms again.',confirmText:'Unpublish',url:'?tab=academic_year',type:'warning',extraData:[{name:'action',value:'unpublish_academic_year'},{name:'pk',value:'{{ ay.pk }}'}]})">Unpublish</c-button>
+            {% else %}
+            <c-button variant="success" size="sm"
+                onclick="confirmDeleteModal({title:'Publish year?',body:'Publish <strong>{{ ay.name|escapejs }}</strong>?',detail:'All terms must have start &amp; end dates. Publishing locks year dates/term count and term edits to Super Admin only.',confirmText:'Publish',url:'?tab=academic_year',type:'info',extraData:[{name:'action',value:'publish_academic_year'},{name:'pk',value:'{{ ay.pk }}'}]})">Publish</c-button>
             {% endif %}
-            {% empty %}
-            <div style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with title='No terms yet' desc='Create an academic year first, then add terms.' icon='calendar' icon_color='grey' %}</div>
-            {% endfor %}
+            {% endif %}
+            <c-button variant="secondary" size="sm"
+                onclick="openYearModal({pk:'{{ ay.pk }}',name:'{{ ay.name|escapejs }}',start:'{{ ay.start_date|date:'Y-m-d' }}',end:'{{ ay.end_date|date:'Y-m-d' }}',terms:{{ ay.number_of_terms|default:3 }},current:{% if ay.is_current %}true{% else %}false{% endif %}})">Edit</c-button>
+            <c-button variant="danger" size="sm"
+                onclick="confirmDeleteModal({title:'Delete year?',body:'Delete <strong>{{ ay.name|escapejs }}</strong>?',detail:'Delete all terms first, then the year can be removed.',confirmText:'Delete year',url:'?tab=academic_year',type:'danger',extraData:[{name:'action',value:'delete_academic_year'},{name:'pk',value:'{{ ay.pk }}'}]})">Delete</c-button>
+            <c-button size="sm" onclick="openTermDrawer({year:'{{ ay.pk }}'})">+ Add term</c-button>
         </div>
-    </div>
-</div>
+        {% endif %}
+    </summary>
 
-{% if current_term %}
-<div
-    style="margin-top:20px;padding:14px 18px;border-radius:8px;background:rgba(2,58,165,.04);border:1px solid rgba(2,58,165,.12);display:flex;align-items:center;gap:12px;font-size:13px">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#023AA5" stroke-width="2" stroke-linecap="round"
-        stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10" />
-        <polyline points="12 6 12 12 16 14" />
-    </svg>
-    <div>
-        <strong>Current Term:</strong> {{ current_term }}
-        {% if current_term.start_date and current_term.end_date %} &middot; {{ current_term.start_date|date:"d M Y" }}
-        to {{ current_term.end_date|date:"d M Y" }}{% endif %}
-        &nbsp;({{ days_remaining }} day{{ days_remaining|pluralize }} remaining)
+    <div class="table-wrap set-year-body">
+        <table class="h-table set-term-table">
+            <colgroup>
+                <col style="width:15%"><col style="width:24%"><col><col style="width:18%"><col style="width:156px">
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>Term</th>
+                    <th>Dates</th>
+                    <th>Assessments</th>
+                    <th>Marking deadlines</th>
+                    <th style="text-align:right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for term in ay.term_list %}
+                <tr{% if term.is_current_term %} class="is-current"{% endif %}>
+                    <td>
+                        <div class="set-cell-main">{{ term.name }}</div>
+                        <div class="set-cell-chips">
+                            {% if term.is_current_term %}<span class="chip chip-blue">Current</span>{% endif %}
+                            {% if term.is_locked %}<span class="chip chip-grey">Locked</span>{% endif %}
+                            {% if term.is_ended %}<span class="chip chip-grey">Ended</span>{% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        {% if term.start_date and term.end_date %}
+                        <div class="set-cell-main">{{ term.start_date|date:"d M Y" }} – {{ term.end_date|date:"d M Y" }}</div>
+                        {% if term.grading_deadline %}<div class="set-cell-sub">Grading due {{ term.grading_deadline|date:"d M Y" }}</div>{% endif %}
+                        {% else %}<span class="set-warn">No dates</span>{% endif %}
+                    </td>
+                    <td class="set-kv">
+                        {% if term.quiz_start_date %}<div><span>Quiz</span>{{ term.quiz_start_date|date:"d M" }}{% if term.quiz_end_date %} – {{ term.quiz_end_date|date:"d M" }}{% endif %}</div>{% endif %}
+                        {% if term.midterm_exam_start_date %}<div><span>Mid-term</span>{{ term.midterm_exam_start_date|date:"d M" }}{% if term.midterm_exam_end_date %} – {{ term.midterm_exam_end_date|date:"d M" }}{% endif %}</div>{% endif %}
+                        {% if term.endterm_exam_start_date %}<div><span>End-term</span>{{ term.endterm_exam_start_date|date:"d M" }}{% if term.endterm_exam_end_date %} – {{ term.endterm_exam_end_date|date:"d M" }}{% endif %}</div>{% endif %}
+                        {% if not term.quiz_start_date and not term.midterm_exam_start_date and not term.endterm_exam_start_date %}<span class="set-muted">Not scheduled</span>{% endif %}
+                    </td>
+                    <td class="set-kv">
+                        {% if term.quiz_grade_marking_end_date %}<div><span>Quiz</span>{{ term.quiz_grade_marking_end_date|date:"d M" }}</div>{% endif %}
+                        {% if term.midterm_grade_marking_end_date %}<div><span>Mid-term</span>{{ term.midterm_grade_marking_end_date|date:"d M" }}</div>{% endif %}
+                        {% if term.endterm_grade_marking_end_date %}<div><span>End-term</span>{{ term.endterm_grade_marking_end_date|date:"d M" }}</div>{% endif %}
+                        {% if not term.quiz_grade_marking_end_date and not term.midterm_grade_marking_end_date and not term.endterm_grade_marking_end_date %}<span class="set-muted">–</span>{% endif %}
+                    </td>
+                    <td style="text-align:right;white-space:nowrap">
+                        {% if not term.is_ended %}
+                        <c-button variant="secondary" size="sm"
+                            onclick="openTermDrawer({pk:'{{ term.pk }}',year:'{{ ay.pk }}',name:'{{ term.name|escapejs }}',start:'{{ term.start_date|date:'Y-m-d' }}',end:'{{ term.end_date|date:'Y-m-d' }}',deadline:'{{ term.grading_deadline|date:'Y-m-d' }}',quiz_start:'{{ term.quiz_start_date|date:'Y-m-d' }}',quiz_end:'{{ term.quiz_end_date|date:'Y-m-d' }}',mt_start:'{{ term.midterm_exam_start_date|date:'Y-m-d' }}',mt_end:'{{ term.midterm_exam_end_date|date:'Y-m-d' }}',et_start:'{{ term.endterm_exam_start_date|date:'Y-m-d' }}',et_end:'{{ term.endterm_exam_end_date|date:'Y-m-d' }}',q_days:{{ term.quiz_grade_marking_days|default:5 }},mt_days:{{ term.midterm_grade_marking_days|default:10 }},et_days:{{ term.endterm_grade_marking_days|default:10 }}})">Edit</c-button>
+                        <c-button variant="danger" size="sm"
+                            onclick="confirmDeleteModal({title:'Delete term?',body:'Delete <strong>{{ term.name|escapejs }}</strong> ({{ ay.name|escapejs }})?',detail:'This cannot be undone.',confirmText:'Delete term',url:'?tab=academic_year',type:'danger',extraData:[{name:'action',value:'delete_term'},{name:'pk',value:'{{ term.pk }}'}]})">Delete</c-button>
+                        {% else %}<span class="set-muted">Read-only</span>{% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="set-empty-row">
+                        No terms yet.{% if not ay.is_ended %} <a href="#" onclick="openTermDrawer({year:'{{ ay.pk }}'});return false">Add the first term</a>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
+</details>
+{% empty %}
+<div class="card">
+    <c-empty-state title="No academic years yet" desc="Add an academic year, then add its terms." icon="calendar" />
 </div>
-{% endif %}
+{% endfor %}
 
-{# ── Add Year Modal ── #}
-<div id="ayModal" class="settings-modal-overlay">
-    <div class="settings-modal">
-        <div class="settings-modal-header">
-            <h3>Add Academic Year</h3><button type="button" class="settings-modal-close"
-                onclick="closeModal('ayModal')">&times;</button>
+{# ── Year modal (add + edit) ── #}
+<c-modal id="yearModal" title="Add academic year">
+    <form method="post" action="?tab=academic_year" id="yearForm" class="set-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_academic_year">
+        <input type="hidden" name="pk">
+        <div class="set-field">
+            <label class="form-label" for="year_name">Year name <span class="req">*</span></label>
+            <input type="text" name="name" id="year_name" required class="hf-input" placeholder="e.g. 2026/2027">
         </div>
-        <form method="post" action="?tab=academic_year" style="padding:0">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="add_academic_year">
-            <div class="settings-modal-body">
-                <div class="form-group" style="margin:0"><label class="form-label">Year Name <span
-                            style="color:var(--red)">*</span></label><input type="text" name="name" required
-                        class="hf-input" placeholder="e.g. 2025/2026"></div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                    <div class="form-group" style="margin:0"><label class="form-label">Start Date <span
-                                style="color:var(--red)">*</span></label><input type="date" name="start_date" required
-                            class="hf-input"></div>
-                    <div class="form-group" style="margin:0"><label class="form-label">End Date <span
-                                style="color:var(--red)">*</span></label><input type="date" name="end_date" required
-                            class="hf-input"></div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                    <div class="form-group" style="margin:0"><label class="form-label"># Terms</label><input
-                            type="number" name="number_of_terms" value="3" min="1" max="6" class="hf-input"></div>
-                    <div class="form-group" style="margin:0;display:flex;align-items:flex-end"><label
-                            style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary);cursor:pointer;padding-bottom:10px"><input
-                                type="checkbox" name="is_current" value="on" style="width:16px;height:16px"> Set as
-                            current academic year</label></div>
-                </div>
+        <div class="set-grid-2">
+            <div class="set-field">
+                <label class="form-label" for="year_start">Start date <span class="req">*</span></label>
+                <input type="date" name="start_date" id="year_start" required class="hf-input">
             </div>
-            <div class="settings-modal-footer"><button type="button" class="btn-secondary"
-                    onclick="closeModal('ayModal')">Cancel</button><button type="submit" class="btn-primary">Create
-                    Year</button></div>
-        </form>
-    </div>
-</div>
+            <div class="set-field">
+                <label class="form-label" for="year_end">End date <span class="req">*</span></label>
+                <input type="date" name="end_date" id="year_end" required class="hf-input">
+            </div>
+        </div>
+        <div class="set-grid-2">
+            <div class="set-field">
+                <label class="form-label" for="year_terms">Number of terms</label>
+                <input type="number" name="number_of_terms" id="year_terms" value="3" min="1" max="6" class="hf-input">
+            </div>
+            <label class="set-check">
+                <input type="checkbox" name="is_current" id="year_current" value="on">
+                <span>Set as the current academic year</span>
+            </label>
+        </div>
+        <p class="set-hint" id="yearCurrentHint" style="display:none">“{{ current_year_name }}” will stop being the current year.</p>
+    </form>
+    <c-slot name="footer">
+        <c-button variant="secondary" data-hui-close>Cancel</c-button>
+        <c-button type="submit" form="yearForm" id="yearSubmit">Create year</c-button>
+    </c-slot>
+</c-modal>
+
+{# ── Term drawer (add + edit) ── #}
+<c-drawer id="termDrawer" title="Add term" size="lg">
+    <form method="post" action="?tab=academic_year" id="termForm" class="set-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_term">
+        <input type="hidden" name="pk">
+
+        <div class="set-section-title">Term</div>
+        <div class="set-grid-2">
+            <div class="set-field">
+                <label class="form-label" for="term_year">Academic year <span class="req">*</span></label>
+                <select name="academic_year" id="term_year" class="hf-select" required>
+                    <option value="">Select year</option>
+                    {% for ay in academic_years %}{% if not ay.is_ended %}<option value="{{ ay.pk }}">{{ ay.name }}</option>{% endif %}{% endfor %}
+                </select>
+            </div>
+            <div class="set-field">
+                <label class="form-label" for="term_name">Term name <span class="req">*</span></label>
+                <input type="text" name="term_name" id="term_name" required class="hf-input" placeholder="e.g. Term 1">
+            </div>
+        </div>
+        <div class="set-grid-3">
+            <div class="set-field">
+                <label class="form-label" for="term_start">Start date <span class="req">*</span></label>
+                <input type="date" name="start_date" id="term_start" required class="hf-input">
+            </div>
+            <div class="set-field">
+                <label class="form-label" for="term_end">End date <span class="req">*</span></label>
+                <input type="date" name="end_date" id="term_end" required class="hf-input">
+            </div>
+            <div class="set-field">
+                <label class="form-label" for="term_deadline">Grading deadline</label>
+                <input type="date" name="grading_deadline" id="term_deadline" class="hf-input">
+            </div>
+        </div>
+
+        <div class="set-section-title">Assessment dates <span class="set-optional">optional</span></div>
+        <div class="set-date-rows">
+            <div class="set-date-row"><span>Quiz</span>
+                <input type="date" name="quiz_start_date" id="term_quiz_start" class="hf-input" aria-label="Quiz start">
+                <em>to</em>
+                <input type="date" name="quiz_end_date" id="term_quiz_end" class="hf-input" aria-label="Quiz end">
+            </div>
+            <div class="set-date-row"><span>Mid-term exams</span>
+                <input type="date" name="midterm_exam_start_date" id="term_mt_start" class="hf-input" aria-label="Mid-term start">
+                <em>to</em>
+                <input type="date" name="midterm_exam_end_date" id="term_mt_end" class="hf-input" aria-label="Mid-term end">
+            </div>
+            <div class="set-date-row"><span>End-term exams</span>
+                <input type="date" name="endterm_exam_start_date" id="term_et_start" class="hf-input" aria-label="End-term start">
+                <em>to</em>
+                <input type="date" name="endterm_exam_end_date" id="term_et_end" class="hf-input" aria-label="End-term end">
+            </div>
+        </div>
+
+        <div class="set-section-title">Marking window <span class="set-optional">working days after each assessment ends</span></div>
+        <div class="set-grid-3">
+            <div class="set-field">
+                <label class="form-label" for="term_q_days">Quiz</label>
+                <input type="number" name="quiz_grade_marking_days" id="term_q_days" value="5" min="1" max="60" class="hf-input">
+            </div>
+            <div class="set-field">
+                <label class="form-label" for="term_mt_days">Mid-term</label>
+                <input type="number" name="midterm_grade_marking_days" id="term_mt_days" value="10" min="1" max="60" class="hf-input">
+            </div>
+            <div class="set-field">
+                <label class="form-label" for="term_et_days">End-term</label>
+                <input type="number" name="endterm_grade_marking_days" id="term_et_days" value="10" min="1" max="60" class="hf-input">
+            </div>
+        </div>
+        <p class="set-hint">Marking deadlines are calculated automatically, skipping weekends.</p>
+    </form>
+    <c-slot name="footer">
+        <c-button variant="secondary" data-hui-close>Cancel</c-button>
+        <c-button type="submit" form="termForm" id="termSubmit">Add term</c-button>
+    </c-slot>
+</c-drawer>
 
 <script>
     var CURRENT_YEAR_NAME = "{{ current_year_name|escapejs }}";
-    (function () {
-        function hookIsCurrentConfirm(formEl) {
-            if (!formEl) return;
-            var cb = formEl.querySelector('input[name="is_current"]');
-            if (!cb) return;
-            formEl.addEventListener('submit', function (e) {
-                if (cb.checked && CURRENT_YEAR_NAME) {
-                    if (!confirm('"' + CURRENT_YEAR_NAME + '" is currently set as the active academic year. Setting this year as current will automatically unassign it. Continue?')) {
-                        e.preventDefault();
-                    }
-                }
-            });
-        }
-        var addForm = document.querySelector('#ayModal form');
-        hookIsCurrentConfirm(addForm);
-        var editForm = document.querySelector('#editAYModal form');
-        hookIsCurrentConfirm(editForm);
-    })();
+
+    function openYearModal(y) {
+        y = y || {};
+        var f = document.getElementById('yearForm'), m = document.getElementById('yearModal');
+        resetForm(f);
+        f.action.value = y.pk ? 'edit_academic_year' : 'add_academic_year';
+        f.pk.value = y.pk || '';
+        f.elements['name'].value = y.name || '';
+        setField('year_start', y.start);
+        setField('year_end', y.end);
+        f.number_of_terms.value = y.terms || 3;
+        f.is_current.checked = !!y.current;
+        f.dataset.wasCurrent = y.current ? '1' : '';
+        m.querySelector('.modal-title').firstChild.textContent = y.pk ? 'Edit ' + y.name : 'Add academic year';
+        document.getElementById('yearSubmit').textContent = y.pk ? 'Save changes' : 'Create year';
+        syncYearHint();
+        HodariUI.open('yearModal');
+    }
+    function syncYearHint() {
+        var f = document.getElementById('yearForm');
+        document.getElementById('yearCurrentHint').style.display =
+            (f.is_current.checked && !f.dataset.wasCurrent && CURRENT_YEAR_NAME) ? 'block' : 'none';
+    }
+    document.getElementById('year_current').addEventListener('change', syncYearHint);
+
+    function openTermDrawer(t) {
+        t = t || {};
+        var f = document.getElementById('termForm'), d = document.getElementById('termDrawer');
+        resetForm(f);
+        var set = setField;
+        f.action.value = t.pk ? 'edit_term' : 'add_term';
+        f.pk.value = t.pk || '';
+        set('term_year', t.year); set('term_name', t.name);
+        set('term_start', t.start); set('term_end', t.end); set('term_deadline', t.deadline);
+        set('term_quiz_start', t.quiz_start); set('term_quiz_end', t.quiz_end);
+        set('term_mt_start', t.mt_start); set('term_mt_end', t.mt_end);
+        set('term_et_start', t.et_start); set('term_et_end', t.et_end);
+        set('term_q_days', t.q_days || 5); set('term_mt_days', t.mt_days || 10); set('term_et_days', t.et_days || 10);
+        // The year can't be changed on an existing term (the server ignores it).
+        document.getElementById('term_year').disabled = !!t.pk;
+        d.querySelector('.drawer-title').firstChild.textContent = t.pk ? 'Edit ' + t.name : 'Add term';
+        document.getElementById('termSubmit').textContent = t.pk ? 'Save changes' : 'Add term';
+        HodariUI.open('termDrawer');
+    }
 </script>
-
-{# ── Edit Year Modal ── #}
-<div id="editAYModal" class="settings-modal-overlay">
-    <div class="settings-modal">
-        <div class="settings-modal-header">
-            <h3>Edit Academic Year</h3><button type="button" class="settings-modal-close"
-                onclick="closeModal('editAYModal')">&times;</button>
-        </div>
-        <form method="post" action="?tab=academic_year" style="padding:0">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="edit_academic_year">
-            <input type="hidden" name="pk" id="editAY_pk">
-            <div class="settings-modal-body">
-                <div class="form-group" style="margin:0"><label class="form-label">Year Name <span
-                            style="color:var(--red)">*</span></label><input type="text" name="name" id="editAY_name"
-                        required class="hf-input"></div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                    <div class="form-group" style="margin:0"><label class="form-label">Start Date</label><input
-                            type="date" name="start_date" id="editAY_start" class="hf-input"></div>
-                    <div class="form-group" style="margin:0"><label class="form-label">End Date</label><input
-                            type="date" name="end_date" id="editAY_end" class="hf-input"></div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                    <div class="form-group" style="margin:0"><label class="form-label"># Terms</label><input
-                            type="number" name="number_of_terms" id="editAY_terms" min="1" max="6" class="hf-input">
-                    </div>
-                    <div class="form-group" style="margin:0;display:flex;align-items:flex-end"><label
-                            style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary);cursor:pointer;padding-bottom:10px"><input
-                                type="checkbox" name="is_current" id="editAY_current" value="on"
-                                style="width:16px;height:16px"> Set as current academic year</label></div>
-                </div>
-            </div>
-            <div class="settings-modal-footer"><button type="button" class="btn-secondary"
-                    onclick="closeModal('editAYModal')">Cancel</button><button type="submit" class="btn-primary">Save
-                    Changes</button></div>
-        </form>
-    </div>
-</div>
-
-{# ── Add Term Modal ── #}
-<div id="termModal" class="settings-modal-overlay">
-    <div class="settings-modal">
-        <div class="settings-modal-header">
-            <h3>Add Term</h3><button type="button" class="settings-modal-close"
-                onclick="closeModal('termModal')">&times;</button>
-        </div>
-        <form method="post" action="?tab=academic_year" style="padding:0">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="add_term">
-            <div class="settings-modal-body">
-                <div class="form-group" style="margin:0"><label class="form-label">Academic Year <span
-                            style="color:var(--red)">*</span></label>
-                    <select name="academic_year" class="hf-select" required>
-                        <option value="">Select Year</option>{% for ay in academic_years %}<option value="{{ ay.pk }}">
-                            {{ ay.name }}</option>{% endfor %}
-                    </select>
-                </div>
-                <div class="form-group" style="margin:0"><label class="form-label">Term Name <span
-                            style="color:var(--red)">*</span></label><input type="text" name="term_name" required
-                        class="hf-input" placeholder="e.g. Term 1"></div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                    <div class="form-group" style="margin:0"><label class="form-label">Start Date <span
-                                style="color:var(--red)">*</span></label><input type="date" name="start_date" required
-                            class="hf-input"></div>
-                    <div class="form-group" style="margin:0"><label class="form-label">End Date <span
-                                style="color:var(--red)">*</span></label><input type="date" name="end_date" required
-                            class="hf-input"></div>
-                </div>
-                <div class="form-group" style="margin:0"><label class="form-label">Grading Deadline</label><input
-                        type="date" name="grading_deadline" class="hf-input"></div>
-                <details style="margin-top:4px">
-                    <summary style="font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer">Quiz Dates
-                        (optional)</summary>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
-                        <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Quiz
-                                Start</label><input type="date" name="quiz_start_date" class="hf-input"></div>
-                        <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Quiz
-                                End</label><input type="date" name="quiz_end_date" class="hf-input"></div>
-                    </div>
-                </details>
-                <details style="margin-top:4px">
-                    <summary style="font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer">Exam Dates
-                        (optional)</summary>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
-                        <div class="form-group" style="margin:0"><label class="form-label"
-                                style="font-size:11px">Mid-Term Start</label><input type="date"
-                                name="midterm_exam_start_date" class="hf-input"></div>
-                        <div class="form-group" style="margin:0"><label class="form-label"
-                                style="font-size:11px">Mid-Term End</label><input type="date"
-                                name="midterm_exam_end_date" class="hf-input"></div>
-                        <div class="form-group" style="margin:0"><label class="form-label"
-                                style="font-size:11px">End-Term Start</label><input type="date"
-                                name="endterm_exam_start_date" class="hf-input"></div>
-                        <div class="form-group" style="margin:0"><label class="form-label"
-                                style="font-size:11px">End-Term End</label><input type="date"
-                                name="endterm_exam_end_date" class="hf-input"></div>
-                    </div>
-                </details>
-                <details style="margin-top:4px">
-                    <summary style="font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer">Grade Marking
-                        Window (optional)</summary>
-                    <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
-                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;align-items:end">
-                            <div class="form-group" style="margin:0"><label class="form-label"
-                                    style="font-size:11px">Quiz Marking Days</label><input type="number"
-                                    name="quiz_grade_marking_days" value="5" min="1" max="60" class="hf-input"></div>
-                            <div class="form-group" style="margin:0"><label class="form-label"
-                                    style="font-size:11px">Mid-Term Marking Days</label><input type="number"
-                                    name="midterm_grade_marking_days" value="10" min="1" max="60" class="hf-input">
-                            </div>
-                            <div class="form-group" style="margin:0"><label class="form-label"
-                                    style="font-size:11px">End-Term Marking Days</label><input type="number"
-                                    name="endterm_grade_marking_days" value="10" min="1" max="60" class="hf-input">
-                            </div>
-                        </div>
-                    </div>
-                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Working days (excl. weekends)
-                        after each exam end date. Marking deadline auto-calculated.</div>
-                </details>
-            </div>
-            <div class="settings-modal-footer"><button type="button" class="btn-secondary"
-                    onclick="closeModal('termModal')">Cancel</button><button type="submit" class="btn-primary">Add
-                    Term</button></div>
-        </form>
-    </div>
-</div>
-
-{# ── Edit Term Modal ── #}
-<div id="editTermModal" class="settings-modal-overlay">
-    <div class="settings-modal">
-        <div class="settings-modal-header">
-            <h3>Edit Term</h3><button type="button" class="settings-modal-close"
-                onclick="closeModal('editTermModal')">&times;</button>
-        </div>
-        <form method="post" action="?tab=academic_year" style="padding:0">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="edit_term">
-            <input type="hidden" name="pk" id="editTerm_pk">
-            <div class="settings-modal-body">
-                <div class="form-group" style="margin:0"><label class="form-label">Start Date</label><input type="date"
-                        name="start_date" id="editTerm_start" class="hf-input"></div>
-                <div class="form-group" style="margin:0"><label class="form-label">End Date</label><input type="date"
-                        name="end_date" id="editTerm_end" class="hf-input"></div>
-                <div class="form-group" style="margin:0"><label class="form-label">Grading Deadline</label><input
-                        type="date" name="grading_deadline" id="editTerm_deadline" class="hf-input"></div>
-                <details style="margin-top:4px">
-                    <summary style="font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer">Quiz Dates
-                        (optional)</summary>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
-                        <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Quiz
-                                Start</label><input type="date" name="quiz_start_date" id="editTerm_quiz_start"
-                                class="hf-input"></div>
-                        <div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Quiz
-                                End</label><input type="date" name="quiz_end_date" id="editTerm_quiz_end"
-                                class="hf-input"></div>
-                    </div>
-                </details>
-                <details style="margin-top:4px">
-                    <summary style="font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer">Exam Dates
-                        (optional)</summary>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
-                        <div class="form-group" style="margin:0"><label class="form-label"
-                                style="font-size:11px">Mid-Term Start</label><input type="date"
-                                name="midterm_exam_start_date" id="editTerm_mt_start" class="hf-input"></div>
-                        <div class="form-group" style="margin:0"><label class="form-label"
-                                style="font-size:11px">Mid-Term End</label><input type="date"
-                                name="midterm_exam_end_date" id="editTerm_mt_end" class="hf-input"></div>
-                        <div class="form-group" style="margin:0"><label class="form-label"
-                                style="font-size:11px">End-Term Start</label><input type="date"
-                                name="endterm_exam_start_date" id="editTerm_et_start" class="hf-input"></div>
-                        <div class="form-group" style="margin:0"><label class="form-label"
-                                style="font-size:11px">End-Term End</label><input type="date"
-                                name="endterm_exam_end_date" id="editTerm_et_end" class="hf-input"></div>
-                    </div>
-                </details>
-                <details style="margin-top:4px">
-                    <summary style="font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer">Grade Marking
-                        Window (optional)</summary>
-                    <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
-                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;align-items:end">
-                            <div class="form-group" style="margin:0"><label class="form-label"
-                                    style="font-size:11px">Quiz Marking Days</label><input type="number"
-                                    name="quiz_grade_marking_days" id="editTerm_gm_q_days" min="1" max="60"
-                                    class="hf-input"></div>
-                            <div class="form-group" style="margin:0"><label class="form-label"
-                                    style="font-size:11px">Mid-Term Marking Days</label><input type="number"
-                                    name="midterm_grade_marking_days" id="editTerm_gm_mt_days" min="1" max="60"
-                                    class="hf-input"></div>
-                            <div class="form-group" style="margin:0"><label class="form-label"
-                                    style="font-size:11px">End-Term Marking Days</label><input type="number"
-                                    name="endterm_grade_marking_days" id="editTerm_gm_et_days" min="1" max="60"
-                                    class="hf-input"></div>
-                        </div>
-                    </div>
-                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Working days (excl. weekends)
-                        after each exam end date. Marking deadline auto-calculated.</div>
-                </details>
-            </div>
-            <div class="settings-modal-footer"><button type="button" class="btn-secondary"
-                    onclick="closeModal('editTermModal')">Cancel</button><button type="submit" class="btn-primary">Save
-                    Changes</button></div>
-        </form>
-    </div>
-</div>
 
 {# ══════════════════════════════════════════════════════════════ #}
 {# MEDIA SETTINGS TAB #}
@@ -745,45 +664,39 @@
 {% elif active_tab == 'media' %}
 
 <div class="card">
-    <div style="display:flex;align-items:center;gap:12px;padding:0 0 12px;border-bottom:1px solid var(--border)">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="16" x2="12" y2="12" />
-            <line x1="12" y1="8" x2="12.01" y2="8" />
-        </svg>
+    <div class="set-head">
         <div>
-            <div style="font-weight:600;font-size:14px">Media Upload Configuration</div>
-            <div style="font-size:12px;color:var(--text-muted)">Configure allowed file types, size limits, and duplicate
-                detection per upload area.</div>
+            <div class="card-title">Media upload limits</div>
+            <div class="set-head-desc">Allowed file types, size limits and duplicate detection for each upload area.</div>
         </div>
     </div>
-    <div style="border-top:1px solid var(--border);margin-top:12px">
+    <div class="table-wrap">
         <table class="h-table">
             <thead>
                 <tr>
                     <th>Area</th>
-                    <th>Max Size</th>
-                    <th>Total Limit</th>
-                    <th>Max Files</th>
-                    <th>Dup Check</th>
+                    <th>File types</th>
+                    <th>Max file</th>
+                    <th>Total limit</th>
+                    <th>Max files</th>
+                    <th>Duplicates</th>
                     <th style="text-align:right">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for ms in media_settings %}
-                <tr style="{% if not ms.is_active %}opacity:.5{% endif %}">
-                    <td style="font-weight:600">{{ ms.get_area_display }}</td>
+                <tr{% if not ms.is_active %} style="opacity:.55"{% endif %}>
+                    <td style="font-weight:600">{{ ms.get_area_display }}{% if not ms.is_active %} <span class="chip chip-grey">Off</span>{% endif %}</td>
+                    <td style="font-size:12px;color:var(--text-secondary);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ ms.allowed_extensions }}">{{ ms.allowed_extensions|default:"Any" }}</td>
                     <td>{{ ms.max_file_size_mb }} MB</td>
                     <td>{{ ms.max_total_size_mb }} MB</td>
                     <td>{{ ms.max_files }}</td>
-                    <td>{% if ms.duplicate_check %}<span class="chip chip-green" style="font-size:10px">On</span>{% else %}<span class="chip chip-grey" style="font-size:10px">Off</span>{% endif %}</td>
+                    <td>{% if ms.duplicate_check %}<span class="chip chip-green">Blocked</span>{% else %}<span class="chip chip-grey">Allowed</span>{% endif %}</td>
                     <td style="text-align:right;white-space:nowrap">
-                        <button type="button" class="btn-secondary btn-sm"
-                            onclick="openEditMediaModal('{{ ms.area }}','{{ ms.allowed_extensions|escapejs }}','{{ ms.max_file_size_mb }}','{{ ms.max_total_size_mb }}','{{ ms.max_files }}',{% if ms.duplicate_check %}true{% else %}false{% endif %},{% if ms.is_active %}true{% else %}false{% endif %},'{{ ms.min_width }}','{{ ms.min_height }}')">Edit</button>
-                        <button type="button" class="btn-secondary btn-sm"
-                            style="color:var(--red,#EF4444);margin-left:4px"
-                            onclick="confirmDeleteModal({title:'Reset {{ ms.get_area_display }}?',body:'Are you sure you want to reset <strong>{{ ms.get_area_display }}</strong> upload settings to defaults?',detail:'This will overwrite your current configuration.',confirmText:'Reset',url:'?tab=media',type:'danger',extraData:[{name:'action',value:'reset_media_defaults'},{name:'area',value:'{{ ms.area }}'}]})">Reset</button>
+                        <c-button variant="secondary" size="sm"
+                            onclick="openEditMediaModal('{{ ms.area }}','{{ ms.get_area_display|escapejs }}','{{ ms.allowed_extensions|escapejs }}','{{ ms.max_file_size_mb }}','{{ ms.max_total_size_mb }}','{{ ms.max_files }}',{% if ms.duplicate_check %}true{% else %}false{% endif %},{% if ms.is_active %}true{% else %}false{% endif %})">Edit</c-button>
+                        <c-button variant="danger" size="sm"
+                            onclick="confirmDeleteModal({title:'Reset to defaults?',body:'Reset <strong>{{ ms.get_area_display|escapejs }}</strong> upload settings to their defaults?',detail:'This overwrites the current configuration.',confirmText:'Reset',url:'?tab=media',type:'danger',extraData:[{name:'action',value:'reset_media_defaults'},{name:'area',value:'{{ ms.area }}'}]})">Reset</c-button>
                     </td>
                 </tr>
                 {% endfor %}
@@ -792,53 +705,40 @@
     </div>
 </div>
 
-{# ── Edit Media Modal ── #}
-<div id="editMediaModal" class="settings-modal-overlay">
-    <div class="settings-modal">
-        <div class="settings-modal-header">
-            <h3 id="editMedia_title">Edit Upload Area</h3><button type="button" class="settings-modal-close"
-                onclick="closeModal('editMediaModal')">&times;</button>
+<c-drawer id="mediaDrawer" title="Edit upload area" subtitle="Limits apply to every upload in this area">
+    <form method="post" action="?tab=media" id="mediaForm" class="set-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save_media_setting">
+        <input type="hidden" name="area">
+        <div class="set-field">
+            <label class="form-label" for="media_ext">Allowed file extensions</label>
+            <input type="text" name="allowed_extensions" id="media_ext" class="hf-input">
+            <span class="set-hint">Comma-separated, without dots, e.g. pdf,docx,jpg</span>
         </div>
-        <form method="post" action="?tab=media" style="padding:0">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="save_media_setting">
-            <input type="hidden" name="area" id="editMedia_area">
-            <div class="settings-modal-body">
-                <div class="form-group" style="margin:0"><label class="form-label">Allowed File Extensions</label><input
-                        type="text" name="allowed_extensions" id="editMedia_ext" class="hf-input"><span
-                        class="form-help">Comma-separated, without dots (e.g. pdf,docx,jpg)</span></div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                    <div class="form-group" style="margin:0"><label class="form-label">Max Single File
-                            (MB)</label><input type="number" name="max_file_size_mb" id="editMedia_size" min="1"
-                            max="100" class="hf-input"></div>
-                    <div class="form-group" style="margin:0"><label class="form-label">Max Total Size (MB)</label><input
-                            type="number" name="max_total_size_mb" id="editMedia_total" min="1" max="500"
-                            class="hf-input"></div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                    <div class="form-group" style="margin:0"><label class="form-label">Max Files Per
-                            Upload</label><input type="number" name="max_files" id="editMedia_files" min="1" max="20"
-                            class="hf-input"></div>
-                    <div class="form-group" style="margin:0">
-                        <label class="form-label">Duplicate Detection</label>
-                        <label
-                            style="display:flex;align-items:center;gap:8px;padding:10px 0;font-size:13px;cursor:pointer"><input
-                                type="checkbox" name="duplicate_check" id="editMedia_dup" value="on"
-                                style="width:16px;height:16px"> Reject duplicate files</label>
-                    </div>
-                </div>
-                <div class="form-group" style="margin:0">
-                    <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input
-                            type="checkbox" name="is_active" id="editMedia_active" value="on"
-                            style="width:16px;height:16px"> Active (enforce these limits)</label>
-                </div>
+        <div class="set-grid-2">
+            <div class="set-field">
+                <label class="form-label" for="media_size">Max single file (MB)</label>
+                <input type="number" name="max_file_size_mb" id="media_size" min="1" max="100" class="hf-input">
             </div>
-            <div class="settings-modal-footer"><button type="button" class="btn-secondary"
-                    onclick="closeModal('editMediaModal')">Cancel</button><button type="submit" class="btn-primary">Save
-                    Settings</button></div>
-        </form>
-    </div>
-</div>
+            <div class="set-field">
+                <label class="form-label" for="media_total">Max total size (MB)</label>
+                <input type="number" name="max_total_size_mb" id="media_total" min="1" max="500" class="hf-input">
+            </div>
+        </div>
+        <div class="set-field">
+            <label class="form-label" for="media_files">Max files per upload</label>
+            <input type="number" name="max_files" id="media_files" min="1" max="20" class="hf-input" style="max-width:200px">
+        </div>
+        <div class="set-toggles">
+            <label class="set-check"><input type="checkbox" name="duplicate_check" value="on"> Reject duplicate files</label>
+            <label class="set-check"><input type="checkbox" name="is_active" value="on"> Active (enforce these limits)</label>
+        </div>
+    </form>
+    <c-slot name="footer">
+        <c-button variant="secondary" data-hui-close>Cancel</c-button>
+        <c-button type="submit" form="mediaForm">Save settings</c-button>
+    </c-slot>
+</c-drawer>
 
 {# ══════════════════════════════════════════════════════════════ #}
 {# DYNAMIC PAGES TAB #}
@@ -1013,11 +913,11 @@
 
                     {# Form fields (static preview) #}
                     <div style="margin-bottom:14px">
-                        <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:5px">Email
-                            or Username</div>
+                        <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:5px">Username
+                            or school email</div>
                         <div
                             style="height:40px;border:1.5px solid var(--border);border-radius:10px;background:#fff;display:flex;align-items:center;padding:0 12px;font-size:13px;color:var(--text-muted)">
-                            you@school.com</div>
+                            e.g. username or your school email</div>
                     </div>
                     <div style="margin-bottom:20px">
                         <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:5px">
@@ -1205,16 +1105,19 @@
 {% elif active_tab == 'induction_checklist' %}
 
 <div class="card">
-    <div class="card-title-row">
-        <div class="card-title" style="margin:0">Induction Checklist Items</div>
-        <button type="button" class="btn-primary btn-sm" onclick="openModal('checklistModal')">+ Add Item</button>
+    <div class="set-head">
+        <div>
+            <div class="card-title">Induction checklist</div>
+            <div class="set-head-desc">Items new staff complete during onboarding, grouped by step.</div>
+        </div>
+        <c-button size="sm" onclick="openChecklistModal()">+ Add item</c-button>
     </div>
-    <div style="border-top:1px solid var(--border);margin-top:12px">
+    <div class="table-wrap">
         <table class="h-table">
             <thead>
                 <tr>
-                    <th style="width:40px"></th>
-                    <th>Item Name</th>
+                    <th style="width:44px">#</th>
+                    <th>Item</th>
                     <th>Step</th>
                     <th>Description</th>
                     <th>Required</th>
@@ -1224,19 +1127,16 @@
             <tbody>
                 {% for item in induction_items %}
                 <tr>
-                    <td style="font-size:13px;color:var(--text-muted);text-align:center">{{ forloop.counter }}</td>
+                    <td style="color:var(--text-muted)">{{ forloop.counter }}</td>
                     <td style="font-weight:600">{{ item.item_name }}</td>
-                    <td><span class="chip chip-blue" style="font-size:11px">Step {{ item.step }}</span></td>
-                    <td
-                        style="font-size:12px;color:var(--text-secondary);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-                        {{ item.description|truncatewords:12|default:"N/A" }}</td>
-                    <td>{% if item.is_required %}<span class="chip chip-green" style="font-size:10px">Required</span>{% else %}<span class="chip chip-grey" style="font-size:10px">Optional</span>{% endif %}</td>
+                    <td><span class="chip chip-blue">Step {{ item.step }}</span></td>
+                    <td style="font-size:12px;color:var(--text-secondary);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ item.description }}">{{ item.description|default:"–" }}</td>
+                    <td>{% if item.is_required %}<span class="chip chip-green">Required</span>{% else %}<span class="chip chip-grey">Optional</span>{% endif %}</td>
                     <td style="text-align:right;white-space:nowrap">
-                        <button type="button" class="btn-secondary btn-sm"
-                            onclick="openEditChecklistModal('{{ item.pk }}','{{ item.item_name|escapejs }}','{{ item.description|escapejs }}','{{ item.step }}',{% if item.is_required %}true{% else %}false{% endif %},'{{ item.order }}')">Edit</button>
-                        <button type="button" class="btn-secondary btn-sm"
-                            style="color:var(--red,#EF4444);margin-left:4px"
-                            onclick="confirmDeleteModal({title:'Delete Item?',body:'Are you sure you want to delete <strong>{{ item.item_name }}</strong>?',detail:'This affects all staff induction records.',confirmText:'Delete Item',url:'?tab=induction_checklist',type:'danger',extraData:[{name:'action',value:'delete_item'},{name:'pk',value:'{{ item.pk }}'}]})">Delete</button>
+                        <c-button variant="secondary" size="sm"
+                            onclick="openChecklistModal({pk:'{{ item.pk }}',name:'{{ item.item_name|escapejs }}',desc:'{{ item.description|escapejs }}',step:'{{ item.step }}',req:{% if item.is_required %}true{% else %}false{% endif %},order:'{{ item.order }}'})">Edit</c-button>
+                        <c-button variant="danger" size="sm"
+                            onclick="confirmDeleteModal({title:'Delete item?',body:'Delete <strong>{{ item.item_name|escapejs }}</strong>?',detail:'This affects all staff induction records.',confirmText:'Delete item',url:'?tab=induction_checklist',type:'danger',extraData:[{name:'action',value:'delete_item'},{name:'pk',value:'{{ item.pk }}'}]})">Delete</c-button>
                     </td>
                 </tr>
                 {% empty %}
@@ -1249,147 +1149,114 @@
     </div>
 </div>
 
-{# ── Add Item Modal ── #}
-<div id="checklistModal" class="settings-modal-overlay">
-    <div class="settings-modal">
-        <div class="settings-modal-header">
-            <h3>Add Checklist Item</h3><button type="button" class="settings-modal-close"
-                onclick="closeModal('checklistModal')">&times;</button>
-        </div>
-        <form method="post" action="?tab=induction_checklist" style="padding:0">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="add_item">
-            <div class="settings-modal-body">
-                <div class="form-group" style="margin:0"><label class="form-label">Onboarding Step <span
-                            style="color:var(--red)">*</span></label>
-                    <select name="step" class="hf-select" required>
-                        <option value="">Select Step</option>{% for num, label in onboarding_step_choices %}<option
-                            value="{{ num }}">{{ label }}</option>{% endfor %}
-                    </select>
-                    <span class="form-help">Which onboarding step this item belongs to.</span>
-                </div>
-                <div class="form-group" style="margin:0"><label class="form-label">Item Name <span
-                            style="color:var(--red)">*</span></label><input type="text" name="item_name" required
-                        class="hf-input" placeholder="e.g. School Tour, IT Access Setup"></div>
-                <div class="form-group" style="margin:0"><label class="form-label">Description</label><textarea
-                        name="description" class="hf-input" rows="3" placeholder="Brief description..."></textarea>
-                </div>
-                <div class="form-group" style="margin:0"><label
-                        style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input
-                            type="checkbox" name="is_required" value="on" checked style="width:16px;height:16px">
-                        Required item</label></div>
-                <div class="form-group" style="margin:0"><label class="form-label">Display Order</label><input
-                        type="number" name="order" value="0" min="0" class="hf-input"><span class="form-help">Lower
-                        numbers appear first within the same step.</span></div>
+<c-modal id="checklistModal" title="Add checklist item">
+    <form method="post" action="?tab=induction_checklist" id="checklistForm" class="set-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_item">
+        <input type="hidden" name="pk">
+        <div class="set-grid-2">
+            <div class="set-field">
+                <label class="form-label" for="cl_step">Onboarding step <span class="req">*</span></label>
+                <select name="step" id="cl_step" class="hf-select" required>
+                    <option value="">Select step</option>
+                    {% for num, label in onboarding_step_choices %}<option value="{{ num }}">{{ label }}</option>{% endfor %}
+                </select>
             </div>
-            <div class="settings-modal-footer"><button type="button" class="btn-secondary"
-                    onclick="closeModal('checklistModal')">Cancel</button><button type="submit" class="btn-primary">Add
-                    Item</button></div>
-        </form>
-    </div>
-</div>
-
-{# ── Edit Item Modal ── #}
-<div id="editChecklistModal" class="settings-modal-overlay">
-    <div class="settings-modal">
-        <div class="settings-modal-header">
-            <h3>Edit Checklist Item</h3><button type="button" class="settings-modal-close"
-                onclick="closeModal('editChecklistModal')">&times;</button>
-        </div>
-        <form method="post" action="?tab=induction_checklist" style="padding:0">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="edit_item">
-            <input type="hidden" name="pk" id="editCL_pk">
-            <div class="settings-modal-body">
-                <div class="form-group" style="margin:0"><label class="form-label">Onboarding Step <span
-                            style="color:var(--red)">*</span></label>
-                    <select name="step" id="editCL_step" class="hf-select" required>
-                        <option value="">Select Step</option>{% for num, label in onboarding_step_choices %}<option
-                            value="{{ num }}">{{ label }}</option>{% endfor %}
-                    </select>
-                </div>
-                <div class="form-group" style="margin:0"><label class="form-label">Item Name <span
-                            style="color:var(--red)">*</span></label><input type="text" name="item_name"
-                        id="editCL_name" required class="hf-input"></div>
-                <div class="form-group" style="margin:0"><label class="form-label">Description</label><textarea
-                        name="description" id="editCL_desc" class="hf-input" rows="3"></textarea></div>
-                <div class="form-group" style="margin:0"><label
-                        style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input
-                            type="checkbox" name="is_required" id="editCL_req" value="on"
-                            style="width:16px;height:16px"> Required item</label></div>
-                <div class="form-group" style="margin:0"><label class="form-label">Display Order</label><input
-                        type="number" name="order" id="editCL_order" min="0" class="hf-input"></div>
+            <div class="set-field">
+                <label class="form-label" for="cl_order">Display order</label>
+                <input type="number" name="order" id="cl_order" value="0" min="0" class="hf-input">
             </div>
-            <div class="settings-modal-footer"><button type="button" class="btn-secondary"
-                    onclick="closeModal('editChecklistModal')">Cancel</button><button type="submit"
-                    class="btn-primary">Save Changes</button></div>
-        </form>
-    </div>
-</div>
+        </div>
+        <div class="set-field">
+            <label class="form-label" for="cl_name">Item name <span class="req">*</span></label>
+            <input type="text" name="item_name" id="cl_name" required class="hf-input" placeholder="e.g. School tour, IT access setup">
+        </div>
+        <div class="set-field">
+            <label class="form-label" for="cl_desc">Description</label>
+            <textarea name="description" id="cl_desc" class="hf-input" rows="3" placeholder="Brief description"></textarea>
+        </div>
+        <label class="set-check"><input type="checkbox" name="is_required" value="on" checked> Required item</label>
+        <p class="set-hint">Lower display numbers appear first within the same step.</p>
+    </form>
+    <c-slot name="footer">
+        <c-button variant="secondary" data-hui-close>Cancel</c-button>
+        <c-button type="submit" form="checklistForm" id="checklistSubmit">Add item</c-button>
+    </c-slot>
+</c-modal>
 
 {# ══════════════════════════════════════════════════════════════ #}
 {# EMAIL TEMPLATES TAB #}
 {# ══════════════════════════════════════════════════════════════ #}
 {% elif active_tab == 'email_templates' %}
 
-<div class="card" style="margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:12px;padding:0 0 12px;border-bottom:1px solid var(--border)">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-            <polyline points="22,6 12,13 2,6" />
-        </svg>
-        <div>
-            <div style="font-weight:600;font-size:14px">Email Templates</div>
-            <div style="font-size:12px;color:var(--text-muted)">Customize the subject and body of all system emails. Use
-                {{ variable }} syntax for dynamic content.</div>
-        </div>
-    </div>
-</div>
+{% include "core/_email_delivery_status.html" %}
 
 <div class="card">
-    <div class="card-title-row">
-        <div class="card-title" style="margin:0">All Email Templates</div>
+    <div class="set-head">
+        <div>
+            <div class="card-title">Email templates</div>
+            <div class="set-head-desc">Switch an email <strong>On</strong> and it is sent whenever its event happens; switch it <strong>Off</strong> and it is never sent. Use &#123;&#123; variable &#125;&#125; placeholders for dynamic content.</div>
+        </div>
     </div>
-    <div style="border-top:1px solid var(--border);margin-top:12px">
+    <div class="table-wrap">
         <table class="h-table">
             <thead>
                 <tr>
-                    <th>Template</th>
-                    <th>Subject</th>
-                    <th>HTML</th>
-                    <th>Plain Text</th>
-                    <th>Status</th>
+                    <th style="width:120px">Sending</th>
+                    <th>Email</th>
+                    <th>Last 30 days</th>
                     <th style="text-align:right">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for tpl in email_templates %}
-                <tr>
-                    <td style="font-weight:600">{{ tpl.name }}</td>
-                    <td
-                        style="font-size:12px;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-                        {{ tpl.subject|truncatewords:8|default:"--" }}</td>
-                    <td>{% if tpl.html_body %}<span class="chip chip-green" style="font-size:10px">Set</span>{% else %}<span class="chip chip-grey" style="font-size:10px">None</span>{% endif %}</td>
-                    <td>{% if tpl.plain_body %}<span class="chip chip-green" style="font-size:10px">Set</span>{% else %}<span class="chip chip-grey" style="font-size:10px">None</span>{% endif %}</td>
-                    <td>{% if tpl.is_enabled %}<span class="chip chip-green" style="font-size:10px">Enabled</span>{% else %}<span class="chip chip-amber" style="font-size:10px">Disabled</span>{% endif %}</td>
+                <tr{% if not tpl.is_enabled %} class="tpl-off"{% endif %}>
+                    <td>
+                        {% if can_edit_email_templates %}
+                        <form method="post" action="?tab=email_templates" class="tpl-toggle">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="toggle_email_template">
+                            <input type="hidden" name="template_type" value="{{ tpl.template_type }}">
+                            <label class="switch" title="{% if tpl.is_enabled %}On: this email is sent{% else %}Off: this email is not sent{% endif %}">
+                                <input type="checkbox" name="is_enabled" value="on" {% if tpl.is_enabled %}checked{% endif %} onchange="this.form.submit()">
+                                <span class="switch-track"></span>
+                                <span class="switch-label">{% if tpl.is_enabled %}On{% else %}Off{% endif %}</span>
+                            </label>
+                        </form>
+                        {% else %}
+                        {% if tpl.is_enabled %}<span class="chip chip-green">On</span>{% else %}<span class="chip chip-grey">Off</span>{% endif %}
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div style="font-weight:600">{{ tpl.name }}{% if not tpl.is_default %} <span class="chip chip-blue" title="Edited from the default wording">Edited</span>{% endif %}</div>
+                        <div class="set-cell-sub" style="max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ tpl.subject }}">{{ tpl.subject|default:"No subject" }}</div>
+                    </td>
+                    <td style="font-size:12px">
+                        {% if tpl.sent_30d or tpl.failed_30d %}
+                            {% if tpl.sent_30d %}<span class="chip chip-green">{{ tpl.sent_30d }} sent</span>{% endif %}
+                            {% if tpl.failed_30d %}<span class="chip chip-red" title="{{ tpl.last_error }}">{{ tpl.failed_30d }} failed</span>{% endif %}
+                            <div class="set-cell-sub">Last: {{ tpl.last_sent_at|date:"d M, H:i" }}</div>
+                            {% if tpl.last_error %}<div class="set-cell-sub" style="color:var(--red);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ tpl.last_error }}">{{ tpl.last_error }}</div>{% endif %}
+                        {% else %}
+                            <span class="set-muted">None sent</span>
+                        {% endif %}
+                    </td>
                     <td style="text-align:right;white-space:nowrap">
                         {% if can_edit_email_templates %}
-                        <button type="button" class="btn-secondary btn-sm"
-                            onclick="openEditEmailTplModal('{{ tpl.pk }}','{{ tpl.template_type|escapejs }}','{{ tpl.name|escapejs }}')">Edit</button>
+                        <c-button variant="secondary" size="sm"
+                            onclick="openEditEmailTplModal('{{ tpl.pk }}','{{ tpl.template_type|escapejs }}','{{ tpl.name|escapejs }}')">Edit</c-button>
                         {% if not tpl.is_default %}
-                        <button type="button" class="btn-secondary btn-sm"
-                            style="color:var(--red,#EF4444);margin-left:4px"
-                            onclick="confirmDeleteModal({title:'Reset Template?',body:'Are you sure you want to reset <strong>{{ tpl.name }}</strong> to its default content?',detail:'This will overwrite your current changes.',confirmText:'Reset',url:'?tab=email_templates',type:'danger',extraData:[{name:'action',value:'reset_email_template'},{name:'template_type',value:'{{ tpl.template_type }}'}]})">Reset</button>
+                        <c-button variant="danger" size="sm"
+                            onclick="confirmDeleteModal({title:'Reset to default wording?',body:'Reset <strong>{{ tpl.name|escapejs }}</strong> to its default wording?',detail:'Your edits to the subject and body are replaced. Whether it is on or off stays the same.',confirmText:'Reset',url:'?tab=email_templates',type:'danger',extraData:[{name:'action',value:'reset_email_template'},{name:'template_type',value:'{{ tpl.template_type }}'}]})">Reset</c-button>
                         {% endif %}
                         {% else %}
-                        <span style="font-size:12px;color:var(--text-muted)">View only</span>
+                        <span class="set-muted">View only</span>
                         {% endif %}
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with title='No email templates yet' desc='Templates will be seeded automatically on first visit.' icon='mail' icon_color='blue' %}</td>
+                    <td colspan="4" style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with title='No email templates yet' desc='Templates will be seeded automatically on first visit.' icon='mail' icon_color='blue' %}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -1398,18 +1265,12 @@
 </div>
 
 {# ── Edit Email Template Modal ── #}
-<div id="editEmailTplModal" class="settings-modal-overlay">
-    <div class="settings-modal" style="max-width:900px">
-        <div class="settings-modal-header">
-            <h3 id="editEmailTpl_title">Edit Email Template</h3><button type="button" class="settings-modal-close"
-                onclick="closeModal('editEmailTplModal')">&times;</button>
-        </div>
-        <form method="post" action="?tab=email_templates" id="editEmailTplForm" style="padding:0">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="save_email_template">
-            <input type="hidden" name="template_type" id="editEmailTpl_type">
-            <textarea name="html_body" id="editEmailTpl_html" style="display:none"></textarea>
-            <div class="settings-modal-body">
+<c-modal id="editEmailTplModal" title="Edit email template" size="xl">
+    <form method="post" action="?tab=email_templates" id="editEmailTplForm" class="set-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save_email_template">
+        <input type="hidden" name="template_type" id="editEmailTpl_type">
+        <textarea name="html_body" id="editEmailTpl_html" style="display:none"></textarea>
                 <div class="form-group" style="margin:0">
                     <label class="form-label">Template Name</label>
                     <input type="text" name="name" id="editEmailTpl_name" required class="hf-input">
@@ -1458,13 +1319,13 @@
                         style="font-family:monospace;font-size:12px" placeholder="Plain text fallback..."></textarea>
                     <span class="form-help">Required fallback for email clients that don't render HTML.</span>
                 </div>
-            </div>
-            <div class="settings-modal-footer"><button type="button" class="btn-secondary"
-                    onclick="closeModal('editEmailTplModal')">Cancel</button><button type="submit"
-                    class="btn-primary">Save Template</button></div>
-        </form>
-    </div>
-</div>
+            
+    </form>
+    <c-slot name="footer">
+        <c-button variant="secondary" data-hui-close>Cancel</c-button>
+        <c-button type="submit" form="editEmailTplForm">Save template</c-button>
+    </c-slot>
+</c-modal>
 
 <script>
     var EMAIL_TPL_VARS = {
@@ -1537,7 +1398,7 @@
 
     function openEditEmailTplModal(pk, type, name) {
         document.getElementById('editEmailTpl_type').value = type;
-        document.getElementById('editEmailTpl_title').textContent = 'Edit ' + name;
+        _setTitle('editEmailTplModal', 'Edit ' + name);
         document.getElementById('editEmailTpl_name').value = name;
 
         currentEmailMode = 'visual';
@@ -1608,255 +1469,68 @@
 </script>
 
 {# ══════════════════════════════════════════════════════════════ #}
-{# SHARED MODAL CSS & JS #}
+{# SHARED MODAL JS — uses the Hodari UI kit (hodari-ui.js) #}
 {# ══════════════════════════════════════════════════════════════ #}
-<style>
-    @keyframes modalSlideIn {
-        from {
-            transform: translateY(16px) scale(0.97);
-            opacity: 0;
-        }
-
-        to {
-            transform: translateY(0) scale(1);
-            opacity: 1;
-        }
-    }
-
-    .settings-modal-overlay {
-        position: fixed;
-        inset: 0;
-        z-index: 9998;
-        background: rgba(0, 0, 0, 0.45);
-        backdrop-filter: blur(4px);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        opacity: 0;
-        visibility: hidden;
-        pointer-events: none;
-        transition: opacity 0.2s, visibility 0.2s;
-    }
-
-    .settings-modal-overlay.is-open {
-        opacity: 1;
-        visibility: visible;
-        pointer-events: auto;
-    }
-
-    .settings-modal {
-        background: #fff;
-        border-radius: 16px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-        max-width: 520px;
-        width: 92%;
-        max-height: 85vh;
-        display: flex;
-        flex-direction: column;
-        animation: modalSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-        overflow: hidden;
-    }
-
-    .settings-modal-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 20px 24px;
-        border-bottom: 1px solid var(--border);
-        flex-shrink: 0;
-    }
-
-    .settings-modal-header h3 {
-        font-size: 16px;
-        font-weight: 700;
-        color: var(--text-primary);
-        margin: 0;
-    }
-
-    .settings-modal-close {
-        border: none;
-        background: none;
-        font-size: 22px;
-        color: var(--text-muted);
-        cursor: pointer;
-        padding: 0 4px;
-        line-height: 1;
-    }
-
-    .settings-modal-close:hover {
-        color: var(--text-primary);
-    }
-
-    .settings-modal-body {
-        padding: 20px 24px;
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-        overflow-y: auto;
-        flex: 1;
-        min-height: 0;
-    }
-
-    .settings-modal form {
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-        min-height: 0;
-    }
-
-    .settings-modal-footer {
-        display: flex;
-        justify-content: flex-end;
-        gap: 8px;
-        padding: 16px 24px;
-        border-top: 1px solid var(--border);
-        flex-shrink: 0;
-    }
-</style>
 <script>
-    function openModal(id) { document.getElementById(id).classList.add('is-open'); }
-    function closeModal(id) { document.getElementById(id).classList.remove('is-open'); }
-    function openEditClassModal(pk, name, dept, cap) {
-        document.getElementById('editClass_pk').value = pk;
-        document.getElementById('editClass_name').value = name;
-        document.getElementById('editClass_dept').value = dept;
-        document.getElementById('editClass_cap').value = cap;
-        openModal('editClassModal');
+    // Date inputs are upgraded to flatpickr site-wide, so set dates through it.
+    function setField(el, v) {
+        if (typeof el === 'string') el = document.getElementById(el);
+        if (!el) return;
+        v = (v === undefined || v === null) ? '' : String(v);
+        if (el._flatpickr) { v ? el._flatpickr.setDate(v, false) : el._flatpickr.clear(false); }
+        else el.value = v;
     }
-    function setDateInput(id, val) {
-        var el = document.getElementById(id);
-        if (!el || !val) return;
-        el.value = val;
+    function resetForm(f) {
+        f.reset();
+        f.querySelectorAll('input').forEach(function (el) { if (el._flatpickr) el._flatpickr.clear(false); });
     }
-    function openEditAYModal(pk, name, start, end, terms, isCurrent) {
-        var html = '<div class="settings-modal-overlay is-open" id="editAYOverlay">' +
-            '<div class="settings-modal">' +
-            '<div class="settings-modal-header"><h3>Edit Academic Year</h3><button type="button" class="settings-modal-close" onclick="this.closest(\'.settings-modal-overlay\').remove()">&times;</button></div>' +
-            '<form method="post" action="?tab=academic_year" style="padding:0">' +
-            '<input type="hidden" name="csrfmiddlewaretoken" value="' + document.querySelector('input[name=csrfmiddlewaretoken]').value + '">' +
-            '<input type="hidden" name="action" value="edit_academic_year">' +
-            '<input type="hidden" name="pk" value="' + pk + '">' +
-            '<div class="settings-modal-body">' +
-            '<div class="form-group" style="margin:0"><label class="form-label">Year Name <span style="color:var(--red)">*</span></label><input type="text" name="name" value="' + name.replace(/"/g, '&quot;') + '" required class="hf-input"></div>' +
-            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
-            '<div class="form-group" style="margin:0"><label class="form-label">Start Date</label><input type="date" name="start_date" value="' + (start || '') + '" class="hf-input"></div>' +
-            '<div class="form-group" style="margin:0"><label class="form-label">End Date</label><input type="date" name="end_date" value="' + (end || '') + '" class="hf-input"></div>' +
-            '</div>' +
-            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
-            '<div class="form-group" style="margin:0"><label class="form-label"># Terms</label><input type="number" name="number_of_terms" value="' + terms + '" min="1" max="6" class="hf-input"></div>' +
-            '<div class="form-group" style="margin:0;display:flex;align-items:flex-end"><label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary);cursor:pointer;padding-bottom:10px"><input type="checkbox" name="is_current" value="on" style="width:16px;height:16px"' + (isCurrent ? ' checked' : '') + '> Set as current academic year</label></div>' +
-            '</div></div>' +
-            '<div class="settings-modal-footer"><button type="button" class="btn-secondary" onclick="this.closest(\'.settings-modal-overlay\').remove()">Cancel</button><button type="submit" class="btn-primary">Save Changes</button></div>' +
-            '</form></div></div>';
-        document.body.insertAdjacentHTML('beforeend', html);
-        var overlay = document.getElementById('editAYOverlay');
-        var form = overlay.querySelector('form');
-        var cb = form.querySelector('input[name="is_current"]');
-        form.addEventListener('submit', function (e) {
-            if (cb.checked && !isCurrent && typeof CURRENT_YEAR_NAME !== 'undefined' && CURRENT_YEAR_NAME) {
-                if (!confirm('"' + CURRENT_YEAR_NAME + '" is currently set as the active academic year. Setting this year as current will automatically unassign it. Continue?')) {
-                    e.preventDefault();
-                }
-            }
-        });
+    function openModal(id) { HodariUI.open(id); }
+    function closeModal(id) { HodariUI.close(id); }
+    function _setTitle(id, text) {
+        var el = document.querySelector('#' + id + ' .modal-title, #' + id + ' .drawer-title');
+        if (el) el.firstChild.textContent = text;
     }
-    function openEditTermModal(pk, name, start, end, deadline, mtStart, mtEnd, etStart, etEnd, quizStart, quizEnd, gmQDays, gmMtDays, gmEtDays) {
-        var html = '<div class="settings-modal-overlay is-open" id="editTermOverlay">' +
-            '<div class="settings-modal">' +
-            '<div class="settings-modal-header"><h3>Edit Term</h3><button type="button" class="settings-modal-close" onclick="this.closest(\'.settings-modal-overlay\').remove()">&times;</button></div>' +
-            '<form method="post" action="?tab=academic_year" style="padding:0">' +
-            '<input type="hidden" name="csrfmiddlewaretoken" value="' + document.querySelector('input[name=csrfmiddlewaretoken]').value + '">' +
-            '<input type="hidden" name="action" value="edit_term">' +
-            '<input type="hidden" name="pk" value="' + pk + '">' +
-            '<div class="settings-modal-body">' +
-            '<div class="form-group" style="margin:0"><label class="form-label">Term Name</label><input type="text" name="term_name" value="' + name.replace(/"/g, '&quot;') + '" required class="hf-input"></div>' +
-            '<div class="form-group" style="margin:0"><label class="form-label">Start Date</label><input type="date" name="start_date" value="' + (start || '') + '" class="hf-input"></div>' +
-            '<div class="form-group" style="margin:0"><label class="form-label">End Date</label><input type="date" name="end_date" value="' + (end || '') + '" class="hf-input"></div>' +
-            '<div class="form-group" style="margin:0"><label class="form-label">Grading Deadline</label><input type="date" name="grading_deadline" value="' + (deadline || '') + '" class="hf-input"></div>' +
-            '<details style="margin-top:4px"><summary style="font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer">Quiz Dates (optional)</summary>' +
-            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">' +
-            '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Quiz Start</label><input type="date" name="quiz_start_date" value="' + (quizStart || '') + '" class="hf-input"></div>' +
-            '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Quiz End</label><input type="date" name="quiz_end_date" value="' + (quizEnd || '') + '" class="hf-input"></div>' +
-            '</div></details>' +
-            '<details style="margin-top:4px"><summary style="font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer">Exam Dates (optional)</summary>' +
-            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">' +
-            '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Mid-Term Start</label><input type="date" name="midterm_exam_start_date" value="' + (mtStart || '') + '" class="hf-input"></div>' +
-            '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Mid-Term End</label><input type="date" name="midterm_exam_end_date" value="' + (mtEnd || '') + '" class="hf-input"></div>' +
-            '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">End-Term Start</label><input type="date" name="endterm_exam_start_date" value="' + (etStart || '') + '" class="hf-input"></div>' +
-            '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">End-Term End</label><input type="date" name="endterm_exam_end_date" value="' + (etEnd || '') + '" class="hf-input"></div>' +
-            '</div></details>' +
-            '<details style="margin-top:4px"><summary style="font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer">Grade Marking Window (optional)</summary>' +
-            '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px;align-items:end">' +
-            '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Quiz Marking Days</label><input type="number" name="quiz_grade_marking_days" value="' + (gmQDays || 5) + '" min="1" max="60" class="hf-input"></div>' +
-            '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">Mid-Term Marking Days</label><input type="number" name="midterm_grade_marking_days" value="' + (gmMtDays || 10) + '" min="1" max="60" class="hf-input"></div>' +
-            '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">End-Term Marking Days</label><input type="number" name="endterm_grade_marking_days" value="' + (gmEtDays || 10) + '" min="1" max="60" class="hf-input"></div>' +
-            '</div><div style="font-size:11px;color:var(--text-muted);margin-top:4px">Working days (excl. weekends) after each exam end date. Marking deadline auto-calculated.</div></details>' +
-            '</div>' +
-            '<div class="settings-modal-footer"><button type="button" class="btn-secondary" onclick="this.closest(\'.settings-modal-overlay\').remove()">Cancel</button><button type="submit" class="btn-primary">Save Changes</button></div>' +
-            '</form></div></div>';
-        document.body.insertAdjacentHTML('beforeend', html);
+    function openClassModal(c) {
+        c = c || {};
+        var f = document.getElementById('classForm');
+        f.reset();
+        f.action.value = c.pk ? 'edit_class' : 'add_class';
+        f.pk.value = c.pk || '';
+        f.elements['name'].value = c.name || '';
+        f.department.value = c.dept || '';
+        f.max_capacity.value = c.cap || 25;
+        _setTitle('classModal', c.pk ? 'Edit ' + c.name : 'Add class');
+        document.getElementById('classSubmit').textContent = c.pk ? 'Save changes' : 'Add class';
+        HodariUI.open('classModal');
     }
-    function openEditMediaModal(area, ext, size, total, files, dup, active, w, h) {
-        document.getElementById('editMedia_area').value = area;
-        document.getElementById('editMedia_title').textContent = 'Edit ' + area.replace(/_/g, ' ').replace(/\b\w/g, function (l) { return l.toUpperCase(); });
-        document.getElementById('editMedia_ext').value = ext;
-        document.getElementById('editMedia_size').value = size;
-        document.getElementById('editMedia_total').value = total;
-        document.getElementById('editMedia_files').value = files;
-        document.getElementById('editMedia_dup').checked = dup;
-        document.getElementById('editMedia_active').checked = active;
-        openModal('editMediaModal');
+    function openEditMediaModal(area, label, ext, size, total, files, dup, active) {
+        var f = document.getElementById('mediaForm');
+        f.area.value = area;
+        f.allowed_extensions.value = ext;
+        f.max_file_size_mb.value = size;
+        f.max_total_size_mb.value = total;
+        f.max_files.value = files;
+        f.duplicate_check.checked = dup;
+        f.is_active.checked = active;
+        _setTitle('mediaDrawer', label);
+        HodariUI.open('mediaDrawer');
     }
-    function openEditChecklistModal(pk, name, desc, step, req, order) {
-        document.getElementById('editCL_pk').value = pk;
-        document.getElementById('editCL_name').value = name;
-        document.getElementById('editCL_desc').value = desc;
-        document.getElementById('editCL_step').value = step;
-        document.getElementById('editCL_req').checked = req;
-        document.getElementById('editCL_order').value = order;
-        openModal('editChecklistModal');
+    function openChecklistModal(i) {
+        i = i || {};
+        var f = document.getElementById('checklistForm');
+        f.reset();
+        f.action.value = i.pk ? 'edit_item' : 'add_item';
+        f.pk.value = i.pk || '';
+        f.step.value = i.step || '';
+        f.item_name.value = i.name || '';
+        f.description.value = i.desc || '';
+        f.is_required.checked = i.pk ? !!i.req : true;
+        f.order.value = i.order || 0;
+        _setTitle('checklistModal', i.pk ? 'Edit checklist item' : 'Add checklist item');
+        document.getElementById('checklistSubmit').textContent = i.pk ? 'Save changes' : 'Add item';
+        HodariUI.open('checklistModal');
     }
-    document.querySelectorAll('.settings-modal-overlay').forEach(function (el) {
-        el.addEventListener('click', function (e) { if (e.target === el) el.classList.remove('is-open'); });
-    });
-    document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') document.querySelectorAll('.settings-modal-overlay').forEach(function (el) { el.classList.remove('is-open'); });
-    });
 
-    function confirmDeleteModal(opts) {
-        var modal = document.createElement('div');
-        modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.45);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center';
-        modal.innerHTML = '<div style="background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.2);max-width:420px;width:92%;overflow:hidden;animation:modalSlideIn 0.25s cubic-bezier(0.16,1,0.3,1)">' +
-            '<div style="padding:20px 24px;border-bottom:1px solid #E5E7EB;display:flex;align-items:center;justify-content:space-between">' +
-            '<h3 style="margin:0;font-size:16px;font-weight:700">' + opts.title + '</h3>' +
-            '<button type="button" onclick="this.closest(\'.settings-modal-overlay,.confirm-modal\').remove()" style="border:none;background:none;font-size:22px;color:#8492A6;cursor:pointer">&times;</button></div>' +
-            '<div style="padding:20px 24px">' +
-            '<p style="margin:0 0 8px;font-size:13px;color:#374151">' + opts.body + '</p>' +
-            (opts.detail ? '<p style="margin:0;font-size:12px;color:#6B7280;font-style:italic">' + opts.detail + '</p>' : '') +
-            '</div>' +
-            '<div style="display:flex;justify-content:flex-end;gap:8px;padding:16px 24px;border-top:1px solid #E5E7EB">' +
-            '<button type="button" class="btn-secondary" onclick="this.closest(\'.settings-modal-overlay,.confirm-modal\').remove()">Cancel</button>' +
-            '<button type="button" class="btn-' + (opts.type === 'danger' ? 'danger' : 'primary') + '" id="confirmModalSubmit">' + opts.confirmText + '</button>' +
-            '</div></div>';
-        modal.className = 'confirm-modal';
-        document.body.appendChild(modal);
-        modal.addEventListener('click', function (e) { if (e.target === modal) modal.remove(); });
-        document.getElementById('confirmModalSubmit').addEventListener('click', function () {
-            var form = document.createElement('form');
-            form.method = 'POST';
-            form.action = opts.url || window.location.href;
-            var csrf = document.querySelector('input[name=csrfmiddlewaretoken]');
-            if (csrf) { var f = csrf.cloneNode(true); form.appendChild(f); }
-            (opts.extraData || []).forEach(function (d) {
-                var inp = document.createElement('input');
-                inp.type = 'hidden';
-                inp.name = d.name;
-                inp.value = d.value;
-                form.appendChild(inp);
-            });
-            document.body.appendChild(form);
-            form.submit();
-        });
-    }
+    // confirmDeleteModal(opts) comes from base.html (shared, text-safe confirmation dialog).
 </script>
 {% endblock %}

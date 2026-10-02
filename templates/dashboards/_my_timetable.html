@@ -1,0 +1,26 @@
+{% if my_timetable %}
+<div class="card" id="my-teaching-timetable" style="margin-bottom:16px; border-left:4px solid #023AA5">
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap">
+    <div class="card-title" style="margin:0">My teaching timetable &middot; {{ my_timetable.label }}{% if not my_timetable.is_today %} ({{ my_timetable.date|date:"D d M" }}){% endif %}</div>
+    <c-button variant="ghost" size="sm" data-hui-open="myWeekTimetable">Full week ({{ my_timetable.lessons_this_week }} lessons)</c-button>
+  </div>
+  {% for slot in my_timetable.slots %}
+    <div class="trow"{% if slot.state == "done" %} style="opacity:.55"{% endif %}>
+      <div>
+        <div class="trow-name">{{ slot.start_time|time:"H:i" }} &ndash; {{ slot.end_time|time:"H:i" }}</div>
+        <div class="trow-sub">{{ slot.subject_name }} &middot; {{ slot.class_name }}{% if slot.room %} &middot; {{ slot.room.name }}{% endif %}</div>
+      </div>
+      <span class="trow-right">
+        {% if slot.state == "now" %}<span class="chip chip-blue">Now</span>
+        {% elif slot.state == "next" %}<span class="chip chip-grey">Next</span>
+        {% elif slot.state == "done" %}<span class="chip chip-grey">Done</span>
+        {% else %}<span class="chip chip-grey">Later</span>{% endif %}
+      </span>
+    </div>
+  {% empty %}
+    <div style="padding:12px 0; font-size:13px; color:var(--text-muted)">No lessons scheduled this week.</div>
+  {% endfor %}
+</div>
+
+{% include "dashboards/_my_week_drawer.html" %}
+{% endif %}

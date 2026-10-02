@@ -20,6 +20,25 @@ from .forms import DisciplineIncidentForm, DisciplineReviewForm
 from .models import DisciplineIncident, IncidentSeverity, IncidentStatus
 
 
+
+
+def _primary_only_head(user):
+    """Heads Primary but no other section and is not school-wide."""
+    return (
+        not user.is_school_wide
+        and user.has_role(UserRole.PRIMARY_HOD)
+        and set(user.section_departments) <= {"PRIMARY"}
+    )
+
+
+def _heads_student_section(user, student):
+    """True if ``student``'s class is in a section ``user`` heads (or user is school-wide)."""
+    if user.is_school_wide:
+        return True
+    from core.scoping import hod_class_names
+    classes = hod_class_names(user)
+    return classes is None or student.class_name in classes
+
 class DisciplineSubmitView(DepartmentScopedMixin, RoleRequiredMixin, CreateView):
     """Teacher-facing form to submit a new discipline incident."""
     model = DisciplineIncident
@@ -222,8 +241,7 @@ class DisciplineListView(DepartmentScopedMixin, RoleRequiredMixin, ListView):
         }
 
         # FRD: Behaviour list filter — Primary + Secondary only (no ECD)
-        role = self.request.user.role
-        if role == UserRole.PRIMARY_HOD:
+        if _primary_only_head(self.request.user):
             ctx["available_classes"] = self._get_dept_classes(Department.PRIMARY)
         else:
             ctx["available_classes"] = self._get_non_ecd_classes()
@@ -283,8 +301,8 @@ class DisciplineReviewView(DepartmentScopedMixin, RoleRequiredMixin, View):
         # Department scoping: HODs can only review incidents from their department
         from users.models import UserRole
         incident = get_object_or_404(DisciplineIncident, pk=pk)
-        if request.user.role in (UserRole.PRIMARY_HOD, UserRole.ECD_HOD):
-            if not self._check_teacher_department(request.user, incident.student):
+        if request.user.has_role(UserRole.PRIMARY_HOD, UserRole.ECD_HOD):
+            if not _heads_student_section(request.user, incident.student):
                 from django.core.exceptions import PermissionDenied
                 raise PermissionDenied("You can only review incidents from your own department.")
         is_locked = incident.status in {IncidentStatus.RESOLVED, IncidentStatus.DISMISSED}
@@ -357,10 +375,8 @@ class DisciplineHODQueueView(DepartmentScopedMixin, RoleRequiredMixin, TemplateV
         ctx = super().get_context_data(**kwargs)
         ctx["discipline_tab"] = "queue"
 
-        role = self.request.user.role
-
         # FRD: Behaviour is Primary + Secondary only — exclude ECD
-        if role == UserRole.PRIMARY_HOD:
+        if _primary_only_head(self.request.user):
             classes = self._get_dept_classes(Department.PRIMARY)
         else:
             classes = self._get_non_ecd_classes()
@@ -404,8 +420,8 @@ class DisciplineParentConfirmView(DepartmentScopedMixin, RoleRequiredMixin, View
 
         # Department scoping: HODs can only confirm incidents from their department
         from users.models import UserRole
-        if request.user.role in (UserRole.PRIMARY_HOD, UserRole.ECD_HOD):
-            if not self._check_teacher_department(request.user, incident.student):
+        if request.user.has_role(UserRole.PRIMARY_HOD, UserRole.ECD_HOD):
+            if not _heads_student_section(request.user, incident.student):
                 from django.core.exceptions import PermissionDenied
                 raise PermissionDenied("You can only confirm incidents from your own department.")
 

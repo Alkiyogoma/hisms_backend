@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.generic import TemplateView
 from django.views import View
@@ -25,10 +26,11 @@ from attendance.services import (
     correct_attendance,
     mark_attendance,
 )
+from attendance.policy import AttendanceWindowError, check_can_modify, is_register_locked, is_super_admin, lock_hour
 from core.teacher_context import get_teacher_assigned_classes
 from django.http import HttpResponse
 from students.models import ParentGuardian, Student
-from users.models import UserRole
+from users.models import User, UserRole
 
 ATTENDANCE_MARK_ROLES = {
     UserRole.SUPER_ADMIN,
@@ -152,6 +154,9 @@ class AttendanceTodayView(RoleRequiredMixin, TemplateView):
         
         # Ensure d is always a date object
         if not isinstance(d, (date_type, timezone.datetime)):
+            d = timezone.localdate()
+        # Future dates are not selectable: fall back to today.
+        if d > timezone.localdate():
             d = timezone.localdate()
 
         # FR-TT-006: Auto-select class based on current timetable slot.
@@ -378,7 +383,14 @@ class AttendanceTodayView(RoleRequiredMixin, TemplateView):
         ctx["date"] = d
         today = timezone.localdate()
         now = timezone.localtime()
-        ctx["is_locked"] = (d < today) or (d == today and now.hour >= 18)
+        ctx["is_locked"] = is_register_locked(d)
+        ctx["is_future"] = d > today
+        ctx["is_super_admin"] = is_super_admin(self.request.user)
+        ctx["max_date"] = today
+        ctx["lock_hour"] = f"{lock_hour():02d}"
+        if ctx["is_super_admin"]:
+            from attendance.models import AttendanceCorrectionRequest
+            ctx["pending_correction_count"] = AttendanceCorrectionRequest.objects.filter(status="pending").count()
         ctx["class_name"] = class_name
         ctx["rows"] = rows
         ctx["statuses"] = AttendanceStatus.choices
@@ -416,16 +428,10 @@ class AttendanceMarkView(RoleRequiredMixin, TemplateView):
             return HttpResponse("Reason required for excused", status=400)
         student = Student.objects.get(pk=form.cleaned_data["student_id"])
         d = form.cleaned_data["date"]
-        today = tz.localdate()
-        now = tz.localtime()
-        if d < today:
-            return HttpResponse("Cannot mark attendance for past dates.", status=403)
-        if d == today and now.hour >= 18:
-            return HttpResponse("Today's attendance is locked after 18:00.", status=403)
         try:
             entry = mark_attendance(actor=request.user, student=student, date=d, status=status)
-        except PermissionDenied:
-            entry = AttendanceEntry.objects.filter(date=d, student=student).first()
+        except AttendanceWindowError as exc:
+            return HttpResponse(exc.message, status=403)
         if reason and entry:
             entry.reason = reason
             entry.save(update_fields=["reason"])
@@ -469,6 +475,8 @@ class AttendanceMarkView(RoleRequiredMixin, TemplateView):
             "statuses": AttendanceStatus.choices,
             "can_correct": request.user.has_perm("attendance.change_attendanceentry"),
             "can_mark": request.user.has_perm("attendance.change_attendanceentry"),
+            "is_locked": is_register_locked(d),
+            "is_super_admin": is_super_admin(request.user),
         }).content.decode('utf-8')
         wrapped = '<tr id="att-row-' + str(student.id) + '">' + rendered + '</tr>'
         resp = HttpResponse(wrapped)
@@ -494,7 +502,11 @@ class AttendanceMarkAllView(RoleRequiredMixin, View):
         except (ValueError, TypeError):
             d = None
         if d is None:
-            d = timezone.now().date()
+            d = timezone.localdate()
+        try:
+            check_can_modify(request.user, d)
+        except AttendanceWindowError as exc:
+            return JsonResponse({"success": False, "message": exc.message}, status=403)
         class_name = request.GET.get("class_name") or request.POST.get("class_name", "").strip()
         if not class_name:
             return JsonResponse({"success": False, "message": "Class is required"}, status=400)
@@ -544,17 +556,131 @@ class AttendanceCorrectionView(RoleRequiredMixin, TemplateView):
 
         entry = AttendanceEntry.objects.select_related("student").get(pk=form.cleaned_data["entry_id"])
         try:
-            correct_attendance(
+            result = correct_attendance(
                 actor=request.user,
                 entry=entry,
                 status=form.cleaned_data["status"],
                 reason=form.cleaned_data["reason"],
             )
-            messages.success(request, "Attendance corrected.")
+            if result.get("success"):
+                messages.success(request, "Attendance corrected.")
+            else:
+                messages.error(request, result.get("message", "Correction failed."))
         except ValidationError as e:
             messages.error(request, str(e))
 
         return redirect("attendance:today")
+
+
+class AttendanceCorrectionRequestCreateView(RoleRequiredMixin, View):
+    """Teachers (anyone who can view the register) ask the super admin to fix a locked record."""
+    login_url = "/accounts/login/"
+    required_permission = "attendance.view_attendanceentry"
+
+    def post(self, request, *args, **kwargs):
+        from django.http import HttpResponse
+        from attendance.models import AttendanceCorrectionRequest
+        form = AttendanceMarkForm(request.POST)
+        reason = (request.POST.get("reason") or "").strip()
+        if not form.is_valid() or not reason:
+            return HttpResponse("A status and a reason are required.", status=400)
+        d = form.cleaned_data["date"]
+        if d > timezone.localdate():
+            return HttpResponse("Attendance cannot be marked for a future date.", status=400)
+        if not is_register_locked(d):
+            return HttpResponse("The register is still open; mark it directly.", status=400)
+        student = get_object_or_404(Student, pk=form.cleaned_data["student_id"])
+        # One open request per learner and day: a second request replaces the first.
+        req, _ = AttendanceCorrectionRequest.objects.update_or_create(
+            student=student, date=d, status="pending",
+            defaults={"requested_status": form.cleaned_data["status"], "reason": reason,
+                      "requested_by": request.user},
+        )
+        try:
+            from communications.email_service import dispatch_notification
+            for admin in User.objects.filter(role=UserRole.SUPER_ADMIN, is_active=True):
+                dispatch_notification(
+                    user=admin,
+                    title="Attendance correction requested",
+                    message=(f"{request.user.get_full_name() or request.user.username} asked to change "
+                             f"{student.get_full_name()} on {d} to {req.get_requested_status_display()}: {reason}"),
+                    link=reverse("attendance:today") + "?corrections=1",
+                )
+        except Exception:
+            pass  # the request is saved; notification is best-effort
+        return JsonResponse({"success": True, "id": req.pk})
+
+
+class AttendanceCorrectionRequestListView(RoleRequiredMixin, TemplateView):
+    """Super admin inbox, shown as a drawer on the register: approve or reject
+    correction requests. Plain (non-htmx) visits land on the register with the
+    drawer open."""
+    template_name = "attendance/_correction_requests_drawer.html"
+    login_url = "/accounts/login/"
+    allowed_roles = [UserRole.SUPER_ADMIN]
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and not is_super_admin(request.user):
+            raise PermissionDenied()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request, *args, **kwargs):
+        if not request.headers.get("HX-Request"):
+            return redirect(reverse("attendance:today") + "?corrections=1")
+        return super().get(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        from attendance.models import AttendanceCorrectionRequest
+        ctx = super().get_context_data(**kwargs)
+        qs = AttendanceCorrectionRequest.objects.select_related("student", "requested_by", "resolved_by")
+        ctx["pending"] = qs.filter(status="pending")
+        ctx["resolved"] = qs.exclude(status="pending")[:50]
+        return ctx
+
+    def post(self, request, *args, **kwargs):
+        from attendance.models import AttendanceCorrectionRequest
+        req = get_object_or_404(AttendanceCorrectionRequest, pk=request.POST.get("request_id"), status="pending")
+        decision = request.POST.get("decision")
+        note = (request.POST.get("note") or "").strip()
+        if decision == "approve":
+            entry = AttendanceEntry.objects.filter(student=req.student, date=req.date).first()
+            if entry:
+                result = correct_attendance(actor=request.user, entry=entry,
+                                            status=req.requested_status, reason=req.reason)
+            else:
+                mark_attendance(actor=request.user, student=req.student, date=req.date, status=req.requested_status)
+                result = {"success": True}
+            if not result.get("success"):
+                return self._list(error=result.get("message", "Could not apply the correction."))
+            req.status = "approved"
+        elif decision == "reject":
+            req.status = "rejected"
+        else:
+            return self._list(error="Choose approve or reject.")
+        req.resolved_by = request.user
+        req.resolved_at = timezone.now()
+        req.resolution_note = note
+        req.save()
+        try:
+            from communications.email_service import dispatch_notification
+            dispatch_notification(
+                user=req.requested_by,
+                title=f"Attendance correction {req.status}",
+                message=(f"Your request to change {req.student.get_full_name()} on {req.date} to "
+                         f"{req.get_requested_status_display()} was {req.status}."
+                         + (f" Note: {note}" if note else "")),
+                link=reverse("attendance:today"),
+            )
+        except Exception:
+            pass
+        resp = self._list(notice=f"Request {req.status}.")
+        resp["HX-Trigger"] = "att-corrections-changed"
+        return resp
+
+    def _list(self, notice="", error=""):
+        ctx = self.get_context_data()
+        ctx.update(notice=notice, error=error)
+        return render(self.request, "attendance/_correction_requests_list.html", ctx)
 
 
 class ParentAttendanceView(RoleRequiredMixin, TemplateView):

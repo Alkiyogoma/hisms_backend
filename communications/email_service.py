@@ -31,8 +31,18 @@ def send_email_safe(to_email, subject, body, html_body=None, actor=None, action_
     except Exception:
         pass
 
+    # Subjects must be a single line (multi-line ones raise BadHeaderError).
+    subject = " ".join(str(subject or "").split())
+
     try:
-        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@hodarischool.com')
+        from core.email_backend import resolve_delivery
+        connection, from_email, delivery = resolve_delivery()
+        if not delivery["delivering"] and not settings.DEBUG:
+            # Don't report a printed-to-console message as "sent".
+            reason = delivery["detail"]
+            logger.error("Email to %s not sent: %s", to_email, reason)
+            _log_email_send(to_email, subject, False, reason, actor, action_type, ip)
+            return False
         send_mail(
             subject=subject,
             message=body,
@@ -40,6 +50,7 @@ def send_email_safe(to_email, subject, body, html_body=None, actor=None, action_
             recipient_list=[to_email],
             fail_silently=False,
             html_message=html_body,
+            connection=connection,
         )
         _log_email_send(to_email, subject, True, "", actor, action_type, ip)
         return True

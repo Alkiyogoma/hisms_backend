@@ -14,6 +14,7 @@ from celery import shared_task
 from django.core.management import call_command
 from django.utils import timezone
 from datetime import timedelta
+import calendar
 import io
 import logging
 
@@ -651,7 +652,7 @@ def send_target_enrollment_reminders_task():
             continue
 
         months_left = (target[0] - current_year) * 12 + (target[1] - current_month)
-        month_label = dict(Applicant._meta.get_field("target_enrollment_month").choices).get(app.target_enrollment_month, str(app.target_enrollment_month))
+        month_label = calendar.month_name[app.target_enrollment_month] if 1 <= app.target_enrollment_month <= 12 else str(app.target_enrollment_month)
 
         for ao in admin_officers:
             send_dynamic_email(

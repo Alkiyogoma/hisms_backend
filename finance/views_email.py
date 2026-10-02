@@ -16,6 +16,8 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views import View
 
+from core.models import SchoolSettings
+from core.models import SchoolSettings
 from core.permissions import RoleRequiredMixin
 from users.models import UserRole
 
@@ -139,6 +141,16 @@ class SendInvoiceEmailView(RoleRequiredMixin, View):
                 actor=request.user,
             )
 
+            if db_sent.disabled:
+                messages.warning(
+                    request,
+                    "The fee invoice email is switched off in Settings > Email Templates, so nothing was sent.",
+                )
+                return redirect("finance:invoice_detail", pk=pk)
+            if db_sent and not db_sent.sent:
+                messages.error(request, "The invoice email could not be delivered. Check Settings > Email & WhatsApp.")
+                return redirect("finance:invoice_detail", pk=pk)
+
             if not db_sent:
                 subject = f"Hodari Christian School — Invoice {invoice.invoice_number}"
                 body = (
@@ -159,11 +171,14 @@ class SendInvoiceEmailView(RoleRequiredMixin, View):
                     f"Thank you,\nHodari Christian School Finance Office"
                 )
 
+                from core.email_backend import resolve_delivery
+                _conn, _from, _ = resolve_delivery()
                 email = EmailMessage(
                     subject=subject,
                     body=body,
-                    from_email=from_email,
+                    from_email=_from or from_email,
                     to=[guardian.email],
+                    connection=_conn,
                 )
                 email.attach(filename, pdf_bytes, "application/pdf")
                 email.send(fail_silently=False)

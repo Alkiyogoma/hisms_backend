@@ -192,7 +192,14 @@ class DashboardRouterView(RoleRequiredMixin, TemplateView):
             UserRole.SUPER_ADMIN: SuperAdminDashboardView,
         }
         view_cls = role_to_view.get(role, SuperAdminDashboardView)
-        return view_cls.as_view()(request, *args, **kwargs)
+        response = view_cls.as_view()(request, *args, **kwargs)
+        # Anyone assigned classes to teach sees their own timetable at the top
+        # of the dashboard, whatever their administrative role. Teachers get
+        # the same data for the "full week" drawer on their own dashboard.
+        if hasattr(response, "context_data") and response.context_data is not None:
+            from core.teaching import get_my_timetable
+            response.context_data["my_timetable"] = get_my_timetable(request.user)
+        return response
 
 class SeedDatabaseView(RoleRequiredMixin, TemplateView):
     """One-click view to seed the database if it's empty."""
@@ -780,12 +787,9 @@ class PrimaryHODDashboardView(RoleRequiredMixin, TemplateView):
         term = get_current_term()
         
         # 2. Scope: Department classes based on HOD role
-        if user.role == UserRole.LOWER_SECONDARY_HOD:
-            dept_classes = GradeClass.objects.filter(department=Department.LOWER_SECONDARY).values_list('name', flat=True)
-        elif user.role == UserRole.ECD_HOD:
-            dept_classes = GradeClass.objects.filter(department=Department.ECD).values_list('name', flat=True)
-        else:
-            dept_classes = GradeClass.objects.filter(department=Department.PRIMARY).values_list('name', flat=True)
+        # Every section this HOD heads (e.g. Primary + Lower Secondary); Primary by default.
+        hod_depts = [d for d in user.section_departments if d != Department.ECD] or [Department.PRIMARY]
+        dept_classes = GradeClass.objects.filter(department__in=hod_depts).values_list('name', flat=True)
         
         # 3. Metrics
         plans_to_review = LessonPlan.objects.filter(class_name__in=dept_classes, status=LessonPlanStatus.SUBMITTED)
@@ -852,14 +856,9 @@ class PrimaryHODDashboardView(RoleRequiredMixin, TemplateView):
         from attendance.models import StaffAttendanceEntry
         from timetable.models import TimetableSlot
         from hr.models import StaffProfile
-        if user.role == UserRole.LOWER_SECONDARY_HOD:
-            dept_staff = User.objects.filter(
-                staff_profile__in=StaffProfile.objects.filter(department=Department.LOWER_SECONDARY)
-            )
-        else:
-            dept_staff = User.objects.filter(
-                staff_profile__in=StaffProfile.objects.filter(department=Department.PRIMARY)
-            )
+        dept_staff = User.objects.filter(
+            staff_profile__in=StaffProfile.objects.filter(department__in=hod_depts)
+        )
 
         today_weekday = today.strftime("%a").lower()[:3]
 
@@ -951,7 +950,7 @@ class PrimaryHODDashboardView(RoleRequiredMixin, TemplateView):
         # FR-ADM-018: Admission actions relevant to Primary HOD
         from admissions.services import get_critical_actions
         admission_actions = get_critical_actions()
-        dept_grade_names = set(GradeClass.objects.filter(department=Department.LOWER_SECONDARY if user.role == UserRole.LOWER_SECONDARY_HOD else Department.PRIMARY).values_list("name", flat=True))
+        dept_grade_names = set(GradeClass.objects.filter(department__in=hod_depts).values_list("name", flat=True))
         relevant_actions = []
         for a in admission_actions:
             app_obj = a.get("applicant")
@@ -1670,6 +1669,9 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
         else:
             form = SchoolSettingsSystemForm(instance=self._get_settings())
         ctx = {"active_tab": tab, "form": form, "is_admin_officer": self._is_admin_officer(request), "is_head_of_school": self._is_head_of_school(request), "is_hod": self._is_hod(request)}
+        if tab == "messaging":
+            from core.email_backend import resolve_delivery
+            ctx["email_delivery"] = resolve_delivery()[2]
         # Always load classes count for the tab badge
         if request.user.has_perm("academics.view_gradeclass"):
             from academics.models import GradeClass as _GC
@@ -1682,16 +1684,19 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
                 ctx["active_tab"] = tab
                 ctx["form"] = SchoolSettingsSystemForm(instance=self._get_settings())
             else:
+                from django.db.models import Case, IntegerField, Value, When
                 classes_qs = GradeClass.objects.all()
-                if self._is_hod(request):
-                    role_dept = {
-                        UserRole.PRIMARY_HOD: Department.PRIMARY,
-                        UserRole.ECD_HOD: Department.ECD,
-                        UserRole.LOWER_SECONDARY_HOD: Department.LOWER_SECONDARY,
-                    }.get(request.user.role)
-                    if role_dept:
-                        classes_qs = classes_qs.filter(department=role_dept)
-                ctx["classes"] = classes_qs.order_by("department", "name")
+                if self._is_hod(request) and request.user.section_departments:
+                    # every section the HOD heads (one person may head several)
+                    classes_qs = classes_qs.filter(department__in=request.user.section_departments)
+                # School order: ECD, Primary, Lower Secondary, then grade order
+                dept_order = Case(
+                    When(department=Department.ECD, then=Value(0)),
+                    When(department=Department.PRIMARY, then=Value(1)),
+                    When(department=Department.LOWER_SECONDARY, then=Value(2)),
+                    default=Value(3), output_field=IntegerField(),
+                )
+                ctx["classes"] = classes_qs.annotate(_dept_order=dept_order).order_by("_dept_order", "sort_order", "name")
                 ctx["departments"] = Department.choices
                 edit_pk = request.GET.get("edit")
                 if edit_pk:
@@ -1699,12 +1704,25 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
         if tab == "academic_year":
             from academics.models import AcademicYear, Term
             from django.utils import timezone
-            ctx["academic_years"] = AcademicYear.objects.prefetch_related("terms").order_by("-is_current", "-name")
-            ctx["is_super_admin"] = self._is_super_admin(request)
-            ctx["today_iso"] = timezone.now().date().isoformat()
-            current_year_obj = AcademicYear.objects.filter(is_current=True).first()
-            ctx["current_year_name"] = current_year_obj.name if current_year_obj else ""
+            from django.db.models import Prefetch
+            today = timezone.localdate()
             current = Term.get_current()
+            years = list(
+                AcademicYear.objects.prefetch_related(
+                    Prefetch("terms", queryset=Term.objects.order_by("start_date", "name"))
+                ).order_by("-is_current", "-name")
+            )
+            for ay in years:
+                ay.term_list = list(ay.terms.all())
+                ay.is_ended = bool(ay.end_date and ay.end_date < today)
+                for t in ay.term_list:
+                    t.is_ended = bool(t.end_date and t.end_date < today)
+                    t.is_current_term = bool(current and t.pk == current.pk)
+            ctx["academic_years"] = years
+            ctx["is_super_admin"] = self._is_super_admin(request)
+            ctx["today_iso"] = today.isoformat()
+            current_year_obj = next((y for y in years if y.is_current), None)
+            ctx["current_year_name"] = current_year_obj.name if current_year_obj else ""
             ctx["current_term"] = current
             if current and current.end_date:
                 ctx["days_remaining"] = max((current.end_date - timezone.now().date()).days, 0)
@@ -1761,7 +1779,29 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
                     })
                 except EmailTemplate.DoesNotExist:
                     return JsonResponse({"error": "not found"}, status=404)
-            ctx["email_templates"] = EmailTemplate.objects.all()
+            from communications.models import EmailSendLog
+            from core.email_backend import resolve_delivery
+            from django.db.models import Count, Max, Q
+            from datetime import timedelta as _td
+            from django.utils import timezone as _tz
+            since = _tz.now() - _td(days=30)
+            stats = {
+                row["action_type"]: row for row in EmailSendLog.objects.filter(created_at__gte=since)
+                .values("action_type")
+                .annotate(ok=Count("id", filter=Q(success=True)), bad=Count("id", filter=Q(success=False)),
+                          last=Max("created_at"))
+            }
+            last_errors = {}
+            for row in (EmailSendLog.objects.filter(success=False, created_at__gte=since)
+                        .order_by("action_type", "-id").values("action_type", "error_message")):
+                last_errors.setdefault(row["action_type"], row["error_message"])
+            templates = list(EmailTemplate.objects.all())
+            for t in templates:
+                st = stats.get(t.template_type.upper(), {})
+                t.sent_30d, t.failed_30d, t.last_sent_at = st.get("ok", 0), st.get("bad", 0), st.get("last")
+                t.last_error = last_errors.get(t.template_type.upper(), "")
+            ctx["email_templates"] = templates
+            ctx["email_delivery"] = resolve_delivery()[2]
             ctx["can_edit_email_templates"] = request.user.has_perm("core.change_emailtemplate")
         return render(request, self.template_name, ctx)
 
@@ -1967,18 +2007,29 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
 
         # Handle messaging tab (email & WhatsApp settings)
         if tab == "messaging":
+            if action == "send_test_email":
+                from communications.email_service import send_email_safe
+                from communications.models import EmailSendLog
+                to = (request.POST.get("test_to") or request.user.email or "").strip()
+                if not to:
+                    messages.error(request, "Enter an address to send the test email to.")
+                elif send_email_safe(
+                    to_email=to,
+                    subject=f"Test email from {self._get_settings().school_name or 'HISMS'}",
+                    body="This is a test email. If you can read it, email delivery is working.",
+                    actor=request.user, action_type="TEST_EMAIL",
+                ):
+                    messages.success(request, f"Test email sent to {to}. Check that inbox (and spam).")
+                else:
+                    last = EmailSendLog.objects.filter(recipient_email=to, action_type="TEST_EMAIL").order_by("-id").first()
+                    messages.error(request, f"Test email failed: {last.error_message if last else 'unknown error'}")
+                return redirect(f"{reverse_lazy('core:school_settings')}?tab=messaging")
+
             form = SchoolSettingsMessagingForm(request.POST, instance=self._get_settings())
             if form.is_valid():
-                settings_obj = form.save()
-                # Apply email settings to Django runtime so they take effect immediately
-                from django.conf import settings as django_settings
-                django_settings.EMAIL_BACKEND = settings_obj.email_backend
-                django_settings.EMAIL_HOST = settings_obj.email_host
-                django_settings.EMAIL_PORT = settings_obj.email_port
-                django_settings.EMAIL_USE_TLS = settings_obj.email_use_tls
-                django_settings.EMAIL_HOST_USER = settings_obj.email_host_user
-                django_settings.EMAIL_HOST_PASSWORD = settings_obj.email_host_password
-                django_settings.DEFAULT_FROM_EMAIL = settings_obj.default_from_email
+                form.save()
+                # Every send reads these settings from the database (core.email_backend.resolve_delivery),
+                # so they apply to all server processes at once; nothing to patch at runtime.
                 messages.success(request, "Email settings updated successfully.")
             else:
                 messages.error(request, "Please correct the errors below.")
@@ -2452,6 +2503,15 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
                 messages.error(request, "You do not have permission to modify email templates.")
                 return redirect(f"{reverse_lazy('core:school_settings')}?tab=email_templates")
 
+            if action == "toggle_email_template":
+                tpl = EmailTemplate.objects.filter(template_type=request.POST.get("template_type")).first()
+                if tpl:
+                    tpl.is_enabled = request.POST.get("is_enabled") == "on"
+                    tpl.save(update_fields=["is_enabled", "updated_at"])
+                    state = "on — it will be sent" if tpl.is_enabled else "off — it will not be sent"
+                    messages.success(request, f"'{tpl.name}' email is now {state}.")
+                return redirect(f"{reverse_lazy('core:school_settings')}?tab=email_templates")
+
             if action == "save_email_template":
                 tpl_type = request.POST.get("template_type")
                 if tpl_type:
@@ -2472,10 +2532,11 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
             if action == "reset_email_template":
                 tpl_type = request.POST.get("template_type")
                 if tpl_type:
-                    EmailTemplate.objects.filter(template_type=tpl_type).delete()
-                    from core.email_templates import seed_default_templates
-                    seed_default_templates()
-                    messages.success(request, "Template reset to defaults.")
+                    from core.email_templates import reset_template
+                    if reset_template(tpl_type):
+                        messages.success(request, "Template reset to the default wording. Its on/off setting is unchanged.")
+                    else:
+                        messages.error(request, "This template has no default to reset to.")
                 return redirect(f"{reverse_lazy('core:school_settings')}?tab=email_templates")
 
             return redirect(f"{reverse_lazy('core:school_settings')}?tab=email_templates")
@@ -2861,6 +2922,7 @@ class BulkImportConfirmView(RoleRequiredMixin, View):
         email = (user.email or "").strip()
         if email:
             from communications.email_service import send_email_safe
+            from django.conf import settings
             from django.template.loader import render_to_string
             from core.models import SchoolSettings
 

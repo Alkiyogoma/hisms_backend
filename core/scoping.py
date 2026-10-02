@@ -4,6 +4,18 @@ Shared department-scoping mixin for welfare and discipline modules.
 from users.models import UserRole
 
 
+def hod_class_names(user):
+    """Class names in every section the user heads (e.g. Grades 1-8 for a
+    Primary + Lower Secondary head). None when the user is school-wide
+    (HOS / Super Admin) or heads no section, meaning "do not narrow"."""
+    if user.is_school_wide or not user.section_departments:
+        return None
+    from academics.models import GradeClass
+    return list(
+        GradeClass.objects.filter(department__in=user.section_departments).values_list("name", flat=True)
+    )
+
+
 class DepartmentScopedMixin:
     """Mixin that provides department-scoping for welfare views.
 
@@ -28,11 +40,11 @@ class DepartmentScopedMixin:
             return Department.ECD
         # Fallback: infer from user role
         user = self.request.user
-        if user.role == UserRole.ECD_HOD:
+        if user.has_role(UserRole.ECD_HOD):
             return Department.ECD
-        if user.role == UserRole.PRIMARY_HOD:
+        if user.has_role(UserRole.PRIMARY_HOD):
             return Department.PRIMARY
-        if user.role == UserRole.LOWER_SECONDARY_HOD:
+        if user.has_role(UserRole.LOWER_SECONDARY_HOD):
             return Department.LOWER_SECONDARY
         # For teachers and other roles, infer from StaffProfile department
         if user.role == UserRole.TEACHER:

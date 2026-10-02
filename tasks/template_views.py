@@ -36,7 +36,7 @@ def _user_tasks_qs(user):
         # School leaders see everything
         return Task.objects.all()
 
-    if user.role in (UserRole.PRIMARY_HOD, UserRole.ECD_HOD):
+    if user.has_role(UserRole.PRIMARY_HOD, UserRole.ECD_HOD):
         from users.models import User as U
         dept = getattr(getattr(user, 'staff_profile', None), 'department', None)
         dept_users = U.objects.none()

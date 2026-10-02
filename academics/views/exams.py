@@ -68,7 +68,7 @@ class ExamScoreEntryView(RoleRequiredMixin, TemplateView):
         if not request.user.is_authenticated:
             return super().dispatch(request, *args, **kwargs)
         # GRD-001/002: Only teachers, HODs, HOS, and Super Admin can access exam scores
-        if request.user.role not in {UserRole.TEACHER, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN}:
+        if not request.user.has_role(UserRole.TEACHER, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN):
             raise PermissionDenied()
         if request.user.role == UserRole.TEACHER:
             # ECD teachers -> ECD evaluations
@@ -106,14 +106,10 @@ class ExamScoreEntryView(RoleRequiredMixin, TemplateView):
             students_qs = Student.objects.filter(is_archived=False, class_name=class_name)
             
             # FR-ACAD-011: HOD Scoping
-            if self.request.user.role == UserRole.PRIMARY_HOD:
-                from academics.models import GradeClass, Department
-                primary_classes = GradeClass.objects.filter(department=Department.PRIMARY).values_list('name', flat=True)
-                students_qs = students_qs.filter(class_name__in=primary_classes)
-            elif self.request.user.role == UserRole.ECD_HOD:
-                from academics.models import GradeClass, Department
-                ecd_classes = GradeClass.objects.filter(department=Department.ECD).values_list('name', flat=True)
-                students_qs = students_qs.filter(class_name__in=ecd_classes)
+            from core.scoping import hod_class_names
+            section_classes = hod_class_names(self.request.user)
+            if section_classes is not None:
+                students_qs = students_qs.filter(class_name__in=section_classes)
 
             # FR-ACAD-001: Teacher scoping on GET — restrict to assigned class+subject
             if self.request.user.role == UserRole.TEACHER:
@@ -146,7 +142,7 @@ class ExamScoreEntryView(RoleRequiredMixin, TemplateView):
         return ctx
 
     def post(self, request, *args, **kwargs):
-        if request.user.role not in {UserRole.TEACHER, UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD}:
+        if not request.user.has_role(UserRole.TEACHER, UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD):
             raise PermissionDenied()
         
         form = ExamScoreFilterForm(request.POST)
@@ -687,10 +683,10 @@ class CambridgeCheckpointEntryView(RoleRequiredMixin, TemplateView):
 
         # Available classes: Grades 6-9 only
         eligible_classes = ["Grade 6", "Grade 7", "Grade 8", "Grade 9"]
-        if user.role == UserRole.PRIMARY_HOD:
-            from academics.models import Department
-            primary_classes = GradeClass.objects.filter(department=Department.PRIMARY).values_list("name", flat=True)
-            eligible_classes = [c for c in eligible_classes if c in primary_classes]
+        from core.scoping import hod_class_names
+        section_classes = hod_class_names(user)
+        if section_classes is not None:
+            eligible_classes = [c for c in eligible_classes if c in section_classes]
         elif user.role == UserRole.TEACHER:
             assigned = get_teacher_assigned_classes(user)
             eligible_classes = [c for c in eligible_classes if c in assigned]

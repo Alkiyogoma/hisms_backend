@@ -98,6 +98,54 @@ class User(AbstractUser):
         setattr(self, cache_attr, perms)
         return perms
 
+    @property
+    def held_roles(self) -> frozenset:
+        """Every system role this user holds: the primary ``role`` plus any
+        system roles granted through ``extra_roles`` (e.g. someone who is both
+        Head of Primary and Head of Lower Secondary)."""
+        cached = getattr(self, "_held_roles_cache", None)
+        if cached is None:
+            roles = {self.role}
+            if self.pk:
+                roles.update(self.extra_roles.values_list("role", flat=True))
+            cached = self._held_roles_cache = frozenset(roles)
+        return cached
+
+    def has_role(self, *roles) -> bool:
+        """True if the user holds any of ``roles`` (primary or additional)."""
+        return not self.held_roles.isdisjoint(roles)
+
+    @property
+    def is_school_wide(self) -> bool:
+        """Super Admin / Head of School: not limited to one section."""
+        return self.is_superuser or self.has_role(UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL)
+
+    @property
+    def section_departments(self) -> list:
+        """Departments this user heads, across every section-head role they hold
+        (e.g. ["PRIMARY", "LOWER_SECONDARY"]). RoleConfig.departments, set in
+        Role Management, overrides each role's default. Empty for non-HODs."""
+        cached = getattr(self, "_section_departments_cache", None)
+        if cached is not None:
+            return cached
+        from users.role_models import RoleConfig
+        defaults = {
+            UserRole.PRIMARY_HOD: "PRIMARY",
+            UserRole.LOWER_SECONDARY_HOD: "LOWER_SECONDARY",
+            UserRole.ECD_HOD: "ECD",
+        }
+        held = [r for r in defaults if r in self.held_roles]
+        configured = dict(
+            RoleConfig.objects.filter(role__in=held, is_active=True).values_list("role", "departments")
+        ) if held else {}
+        depts = []
+        for role in held:
+            for d in (configured.get(role) or [defaults[role]]):
+                if d not in depts:
+                    depts.append(d)
+        self._section_departments_cache = depts
+        return depts
+
     def has_perm(self, perm, obj=None):
         """
         Permission check driven by the user's effective permission set

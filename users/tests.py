@@ -90,7 +90,7 @@ class IncorrectPasswordTests(TestCase):
     def test_incorrect_password_shows_correct_error(self):
         response = self.client.post(self.login_url, {"username": "wrongpw", "password": "WrongPassword!"})
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Email or password incorrect", response.content.decode())
+        self.assertIn("Incorrect password", response.content.decode())
 
     def test_incorrect_password_counts_the_attempt(self):
         self.assertEqual(self.user.failed_login_attempts, 0)
@@ -104,10 +104,10 @@ class IncorrectPasswordTests(TestCase):
         self.user.refresh_from_db()
         self.assertEqual(self.user.failed_login_attempts, 3)
 
-    def test_nonexistent_username_does_not_leak(self):
+    def test_nonexistent_username_says_not_found(self):
         response = self.client.post(self.login_url, {"username": "nonexistent_user_12345", "password": "SomePassword!"})
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Email or password incorrect", response.content.decode())
+        self.assertIn("No account was found", response.content.decode())
 
     def test_correct_password_authenticates(self):
         response = self.client.post(self.login_url, {"username": "wrongpw", "password": "CorrectPass123!"})
@@ -271,7 +271,7 @@ class LoginFlowIntegrationTests(TestCase):
 
 class EmailOrUsernameLoginTests(TestCase):
     """Staff can sign in with their username or their school email; the same
-    password works for both, and failures never reveal whether an account exists."""
+    password works for both, and failures say whether the account was not found or the password was wrong."""
 
     def setUp(self):
         self.user = _create_user("your.username", "CorrectPass123!")  # email your.username@hodari.edu
@@ -291,11 +291,13 @@ class EmailOrUsernameLoginTests(TestCase):
         self.user.refresh_from_db()
         self.assertEqual(self.user.failed_login_attempts, 1)
 
-    def test_unknown_account_and_wrong_password_look_the_same(self):
+    def test_unknown_account_and_wrong_password_are_distinguished(self):
         wrong_pw = self.client.post(self.login_url, {"username": "your.username@hodari.edu", "password": "nope"})
         unknown = self.client.post(self.login_url, {"username": "nobody@hodari.edu", "password": "nope"})
-        for resp in (wrong_pw, unknown):
-            self.assertContains(resp, "Email or password incorrect. You can sign in with your username")
+        self.assertContains(wrong_pw, "Incorrect password")
+        self.assertNotContains(wrong_pw, "No account was found")
+        self.assertContains(unknown, "No account was found")
+        self.assertNotContains(unknown, "Incorrect password")
 
     def test_login_field_label_matches_what_is_accepted(self):
         resp = self.client.get(self.login_url)

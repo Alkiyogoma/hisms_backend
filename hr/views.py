@@ -65,13 +65,10 @@ class StaffDetailView(RoleRequiredMixin, DetailView):
     required_permission = "hr.view_staffprofile"
 
     def _hod_department(self, user):
-        if user.role == UserRole.PRIMARY_HOD:
-            return "PRIMARY"
-        if user.role == UserRole.ECD_HOD:
-            return "ECD"
-        if user.role == UserRole.LOWER_SECONDARY_HOD:
-            return "LOWER_SECONDARY"
-        return None
+        """Departments the HOD heads (all of them), or None if not section-limited."""
+        if user.is_school_wide:
+            return None
+        return user.section_departments or None
 
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated and request.user.role == UserRole.TEACHER:
@@ -88,7 +85,7 @@ class StaffDetailView(RoleRequiredMixin, DetailView):
             from django.core.exceptions import PermissionDenied
             raise PermissionDenied("You can only view your own staff profile.")
         dept = self._hod_department(user)
-        if dept and obj.department != dept:
+        if dept and obj.department not in dept:
             from audit.models import log_event
             log_event(
                 actor=self.request.user,
