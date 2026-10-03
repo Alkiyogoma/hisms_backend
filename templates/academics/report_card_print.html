@@ -385,6 +385,7 @@
                         {% if report.overall_average %}{{ report.overall_average }}
                         {% elif computed_average %}{{ computed_average|floatformat:1 }}
                         {% endif %}
+                        {% if average_total_subjects %}<div style="font-size:9px; color:#64748B; font-weight:400">{{ average_included_subjects }} of {{ average_total_subjects }} subjects{% if not report_is_complete %} &middot; incomplete{% endif %}</div>{% endif %}
                     </td>
                     <td>
                         {% if report.overall_average %}

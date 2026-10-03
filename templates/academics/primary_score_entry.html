@@ -255,6 +255,7 @@
             <div id="total-avg-card" style="background:#1E293B; border-radius:12px; padding:12px 24px; text-align:center; color:#fff; min-width:140px">
                 <div style="font-size:10px; font-weight:700; color:#94A3B8; text-transform:uppercase; margin-bottom:2px">Grand Average</div>
                 <div id="grand-avg" style="font-size:24px; font-weight:800; font-family:'JetBrains Mono'">--%</div>
+                <div id="grand-avg-note" style="font-size:10px; color:#94A3B8; margin-top:2px">Approved scores only</div>
             </div>
         </div>
 
@@ -274,7 +275,7 @@
                             <span style="font-size:10px; font-weight:600; color:#94A3B8; background:#F1F5F9; padding:2px 6px; border-radius:4px">{{ et.weight_percentage|floatformat:0 }}%</span>
                         </div>
                         <input type="number" step="1" min="0" max="{{ et.max_score }}"
-                               data-subject="{{ sub }}" data-type="{{ et.code }}" data-weight="{{ et.weight_percentage }}" data-max_score="{{ et.max_score }}"
+                               data-subject="{{ sub }}" data-type="{{ et.code }}" data-type-name="{{ et.name }}" data-weight="{{ et.weight_percentage }}" data-max_score="{{ et.max_score }}"
                                class="score-field score-input-val" placeholder="0" oninput="calcSubjectAverage('{{ sub|slugify }}')" onblur="validatePrimaryScore(this)"
                                {% if editable_subjects and sub not in editable_subjects or et.code not in open_exam_codes %}readonly style="background:#F1F5F9;color:#94A3B8;cursor:not-allowed"{% endif %}>
                         {% if et.code not in open_exam_codes %}
@@ -312,6 +313,7 @@ const CAN_SUBMIT_HOD = {{ can_submit_hod|yesno:"true,false" }};
 
 let students = [];
 let current = null;
+let currentProgress = null;
 
 async function init() {
   const r = await fetch(API + "students/?class_name=" + encodeURIComponent(CLASS_NAME) + "&term=" + TERM_ID);
@@ -329,7 +331,8 @@ function renderList() {
     let statusText, statusClass;
     if (s.score_status === 'returned') { statusText = 'Returned'; statusClass = 'status-returned'; }
     else if (s.score_status === 'approved') { statusText = 'Approved'; statusClass = 'status-approved'; }
-    else if (s.report_card_status && s.report_card_status !== 'draft') { statusText = 'Submitted'; statusClass = 'status-saved'; }
+    else if (s.score_status === 'submitted') { statusText = 'Submitted'; statusClass = 'status-saved'; }
+    else if (s.score_status === 'partial') { statusText = s.approved_subjects + '/' + s.total_subjects + ' approved'; statusClass = 'status-saved'; }
     else if (s.has_scores) { statusText = 'Saved'; statusClass = 'status-saved'; }
     else { statusText = 'Pending'; statusClass = 'status-pending'; }
     return `
@@ -373,7 +376,6 @@ async function loadStudent(id) {
   const r = await fetch(API + "scores/" + id + "/?term=" + TERM_ID);
   const d = await r.json();
   
-  const isGlobalLocked = d.report_card_status && d.report_card_status !== 'draft';
   
   if (d.scores) {
       let hasReturned = false, hasApproved = false, allApproved = true, hasAny = false;
@@ -418,23 +420,8 @@ async function loadStudent(id) {
            });
        });
 
-       const chip = document.getElementById("st-" + id);
-       if(chip) {
-           if (hasReturned) {
-               chip.textContent = "Returned";
-               chip.className = "status-chip status-returned";
-           } else if (hasApproved && allApproved) {
-               chip.textContent = "Approved";
-               chip.className = "status-chip status-approved";
-           } else if (isGlobalLocked) {
-               chip.textContent = "Submitted";
-               chip.className = "status-chip status-saved";
-           } else if(hasAny) {
-              chip.textContent = "Saved";
-              chip.className = "status-chip status-saved";
-              current.has_scores = true;
-          }
-      }
+       if (hasAny) current.has_scores = true;
+       applyProgress(id, d.progress);
   }
 
   // Lock approved scores and closed-window scores
@@ -445,6 +432,7 @@ async function loadStudent(id) {
       if (CLOSED_EXAM_CODES.indexOf(inp.dataset.type) !== -1 && !inp.hasAttribute("data-returned")) inp.readOnly = true;
   });
   
+  currentProgress = d.progress || null;
   calcGrandAverage();
   updateProgress();
 }
@@ -453,7 +441,6 @@ async function reloadScores() {
   if (!current) return;
   const r = await fetch(API + "scores/" + current.id + "/?term=" + TERM_ID);
   const d = await r.json();
-  const isGlobalLocked = d.report_card_status && d.report_card_status !== 'draft';
   if (d.scores) {
       let hasReturned = false, hasApproved = false, allApproved = true, hasAny = false;
       Object.keys(d.scores).forEach(subject => {
@@ -490,15 +477,24 @@ async function reloadScores() {
               }
           });
       });
-      const chip = document.getElementById("st-" + current.id);
-      if(chip) {
-          if (hasReturned) { chip.textContent = "Returned"; chip.className = "status-chip status-returned"; }
-          else if (hasApproved && allApproved) { chip.textContent = "Approved"; chip.className = "status-chip status-approved"; }
-          else if (isGlobalLocked) { chip.textContent = "Submitted"; chip.className = "status-chip status-saved"; }
-          else if (hasAny) { chip.textContent = "Saved"; chip.className = "status-chip status-saved"; }
-      }
+      applyProgress(current.id, d.progress);
   }
+  currentProgress = d.progress || null;
   calcGrandAverage();
+}
+
+/* Learner status comes from per-subject approval: "Approved" only when every
+   subject is approved; otherwise show how many subjects are approved. */
+function applyProgress(id, p) {
+  const chip = document.getElementById("st-" + id);
+  const s = students.find(x => x.id === id);
+  if (!chip || !p) return;
+  if (s) { s.score_status = p.status; s.approved_subjects = p.approved_subjects; s.total_subjects = p.total_subjects; }
+  if (p.status === 'returned') { chip.textContent = "Returned"; chip.className = "status-chip status-returned"; }
+  else if (p.status === 'approved') { chip.textContent = "Approved"; chip.className = "status-chip status-approved"; }
+  else if (p.status === 'submitted') { chip.textContent = "Submitted"; chip.className = "status-chip status-saved"; }
+  else if (p.status === 'partial') { chip.textContent = p.approved_subjects + "/" + p.total_subjects + " approved"; chip.className = "status-chip status-saved"; }
+  else if (p.status === 'draft') { chip.textContent = "Saved"; chip.className = "status-chip status-saved"; }
 }
 
 function calcSubjectAverage(slug) {
@@ -565,38 +561,59 @@ function calcGrandAverage() {
         }
     });
 
+    // Grand average: HOD-approved scores only, with how many subjects it covers.
     const grandDisplay = document.getElementById("grand-avg");
-    if(subjectCount > 0) {
-        const grandAvg = (totalWeightedSum / subjectCount).toFixed(1);
+    const grandNote = document.getElementById("grand-avg-note");
+    const p = currentProgress;
+    if (p && p.grand_average !== null && p.grand_average !== undefined) {
+        const grandAvg = Number(p.grand_average).toFixed(1);
         grandDisplay.textContent = grandAvg + "%";
         grandDisplay.style.color = grandAvg >= 50 ? "#10B981" : "#EF4444";
     } else {
         grandDisplay.textContent = "--%";
         grandDisplay.style.color = "#94A3B8";
     }
+    if (grandNote) {
+        if (p && p.total_subjects) {
+            grandNote.textContent = (p.included_subjects || 0) + " of " + p.total_subjects + " subjects approved"
+                + (p.is_complete ? "" : " · incomplete");
+        } else {
+            grandNote.textContent = "Approved scores only";
+        }
+    }
+}
+
+function scoreCellLabel(inp) {
+    return inp.getAttribute("data-subject") + " – " + (inp.getAttribute("data-type-name") || inp.getAttribute("data-type"));
+}
+function markScoreCell(inp, msg) {
+    inp.style.borderColor = "#EF4444";
+    inp.title = msg;
+    inp.setAttribute("aria-invalid", "true");
+}
+function focusScoreCell(inp) {
+    inp.scrollIntoView({behavior: "smooth", block: "center"});
+    try { inp.focus({preventScroll: true}); } catch (e) { inp.focus(); }
 }
 
 async function saveAllScores() {
     if(!current) return;
     const scores = {};
-    let hasInvalid = false;
+    const invalidCells = [];
     
     document.querySelectorAll(".score-input-val").forEach(inp => {
+        inp.style.borderColor = "#E2E8F0";
+        inp.title = "";
+        inp.removeAttribute("aria-invalid");
         if(inp.value === "") return;
-        const raw = inp.value;
+        const raw = inp.value.trim();
         const maxScore = parseInt(inp.getAttribute("data-max_score") || "100", 10);
-        /* Reject decimals */
-        if (raw.indexOf('.') !== -1) {
-            hasInvalid = true;
-            inp.style.borderColor = "#EF4444";
-            inp.title = "Score must be a whole number (integer) between 0 and " + maxScore + ".";
-            return;
-        }
         const val = parseInt(raw, 10);
-        if (isNaN(val) || val < 0 || val > maxScore || String(val) !== raw) {
-            hasInvalid = true;
-            inp.style.borderColor = "#EF4444";
-            inp.title = "Score must be a whole number (integer) between 0 and " + maxScore + ".";
+        /* Whole numbers only, within the configured range */
+        if (raw.indexOf('.') !== -1 || isNaN(val) || val < 0 || val > maxScore || String(val) !== raw) {
+            const msg = scoreCellLabel(inp) + ": must be a whole number from 0 to " + maxScore + ".";
+            markScoreCell(inp, msg);
+            invalidCells.push({inp: inp, msg: msg});
             return;
         }
         const sub = inp.getAttribute("data-subject");
@@ -605,22 +622,41 @@ async function saveAllScores() {
         scores[sub][type] = inp.value;
     });
 
-    if(hasInvalid) {
-        showToast("Please correct invalid scores (must be within configured range)", "error");
+    if(invalidCells.length) {
+        showToast("Nothing was saved. " + invalidCells.map(c => c.msg).join(" "), "error");
+        focusScoreCell(invalidCells[0].inp);
         return;
     }
-    if(Object.keys(scores).length === 0) return;
+    if(Object.keys(scores).length === 0) {
+        showToast("There are no scores to save for this learner yet.", "warning");
+        return;
+    }
 
-    const r = await fetch(API + "scores/" + current.id + "/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-CSRFToken": CSRF },
-        body: JSON.stringify({ term: TERM_ID, scores: scores })
-    });
-    
-    const resp = await r.json();
+    let r, resp;
+    try {
+        r = await fetch(API + "scores/" + current.id + "/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": CSRF },
+            body: JSON.stringify({ term: TERM_ID, scores: scores })
+        });
+    } catch (e) {
+        showToast("Scores were not saved: the server could not be reached. Check your connection and try again.", "error");
+        return;
+    }
+    resp = await r.json().catch(() => null);
+    if(!resp) {
+        showToast("Scores were not saved: the server returned an unexpected error (" + r.status + "). Please try again.", "error");
+        return;
+    }
     
     if(!r.ok) {
-        showToast(resp.error || "Failed to save scores", "error");
+        let first = null;
+        (resp.invalid || []).forEach(c => {
+            const inp = document.querySelector(`input.score-input-val[data-subject="${CSS.escape(c.subject)}"][data-type="${CSS.escape(c.type)}"]`);
+            if (inp) { markScoreCell(inp, c.message); first = first || inp; }
+        });
+        showToast(resp.error || ("Scores were not saved (error " + r.status + ")."), "error");
+        if (first) focusScoreCell(first);
         return;
     }
 
@@ -631,6 +667,8 @@ async function saveAllScores() {
 
     if(resp.window_warnings && resp.window_warnings.length > 0) {
         showToast("Saved with warnings: " + resp.window_warnings.join("; "), "warning");
+    } else if(resp.locked && resp.locked.length > 0) {
+        showToast("Saved. Already submitted and locked: " + resp.locked.join(", "), "warning");
     } else {
         showToast("Student assessment saved", "success");
     }

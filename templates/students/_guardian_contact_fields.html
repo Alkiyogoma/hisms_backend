@@ -1,0 +1,42 @@
+{# Guardian contact fields shared by the guardian add/edit page and the link page. #}
+{# Context: values (dict of submitted or stored values), errors (dict field -> message). #}
+<div class="form-grid">
+  <div class="form-group">
+    <label class="form-label" for="id_full_name"{% if errors.full_name %} style="color:#DC2626"{% endif %}>Full Name*</label>
+    <input type="text" name="full_name" id="id_full_name" class="form-input" maxlength="150" placeholder="e.g. Mary Jane" value="{{ values.full_name|default:'' }}"{% if errors.full_name %} aria-invalid="true" aria-describedby="id_full_name_error" style="border-color:#DC2626"{% endif %}{% if required_fields %} required{% endif %}>
+    {% if errors.full_name %}<p class="hf2-error" id="id_full_name_error">{{ errors.full_name }}</p>{% endif %}
+  </div>
+  <div class="form-group">
+    <label class="form-label" for="id_phone"{% if errors.phone %} style="color:#DC2626"{% endif %}>Primary Phone*</label>
+    <input type="tel" name="phone" id="id_phone" class="form-input" maxlength="32" placeholder="e.g. +255 767 000 000" value="{{ values.phone|default:'' }}"{% if errors.phone %} aria-invalid="true" aria-describedby="id_phone_error" style="border-color:#DC2626"{% endif %}{% if required_fields %} required{% endif %}>
+    {% if errors.phone %}<p class="hf2-error" id="id_phone_error">{{ errors.phone }}</p>{% endif %}
+  </div>
+  <div class="form-group">
+    <label class="form-label" for="id_secondary_phone"{% if errors.secondary_phone %} style="color:#DC2626"{% endif %}>Secondary Phone</label>
+    <input type="tel" name="secondary_phone" id="id_secondary_phone" class="form-input" maxlength="32" placeholder="e.g. +255 743 000 000" value="{{ values.secondary_phone|default:'' }}"{% if errors.secondary_phone %} aria-invalid="true" aria-describedby="id_secondary_phone_error" style="border-color:#DC2626"{% endif %}>
+    {% if errors.secondary_phone %}<p class="hf2-error" id="id_secondary_phone_error">{{ errors.secondary_phone }}</p>{% endif %}
+  </div>
+  <div class="form-group">
+    <label class="form-label" for="id_email"{% if errors.email %} style="color:#DC2626"{% endif %}>Email Address</label>
+    <input type="email" name="email" id="id_email" class="form-input" maxlength="254" placeholder="e.g. parent@example.com" value="{{ values.email|default:'' }}"{% if errors.email %} aria-invalid="true" aria-describedby="id_email_error" style="border-color:#DC2626"{% endif %}>
+    {% if errors.email %}<p class="hf2-error" id="id_email_error">{{ errors.email }}</p>{% endif %}
+  </div>
+  <div class="form-group">
+    <label class="form-label" for="id_preferred_invoice_name"{% if errors.preferred_invoice_name %} style="color:#DC2626"{% endif %}>Preferred Invoice Name</label>
+    <input type="text" name="preferred_invoice_name" id="id_preferred_invoice_name" class="form-input" maxlength="150" placeholder="e.g. The Jane Family" value="{{ values.preferred_invoice_name|default:'' }}"{% if errors.preferred_invoice_name %} aria-invalid="true" aria-describedby="id_preferred_invoice_name_error" style="border-color:#DC2626"{% endif %}>
+    {% if errors.preferred_invoice_name %}<p class="hf2-error" id="id_preferred_invoice_name_error">{{ errors.preferred_invoice_name }}</p>{% else %}<p class="form-help">Name to appear on all school invoices.</p>{% endif %}
+  </div>
+  <div class="form-group">
+    <label class="form-label" for="id_preferred_language">Preferred Language</label>
+    <select name="preferred_language" id="id_preferred_language" class="form-select">
+      <option value="en"{% if values.preferred_language != "sw" %} selected{% endif %}>English</option>
+      <option value="sw"{% if values.preferred_language == "sw" %} selected{% endif %}>Swahili</option>
+    </select>
+    <p class="form-help">Used for SMS and email notifications.</p>
+  </div>
+</div>
+<div class="form-group" style="margin-top:16px">
+  <label class="form-label" for="id_address"{% if errors.address %} style="color:#DC2626"{% endif %}>Physical Address</label>
+  <textarea name="address" id="id_address" class="form-input" rows="2" maxlength="255" placeholder="Street, Area, City..."{% if errors.address %} aria-invalid="true" aria-describedby="id_address_error" style="border-color:#DC2626"{% endif %}>{{ values.address|default:'' }}</textarea>
+  {% if errors.address %}<p class="hf2-error" id="id_address_error">{{ errors.address }}</p>{% endif %}
+</div>

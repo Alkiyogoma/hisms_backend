@@ -33,6 +33,10 @@ app.autodiscover_tasks()
 
 # Celery Beat schedule for periodic tasks
 app.conf.beat_schedule = {
+    'process-pending-sms': {
+        'task': 'attendance.tasks.process_pending_sms',
+        'schedule': crontab(minute='*/2'),  # safety sweep; SMS normally send instantly
+    },
     'retry-failed-notifications': {
         'task': 'attendance.tasks.retry_failed_notifications',
         'schedule': crontab(minute='*/5'),  # Every 5 minutes

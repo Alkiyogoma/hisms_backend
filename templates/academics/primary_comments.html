@@ -485,8 +485,10 @@ function autoSave(reportId, comment) {
             'X-Requested-With': 'XMLHttpRequest'
         },
         body: JSON.stringify({ report_id: reportId, comment: comment })
-    }).then(function(r) { return r.json(); }).then(function(d) {
+    }).then(function(r) { return r.json().catch(function() { return {error: 'Not saved: the server returned an unexpected error (' + r.status + '). Your text is still here — try again.'}; }); }).then(function(d) {
         if (d.ok) {
+            ind.style.color = '';
+            ind.title = '';
             ind.className = 'save-indicator visible';
             ind.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Saved';
             setTimeout(function() { ind.classList.remove('visible'); }, 2000);
@@ -494,12 +496,13 @@ function autoSave(reportId, comment) {
         } else {
             ind.className = 'save-indicator visible';
             ind.style.color = '#DC2626';
-            ind.innerHTML = 'Save failed';
+            ind.textContent = d.error || 'Not saved — try again';
+            ind.title = d.error || '';
         }
     }).catch(function() {
         ind.className = 'save-indicator visible';
         ind.style.color = '#DC2626';
-        ind.innerHTML = 'Network error';
+        ind.textContent = 'Not saved: the server could not be reached. Check your connection.';
     });
 }
 
@@ -522,20 +525,23 @@ function onTraitChange(reportId) {
                 'X-Requested-With': 'XMLHttpRequest'
             },
             body: JSON.stringify({ report_id: reportId, traits: allTraits })
-        }).then(function(r) { return r.json(); }).then(function(d) {
+        }).then(function(r) { return r.json().catch(function() { return {error: 'Not saved: the server returned an unexpected error (' + r.status + '). Your text is still here — try again.'}; }); }).then(function(d) {
             if (d.ok) {
+                ind.style.color = '';
+                ind.title = '';
                 ind.className = 'save-indicator visible';
                 ind.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Saved';
                 setTimeout(function() { ind.classList.remove('visible'); }, 2000);
             } else {
                 ind.className = 'save-indicator visible';
                 ind.style.color = '#DC2626';
-                ind.innerHTML = 'Save failed';
+                ind.textContent = d.error || 'Not saved — try again';
+                ind.title = d.error || '';
             }
         }).catch(function() {
             ind.className = 'save-indicator visible';
             ind.style.color = '#DC2626';
-            ind.innerHTML = 'Network error';
+            ind.textContent = 'Not saved: the server could not be reached. Check your connection.';
         });
     }, 800);
 }

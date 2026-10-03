@@ -63,7 +63,7 @@
   </div>
   {% endif %}
 
-  <div id="assessment-form-container" style="{% if applicant.assessment %}display:none{% endif %}">
+  <div id="assessment-form-container" style="{% if applicant.assessment and not form.errors %}display:none{% endif %}">
   <form
     id="assessment-form"
     method="post"
@@ -74,6 +74,10 @@
     hx-swap="outerHTML"
   >
     {% csrf_token %}
+    {% include "_partials/form_error_summary.html" with form=form %}
+    {% for message in messages %}
+      <div class="msg-toast {% if message.tags == 'error' %}msg-error{% else %}msg-success{% endif %}" style="margin-bottom:12px">{{ message }}</div>
+    {% endfor %}
     <div class="hf2-grid-2">
       {% field form.scheduled_date %}
       {% field form.scheduled_time %}
@@ -105,35 +109,40 @@
 </style>
 
 <script>
+function _mountAssessmentForm(html) {
+  var body = document.getElementById('assessmentModalBody');
+  var tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  var form = tmp.querySelector('form');
+  if (!form) {
+    body.innerHTML = '<p style="color:#64748B;font-size:13px">No form available.</p>';
+    return null;
+  }
+  form.removeAttribute('hx-post');
+  form.removeAttribute('hx-target');
+  form.removeAttribute('hx-swap');
+  form.removeAttribute('id');
+  form.style.display = 'flex';
+  form.style.flexDirection = 'column';
+  form.style.gap = '12px';
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    submitAssessmentModal();
+  });
+  body.innerHTML = '';
+  body.appendChild(form);
+  return form;
+}
 function openAssessmentModal() {
   var modal = document.getElementById('assessmentModal');
   var body = document.getElementById('assessmentModalBody');
   body.innerHTML = '<div style="text-align:center;padding:24px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#023AA5" stroke-width="2" style="animation:btn-spin 1s linear infinite"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg><p style="margin:8px 0 0;color:#64748B;font-size:13px">Loading form...</p></div>';
   modal.style.display = 'flex';
-  var url = '{% url "admissions:assessment" applicant.id %}';
-  fetch(url, {headers:{'HX-Request':'true'}})
+  fetch('{% url "admissions:assessment" applicant.id %}', {headers:{'HX-Request':'true'}})
     .then(function(r){return r.text()})
-    .then(function(html){
-      var tmp = document.createElement('div');
-      tmp.innerHTML = html;
-      var form = tmp.querySelector('form');
-      if (form) {
-        form.removeAttribute('hx-post');
-        form.removeAttribute('hx-target');
-        form.removeAttribute('hx-swap');
-        form.removeAttribute('id');
-        form.style.display = 'flex';
-        form.style.flexDirection = 'column';
-        form.style.gap = '12px';
-        form.addEventListener('submit', function(e) {
-          e.preventDefault();
-          submitAssessmentModal();
-        });
-        body.innerHTML = '';
-        body.appendChild(form);
-      } else {
-        body.innerHTML = '<p style="color:#64748B;font-size:13px">No form available.</p>';
-      }
+    .then(_mountAssessmentForm)
+    .catch(function(){
+      body.innerHTML = '<p style="color:#DC2626;font-size:13px">The form could not be loaded. Check your connection and try again.</p>';
     });
 }
 function closeAssessmentModal() {
@@ -155,22 +164,41 @@ function _doAssessmentSubmit(form) {
   var fd = new FormData(form);
   var csrf = document.querySelector('input[name=csrfmiddlewaretoken]');
   if (csrf && !fd.has('csrfmiddlewaretoken')) fd.append('csrfmiddlewaretoken', csrf.value);
+  var cm = document.getElementById('assessmentRescheduleConfirmModal');
   fetch(form.action, {method:'POST',body:fd,headers:{'HX-Request':'true'}})
     .then(function(resp){
-      if (!resp.ok) throw new Error('Save failed');
-      return fetch('{% url "admissions:assessment" applicant.id %}', {headers:{'HX-Request':'true'}});
+      return resp.text().then(function(html){ return {ok: resp.ok, status: resp.status, html: html}; });
     })
-    .then(function(r){return r.text()})
-    .then(function(html){
-      closeAssessmentModal();
-      var cm = document.getElementById('assessmentRescheduleConfirmModal');
-      if (cm) cm.style.display = 'none';
+    .then(function(res){
       _pendingAssessmentSubmit = false;
+      if (cm) cm.style.display = 'none';
+      // A failed save comes back as the form with its errors (status 200 for HTMX):
+      // keep the modal open with the user's entries and the reasons shown.
+      var failed = !res.ok || res.html.indexOf('form-error-summary') !== -1 || res.html.indexOf('msg-error') !== -1;
+      if (failed) {
+        var mounted = res.ok ? _mountAssessmentForm(res.html) : null;
+        if (!mounted) {
+          var body = document.getElementById('assessmentModalBody');
+          var note = document.createElement('div');
+          note.className = 'msg-toast msg-error';
+          note.style.marginBottom = '12px';
+          note.textContent = 'The assessment was not saved: the server returned an error (' + res.status + '). Please try again.';
+          body.insertBefore(note, body.firstChild);
+        }
+        return;
+      }
+      closeAssessmentModal();
       location.reload();
     })
     .catch(function(){
       _pendingAssessmentSubmit = false;
-      alert('Failed to save assessment. Please try again.');
+      if (cm) cm.style.display = 'none';
+      var body = document.getElementById('assessmentModalBody');
+      var note = document.createElement('div');
+      note.className = 'msg-toast msg-error';
+      note.style.marginBottom = '12px';
+      note.textContent = 'The assessment was not saved: the server could not be reached. Your entries are still here — try again.';
+      body.insertBefore(note, body.firstChild);
     });
 }
 function closeRescheduleConfirm() {

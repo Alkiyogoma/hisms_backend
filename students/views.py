@@ -7,6 +7,8 @@ import json
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.db.models import Q, Count
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
@@ -20,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 from attendance.models import PRESENT_STATUSES
 from .models import GuardianRelationship, ParentGuardian, Student, StudentGuardian, StudentStatus, PDPAConsentLog
-from .forms import StudentCreateForm, StudentPhotoUploadForm
+from .forms import StudentCreateForm, StudentEditForm, StudentPhotoUploadForm
 from .services import generate_admission_number
 
 # HOD academic scope derived from role (more reliable than staff_profile.department,
@@ -647,7 +649,7 @@ class StudentEditView(RoleRequiredMixin, TemplateView):
         ctx["student"] = student
         ctx["form_title"] = "Edit Student"
         ctx["today_date"] = date.today().strftime("%d %B %Y")
-        ctx["form"] = kwargs.get("form", StudentCreateForm(instance=student))
+        ctx["form"] = kwargs.get("form") or StudentEditForm(instance=student)
 
         # Linked guardians
         ctx["linked_guardians"] = StudentGuardian.objects.filter(
@@ -789,18 +791,31 @@ class StudentEditView(RoleRequiredMixin, TemplateView):
                 messages.success(request, f"Document '{doc_title}' deleted.")
             return redirect("students:edit", pk=pk)
 
-        form = StudentCreateForm(request.POST, instance=student)
+        # Snapshot first: validation writes the submitted values onto the instance.
+        original = {
+            f: getattr(student, f) for f in [*StudentEditForm._meta.fields, "class_name"]
+        }
+        form = StudentEditForm(request.POST, instance=student)
         if form.is_valid():
             # FR-AUD-001: Capture all changed fields with before/after values
             changed_fields = [f for f in form.changed_data if f != "photo"]
             before = {}
             for f in changed_fields:
-                val = getattr(student, f)
+                val = original.get(f)
                 if hasattr(val, "isoformat"):
                     val = val.isoformat()
                 before[f] = val
 
-            student = form.save()
+            try:
+                with transaction.atomic():
+                    student = form.save()
+            except (ValidationError, IntegrityError) as exc:
+                # Model-level checks run again on save; report them plainly
+                # rather than as "errors below" that are not on the page.
+                detail = "; ".join(getattr(exc, "messages", None) or [str(exc)])
+                form.add_error(None, detail)
+                messages.error(request, f"The learner's record could not be saved: {detail}")
+                return self.render_to_response(self.get_context_data(pk=pk, form=form))
 
             after = {}
             for f in changed_fields:
@@ -822,10 +837,26 @@ class StudentEditView(RoleRequiredMixin, TemplateView):
             )
             messages.success(request, "Student record updated.")
             return redirect("students:detail", pk=pk)
-        else:
-            messages.error(request, "Please correct the errors below.")
-        
+
+        messages.error(request, _form_error_summary(form))
         return self.render_to_response(self.get_context_data(pk=pk, form=form))
+
+
+def _form_error_summary(form):
+    """One plain sentence naming what stopped the save."""
+    field_labels = [
+        form.fields[name].label or name.replace("_", " ").capitalize()
+        for name in form.errors if name != "__all__" and name in form.fields
+    ]
+    general = list(form.non_field_errors())
+    parts = []
+    if field_labels:
+        parts.append("please fix " + ", ".join(field_labels))
+    if general:
+        parts.append(" ".join(general))
+    if not parts:
+        return "The learner's record could not be saved. Please try again."
+    return "The learner's record was not saved: " + "; ".join(parts) + "."
 
 
 class StudentArchiveView(RoleRequiredMixin, View):
@@ -1023,103 +1054,194 @@ class GuardianDetailView(RoleRequiredMixin, DetailView):
         return ctx
 
 
+GUARDIAN_TEXT_FIELDS = (
+    "full_name", "phone", "secondary_phone", "email", "address", "preferred_invoice_name",
+)
+GUARDIAN_FIELD_LABELS = {
+    "full_name": "Full Name",
+    "phone": "Primary Phone",
+    "secondary_phone": "Secondary Phone",
+    "email": "Email Address",
+    "address": "Physical Address",
+    "preferred_invoice_name": "Preferred Invoice Name",
+}
+
+
+def _set_guardian_link(student, guardian, relationship, is_primary):
+    """Create or update a student-guardian link. Making this guardian primary
+    moves the primary flag from the student's current primary contact
+    (FR-PAR-002) instead of failing the save."""
+    if relationship not in GuardianRelationship.values:
+        relationship = GuardianRelationship.GUARDIAN
+    if is_primary:
+        StudentGuardian.objects.filter(student=student, is_primary=True).exclude(
+            guardian=guardian
+        ).update(is_primary=False)
+    link, created = StudentGuardian.objects.get_or_create(
+        student=student, guardian=guardian,
+        defaults={"relationship": relationship, "is_primary": is_primary},
+    )
+    if not created and (link.relationship != relationship or link.is_primary != is_primary):
+        link.relationship = relationship
+        link.is_primary = is_primary
+        link.save()
+    return link, created
+
+
+def _clean_guardian_post(post, exclude_pk=None):
+    """Read and check guardian contact fields. Returns (values, errors) where
+    errors maps a field name to a message that names the field."""
+    from django.core.validators import validate_email
+
+    values = {f: post.get(f, "").strip() for f in GUARDIAN_TEXT_FIELDS}
+    values["preferred_language"] = post.get("preferred_language", "en")
+    errors = {}
+    if not values["full_name"]:
+        errors["full_name"] = "Full Name is required."
+    if not values["phone"]:
+        errors["phone"] = "Primary Phone is required."
+    if values["email"]:
+        try:
+            validate_email(values["email"])
+        except ValidationError:
+            errors["email"] = "Email Address is not a valid email address."
+    if values["preferred_language"] not in ("en", "sw"):
+        values["preferred_language"] = "en"
+    for name, label in GUARDIAN_FIELD_LABELS.items():
+        limit = ParentGuardian._meta.get_field(name).max_length
+        if name not in errors and limit and len(values[name]) > limit:
+            errors[name] = f"{label} must be at most {limit} characters (it has {len(values[name])})."
+    if values["full_name"] and values["phone"]:
+        dupes = ParentGuardian.objects.filter(full_name=values["full_name"], phone=values["phone"])
+        if exclude_pk:
+            dupes = dupes.exclude(pk=exclude_pk)
+        if dupes.exists():
+            errors["phone"] = (
+                "Primary Phone: a guardian with this name and phone number already exists. "
+                "Link the existing guardian instead."
+            )
+    return values, errors
+
+
+def _guardian_error_message(errors, general=""):
+    if general:
+        return f"The guardian record was not saved: {general}"
+    labels = {**GUARDIAN_FIELD_LABELS, "pdpa": "PDPA Consent", "guardian_id": "Guardian"}
+    names = ", ".join(labels.get(k, k.replace("_", " ").title()) for k in errors)
+    return f"The guardian record was not saved: please fix {names}."
+
+
 class GuardianCreateView(RoleRequiredMixin, TemplateView):
     template_name = "students/guardian_form.html"
     required_permission = "students.add_parentguardian"
 
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["relationships"] = GuardianRelationship.choices
+        return ctx
+
+    def _invalid(self, request, values, errors, general=""):
+        messages.error(request, _guardian_error_message(errors, general))
+        student_id = request.POST.get("student_id")
+        if student_id and student_id.isdigit():
+            values["student"] = Student.objects.filter(pk=student_id).first()
+        ctx = self.get_context_data(values=values, errors=errors, general_error=general)
+        return self.render_to_response(ctx)
+
     def post(self, request):
+        values, errors = _clean_guardian_post(request.POST)
         # FR-PDPA-002: PDPA consent must be recorded before creating a guardian
         pdpa_consent_given = request.POST.get("pdpa_consent_given") == "on"
         pdpa_consent_method = request.POST.get("pdpa_consent_method", "").strip()
         pdpa_consent_version = request.POST.get("pdpa_consent_version", "").strip()
+        values.update(
+            pdpa_consent_given=pdpa_consent_given,
+            pdpa_consent_method=pdpa_consent_method,
+            pdpa_consent_version=pdpa_consent_version,
+            portal_access=request.POST.get("portal_access") == "on",
+            relationship=request.POST.get("relationship", GuardianRelationship.GUARDIAN),
+            is_primary=request.POST.get("is_primary") == "on",
+        )
 
         if not pdpa_consent_given or not pdpa_consent_method:
-            messages.error(
-                request,
-                "PDPA consent must be recorded before this record can be saved."
-            )
-            return redirect("students:guardian_create")
+            errors["pdpa"] = "PDPA consent must be recorded before this record can be saved."
         # FR-PAR-004: the version of the consent statement presented is mandatory
-        if not pdpa_consent_version:
-            messages.error(
-                request,
-                "The version of the PDPA consent statement must be recorded with the consent."
-            )
-            return redirect("students:guardian_create")
+        elif not pdpa_consent_version:
+            errors["pdpa"] = "The version of the PDPA consent statement must be recorded with the consent."
+        if errors:
+            return self._invalid(request, values, errors)
 
-        # FR-PAR-001: Phone is required; student link is optional
-        phone = request.POST.get("phone", "").strip()
+        phone = values["phone"]
         student_id = request.POST.get("student_id")
-        if not phone:
-            messages.error(request, "A primary phone number is required.")
-            return redirect("students:guardian_create")
 
         student = None
         if student_id:
             try:
                 student = Student.objects.get(pk=student_id)
-            except Student.DoesNotExist:
+            except (Student.DoesNotExist, ValueError):
                 messages.warning(request, "Selected student not found — guardian created without link.")
 
 
         try:
-            guardian = ParentGuardian.objects.create(
-                full_name=request.POST.get("full_name", "").strip(),
-                phone=phone,
-                secondary_phone=request.POST.get("secondary_phone", "").strip(),
-                email=request.POST.get("email", "").strip(),
-                address=request.POST.get("address", "").strip(),
-                preferred_invoice_name=request.POST.get("preferred_invoice_name", "").strip(),
-                preferred_language=request.POST.get("preferred_language", "en"),
-                pdpa_consent_given=True,
-                pdpa_consent_method=pdpa_consent_method,
-                pdpa_consent_version=pdpa_consent_version,
-                pdpa_consented_at=timezone.now(),
-            )
-            PDPAConsentLog.objects.create(
-                guardian=guardian, action=PDPAConsentLog.Action.GIVEN,
-                method=pdpa_consent_method, version=pdpa_consent_version,
-                actor=request.user,
-                notes="Consent recorded during guardian creation.",
-            )
-            # Link student only if one was selected
-            if student:
-                relationship = request.POST.get("relationship", GuardianRelationship.GUARDIAN)
-                is_primary_flag = request.POST.get("is_primary") == "on"
-                StudentGuardian.objects.create(
-                    student=student,
-                    guardian=guardian,
-                    relationship=relationship,
-                    is_primary=is_primary_flag,
+            with transaction.atomic():
+                guardian = ParentGuardian.objects.create(
+                    full_name=values["full_name"],
+                    phone=phone,
+                    secondary_phone=values["secondary_phone"],
+                    email=values["email"],
+                    address=values["address"],
+                    preferred_invoice_name=values["preferred_invoice_name"],
+                    preferred_language=values["preferred_language"],
+                    pdpa_consent_given=True,
+                    pdpa_consent_method=pdpa_consent_method,
+                    pdpa_consent_version=pdpa_consent_version,
+                    pdpa_consented_at=timezone.now(),
                 )
-            # Portal access: create linked User account if requested
-            portal_access = request.POST.get("portal_access") == "on"
-            if portal_access:
-                self._create_parent_user(guardian, request.user)
-                messages.success(
-                    request,
-                    f"Guardian {guardian.full_name} created — portal account created. Credentials sent via notification."
+                PDPAConsentLog.objects.create(
+                    guardian=guardian, action=PDPAConsentLog.Action.GIVEN,
+                    method=pdpa_consent_method, version=pdpa_consent_version,
+                    actor=request.user,
+                    notes="Consent recorded during guardian creation.",
                 )
-            else:
-                messages.success(request, f"Guardian {guardian.full_name} created.")
+                # Link student only if one was selected
+                if student:
+                    _set_guardian_link(
+                        student, guardian,
+                        request.POST.get("relationship", GuardianRelationship.GUARDIAN),
+                        request.POST.get("is_primary") == "on",
+                    )
+                # Portal access: create linked User account if requested
+                portal_access = request.POST.get("portal_access") == "on"
+                if portal_access:
+                    self._create_parent_user(guardian, request.user)
 
-            # Tracker 12.1: audit guardian creation
-            from audit.models import log_event
-            log_event(
-                actor=request.user,
-                action_type="GUARDIAN_CREATED",
-                model_name="ParentGuardian",
-                object_id=guardian.pk,
-                description=(
-                    f"Guardian {guardian.full_name} (phone {guardian.phone}) created by "
-                    f"{request.user.get_full_name() or request.user.username}"
-                ),
-                request=request,
-            )
-            return redirect("students:guardian_detail", pk=guardian.pk)
+                # Tracker 12.1: audit guardian creation
+                from audit.models import log_event
+                log_event(
+                    actor=request.user,
+                    action_type="GUARDIAN_CREATED",
+                    model_name="ParentGuardian",
+                    object_id=guardian.pk,
+                    description=(
+                        f"Guardian {guardian.full_name} (phone {guardian.phone}) created by "
+                        f"{request.user.get_full_name() or request.user.username}"
+                    ),
+                    request=request,
+                )
         except Exception as e:
-            messages.error(request, f"Error: {e}")
-            return redirect("students:guardian_create")
+            logger.exception("Guardian create failed")
+            return self._invalid(
+                request, values, {},
+                general=f"The system could not save it ({e}). Nothing was saved; please try again.",
+            )
+        if portal_access:
+            messages.success(
+                request,
+                f"Guardian {guardian.full_name} created — portal account created. Credentials sent via notification."
+            )
+        else:
+            messages.success(request, f"Guardian {guardian.full_name} created.")
+        return redirect("students:guardian_detail", pk=guardian.pk)
 
     def _create_parent_user(self, guardian, actor):
         """Create a linked User account with role=PARENT for portal access."""
@@ -1354,97 +1476,122 @@ class StudentGuardianLinkView(RoleRequiredMixin, TemplateView):
         ctx["relationships"] = GuardianRelationship.choices
         return ctx
 
+    def _invalid(self, request, pk, values, errors, mode, general=""):
+        messages.error(request, _guardian_error_message(errors, general).replace(
+            "guardian record was not saved", "guardian was not linked"))
+        ctx = self.get_context_data(
+            pk=pk, values=values, errors=errors, general_error=general, mode=mode,
+        )
+        return self.render_to_response(ctx)
+
     def post(self, request, pk):
         student = get_object_or_404(Student, pk=pk)
-        guardian_id = request.POST.get("guardian_id")
+        guardian_id = (request.POST.get("guardian_id") or "").strip()
         relationship = request.POST.get("relationship", GuardianRelationship.GUARDIAN)
         is_primary = request.POST.get("is_primary") == "on"
-
+        mode = "new" if request.POST.get("mode") == "new" else "existing"
         if guardian_id:
+            mode = "existing"
+
+        if mode == "existing":
             # Scenario 1: Link existing
-            guardian = get_object_or_404(ParentGuardian, pk=guardian_id)
+            values = {"relationship": relationship, "is_primary": is_primary}
+            guardian = None
+            if guardian_id.isdigit():
+                guardian = ParentGuardian.objects.filter(pk=guardian_id, is_archived=False).first()
+            if guardian is None:
+                return self._invalid(request, pk, values, {
+                    "guardian_id": "Guardian: search for and select a guardian, "
+                                   "or switch to Create New Guardian.",
+                }, mode)
+            values["guardian"] = guardian
             if not guardian.has_given_consent():
-                messages.error(
-                    request,
-                    "PDPA consent must be recorded before this record can be saved."
-                )
-                return redirect("students:guardian_link", pk=pk)
-            StudentGuardian.objects.get_or_create(
-                student=student, 
-                guardian=guardian,
-                defaults={"relationship": relationship, "is_primary": is_primary}
-            )
-            messages.success(request, f"Linked existing guardian: {guardian.full_name}")
-
-            # FR-STU-005: Notify Finance Officer if sibling relationship confirmed
-            if request.POST.get("confirm_sibling") == "1":
-                self._notify_sibling_confirmation(request, student, guardian)
-
-        else:
-            # Scenario 2: Create new
-            full_name = request.POST.get("full_name", "").strip()
-            phone = request.POST.get("phone", "").strip()
-            if not full_name or not phone:
-                messages.error(request, "Name and Phone are required for new guardians.")
-                return self.get(request, pk=pk)
-
-            # FR-PDPA-002: PDPA consent must be recorded before creating/linking a guardian
-            pdpa_consent_given = request.POST.get("pdpa_consent_given") == "on"
-            pdpa_consent_method = request.POST.get("pdpa_consent_method", "").strip()
-            pdpa_consent_version = request.POST.get("pdpa_consent_version", "").strip()
-            if not pdpa_consent_given or not pdpa_consent_method:
-                messages.error(
-                    request,
-                    "PDPA consent must be recorded before this record can be saved."
-                )
-                return redirect("students:guardian_link", pk=pk)
-            # FR-PAR-004: the version of the consent statement presented is mandatory
-            if not pdpa_consent_version:
-                messages.error(
-                    request,
-                    "The version of the PDPA consent statement must be recorded with the consent."
-                )
-                return redirect("students:guardian_link", pk=pk)
-            
-            guardian = ParentGuardian.objects.create(
-                full_name=full_name,
-                phone=phone,
-                secondary_phone=request.POST.get("secondary_phone", "").strip(),
-                email=request.POST.get("email", "").strip(),
-                address=request.POST.get("address", "").strip(),
-                preferred_invoice_name=request.POST.get("preferred_invoice_name", "").strip(),
-                pdpa_consent_given=True,
-                pdpa_consent_method=pdpa_consent_method,
-                pdpa_consent_version=pdpa_consent_version,
-                pdpa_consented_at=timezone.now(),
-            )
-            PDPAConsentLog.objects.create(
-                guardian=guardian, action=PDPAConsentLog.Action.GIVEN,
-                method=pdpa_consent_method, version=pdpa_consent_version,
-                actor=request.user,
-                notes="Consent recorded during guardian link flow.",
-            )
-            StudentGuardian.objects.create(
-                student=student,
-                guardian=guardian,
-                relationship=relationship,
-                is_primary=is_primary
-            )
-
-            # Portal access: create linked User account if requested
-            portal_access = request.POST.get("portal_access") == "on"
-            if portal_access:
-                self._create_parent_user(guardian, request.user)
+                return self._invalid(request, pk, values, {
+                    "guardian_id": f"Guardian: {guardian.full_name} has no recorded PDPA consent. "
+                                   "Consent must be recorded before this record can be saved.",
+                }, mode)
+            try:
+                with transaction.atomic():
+                    _link, created = _set_guardian_link(student, guardian, relationship, is_primary)
+            except (ValidationError, IntegrityError) as exc:
+                detail = "; ".join(getattr(exc, "messages", None) or [str(exc)])
+                return self._invalid(request, pk, values, {}, mode, general=detail)
+            if created:
+                messages.success(request, f"Linked existing guardian: {guardian.full_name}")
+            else:
                 messages.success(
                     request,
-                    f"Created and linked new guardian: {guardian.full_name} — portal account created. Credentials sent via notification."
+                    f"{guardian.full_name} was already linked — relationship and primary contact updated.",
                 )
-            else:
-                messages.success(request, f"Created and linked new guardian: {guardian.full_name}")
 
             # FR-STU-005: Notify Finance Officer if sibling relationship confirmed
             if request.POST.get("confirm_sibling") == "1":
                 self._notify_sibling_confirmation(request, student, guardian)
+            return redirect("students:detail", pk=pk)
+
+        # Scenario 2: Create new
+        values, errors = _clean_guardian_post(request.POST)
+        # FR-PDPA-002: PDPA consent must be recorded before creating/linking a guardian
+        pdpa_consent_given = request.POST.get("pdpa_consent_given") == "on"
+        pdpa_consent_method = request.POST.get("pdpa_consent_method", "").strip()
+        pdpa_consent_version = request.POST.get("pdpa_consent_version", "").strip()
+        portal_access = request.POST.get("portal_access") == "on"
+        values.update(
+            pdpa_consent_given=pdpa_consent_given, pdpa_consent_method=pdpa_consent_method,
+            pdpa_consent_version=pdpa_consent_version, portal_access=portal_access,
+            relationship=relationship, is_primary=is_primary,
+        )
+        if not pdpa_consent_given or not pdpa_consent_method:
+            errors["pdpa"] = "PDPA consent must be recorded before this record can be saved."
+        # FR-PAR-004: the version of the consent statement presented is mandatory
+        elif not pdpa_consent_version:
+            errors["pdpa"] = "The version of the PDPA consent statement must be recorded with the consent."
+        if errors:
+            return self._invalid(request, pk, values, errors, mode)
+
+        try:
+            with transaction.atomic():
+                guardian = ParentGuardian.objects.create(
+                    full_name=values["full_name"],
+                    phone=values["phone"],
+                    secondary_phone=values["secondary_phone"],
+                    email=values["email"],
+                    address=values["address"],
+                    preferred_invoice_name=values["preferred_invoice_name"],
+                    preferred_language=values["preferred_language"],
+                    pdpa_consent_given=True,
+                    pdpa_consent_method=pdpa_consent_method,
+                    pdpa_consent_version=pdpa_consent_version,
+                    pdpa_consented_at=timezone.now(),
+                )
+                PDPAConsentLog.objects.create(
+                    guardian=guardian, action=PDPAConsentLog.Action.GIVEN,
+                    method=pdpa_consent_method, version=pdpa_consent_version,
+                    actor=request.user,
+                    notes="Consent recorded during guardian link flow.",
+                )
+                _set_guardian_link(student, guardian, relationship, is_primary)
+                # Portal access: create linked User account if requested
+                if portal_access:
+                    self._create_parent_user(guardian, request.user)
+        except Exception as e:
+            logger.exception("Guardian create-and-link failed")
+            return self._invalid(
+                request, pk, values, {}, mode,
+                general=f"The system could not save it ({e}). Nothing was saved; please try again.",
+            )
+
+        if portal_access:
+            messages.success(
+                request,
+                f"Created and linked new guardian: {guardian.full_name} — portal account created. Credentials sent via notification."
+            )
+        else:
+            messages.success(request, f"Created and linked new guardian: {guardian.full_name}")
+
+        # FR-STU-005: Notify Finance Officer if sibling relationship confirmed
+        if request.POST.get("confirm_sibling") == "1":
+            self._notify_sibling_confirmation(request, student, guardian)
 
         return redirect("students:detail", pk=pk)
 
@@ -1587,16 +1734,39 @@ class GuardianEditView(RoleRequiredMixin, TemplateView):
         guardian = get_object_or_404(ParentGuardian, pk=kwargs["pk"])
         ctx["guardian"] = guardian
         ctx["edit_mode"] = True
-        ctx["linked_students"] = guardian.studentguardian_set.select_related("student")
+        links = list(guardian.studentguardian_set.select_related("student").order_by(
+            "student__first_name", "student__last_name"
+        ))
+        posted = kwargs.get("posted")
+        for link in links:
+            # Show what was submitted after a failed save, otherwise what is stored.
+            if posted is not None and f"relationship_{link.pk}" in posted:
+                link.form_relationship = posted.get(f"relationship_{link.pk}")
+                link.form_primary = posted.get(f"primary_{link.pk}") == "on"
+            else:
+                link.form_relationship = link.relationship
+                link.form_primary = link.is_primary
+        ctx["linked_students"] = links
+        ctx["relationships"] = GuardianRelationship.choices
+        if "values" not in kwargs:
+            ctx["values"] = {f: getattr(guardian, f) for f in GUARDIAN_TEXT_FIELDS}
+            ctx["values"]["preferred_language"] = guardian.preferred_language
         return ctx
+
+    def _invalid(self, request, pk, values, errors, general=""):
+        messages.error(request, _guardian_error_message(errors, general))
+        ctx = self.get_context_data(
+            pk=pk, values=values, errors=errors, general_error=general, posted=request.POST,
+        )
+        return self.render_to_response(ctx)
 
     def post(self, request, pk):
         guardian = get_object_or_404(ParentGuardian, pk=pk)
-        full_name = request.POST.get("full_name", "").strip()
-        phone = request.POST.get("phone", "").strip()
-        if not full_name or not phone:
-            messages.error(request, "Name and phone are required.")
-            return redirect("students:guardian_edit", pk=pk)
+        values, errors = _clean_guardian_post(request.POST, exclude_pk=guardian.pk)
+        if errors:
+            return self._invalid(request, pk, values, errors)
+        full_name = values["full_name"]
+        phone = values["phone"]
 
         # FR-PAR-001: Sibling scope — users without school-wide student access
         # can only edit guardians linked to students they have access to
@@ -1628,25 +1798,27 @@ class GuardianEditView(RoleRequiredMixin, TemplateView):
 
         guardian.full_name = full_name
         guardian.phone = phone
-        guardian.secondary_phone = request.POST.get("secondary_phone", "").strip()
-        guardian.email = request.POST.get("email", "").strip()
-        guardian.address = request.POST.get("address", "").strip()
-        guardian.preferred_invoice_name = request.POST.get("preferred_invoice_name", "").strip()
-        lang = request.POST.get("preferred_language", "en")
-        if lang in ("en", "sw"):
-            guardian.preferred_language = lang
-        guardian.save()
-
-        # FR-PAR-002: Primary contact replacement — if is_primary changed, clear other primaries
-        new_is_primary = request.POST.get("is_primary") == "on"
-        student_id = request.POST.get("scope_student_id")
-        if student_id and new_is_primary:
-            StudentGuardian.objects.filter(
-                student_id=student_id, is_primary=True
-            ).exclude(guardian=guardian).update(is_primary=False)
-            StudentGuardian.objects.filter(
-                student=student_id, guardian=guardian
-            ).update(is_primary=True)
+        guardian.secondary_phone = values["secondary_phone"]
+        guardian.email = values["email"]
+        guardian.address = values["address"]
+        guardian.preferred_invoice_name = values["preferred_invoice_name"]
+        guardian.preferred_language = values["preferred_language"]
+        try:
+            with transaction.atomic():
+                guardian.save()
+                # Relationship and primary contact for each linked student. Making
+                # this guardian primary clears the student's other primary (FR-PAR-002).
+                for link in guardian.studentguardian_set.select_related("student"):
+                    relationship = request.POST.get(f"relationship_{link.pk}")
+                    if relationship is None:
+                        continue  # link added after the page was opened
+                    _set_guardian_link(
+                        link.student, guardian, relationship,
+                        request.POST.get(f"primary_{link.pk}") == "on",
+                    )
+        except (ValidationError, IntegrityError) as exc:
+            detail = "; ".join(getattr(exc, "messages", None) or [str(exc)])
+            return self._invalid(request, pk, values, {}, general=detail)
 
         from audit.models import log_event
         log_event(

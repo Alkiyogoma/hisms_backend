@@ -58,6 +58,7 @@
       hx-swap="innerHTML"
     >
       {% csrf_token %}
+    {% include "_partials/form_error_summary.html" with form=form %}
       <div class="hf2-grid-2">
         {% field form.meeting_date %}
         {% field form.meeting_time %}

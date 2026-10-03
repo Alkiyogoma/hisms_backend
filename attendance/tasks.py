@@ -13,7 +13,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from .models import Message, NotificationLog, OtpCode
 from .notification_service import NotificationService
@@ -21,44 +21,44 @@ from .notification_service import NotificationService
 logger = logging.getLogger(__name__)
 
 
+def _sms_too_old(message):
+    max_age = timedelta(minutes=getattr(settings, 'SMS_MAX_AGE_MINUTES', 15))
+    return message.created_at < timezone.now() - max_age
+
+
 @shared_task(bind=True, max_retries=3)
 def send_sms_notification(self, message_id: int):
     """
-    Send SMS notification via external SMS gateway.
-    
-    Args:
-        message_id: ID of Message record to send
+    Send one queued SMS via the configured provider (DarSMS).
+
+    The row is locked while sending so a sweep and a retry can't both send it,
+    and messages older than SMS_MAX_AGE_MINUTES are dropped instead of sent late.
     """
+    from django.db import transaction
     try:
-        message = Message.objects.get(id=message_id)
-        
-        # Check if already sent
-        if message.status == 1:  # Sent
-            logger.info(f"Message {message_id} already sent")
-            return
-        
-        # Send via configured SMS provider
-        result = NotificationService.send_sms(message.phone, message.message)
-        
-        if result['success']:
-            # Mark as sent
-            message.mark_sent()
-            logger.info(f"SMS sent to {message.phone}")
-        else:
-            # Mark as failed
+        with transaction.atomic():
+            message = Message.objects.select_for_update().get(id=message_id)
+            if message.status == 1:  # Sent
+                logger.info(f"Message {message_id} already sent")
+                return
+            if _sms_too_old(message):
+                message.mark_expired("Expired: not sent within %s minutes." % getattr(settings, 'SMS_MAX_AGE_MINUTES', 15))
+                logger.warning(f"Message {message_id} expired before it could be sent")
+                return
+
+            result = NotificationService.send_sms(message.phone, message.message)
+            if result['success']:
+                message.mark_sent()
+                logger.info(f"SMS sent to {message.phone}")
+                return
             message.mark_failed(result.get('error', 'Unknown error'))
             logger.error(f"SMS send failed to {message.phone}: {result.get('error')}")
-            
-            # Retry if under max retries
-            if message.retry_count < NotificationService.SMS_MAX_RETRIES:
-                raise self.retry(exc=Exception(result.get('error')), countdown=NotificationService.SMS_RETRY_DELAY)
-        
+
+        if message.retry_count < NotificationService.SMS_MAX_RETRIES:
+            raise self.retry(exc=Exception(result.get('error')), countdown=60 * (2 ** self.request.retries))
+
     except Message.DoesNotExist:
         logger.error(f"Message {message_id} not found")
-    except Exception as exc:
-        logger.error(f"Error sending SMS {message_id}: {str(exc)}")
-        # Retry with exponential backoff
-        raise self.retry(exc=exc, countdown=60 * (2 ** self.request.retries))
 
 
 @shared_task(bind=True, max_retries=3)
@@ -130,7 +130,7 @@ def send_email_notification(self, notification_id: int):
         else:
             subject = "Hodari Christian School Notification"
         
-        # Send email through the configured delivery (Settings > Email & WhatsApp)
+        # Send email through the configured delivery (Settings > Email & SMS)
         from communications.email_service import send_email_safe
         if not send_email_safe(
             to_email=notification.recipient_email,
@@ -197,19 +197,29 @@ def cleanup_expired_otps():
 @shared_task
 def process_pending_sms():
     """
-    Process all pending SMS messages.
-    Called periodically by Celery beat.
+    Safety sweep (Celery beat, every 2 minutes): send recent SMS that were never
+    handed to a worker (e.g. the broker was down). Messages normally go out
+    straight away via Message.queue(); anything older than SMS_MAX_AGE_MINUTES
+    is expired rather than sent late. Laravel-imported rows are never sent.
     """
-    try:
-        pending_messages = Message.objects.filter(status=0)  # Pending
-        
-        for message in pending_messages:
-            send_sms_notification.delay(message.id)
-        
-        logger.info(f"Queued {pending_messages.count()} SMS messages for processing")
-        
-    except Exception as e:
-        logger.error(f"Error in process_pending_sms task: {str(e)}")@shared_task
+    now = timezone.now()
+    max_age = timedelta(minutes=getattr(settings, 'SMS_MAX_AGE_MINUTES', 15))
+    unsent = Message.objects.filter(status__in=[0, 3], laravel_message_id__isnull=True)
+
+    expired = 0
+    for message in unsent.filter(created_at__lt=now - max_age):
+        message.mark_expired("Expired: not sent within %s minutes." % getattr(settings, 'SMS_MAX_AGE_MINUTES', 15))
+        expired += 1
+
+    # Skip the newest 2 minutes: those were just dispatched by Message.queue().
+    due = list(unsent.filter(created_at__gte=now - max_age, created_at__lt=now - timedelta(minutes=2))
+               .values_list('id', flat=True))
+    for message_id in due:
+        send_sms_notification.delay(message_id)
+    logger.info(f"SMS sweep: queued {len(due)}, expired {expired}")
+
+
+@shared_task
 def process_pending_emails():
     """
     Process all pending email notifications.
@@ -443,7 +453,7 @@ def send_checkin_notification_task(self, student_id, entry_id, timestamp_iso):
 
         parents = _collect_parent_contacts(student)
         for parent in parents:
-            Message.objects.create(phone=parent['phone'], message=message_text, status=0)
+            Message.queue(parent['phone'], message_text)
             NotificationLog.objects.create(
                 attendance_entry_id=entry_id,
                 recipient_phone=parent['phone'],
@@ -480,7 +490,7 @@ def send_checkout_notification_task(self, student_id, entry_id, timestamp_iso, p
 
         parents = _collect_parent_contacts(student)
         for parent in parents:
-            Message.objects.create(phone=parent['phone'], message=message_text, status=0)
+            Message.queue(parent['phone'], message_text)
             NotificationLog.objects.create(
                 attendance_entry_id=entry_id,
                 recipient_phone=parent['phone'],

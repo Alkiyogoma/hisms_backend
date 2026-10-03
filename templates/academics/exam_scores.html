@@ -12,21 +12,26 @@
 
 <div class="card">
   <form method="GET" action="." class="grid-4" style="align-items:end; gap:12px; margin-bottom:0;">
+    {% if filter_form.non_field_errors %}<div class="hf2-error" role="alert" style="grid-column:span 4">{{ filter_form.non_field_errors|join:" " }}</div>{% endif %}
     <div>
-      <label class="field-lbl">Term</label>
+      <label class="field-lbl" for="{{ filter_form.term.id_for_label }}"{% if filter_form.term.errors %} style="color:#DC2626"{% endif %}>Term</label>
       {{ filter_form.term }}
+      {% if filter_form.term.errors %}<p class="hf2-error" role="alert">Term: {{ filter_form.term.errors|join:" " }}</p>{% endif %}
     </div>
     <div>
-      <label class="field-lbl">Class</label>
+      <label class="field-lbl" for="{{ filter_form.class_name.id_for_label }}"{% if filter_form.class_name.errors %} style="color:#DC2626"{% endif %}>Class</label>
       {{ filter_form.class_name }}
+      {% if filter_form.class_name.errors %}<p class="hf2-error" role="alert">Class: {{ filter_form.class_name.errors|join:" " }}</p>{% endif %}
     </div>
     <div>
-      <label class="field-lbl">Subject</label>
+      <label class="field-lbl" for="{{ filter_form.subject_name.id_for_label }}"{% if filter_form.subject_name.errors %} style="color:#DC2626"{% endif %}>Subject</label>
       {{ filter_form.subject_name }}
+      {% if filter_form.subject_name.errors %}<p class="hf2-error" role="alert">Subject: {{ filter_form.subject_name.errors|join:" " }}</p>{% endif %}
     </div>
     <div>
-      <label class="field-lbl">Exam Type</label>
+      <label class="field-lbl" for="{{ filter_form.exam_type.id_for_label }}"{% if filter_form.exam_type.errors %} style="color:#DC2626"{% endif %}>Exam Type</label>
       {{ filter_form.exam_type }}
+      {% if filter_form.exam_type.errors %}<p class="hf2-error" role="alert">Exam Type: {{ filter_form.exam_type.errors|join:" " }}</p>{% endif %}
     </div>
     <div style="grid-column: span 4; text-align: right; margin-top: 12px;">
       <button type="submit" class="hf-btn hf-btn-primary">Load Class List</button>

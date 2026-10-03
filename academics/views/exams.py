@@ -147,23 +147,50 @@ class ExamScoreEntryView(RoleRequiredMixin, TemplateView):
         
         form = ExamScoreFilterForm(request.POST)
         if not form.is_valid():
-            messages.error(request, "Please provide term, class, subject, and exam type.")
-            return redirect(request.path)
+            missing = ", ".join(
+                (form.fields[name].label or name.replace("_", " ").title())
+                for name in form.errors if name in form.fields
+            )
+            messages.error(
+                request,
+                f"Scores were not saved: {missing or 'the selection'} is missing or invalid. "
+                "Choose the term, class, subject and exam type again.",
+            )
+            ctx = self.get_context_data(**kwargs)
+            ctx["filter_form"] = form
+            return self.render_to_response(ctx)
 
         term = form.cleaned_data["term"]
         class_name = form.cleaned_data["class_name"].strip()
         subject_name = form.cleaned_data["subject_name"].strip()
         exam_type = form.cleaned_data["exam_type"]
 
+        def refuse(message):
+            """Explain why nothing was saved, keeping the filter and every typed score."""
+            messages.error(request, f"Scores were not saved: {message}")
+            students = Student.objects.filter(is_archived=False, class_name=class_name).order_by("last_name", "first_name")
+            ctx = self.get_context_data(**kwargs)
+            ctx["filter_form"] = form
+            ctx["students"] = students
+            ctx["scores_by_student"] = {
+                sc.student_id: sc for sc in ExamScore.objects.filter(
+                    term=term, subject_name=subject_name, exam_type=exam_type, student__in=students,
+                )
+            }
+            ctx["score_errors"] = {}
+            ctx["submitted_scores"] = {
+                str(st.id): request.POST.get(f"score_{st.id}", "").strip()
+                for st in students if request.POST.get(f"score_{st.id}", "").strip()
+            }
+            return self.render_to_response(ctx)
+
         if term.is_locked:
-            messages.error(request, "This term is locked and cannot accept score entry.")
-            return redirect(request.path)
+            return refuse("this term is locked and cannot accept score entry.")
 
         from academics.utils import check_score_entry_allowed
         allowed, msg = check_score_entry_allowed(term, exam_type)
         if not allowed:
-            messages.error(request, msg or "Score entry is not allowed for this exam type at this time.")
-            return redirect(request.path)
+            return refuse(msg or "score entry is not allowed for this exam type at this time.")
 
         # FR-ACAD-001: Teacher must be assigned to this class+subject before entering scores
         if request.user.role == UserRole.TEACHER:
@@ -171,8 +198,7 @@ class ExamScoreEntryView(RoleRequiredMixin, TemplateView):
             class_info = tca.get(class_name, {})
             allowed_subjects = class_info.get("subjects", set())
             if not allowed_subjects or subject_name not in allowed_subjects:
-                messages.error(request, f"You are not assigned to teach {subject_name} in {class_name}.")
-                return redirect(request.path)
+                return refuse(f"you are not assigned to teach {subject_name} in {class_name}.")
 
         students = Student.objects.filter(is_archived=False, class_name=class_name).order_by("last_name", "first_name")
         scores = ExamScore.objects.filter(
@@ -208,13 +234,19 @@ class ExamScoreEntryView(RoleRequiredMixin, TemplateView):
 
             try:
                 score_val = Decimal(raw)
+                if not score_val.is_finite():
+                    raise InvalidOperation
             except InvalidOperation:
-                score_errors[student.id] = f"Score must be a number between 0 and {max_score}."
+                score_errors[student.id] = f"'{raw}' is not a number. Enter a whole number from 0 to {max_score}."
                 continue
 
             # FR-ACAD-001: explicit 0–max_score range check
             if score_val < 0 or score_val > max_score:
-                score_errors[student.id] = f"Score must be a number between 0 and {max_score}."
+                score_errors[student.id] = f"{raw} is out of range. Enter a whole number from 0 to {max_score}."
+                continue
+            # Same rule as the Primary / Lower Secondary entry pages.
+            if score_val != score_val.to_integral_value():
+                score_errors[student.id] = f"{raw} must be a whole number (0 to {max_score})."
                 continue
 
             existing = existing_scores.get(student.id)
@@ -225,7 +257,12 @@ class ExamScoreEntryView(RoleRequiredMixin, TemplateView):
                 if existing.score != score_val:
                     old_score = existing.score
                     existing.score = score_val
-                    existing.full_clean()
+                    try:
+                        existing.full_clean()
+                    except ValidationError as exc:
+                        existing.score = old_score
+                        score_errors[student.id] = " ".join(exc.messages)
+                        continue
                     existing.save(update_fields=["score", "updated_at"])
                     updates_made += 1
 
@@ -249,7 +286,11 @@ class ExamScoreEntryView(RoleRequiredMixin, TemplateView):
                     score=score_val,
                     entered_by=request.user
                 )
-                new_score.full_clean()
+                try:
+                    new_score.full_clean()
+                except ValidationError as exc:
+                    score_errors[student.id] = " ".join(exc.messages)
+                    continue
                 new_score.save()
                 updates_made += 1
                 
@@ -278,15 +319,17 @@ class ExamScoreEntryView(RoleRequiredMixin, TemplateView):
             ctx["score_errors"] = {str(k): v for k, v in score_errors.items()}
             ctx["submitted_scores"] = {str(k): v for k, v in submitted_scores.items()}
             ctx["exam_max_score"] = int(max_score)
+            names = {st.id: f"{st.first_name} {st.last_name}" for st in students if st.id in score_errors}
+            problem_list = "; ".join(f"{names.get(sid, sid)}: {err}" for sid, err in score_errors.items())
             if updates_made > 0:
                 messages.warning(
                     request,
-                    f"Saved {updates_made} score(s), but {len(score_errors)} had errors."
+                    f"Saved {updates_made} score(s). These were not saved — {problem_list}"
                 )
             else:
                 messages.error(
                     request,
-                    f"{len(score_errors)} score(s) could not be saved."
+                    f"No scores were saved. Fix the highlighted rows — {problem_list}"
                 )
             return self.render_to_response(ctx)
 
@@ -355,6 +398,10 @@ class ExamScoreEntryView(RoleRequiredMixin, TemplateView):
             score.is_locked = True
             score.save(update_fields=["status", "is_locked", "updated_at"])
             submitted_count += 1
+
+            # Report moves to pending only once every subject is submitted.
+            from academics.score_progress import sync_report_status
+            sync_report_status(score.student, term)
 
             from audit.models import log_event
             log_event(
@@ -627,6 +674,10 @@ class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
                 score.correction_reason = reason
                 score.is_locked = False
                 score.save(update_fields=["status", "correction_reason", "is_locked", "updated_at"])
+
+                # A returned subject means the report is no longer complete.
+                from academics.score_progress import sync_report_status
+                sync_report_status(score.student, score.term)
 
                 # Notify the teacher who entered the score
                 if score.entered_by:

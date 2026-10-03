@@ -1594,7 +1594,7 @@ class SendInvoiceReminderView(RoleRequiredMixin, View):
             if db_sent.disabled:
                 messages.warning(request, "The fee reminder email is switched off in Settings > Email Templates, so no email was sent.")
             elif db_sent and not db_sent.sent:
-                messages.error(request, "The reminder email could not be delivered. Check Settings > Email & WhatsApp.")
+                messages.error(request, "The reminder email could not be delivered. Check Settings > Email & SMS.")
             else:
                 messages.success(request, f"Reminder sent to {primary_guardian.guardian.full_name}.")
         else:

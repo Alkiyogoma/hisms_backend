@@ -5,7 +5,7 @@
     <span>{{ label }}</span>
   </label>
   {% if help_text %}<p class="hf2-hint">{{ help_text }}</p>{% endif %}
-  {% for err in errors %}<p class="hf2-error">{{ err }}</p>{% endfor %}
+  {% if errors %}<p class="hf2-error" id="{{ field.auto_id }}_error" role="alert">{{ label }}: {{ errors|join:" " }}</p>{% endif %}
 </div>
 {% elif is_checkbox_select %}
 <div class="hf2-group{% if span == 'full' %} hf2-span-full{% endif %}">
@@ -14,7 +14,7 @@
     {{ rendered }}
   </div>
   {% if help_text %}<p class="hf2-hint">{{ help_text }}</p>{% endif %}
-  {% for err in errors %}<p class="hf2-error">{{ err }}</p>{% endfor %}
+  {% if errors %}<p class="hf2-error" id="{{ field.auto_id }}_error" role="alert">{{ label }}: {{ errors|join:" " }}</p>{% endif %}
 </div>
 {% elif is_file %}
 <div class="hf2-group{% if span == 'full' %} hf2-span-full{% endif %}">
@@ -37,7 +37,7 @@
         <div id="file-status-{{ field.id_for_label }}">Click to upload student photo</div>
      </div>
   </div>
-  {% for err in errors %}<p class="hf2-error">{{ err }}</p>{% endfor %}
+  {% if errors %}<p class="hf2-error" id="{{ field.auto_id }}_error" role="alert">{{ label }}: {{ errors|join:" " }}</p>{% endif %}
   
   <script>
     (function() {
@@ -91,6 +91,6 @@
   <label class="hf2-label{% if errors %} hf2-label-err{% endif %}">{{ label }}{% if field.field.required %}<span class="hf2-req">*</span>{% endif %}</label>
   {{ rendered }}
   {% if help_text %}<p class="hf2-hint">{{ help_text }}</p>{% endif %}
-  {% for err in errors %}<p class="hf2-error">{{ err }}</p>{% endfor %}
+  {% if errors %}<p class="hf2-error" id="{{ field.auto_id }}_error" role="alert">{{ label }}: {{ errors|join:" " }}</p>{% endif %}
 </div>
 {% endif %}

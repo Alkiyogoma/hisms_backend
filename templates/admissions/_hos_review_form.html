@@ -2,6 +2,7 @@
       hx-target="#hos-review-section"
       hx-swap="innerHTML">
   {% csrf_token %}
+    {% include "_partials/form_error_summary.html" with form=form %}
   {% if messages %}
   {% for msg in messages %}
   <div style="padding:10px 14px;margin-bottom:12px;border-radius:8px;font-size:12px;font-weight:600;{% if msg.tags == 'success' %}background:#F0FDF4;color:#16A34A;border:1px solid #BBF7D0;{% elif msg.tags == 'error' %}background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;{% else %}background:#EFF6FF;color:#2563EB;border:1px solid #BFDBFE;{% endif %}">{{ msg }}</div>

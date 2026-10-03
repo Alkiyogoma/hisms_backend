@@ -27,6 +27,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from admissions.forms_workflow import AssessmentScheduleForm, AssessmentResultForm, HodReviewForm, MeetingScheduleForm
 from academics.models import GradeClass
 from core.models import SchoolSettings
+from core.utils import form_error_message
 from admissions.models import (
     ENROLMENT_REQUIRED_DOCUMENTS, Applicant, ApplicantDocumentType, ApplicantStatus,
     AssessmentSchedule, ApplicantTimelineEntry,
@@ -326,6 +327,10 @@ class InquiryCreateView(AdmissionsCountsMixin, PermissionCacheMixin, AdmissionsR
     form_class = ApplicantCreateForm
     success_url = reverse_lazy("admissions:pipeline")
     login_url = "/accounts/login/"
+
+    def form_invalid(self, form):
+        messages.error(self.request, form_error_message(form, "The inquiry details"))
+        return super().form_invalid(form)
 
     def dispatch(self, request, *args, **kwargs):
         # FR-ADM-001: Only Admin Officers create inquiries (HOS is excluded)
@@ -639,6 +644,10 @@ class InquiryEditView(PermissionCacheMixin, AdmissionsRoleRequiredMixin, UpdateV
         if request.headers.get("HX-Request") != "true":
             return redirect("admissions:detail", pk=self.object.pk)
         return super().get(request, *args, **kwargs)
+
+    def form_invalid(self, form):
+        messages.error(self.request, form_error_message(form, "The inquiry changes"))
+        return super().form_invalid(form)
 
     def get_initial(self):
         # Show the human free-text notes (not the raw JSON) in the notes field.
@@ -1399,7 +1408,7 @@ class AssessmentScheduleView(HtmxRequiredMixin, PermissionCacheMixin, Admissions
                 messages.error(request, f"Workflow error: {msg}")
                 return self.render_to_response(self.get_context_data(form=form))
         else:
-            messages.error(request, "Please correct the assessment form errors.")
+            messages.error(request, form_error_message(form, "The assessment schedule changes"))
             return self.render_to_response(self.get_context_data(form=form))
 
     def get_context_data(self, **kwargs):
@@ -1500,7 +1509,7 @@ class MeetingScheduleView(HtmxRequiredMixin, PermissionCacheMixin, AdmissionsRol
             messages.success(request, "Meeting scheduled and applicant moved to Meeting scheduled.")
             return self.render_to_response(self.get_context_data())
         else:
-            messages.error(request, "Please correct the form errors.")
+            messages.error(request, form_error_message(form, "The meeting details"))
             return self.render_to_response(self.get_context_data(form=form))
 
     def get_context_data(self, **kwargs):
@@ -1617,7 +1626,7 @@ class MeetingRescheduleView(HtmxRequiredMixin, PermissionCacheMixin, AdmissionsR
             messages.success(request, "Meeting rescheduled. Parent has been notified (E04).")
             return self.render_to_response(self.get_context_data())
         else:
-            messages.error(request, "Please correct the form errors.")
+            messages.error(request, form_error_message(form, "The meeting details"))
             return self.render_to_response(self.get_context_data(form=form))
 
     def get_context_data(self, **kwargs):
@@ -1689,7 +1698,7 @@ class AssessmentResultSignOffView(HtmxRequiredMixin, PermissionCacheMixin, Admis
                 messages.error(request, f"Workflow error: {msg}")
                 return self.render_to_response(self.get_context_data(form=form))
         else:
-            messages.error(request, "Please correct the result form errors.")
+            messages.error(request, form_error_message(form, "The assessment result changes"))
             return self.render_to_response(self.get_context_data(form=form))
 
     def get_context_data(self, **kwargs):
@@ -1810,12 +1819,11 @@ class HodReviewSubmitView(HtmxRequiredMixin, PermissionCacheMixin, AdmissionsRol
                 resp.content = '<div style="padding:10px;color:#16A34A;font-size:12px;font-weight:600">Review submitted. Moving to decision...</div>'
                 return resp
             except ValidationError as e:
-                msg = e.messages[0] if hasattr(e, 'messages') else str(e).strip("[]' ")
-                from django.http import HttpResponse
-                return HttpResponse(f'<div style="padding:10px;color:#DC2626;font-size:12px;font-weight:600">{msg}</div>')
+                # Workflow rule, not a field problem: say so and keep the typed comments.
+                form.add_error(None, " ".join(getattr(e, "messages", None) or [str(e)]))
+                return self.render_to_response(self.get_context_data(form=form))
         else:
-            from django.http import HttpResponse
-            return HttpResponse('<div style="padding:10px;color:#DC2626;font-size:12px;font-weight:600">Please correct the form errors.</div>')
+            return self.render_to_response(self.get_context_data(form=form))
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)

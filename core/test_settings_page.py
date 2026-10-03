@@ -50,6 +50,5 @@ class SettingsPageTests(TestCase):
         names = [c.name for c in self.get("classes").context["classes"]]
         self.assertEqual(names, ["Pre-K", "Grade 1", "Grade 8"])
 
-    def test_login_preview_matches_real_login_label(self):
-        self.assertContains(self.get("dynamic_pages"), "Username")
-        self.assertNotContains(self.get("dynamic_pages"), "you@school.com")
+    def test_dynamic_pages_tab_removed(self):
+        self.assertNotContains(self.get("system"), "?tab=dynamic_pages")

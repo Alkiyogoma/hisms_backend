@@ -183,6 +183,19 @@ def sign_off_report(report_card, user):
                 f"All submitted scores must be approved before sign-off."
             )
 
+        # A report is complete only when every subject has approved scores.
+        from academics.score_progress import student_progress
+        progress = student_progress(report_card.student, report_card.term)
+        missing = sorted(
+            name for name, info in progress["subjects"].items()
+            if info["status"] != ScoreStatus.APPROVED and info["approved_average"] is None
+        )
+        if missing:
+            raise ValidationError(
+                f"Cannot sign off: {report_card.student.first_name}'s report is incomplete — "
+                f"no approved scores yet for: {', '.join(missing)}."
+            )
+
     # Validation gate: ECD mandatory comments
     if report_card.is_ecd_report and report_card.ecd_template_type in ["kindergarten", "pre_school", "abc"]:
         if len((report_card.teacher_comments or "").strip()) < 50:
@@ -258,30 +271,47 @@ def sign_off_report(report_card, user):
         )
 
 @transaction.atomic
-def reject_report_for_edit(report_card, user, reason=""):
+def reject_report_for_edit(report_card, user, reason="", subjects=None):
     """
-    Returns a report to DRAFT status and unlocks individual scores 
-    so the teacher can re-edit.
+    Returns a report to DRAFT status so the teacher can re-edit it.
+
+    Only the scores of the named ``subjects`` are reopened (marked RETURNED with
+    the reason); every other subject keeps its approval and lock. With no
+    subjects the report is returned for comments only and no score changes.
     """
-    if getattr(user, "role", None) not in {UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN, UserRole.PRIMARY_HOD, UserRole.ECD_HOD}:
+    if getattr(user, "role", None) not in {
+        UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN, UserRole.PRIMARY_HOD,
+        UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD,
+    }:
         raise ValidationError("Only HOS, Super Admin, or HOD may reject reports.")
 
-    if report_card.status != ReportCardStatus.PENDING_SIGN_OFF:
-        raise ValidationError("Only reports pending sign-off can be returned for edit.")
+    if report_card.status == ReportCardStatus.PUBLISHED:
+        raise ValidationError(
+            "This report is already published. Revoke the sign-off first, then return it for correction."
+        )
 
     report_card.status = ReportCardStatus.DRAFT
     report_card.signed_off_by = None
     report_card.signed_off_at = None
-    # Preserve existing comments but allow teacher to edit
+    # Preserve existing comments but unlock them so the teacher can edit.
+    report_card.comments_submitted = False
     report_card.save()
 
-    # Unlock all individual scores for this student/term
+    # Reopen only the subjects the reviewer picked.
     from academics.models import ScoreStatus
-    ExamScore.objects.filter(student=report_card.student, term=report_card.term).update(
-        status=ScoreStatus.DRAFT,
-        is_locked=False,
-        updated_at=timezone.now()
-    )
+    subjects = [s for s in (subjects or []) if s]
+    subject_teacher_ids = set()
+    if subjects:
+        reopened = ExamScore.objects.filter(
+            student=report_card.student, term=report_card.term, subject_name__in=subjects,
+        )
+        subject_teacher_ids = set(reopened.values_list("entered_by_id", flat=True))
+        reopened.update(
+            status=ScoreStatus.RETURNED,
+            is_locked=False,
+            correction_reason=reason,
+            updated_at=timezone.now(),
+        )
 
     from audit.models import log_event
     log_event(
@@ -289,18 +319,26 @@ def reject_report_for_edit(report_card, user, reason=""):
         action_type="REPORT_REJECTED",
         model_name="ReportCard",
         object_id=report_card.pk,
-        description=f"Report returned for edit: {report_card.student.admission_no}. Reason: {reason}",
+        description=(
+            f"Report returned for edit: {report_card.student.admission_no}. "
+            f"Subjects reopened: {', '.join(subjects) if subjects else 'none (comments only)'}. "
+            f"Reason: {reason}"
+        ),
     )
 
     # Notify teacher
     from communications.email_service import dispatch_notification
     # Find the teacher who generated it or is assigned to the class
-    teacher = report_card.generated_by
-    if teacher:
+    from users.models import User
+    recipient_ids = set(subject_teacher_ids)
+    if report_card.generated_by_id:
+        recipient_ids.add(report_card.generated_by_id)
+    subject_note = f"\nSubjects to correct: {', '.join(subjects)}" if subjects else ""
+    for teacher in User.objects.filter(pk__in=recipient_ids):
         dispatch_notification(
             user=teacher,
             title="Report Returned for Edit",
-            message=f"The term report for {report_card.student.first_name} has been returned for correction by {user.get_full_name()}.\n\nReason: {reason}",
+            message=f"The term report for {report_card.student.first_name} has been returned for correction by {user.get_full_name()}.{subject_note}\n\nReason: {reason}",
             link="/academics/primary-assessment/", # or dynamic based on type
             actor=user
         )

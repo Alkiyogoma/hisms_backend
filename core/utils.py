@@ -74,3 +74,24 @@ def append_review_comment(existing_notes, author, comment_text):
     if existing_notes and existing_notes.strip():
         return f"{existing_notes.rstrip()}\n\n{entry}"
     return entry
+
+
+def form_error_message(form, subject="Your changes"):
+    """One plain sentence naming what stopped a form from saving, for a toast.
+
+    Names the fields with errors (by label) and includes any errors that are
+    not tied to a field, so the user is never told to fix errors they cannot see.
+    """
+    labels = [
+        form.fields[name].label or name.replace("_", " ").capitalize()
+        for name in form.errors if name != "__all__" and name in form.fields
+    ]
+    general = list(form.non_field_errors())
+    parts = []
+    if labels:
+        parts.append("please fix " + ", ".join(str(label) for label in labels))
+    if general:
+        parts.append(" ".join(general))
+    if not parts:
+        return f"{subject} could not be saved. Please try again."
+    return f"{subject} were not saved: " + "; ".join(parts) + "."

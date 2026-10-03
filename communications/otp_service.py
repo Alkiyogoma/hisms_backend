@@ -2,8 +2,8 @@
 OTP foundation for parent verification (USSD / SMS gateway to be wired in settings).
 
 Configure in .env:
-  SMS_PROVIDER=console|africas_talking|...
-  SMS_API_KEY=...
+  SMS_PROVIDER=darsms|console  (see config/settings.py)
+  DARSMS_API_KEY=...
 """
 
 import hashlib
@@ -58,11 +58,14 @@ def verify_otp(phone: str, code: str) -> bool:
 
 
 def _dispatch_sms(phone: str, message: str) -> None:
-    provider = os.getenv("SMS_PROVIDER", "console")
+    provider = (getattr(settings, "SMS_PROVIDER", "") or "console").lower()
     if provider == "console":
         if settings.DEBUG:
             print(f"[SMS:{phone}] {message}")
         else:
             logger.warning("SMS_PROVIDER=console but DEBUG=False; no SMS sent to %s", phone)
         return
-    # Future: AfricasTalking, Twilio, etc.
+    from attendance.notification_service import NotificationService
+    result = NotificationService.send_sms(phone, message)
+    if not result.get("success"):
+        logger.error("OTP SMS to %s failed: %s", phone, result.get("error"))

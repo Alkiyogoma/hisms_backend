@@ -679,6 +679,27 @@ class AssessmentReportSubmitView(RoleRequiredMixin, View):
         assessment_data["teacher_name"] = teacher_name
         assessment_data["report_date"] = report_date
 
+        action = request.POST.get("action", "submit_report")
+        errors = self._validate(assessment_data, final=(action == "submit_report"))
+        if errors:
+            message = "The report was not submitted: " + " ".join(errors.values())
+            if action != "submit_report":
+                # Drafts autosave as the teacher types; keep the valid parts and
+                # report the rest instead of discarding everything.
+                for key in errors:
+                    if key.startswith("pct_"):
+                        assessment_data[key] = ""
+                message = "Draft saved, except: " + " ".join(errors.values())
+            else:
+                is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+                if is_ajax:
+                    return JsonResponse({"ok": False, "error": message, "errors": errors}, status=400)
+                from django.shortcuts import render
+                ctx = self._form_context(task, assessment_data, teacher_comments, teacher_name, report_date)
+                ctx["errors"] = errors
+                ctx["error_message"] = message
+                return render(request, "tasks/_assessment_report_form.html", ctx, status=400)
+
         task.metadata["assessment_data"] = assessment_data
         task.save(update_fields=["metadata"])
 
@@ -692,8 +713,6 @@ class AssessmentReportSubmitView(RoleRequiredMixin, View):
             except Exception:
                 pass
 
-        action = request.POST.get("action", "submit_report")
-
         if action == "submit_report":
             task.mark_completed()
             TaskHistory.objects.create(
@@ -703,20 +722,59 @@ class AssessmentReportSubmitView(RoleRequiredMixin, View):
 
         is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
         if is_ajax:
-            return JsonResponse({"ok": True, "action": action})
+            payload = {"ok": True, "action": action}
+            if errors:
+                payload["warning"] = message
+                payload["errors"] = errors
+            return JsonResponse(payload)
 
         from django.shortcuts import render
-        ctx = {
+        ctx = self._form_context(task, assessment_data, teacher_comments, teacher_name, report_date)
+        ctx["saved"] = True
+        ctx["draft"] = action == "save_draft"
+        return render(request, "tasks/_assessment_report_form.html", ctx)
+
+    def _form_context(self, task, data, teacher_comments, teacher_name, report_date):
+        return {
             "task": task,
-            "eot": self._build_section(self.EOT_SUBJECTS, assessment_data),
-            "cambridge": self._build_section(self.CAMBRIDGE_SUBJECTS, assessment_data),
-            "work_habits": self._build_traits(self.WORK_HABITS, assessment_data),
-            "personal_traits": self._build_traits(self.PERSONAL_TRAITS, assessment_data),
-            "social_traits": self._build_traits(self.SOCIAL_TRAITS, assessment_data),
+            "eot": self._build_section(self.EOT_SUBJECTS, data),
+            "cambridge": self._build_section(self.CAMBRIDGE_SUBJECTS, data),
+            "work_habits": self._build_traits(self.WORK_HABITS, data),
+            "personal_traits": self._build_traits(self.PERSONAL_TRAITS, data),
+            "social_traits": self._build_traits(self.SOCIAL_TRAITS, data),
             "teacher_comments": teacher_comments,
             "teacher_name": teacher_name,
             "report_date": report_date,
-            "saved": True,
-            "draft": action == "save_draft",
         }
-        return render(request, "tasks/_assessment_report_form.html", ctx)
+
+    def _validate(self, data, final):
+        """Field-keyed problems, each naming the field. Percentages are always
+        checked; the completeness rules apply only when submitting."""
+        from decimal import Decimal, InvalidOperation
+        errors = {}
+        sections = (("End of Term", self.EOT_SUBJECTS), ("Cambridge", self.CAMBRIDGE_SUBJECTS))
+        entered = 0
+        for section, subjects in sections:
+            for subj in subjects:
+                key = "pct_%s" % subj["key"]
+                raw = data.get(key, "")
+                if raw == "":
+                    continue
+                try:
+                    val = Decimal(raw)
+                    if not val.is_finite():
+                        raise InvalidOperation
+                except InvalidOperation:
+                    errors[key] = f"{section} {subj['label']}: '{raw}' is not a number."
+                    continue
+                if val < 0 or val > 100:
+                    errors[key] = f"{section} {subj['label']}: {raw}% must be between 0 and 100."
+                    continue
+                entered += 1
+        if final:
+            if not entered and not any(k.startswith("pct_") for k in errors):
+                first = self.EOT_SUBJECTS[0]["key"]
+                errors["pct_%s" % first] = "Enter at least one subject percentage."
+            if not data.get("teacher_comments"):
+                errors["teacher_comments"] = "Supervisor's Comment is required."
+        return errors
