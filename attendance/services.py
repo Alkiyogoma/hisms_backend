@@ -67,11 +67,7 @@ class OTPService:
         )
         
         # Queue SMS message
-        Message.objects.create(
-            phone=parent.phone,
-            message=message_text,
-            status=0  # Pending
-        )
+        Message.queue(parent.phone, message_text)
         
         # Log notification
         NotificationLog.objects.create(

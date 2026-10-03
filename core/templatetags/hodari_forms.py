@@ -73,6 +73,12 @@ def field(bound_field, placeholder=None, rows=None, label=None, hint=None, span=
     else:
         extra["class"] = _INPUT_CLASS
 
+    if bound_field.errors:
+        # Mark the input itself, not just the label, so the bad field stands out.
+        extra["class"] = (extra.get("class", "") + " hf2-err").strip()
+        extra["aria-invalid"] = "true"
+        extra["aria-describedby"] = f"{bound_field.auto_id}_error"
+
     # Django renders the widget's own input_type before any attrs, so a "type"
     # passed via attrs yields a duplicate attribute the browser ignores. Swap the
     # type on a copy of the widget instead so date/time pickers actually appear.

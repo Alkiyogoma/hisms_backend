@@ -60,6 +60,59 @@ from django.views.decorators.csrf import csrf_exempt
 
 
 @method_decorator(csrf_exempt, name='dispatch')
+def _comment_lock_reason(report_card, user):
+    """Why a report's teacher comment can no longer be edited, or '' if it can."""
+    from academics.models import ReportCardStatus
+    if report_card.status == ReportCardStatus.PUBLISHED:
+        return "This report is published. Ask the Head of School to revoke the sign-off before changing the comment."
+    if report_card.comments_submitted and user.role == UserRole.TEACHER:
+        return "These comments were submitted for review and are locked. Ask your HOD to return the report to edit them."
+    term = report_card.term
+    deadline = getattr(term, "grading_deadline", None)
+    if deadline and timezone.localdate() > deadline:
+        return "The grading deadline has passed, so comments can no longer be changed. Contact your admin."
+    return ""
+
+
+def _invalid_score_cells(all_subject_scores, active_configs):
+    """Check every submitted cell before anything is saved, so one bad value
+    never leaves a half-saved learner. Each problem names the subject and
+    assessment so the page can mark that cell."""
+    problems = []
+    for subject_name, subject_scores in all_subject_scores.items():
+        if not isinstance(subject_scores, dict):
+            continue
+        for code, val in subject_scores.items():
+            if code not in active_configs or val == "" or val is None:
+                continue
+            config = active_configs[code]
+            label = f"{subject_name} – {config.name}"
+            max_score = int(config.max_score)
+            try:
+                score = Decimal(str(val).strip())
+                if not score.is_finite():
+                    raise DecimalException
+            except (ValueError, DecimalException):
+                problems.append({"subject": subject_name, "type": code,
+                                 "message": f"{label}: '{val}' is not a number."})
+                continue
+            if score < 0 or score > max_score:
+                problems.append({"subject": subject_name, "type": code,
+                                 "message": f"{label}: {score} is out of range (0–{max_score})."})
+            elif score != score.to_integral_value():
+                problems.append({"subject": subject_name, "type": code,
+                                 "message": f"{label}: {score} must be a whole number."})
+    return problems
+
+
+def _invalid_scores_response(problems):
+    return JsonResponse({
+        "error": "Nothing was saved. Fix these scores and save again: "
+                 + " ".join(p["message"] for p in problems),
+        "invalid": problems,
+    }, status=400)
+
+
 class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
     """View for Primary teachers to enter narrative comments in bulk."""
     template_name = "academics/primary_comments.html"
@@ -175,6 +228,9 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
                 class_info = teacher_tca.get(rc.student.class_name, {})
                 if not class_info or not class_info.get("is_class_teacher"):
                     return JsonResponse({"error": "Only the class teacher can enter narrative comments"}, status=403)
+            locked = _comment_lock_reason(rc, request.user)
+            if locked:
+                return JsonResponse({"error": locked}, status=409)
             try:
                 update_fields = ["updated_at"]
                 if comment is not None:
@@ -184,8 +240,15 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
                     rc.general_traits = traits
                     update_fields.append("general_traits")
                 rc.save(update_fields=update_fields)
-            except Exception as e:
-                return JsonResponse({"error": f"Save failed: {e}"}, status=500)
+            except ValidationError as e:
+                return JsonResponse({"error": "Not saved: " + " ".join(e.messages)}, status=400)
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception("Comment autosave failed for report %s", rc.pk)
+                return JsonResponse(
+                    {"error": "Not saved: the system could not save this comment. Your text is still in the box — try again."},
+                    status=500,
+                )
             try:
                 log_event(
                     actor=request.user,
@@ -202,19 +265,26 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
         term_id = request.POST.get("term_id") or request.POST.get("term")
         class_name = request.POST.get("class_name")
         action = request.POST.get("action")
+        from urllib.parse import urlencode
+        back = f"{request.path}?" + urlencode({k: v for k, v in (("class_name", class_name), ("term", term_id)) if v})
         
-        # Comment window gate: block form submit if window not open
+        # Comment window gate: drafts can be saved until the grading deadline;
+        # submission for review opens only after endterm exams end.
         from django.utils import timezone as _tz
         today = _tz.localdate()
         term_obj = Term.objects.filter(pk=term_id).first() if term_id else get_current_term()
         endterm_end = getattr(term_obj, "endterm_exam_end_date", None) if term_obj else None
         grading_dl = getattr(term_obj, "grading_deadline", None) if term_obj else None
         if grading_dl and today > grading_dl:
-            messages.error(request, "The grading deadline has passed. Comments can no longer be submitted. Contact your admin.")
-            return redirect(f"{request.path}?class_name={class_name}")
-        if endterm_end and today < endterm_end:
-            messages.warning(request, f"Comment entry opens after endterm exams end on {endterm_end.strftime('%d %b %Y')}. You can still draft comments, but submission is blocked until then.")
-            return redirect(f"{request.path}?class_name={class_name}")
+            messages.error(request, "Comments were not saved: the grading deadline has passed. Contact your admin.")
+            return redirect(back)
+        if action == "submit_for_review" and endterm_end and today < endterm_end:
+            messages.warning(
+                request,
+                f"Your comments were saved as drafts but not submitted: submission opens after endterm "
+                f"exams end on {endterm_end.strftime('%d %b %Y')}.",
+            )
+            action = "save"
         
         # RBAC: TEACHER scoped to class-teacher-only assignments
         if request.user.role == UserRole.TEACHER:
@@ -229,11 +299,21 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
         report_cards = ReportCard.objects.filter(term_id=term_id, student__in=students, is_ecd_report=False)
         
         updated = 0
-        for rc in report_cards:
+        too_short = []
+        locked_names = []
+        for rc in report_cards.select_related("student"):
             comment = request.POST.get(f"comment_{rc.id}")
             if comment is not None:
-                if len(comment.strip()) < 50:
-                    messages.warning(request, f"Comment for {rc.student.first_name} {rc.student.last_name} is too short (minimum 50 characters).")
+                name = f"{rc.student.first_name} {rc.student.last_name}"
+                if _comment_lock_reason(rc, request.user):
+                    if comment != (rc.teacher_comments or ""):
+                        locked_names.append(name)
+                    continue
+                # Always keep what was typed; the 50-character minimum only
+                # decides whether the comment can be submitted for review.
+                if comment.strip() and len(comment.strip()) < 50:
+                    too_short.append(f"{name} ({len(comment.strip())})")
+                if comment == (rc.teacher_comments or ""):
                     continue
                 rc.teacher_comments = comment
                 rc.save(update_fields=["teacher_comments", "updated_at"])
@@ -276,11 +356,22 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
                     )
                 messages.success(request, f"Submitted {len(rc_ids)} report(s) for HOD/HOS review.")
             else:
-                messages.warning(request, "No reports met the minimum comment length (50 chars) for submission.")
+                messages.warning(request, "Nothing was submitted: no comment met the 50-character minimum.")
         elif updated:
             messages.success(request, f"Saved comments for {updated} students.")
+        if too_short:
+            messages.warning(
+                request,
+                "Saved, but too short to submit (minimum 50 characters, current length in brackets): "
+                + ", ".join(too_short) + ".",
+            )
+        if locked_names:
+            messages.warning(
+                request,
+                "Not changed because the report is already submitted or published: " + ", ".join(locked_names) + ".",
+            )
             
-        return redirect(f"{request.path}?class_name={class_name}")
+        return redirect(back)
 
 
 class ScoreCorrectionHistoryView(RoleRequiredMixin, TemplateView):
@@ -413,37 +504,24 @@ class PrimaryScoreEntryView(RoleRequiredMixin, TemplateView):
         ctx["academics_tab"] = "primary_assessment"
 
         if selected_class and ctx.get("current_term"):
-            from academics.models import ReportCard, ReportCardStatus, ExamScore, ScoreStatus
-            total_students = Student.objects.filter(class_name=selected_class, is_archived=False).count()
-            submitted_count = ReportCard.objects.filter(
-                student__class_name=selected_class,
-                term=ctx["current_term"],
-                status=ReportCardStatus.PENDING_SIGN_OFF,
-            ).count()
-            has_returned = ExamScore.objects.filter(
-                student__class_name=selected_class,
-                term=ctx["current_term"],
-                status=ScoreStatus.RETURNED,
-            ).exists()
-            returned_student_ids = list(
-                ExamScore.objects.filter(
-                    student__class_name=selected_class,
-                    term=ctx["current_term"],
-                    status=ScoreStatus.RETURNED,
-                ).values_list("student_id", flat=True).distinct()
+            from academics.models import ExamScore, ScoreStatus
+            # Scoped to the subjects this user can edit: another teacher's
+            # submission or approval must not mark this teacher's work as done.
+            own_scores = ExamScore.objects.filter(
+                student__class_name=selected_class, term=ctx["current_term"],
             )
-            ctx["class_submitted"] = total_students > 0 and submitted_count >= total_students and not has_returned
+            if role == UserRole.TEACHER:
+                own_scores = own_scores.filter(subject_name__in=ctx.get("editable_subjects") or [])
+            returned_student_ids = list(
+                own_scores.filter(status=ScoreStatus.RETURNED)
+                .values_list("student_id", flat=True).distinct()
+            )
+            ctx["class_submitted"] = (
+                own_scores.exists()
+                and not own_scores.filter(status__in=[ScoreStatus.DRAFT, ScoreStatus.RETURNED]).exists()
+            )
             ctx["returned_count"] = len(returned_student_ids)
             ctx["returned_student_ids"] = returned_student_ids
-
-            # Check if there are any scores waiting to be submitted (new midterm/quiz entries)
-            has_unsubmitted = ExamScore.objects.filter(
-                student__class_name=selected_class,
-                term=ctx["current_term"],
-                status__in=[ScoreStatus.DRAFT, ScoreStatus.SUBMITTED],
-            ).exists()
-            if has_unsubmitted:
-                ctx["class_submitted"] = False
 
         return ctx
 
@@ -489,24 +567,12 @@ class PrimaryStudentsAPIView(RoleRequiredMixin, View):
                 rc_map[rc.student_id] = rc.status
 
         # Per-student score status summary for sidebar chips
-        score_status_map = {}
+        # Per-student status from per-subject approval: "approved" only when
+        # every subject is approved; "partial" when only some are.
+        progress_map = {}
         if term_id and student_ids:
-            from academics.models import ScoreStatus
-            for sid in student_ids:
-                statuses = set(
-                    ExamScore.objects.filter(student_id=sid, term_id=term_id)
-                    .values_list("status", flat=True)
-                )
-                if not statuses:
-                    score_status_map[sid] = "draft"
-                elif ScoreStatus.RETURNED in statuses:
-                    score_status_map[sid] = "returned"
-                elif ScoreStatus.APPROVED in statuses and ScoreStatus.DRAFT not in statuses and ScoreStatus.SUBMITTED not in statuses:
-                    score_status_map[sid] = "approved"
-                elif ScoreStatus.SUBMITTED in statuses:
-                    score_status_map[sid] = "submitted"
-                elif ScoreStatus.DRAFT in statuses:
-                    score_status_map[sid] = "draft"
+            from academics.score_progress import class_progress
+            progress_map = class_progress(student_ids, term_id, class_name)
 
         data = [
             {
@@ -516,7 +582,9 @@ class PrimaryStudentsAPIView(RoleRequiredMixin, View):
                 "admission_no": s.admission_no,
                 "has_scores": s.id in scored_ids,
                 "report_card_status": rc_map.get(s.id, ReportCardStatus.DRAFT),
-                "score_status": score_status_map.get(s.id, ""),
+                "score_status": progress_map[s.id]["status"] if s.id in progress_map else "",
+                "approved_subjects": progress_map[s.id]["approved_subjects"] if s.id in progress_map else 0,
+                "total_subjects": progress_map[s.id]["total_subjects"] if s.id in progress_map else 0,
             }
             for s in students
         ]
@@ -564,9 +632,11 @@ class PrimaryScoreAPIView(RoleRequiredMixin, View):
                 "hod_feedback": s.hod_feedback or "",
             }
 
+        from academics.score_progress import build_progress, expected_subjects_for_class
         return JsonResponse({
             "scores": score_data,
-            "report_card_status": rc_status
+            "report_card_status": rc_status,
+            "progress": build_progress(scores, expected_subjects_for_class(student.class_name)),
         })
 
     def post(self, request, student_id):
@@ -583,27 +653,8 @@ class PrimaryScoreAPIView(RoleRequiredMixin, View):
         if not term_id:
             return JsonResponse({"error": "Missing term_id"}, status=400)
             
-        # Check ReportCard status for global lock
-        rc = ReportCard.objects.filter(student_id=student_id, term_id=term_id).first()
-        if rc and rc.status != ReportCardStatus.DRAFT:
-            from academics.models import ScoreStatus as _ScoreStatus
-            # Only block exam codes that have already been submitted/approved.
-            # Allow new exam types (midterm, endterm) that haven't been submitted yet.
-            submitted_codes = set(
-                ExamScore.objects.filter(
-                    student_id=student_id, term_id=term_id,
-                    status__in=[_ScoreStatus.SUBMITTED, _ScoreStatus.APPROVED]
-                ).values_list("exam_type", flat=True)
-            )
-            # Collect all exam codes the teacher is trying to save
-            codes_to_save = set()
-            for _subj, _codes in all_subject_scores.items():
-                if isinstance(_codes, dict):
-                    codes_to_save.update(_codes.keys())
-            # If all codes being saved are already submitted/approved, block
-            if codes_to_save and codes_to_save.issubset(submitted_codes):
-                return JsonResponse({"error": "Evaluation is locked (Submitted to HOD)"}, status=403)
-
+        # Locking is per subject + assessment type (checked per score below);
+        # another subject's submission/approval never blocks this one.
         student = get_object_or_404(Student, id=student_id)
         if not self._student_in_teacher_classes(request, student):
             return JsonResponse({"error": "Access denied"}, status=403)
@@ -636,8 +687,12 @@ class PrimaryScoreAPIView(RoleRequiredMixin, View):
         
         from academics.models import ExamTypeConfiguration, ScoreStatus
         active_configs = {c.code: c for c in ExamTypeConfiguration.objects.filter(is_active=True)}
-        
+        problems = _invalid_score_cells(all_subject_scores, active_configs)
+        if problems:
+            return _invalid_scores_response(problems)
+
         updated = 0
+        locked_cells = []
         for subject_name, subjects_scores in all_subject_scores.items():
             for code, val in subjects_scores.items():
                 if code not in active_configs: continue
@@ -672,6 +727,8 @@ class PrimaryScoreAPIView(RoleRequiredMixin, View):
                     exam_type=code
                 ).first()
                 if existing and existing.is_locked and existing.status != "returned":
+                    if existing.score != score_val:
+                        locked_cells.append(f"{subject_name} – {active_configs[code].name}")
                     continue
 
                 score_obj, created = ExamScore.objects.get_or_create(
@@ -699,7 +756,13 @@ class PrimaryScoreAPIView(RoleRequiredMixin, View):
                 except ValidationError as e:
                     if created:
                         score_obj.delete()
-                    return JsonResponse({"error": str(e)}, status=400)
+                    label = f"{subject_name} – {active_configs[code].name}"
+                    return JsonResponse({
+                        "error": f"{label} was not saved: " + " ".join(e.messages)
+                                 + (f" ({updated} other score(s) were saved.)" if updated else ""),
+                        "invalid": [{"subject": subject_name, "type": code,
+                                     "message": f"{label}: " + " ".join(e.messages)}],
+                    }, status=400)
                 if not created:
                     save_fields = ["score", "max_score", "entered_by", "exam_type_config", "updated_at"]
                     if was_returned:
@@ -743,7 +806,17 @@ class PrimaryScoreAPIView(RoleRequiredMixin, View):
                     if rc:
                         recalculate_report_card_average(rc)
             
+        if locked_cells and not updated:
+            return JsonResponse({
+                "error": (
+                    "Already submitted to the HOD and locked: " + ", ".join(locked_cells)
+                    + ". Other subjects are not affected."
+                ),
+                "locked": locked_cells,
+            }, status=403)
         response_data = {"success": True, "updated": updated}
+        if locked_cells:
+            response_data["locked"] = locked_cells
         if skipped_subjects:
             response_data["warning"] = f"Subjects not in your assignment were skipped: {', '.join(sorted(skipped_subjects))}"
         if soft_warnings:
@@ -814,19 +887,10 @@ class PrimaryBulkSubmissionAPIView(RoleRequiredMixin, View):
         from django.db import transaction
         with transaction.atomic():
             for student in students:
-                rc, created = ReportCard.objects.get_or_create(
-                    student=student,
-                    term=term,
-                    defaults={
-                        "status": ReportCardStatus.PENDING_SIGN_OFF,
-                        "updated_at": timezone.now(),
-                        "generated_by": request.user,
-                    }
+                ReportCard.objects.get_or_create(
+                    student=student, term=term,
+                    defaults={"status": ReportCardStatus.DRAFT, "generated_by": request.user},
                 )
-                if not created:
-                    rc.status = ReportCardStatus.PENDING_SIGN_OFF
-                    rc.updated_at = timezone.now()
-                    rc.save(update_fields=["status", "updated_at"])
                 # Force save individual scores to ensure they follow the ReportCard status
                 from academics.models import ExamScore, ScoreStatus
                 from audit.models import log_event
@@ -838,8 +902,8 @@ class PrimaryBulkSubmissionAPIView(RoleRequiredMixin, View):
                     tca = get_teacher_assigned_classes_from_tca(request.user)
                     class_info = tca.get(class_name, {})
                     allowed_subjects = class_info.get("subjects", set())
-                    if allowed_subjects:
-                        score_qs = score_qs.filter(subject_name__in=allowed_subjects)
+                    # Only the teacher's own subjects — never other teachers' drafts.
+                    score_qs = score_qs.filter(subject_name__in=allowed_subjects)
                 score_ids = list(score_qs.values_list('id', flat=True))
                 score_qs.update(
                     status=ScoreStatus.SUBMITTED, 
@@ -856,6 +920,11 @@ class PrimaryBulkSubmissionAPIView(RoleRequiredMixin, View):
                         description=f"Score submitted for {student.admission_no} via primary assessment — {class_name}",
                         request=request,
                     )
+
+                # The report is pending sign-off only once every subject is
+                # submitted or approved — one subject's submission is not enough.
+                from academics.score_progress import sync_report_status
+                sync_report_status(student, term)
         
         # ── HOD Notification ──
         from communications.email_service import dispatch_notification
@@ -984,36 +1053,24 @@ class LowerSecondaryScoreEntryView(RoleRequiredMixin, TemplateView):
         ctx["academics_tab"] = "lower_secondary_assessment"
 
         if selected_class and ctx.get("current_term"):
-            from academics.models import ReportCard, ReportCardStatus, ExamScore, ScoreStatus
-            total_students = Student.objects.filter(class_name=selected_class, is_archived=False).count()
-            submitted_count = ReportCard.objects.filter(
-                student__class_name=selected_class,
-                term=ctx["current_term"],
-                status=ReportCardStatus.PENDING_SIGN_OFF,
-            ).count()
-            has_returned = ExamScore.objects.filter(
-                student__class_name=selected_class,
-                term=ctx["current_term"],
-                status=ScoreStatus.RETURNED,
-            ).exists()
-            returned_student_ids = list(
-                ExamScore.objects.filter(
-                    student__class_name=selected_class,
-                    term=ctx["current_term"],
-                    status=ScoreStatus.RETURNED,
-                ).values_list("student_id", flat=True).distinct()
+            from academics.models import ExamScore, ScoreStatus
+            # Scoped to the subjects this user can edit: another teacher's
+            # submission or approval must not mark this teacher's work as done.
+            own_scores = ExamScore.objects.filter(
+                student__class_name=selected_class, term=ctx["current_term"],
             )
-            ctx["class_submitted"] = total_students > 0 and submitted_count >= total_students and not has_returned
+            if role == UserRole.TEACHER:
+                own_scores = own_scores.filter(subject_name__in=ctx.get("editable_subjects") or [])
+            returned_student_ids = list(
+                own_scores.filter(status=ScoreStatus.RETURNED)
+                .values_list("student_id", flat=True).distinct()
+            )
+            ctx["class_submitted"] = (
+                own_scores.exists()
+                and not own_scores.filter(status__in=[ScoreStatus.DRAFT, ScoreStatus.RETURNED]).exists()
+            )
             ctx["returned_count"] = len(returned_student_ids)
             ctx["returned_student_ids"] = returned_student_ids
-
-            has_unsubmitted = ExamScore.objects.filter(
-                student__class_name=selected_class,
-                term=ctx["current_term"],
-                status__in=[ScoreStatus.DRAFT, ScoreStatus.SUBMITTED],
-            ).exists()
-            if has_unsubmitted:
-                ctx["class_submitted"] = False
 
         return ctx
 
@@ -1056,24 +1113,12 @@ class LowerSecondaryStudentsAPIView(RoleRequiredMixin, View):
             for rc in ReportCard.objects.filter(student_id__in=student_ids, term_id=term_id):
                 rc_map[rc.student_id] = rc.status
 
-        score_status_map = {}
+        # Per-student status from per-subject approval: "approved" only when
+        # every subject is approved; "partial" when only some are.
+        progress_map = {}
         if term_id and student_ids:
-            from academics.models import ScoreStatus
-            for sid in student_ids:
-                statuses = set(
-                    ExamScore.objects.filter(student_id=sid, term_id=term_id)
-                    .values_list("status", flat=True)
-                )
-                if not statuses:
-                    score_status_map[sid] = "draft"
-                elif ScoreStatus.RETURNED in statuses:
-                    score_status_map[sid] = "returned"
-                elif ScoreStatus.APPROVED in statuses and ScoreStatus.DRAFT not in statuses and ScoreStatus.SUBMITTED not in statuses:
-                    score_status_map[sid] = "approved"
-                elif ScoreStatus.SUBMITTED in statuses:
-                    score_status_map[sid] = "submitted"
-                elif ScoreStatus.DRAFT in statuses:
-                    score_status_map[sid] = "draft"
+            from academics.score_progress import class_progress
+            progress_map = class_progress(student_ids, term_id, class_name)
 
         data = [
             {
@@ -1083,7 +1128,9 @@ class LowerSecondaryStudentsAPIView(RoleRequiredMixin, View):
                 "admission_no": s.admission_no,
                 "has_scores": s.id in scored_ids,
                 "report_card_status": rc_map.get(s.id, ReportCardStatus.DRAFT),
-                "score_status": score_status_map.get(s.id, ""),
+                "score_status": progress_map[s.id]["status"] if s.id in progress_map else "",
+                "approved_subjects": progress_map[s.id]["approved_subjects"] if s.id in progress_map else 0,
+                "total_subjects": progress_map[s.id]["total_subjects"] if s.id in progress_map else 0,
             }
             for s in students
         ]
@@ -1131,7 +1178,12 @@ class LowerSecondaryScoreAPIView(RoleRequiredMixin, View):
                 "hod_feedback": s.hod_feedback or "",
             }
 
-        return JsonResponse({"scores": score_data, "report_card_status": rc_status})
+        from academics.score_progress import build_progress, expected_subjects_for_class
+        return JsonResponse({
+            "scores": score_data,
+            "report_card_status": rc_status,
+            "progress": build_progress(scores, expected_subjects_for_class(student.class_name)),
+        })
 
     def post(self, request, student_id):
         if not request.user.has_role(UserRole.TEACHER, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN):
@@ -1147,22 +1199,7 @@ class LowerSecondaryScoreAPIView(RoleRequiredMixin, View):
         if not term_id:
             return JsonResponse({"error": "Missing term_id"}, status=400)
 
-        rc = ReportCard.objects.filter(student_id=student_id, term_id=term_id).first()
-        if rc and rc.status != ReportCardStatus.DRAFT:
-            from academics.models import ScoreStatus as _ScoreStatus
-            submitted_codes = set(
-                ExamScore.objects.filter(
-                    student_id=student_id, term_id=term_id,
-                    status__in=[_ScoreStatus.SUBMITTED, _ScoreStatus.APPROVED]
-                ).values_list("exam_type", flat=True)
-            )
-            codes_to_save = set()
-            for _subj, _codes in all_subject_scores.items():
-                if isinstance(_codes, dict):
-                    codes_to_save.update(_codes.keys())
-            if codes_to_save and codes_to_save.issubset(submitted_codes):
-                return JsonResponse({"error": "Evaluation is locked (Submitted to HOD)"}, status=403)
-
+        # Locking is per subject + assessment type (checked per score below).
         student = get_object_or_404(Student, id=student_id)
         if not self._student_in_teacher_classes(request, student):
             return JsonResponse({"error": "Access denied"}, status=403)
@@ -1191,8 +1228,12 @@ class LowerSecondaryScoreAPIView(RoleRequiredMixin, View):
 
         from academics.models import ExamTypeConfiguration, ScoreStatus
         active_configs = {c.code: c for c in ExamTypeConfiguration.objects.filter(is_active=True)}
+        problems = _invalid_score_cells(all_subject_scores, active_configs)
+        if problems:
+            return _invalid_scores_response(problems)
 
         updated = 0
+        locked_cells = []
         for subject_name, subjects_scores in all_subject_scores.items():
             for code, val in subjects_scores.items():
                 if code not in active_configs:
@@ -1224,6 +1265,8 @@ class LowerSecondaryScoreAPIView(RoleRequiredMixin, View):
                     student=student, term=term, subject_name=subject_name, exam_type=code
                 ).first()
                 if existing and existing.is_locked and existing.status != "returned":
+                    if existing.score != score_val:
+                        locked_cells.append(f"{subject_name} – {active_configs[code].name}")
                     continue
 
                 score_obj, created = ExamScore.objects.get_or_create(
@@ -1248,7 +1291,13 @@ class LowerSecondaryScoreAPIView(RoleRequiredMixin, View):
                 except ValidationError as e:
                     if created:
                         score_obj.delete()
-                    return JsonResponse({"error": str(e)}, status=400)
+                    label = f"{subject_name} – {active_configs[code].name}"
+                    return JsonResponse({
+                        "error": f"{label} was not saved: " + " ".join(e.messages)
+                                 + (f" ({updated} other score(s) were saved.)" if updated else ""),
+                        "invalid": [{"subject": subject_name, "type": code,
+                                     "message": f"{label}: " + " ".join(e.messages)}],
+                    }, status=400)
                 if not created:
                     save_fields = ["score", "max_score", "entered_by", "exam_type_config", "updated_at"]
                     if was_returned:
@@ -1283,7 +1332,17 @@ class LowerSecondaryScoreAPIView(RoleRequiredMixin, View):
                     if rc:
                         recalculate_report_card_average(rc)
 
+        if locked_cells and not updated:
+            return JsonResponse({
+                "error": (
+                    "Already submitted to the HOD and locked: " + ", ".join(locked_cells)
+                    + ". Other subjects are not affected."
+                ),
+                "locked": locked_cells,
+            }, status=403)
         response_data = {"success": True, "updated": updated}
+        if locked_cells:
+            response_data["locked"] = locked_cells
         if skipped_subjects:
             response_data["warning"] = f"Subjects not in your assignment were skipped: {', '.join(sorted(skipped_subjects))}"
         if soft_warnings:
@@ -1342,18 +1401,10 @@ class LowerSecondaryBulkSubmissionAPIView(RoleRequiredMixin, View):
         from django.db import transaction
         with transaction.atomic():
             for student in students:
-                rc, created = ReportCard.objects.get_or_create(
+                ReportCard.objects.get_or_create(
                     student=student, term=term,
-                    defaults={
-                        "status": ReportCardStatus.PENDING_SIGN_OFF,
-                        "updated_at": timezone.now(),
-                        "generated_by": request.user,
-                    }
+                    defaults={"status": ReportCardStatus.DRAFT, "generated_by": request.user},
                 )
-                if not created:
-                    rc.status = ReportCardStatus.PENDING_SIGN_OFF
-                    rc.updated_at = timezone.now()
-                    rc.save(update_fields=["status", "updated_at"])
                 from academics.models import ExamScore, ScoreStatus
                 from audit.models import log_event
                 score_qs = ExamScore.objects.filter(
@@ -1364,8 +1415,8 @@ class LowerSecondaryBulkSubmissionAPIView(RoleRequiredMixin, View):
                     tca = get_teacher_assigned_classes_from_tca(request.user)
                     class_info = tca.get(class_name, {})
                     allowed_subjects = class_info.get("subjects", set())
-                    if allowed_subjects:
-                        score_qs = score_qs.filter(subject_name__in=allowed_subjects)
+                    # Only the teacher's own subjects — never other teachers' drafts.
+                    score_qs = score_qs.filter(subject_name__in=allowed_subjects)
                 score_ids = list(score_qs.values_list("id", flat=True))
                 score_qs.update(
                     status=ScoreStatus.SUBMITTED, is_locked=True, updated_at=timezone.now()
@@ -1377,6 +1428,11 @@ class LowerSecondaryBulkSubmissionAPIView(RoleRequiredMixin, View):
                         description=f"Score submitted for {student.admission_no} via lower secondary assessment — {class_name}",
                         request=request,
                     )
+
+                # The report is pending sign-off only once every subject is
+                # submitted or approved — one subject's submission is not enough.
+                from academics.score_progress import sync_report_status
+                sync_report_status(student, term)
 
         from communications.email_service import dispatch_notification
         from users.models import User

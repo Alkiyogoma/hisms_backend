@@ -1671,7 +1671,9 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
         ctx = {"active_tab": tab, "form": form, "is_admin_officer": self._is_admin_officer(request), "is_head_of_school": self._is_head_of_school(request), "is_hod": self._is_hod(request)}
         if tab == "messaging":
             from core.email_backend import resolve_delivery
+            from attendance.notification_service import sms_status
             ctx["email_delivery"] = resolve_delivery()[2]
+            ctx["sms_status"] = sms_status()
         # Always load classes count for the tab badge
         if request.user.has_perm("academics.view_gradeclass"):
             from academics.models import GradeClass as _GC
@@ -1738,8 +1740,6 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
                 for area_code, _ in MediaSettings.AREA_CHOICES:
                     MediaSettings.get_for_area(area_code)
             ctx["media_settings"] = MediaSettings.objects.all()
-        if tab == "dynamic_pages":
-            pass  # Branding context is already available via the branding context processor
         from hr.models import OnboardingChecklistItem
         ctx["induction_items"] = OnboardingChecklistItem.objects.all().order_by("step", "order", "item_name")
         if tab == "induction_checklist":
@@ -1943,38 +1943,6 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
                 messages.success(request, f"Class '{gc.name}' updated.")
             return redirect(f"{reverse_lazy('core:school_settings')}?tab=classes")
 
-        # Handle branding save from dynamic_pages tab
-        if action == "save_branding":
-            settings_obj = self._get_settings()
-            login_hero = request.FILES.get("login_hero_image")
-            login_staff_hero = request.FILES.get("login_staff_hero_image")
-            login_parent_hero = request.FILES.get("login_parent_hero_image")
-            login_logo = request.FILES.get("login_logo")
-            if login_hero:
-                settings_obj.login_hero_image = login_hero
-            if login_staff_hero:
-                settings_obj.login_staff_hero_image = login_staff_hero
-            if login_parent_hero:
-                settings_obj.login_parent_hero_image = login_parent_hero
-            if login_logo:
-                settings_obj.login_logo = login_logo
-            if request.POST.get("remove_staff_hero"):
-                settings_obj.login_staff_hero_image = None
-            if request.POST.get("remove_parent_hero"):
-                settings_obj.login_parent_hero_image = None
-            if request.POST.get("remove_logo"):
-                settings_obj.login_logo = None
-            for field in [
-                "login_heading", "login_description", "login_tagline",
-                "login_feature1", "login_feature2", "login_feature3",
-                "login_right_heading", "login_right_subtitle",
-            ]:
-                val = request.POST.get(field, "").strip()
-                setattr(settings_obj, field, val)
-            settings_obj.save()
-            messages.success(request, "Login page branding updated.")
-            return redirect(f"{reverse_lazy('core:school_settings')}?tab=dynamic_pages")
-
         # Handle media settings tab
         if tab == "media":
             from core.models import MediaSettings
@@ -2007,6 +1975,20 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
 
         # Handle messaging tab (email & WhatsApp settings)
         if tab == "messaging":
+            if action == "send_test_sms":
+                from attendance.notification_service import NotificationService
+                to = (request.POST.get("test_phone") or "").strip()
+                if not to:
+                    messages.error(request, "Enter a phone number to send the test SMS to.")
+                else:
+                    result = NotificationService.send_sms(
+                        to, f"Test SMS from {self._get_settings().school_name or 'HISMS'}. SMS delivery is working.")
+                    if result.get("success"):
+                        messages.success(request, f"Test SMS sent to {', '.join(result.get('sent_to') or [to])}.")
+                    else:
+                        messages.error(request, f"Test SMS failed: {result.get('error') or 'unknown error'}")
+                return redirect(f"{reverse_lazy('core:school_settings')}?tab=messaging")
+
             if action == "send_test_email":
                 from communications.email_service import send_email_safe
                 from communications.models import EmailSendLog

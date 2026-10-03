@@ -321,6 +321,8 @@
     <div class="card">
       <div class="card-title-row" style="margin-bottom:16px">
         <div class="card-title" style="margin:0;font-size:14px">Contact Information</div>
+        {% has_perm user "students.change_parentguardian" as can_edit_contact %}
+        {% if can_edit_contact %}<a href="{% url 'students:guardian_edit' guardian.pk %}" style="font-size:12px;font-weight:600;color:var(--hodari-blue);text-decoration:none">Edit</a>{% endif %}
       </div>
       <div class="gp-detail-grid">
         <div class="gp-detail-item">
@@ -343,6 +345,10 @@
           <label>Preferred Invoice Name</label>
           <span>{{ guardian.preferred_invoice_name|default:"N/A" }}</span>
         </div>
+        <div class="gp-detail-item">
+          <label>Preferred Language</label>
+          <span>{{ guardian.get_preferred_language_display|default:"N/A" }}</span>
+        </div>
       </div>
     </div>
   </div>
@@ -354,6 +360,13 @@
       <div class="card-title" style="font-size:13px;margin-bottom:12px">Actions</div>
       <div style="display:flex;flex-direction:column;gap:8px">
         {% has_perm user "students.change_parentguardian" as can_change_guardian %}
+        {% if can_change_guardian %}
+        <a href="{% url 'students:guardian_edit' guardian.pk %}"
+           class="hf-btn hf-btn-primary" style="width:100%;justify-content:center;text-decoration:none">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+          Edit Guardian
+        </a>
+        {% endif %}
         {% if guardian.user and can_change_guardian %}
         <a href="{% url 'users:impersonate_start' guardian.user.pk %}"
            class="hf-btn hf-btn-primary" style="width:100%;justify-content:center;text-decoration:none">

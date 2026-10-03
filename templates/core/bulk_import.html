@@ -12,10 +12,9 @@
   {% if can_view_classes %}
   <a href="{% url 'core:school_settings' %}?tab=classes" class="sub-tab">Classes <span class="sub-tab-count grey">{{ classes_count }}</span></a>
   {% endif %}
-  <a href="{% url 'core:school_settings' %}?tab=messaging" class="sub-tab">Email & WhatsApp</a>
+  <a href="{% url 'core:school_settings' %}?tab=messaging" class="sub-tab">Email & SMS</a>
   <a href="{% url 'core:school_settings' %}?tab=academic_year" class="sub-tab">Academic Year & Terms</a>
   <a href="{% url 'core:school_settings' %}?tab=media" class="sub-tab">Media Settings</a>
-  <a href="{% url 'core:school_settings' %}?tab=dynamic_pages" class="sub-tab">Dynamic Pages</a>
   <a href="{% url 'core:bulk_import' %}" class="sub-tab active">Bulk Import</a>
   {% if not is_admin_officer and not is_head_of_school and not is_hod %}
   <a href="{% url 'core:school_settings' %}?tab=induction_checklist" class="sub-tab">Induction Checklist</a>

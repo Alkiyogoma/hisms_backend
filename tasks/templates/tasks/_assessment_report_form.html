@@ -59,6 +59,9 @@
   <form id="assessment-form" method="post" action="{% url 'tasks:assessment_report_submit' task.pk %}"
     style="display:flex;flex-direction:column;gap:2px">
     {% csrf_token %}
+    <div id="assessment-errors" role="alert" tabindex="-1"
+         style="{% if not error_message %}display:none;{% endif %}border:1.5px solid #DC2626;background:#FEF2F2;color:#991B1B;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px">{{ error_message }}</div>
+    {{ errors|default:None|json_script:"assessment-errors-data" }}
 
     <!-- END OF TERM TEST -->
     <div class="assess-section-title">End of Term Test</div>
@@ -365,12 +368,17 @@
       });
       var body = await resp.json().catch(function(){ return null; });
       if (resp.ok && body && body.ok) {
-        showStatus('Saved', 'saved');
+        if (body.warning) {
+          showStatus('Saved with problems', '');
+          showFieldErrors(body.warning, body.errors, true);
+        } else {
+          showStatus('Saved', 'saved');
+        }
       } else {
-        showStatus('Save failed', '');
+        showStatus('Save failed — your entries are still on the page', '');
       }
     } catch(e) {
-      showStatus('Save failed', '');
+      showStatus('Save failed — check your connection', '');
     }
     saving = false;
   }
@@ -379,6 +387,45 @@
     if (saveTimeout) clearTimeout(saveTimeout);
     saveTimeout = setTimeout(autoSave, 1000);
   }
+
+  var errorBox = document.getElementById('assessment-errors');
+
+  function clearFieldErrors() {
+    form.querySelectorAll('[aria-invalid="true"]').forEach(function(el) {
+      el.removeAttribute('aria-invalid');
+      el.style.borderColor = '';
+    });
+    form.querySelectorAll('.assess-field-error').forEach(function(el) { el.remove(); });
+    errorBox.style.display = 'none';
+    errorBox.textContent = '';
+  }
+
+  // Mark each problem field, explain it beside the field, and bring the first into view.
+  function showFieldErrors(message, errors, quiet) {
+    clearFieldErrors();
+    errorBox.textContent = message || 'The report was not submitted.';
+    errorBox.style.display = 'block';
+    var first = null;
+    Object.keys(errors || {}).forEach(function(name) {
+      var el = form.querySelector('[name="' + name + '"]');
+      if (!el) return;
+      el.setAttribute('aria-invalid', 'true');
+      el.style.borderColor = '#DC2626';
+      var note = document.createElement('div');
+      note.className = 'assess-field-error';
+      note.style.cssText = 'color:#DC2626;font-size:11px;margin-top:2px';
+      note.textContent = errors[name];
+      el.insertAdjacentElement('afterend', note);
+      first = first || el;
+    });
+    if (quiet) return;  // autosave: never move the cursor while the teacher is typing
+    var target = first || errorBox;
+    target.scrollIntoView({behavior: 'smooth', block: 'center'});
+    try { target.focus({preventScroll: true}); } catch (e) { target.focus(); }
+  }
+
+  var initialErrors = JSON.parse(document.getElementById('assessment-errors-data').textContent || 'null');
+  if (initialErrors) showFieldErrors(errorBox.textContent, initialErrors);
 
   window.submitAction = async function(action) {
     showStatus('Saving...', 'saving');
@@ -391,7 +438,13 @@
         headers: { 'X-Requested-With': 'XMLHttpRequest' }
       });
       var body = await resp.json().catch(function(){ return null; });
+      if (body && body.errors && !body.ok) {
+        showStatus('Not submitted', '');
+        showFieldErrors(body.error, body.errors);
+        return;
+      }
       if (resp.ok && body && body.ok) {
+        clearFieldErrors();
         if (action === 'submit_report') {
           document.getElementById('assessment-modal').style.display = 'none';
           if (typeof showToast === 'function') {
@@ -403,9 +456,11 @@
         }
       } else {
         showStatus('Save failed', '');
+        showFieldErrors('The report was not saved: the server returned an unexpected error (' + resp.status + '). Please try again.', {});
       }
     } catch(e) {
       showStatus('Save failed', '');
+      showFieldErrors('The report was not saved: the server could not be reached. Check your connection and try again.', {});
     }
   };
 

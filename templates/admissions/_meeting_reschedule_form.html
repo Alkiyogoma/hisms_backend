@@ -35,6 +35,7 @@
     hx-swap="innerHTML"
   >
     {% csrf_token %}
+    {% include "_partials/form_error_summary.html" with form=form %}
     <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:4px">New date &amp; time</div>
     <div class="hf2-grid-2">
       {% field form.meeting_date %}

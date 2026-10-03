@@ -126,6 +126,8 @@
         <td>
           {% if item.all_scores_approved %}
             <a href="{% url 'academics:primary_assessment' %}?class_name={{ item.class_name|urlencode }}&term_id={{ term.id }}" target="_blank" class="chip chip-green" style="cursor:pointer;text-decoration:none" title="View scores for {{ item.class_name }}">Approved</a>
+          {% elif item.approved_subjects %}
+            <a href="{% url 'academics:primary_assessment' %}?class_name={{ item.class_name|urlencode }}&term_id={{ term.id }}" target="_blank" class="chip chip-amber" style="cursor:pointer;text-decoration:none" title="Report is incomplete until every subject is approved">{{ item.approved_subjects }}/{{ item.total_subjects }} approved</a>
           {% elif item.pending_score_count > 0 %}
             <a href="{% url 'academics:primary_assessment' %}?class_name={{ item.class_name|urlencode }}&term_id={{ term.id }}" target="_blank" class="chip chip-amber" style="cursor:pointer;text-decoration:none" title="View {{ item.pending_score_count }} pending score(s)">{{ item.pending_score_count }} pending</a>
           {% else %}
@@ -169,7 +171,7 @@
               {% elif not can_publish and item.all_scores_approved and item.comment_ok %}
               <span class="chip chip-amber" style="font-size:10px">Awaiting HOS Sign-Off</span>
               {% endif %}
-              <button class="hf-btn hf-btn-secondary" style="font-size:11px;padding:5px 12px;color:var(--red);border-color:var(--red-bd)" onclick="showReject({{ item.report.pk }})">
+              <button class="hf-btn hf-btn-secondary" style="font-size:11px;padding:5px 12px;color:var(--red);border-color:var(--red-bd)" data-subjects="{{ item.subject_names|join:'|' }}" onclick="showReject({{ item.report.pk }}, this.dataset.subjects)">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M18 6L6 18M6 6l12 12"/></svg>
                 Return
               </button>
@@ -205,6 +207,11 @@
       <input type="hidden" name="report_id" id="rejectReportId">
       <input type="hidden" name="action" value="reject">
       <div style="padding:20px 22px">
+        <div id="rejectSubjectsWrap" style="display:none;margin-bottom:14px">
+          <label style="display:block;font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px">Subjects to reopen for correction</label>
+          <div id="rejectSubjects" style="display:flex;flex-direction:column;gap:6px;font-size:13px"></div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:6px">Only ticked subjects are unlocked. Leave all unticked to return the report for comments only; approved subjects stay approved.</div>
+        </div>
         <label style="display:block;font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px">Reason for returning (required)</label>
         <textarea name="reason" id="rejectReason" style="width:100%;min-height:100px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--font-ui);resize:vertical;outline:none" placeholder="Explain what needs to be corrected..." required></textarea>
       </div>
@@ -217,8 +224,22 @@
 </div>
 
 <script>
-function showReject(reportId) {
+function showReject(reportId, subjects) {
   document.getElementById('rejectReportId').value = reportId;
+  var wrap = document.getElementById('rejectSubjectsWrap');
+  var list = document.getElementById('rejectSubjects');
+  list.innerHTML = '';
+  var names = (subjects || '').split('|').filter(Boolean);
+  names.forEach(function(name) {
+    var label = document.createElement('label');
+    label.style.cssText = 'display:flex;align-items:center;gap:8px;cursor:pointer';
+    var cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.name = 'subjects'; cb.value = name;
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(name));
+    list.appendChild(label);
+  });
+  wrap.style.display = names.length ? 'block' : 'none';
   var modal = document.getElementById('rejectModal');
   modal.style.display = 'flex';
 }

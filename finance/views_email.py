@@ -148,7 +148,7 @@ class SendInvoiceEmailView(RoleRequiredMixin, View):
                 )
                 return redirect("finance:invoice_detail", pk=pk)
             if db_sent and not db_sent.sent:
-                messages.error(request, "The invoice email could not be delivered. Check Settings > Email & WhatsApp.")
+                messages.error(request, "The invoice email could not be delivered. Check Settings > Email & SMS.")
                 return redirect("finance:invoice_detail", pk=pk)
 
             if not db_sent:

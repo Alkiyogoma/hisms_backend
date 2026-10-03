@@ -176,6 +176,124 @@ class HodariSMSProvider(SMSProvider):
             }
 
 
+def normalize_tz_phone(phone: str) -> Optional[str]:
+    """Return a Tanzanian mobile number as 255XXXXXXXXX, or None if it can't be one.
+
+    Accepts +255 7XX..., 255 7XX..., 07XX..., 7XX... with any spaces/dashes.
+    """
+    digits = "".join(ch for ch in str(phone or "") if ch.isdigit())
+    if digits.startswith("00"):
+        digits = digits[2:]
+    if len(digits) == 10 and digits.startswith("0"):
+        digits = "255" + digits[1:]
+    elif len(digits) == 9 and digits[0] in "67":
+        digits = "255" + digits
+    if len(digits) == 12 and digits.startswith("255") and digits[3] in "67":
+        return digits
+    return None
+
+
+class DarSMSProvider(SMSProvider):
+    """SMS provider for the DarSMS bulk SMS API (POST JSON, X-API-Key header)."""
+
+    def __init__(self):
+        self.api_key = getattr(settings, "DARSMS_API_KEY", "")
+        self.api_url = getattr(settings, "DARSMS_API_URL", "")
+        self.timeout = getattr(settings, "DARSMS_TIMEOUT", 15)
+        self.sender_id = self._sender_id()
+
+    @staticmethod
+    def _sender_id() -> str:
+        try:
+            from core.models import SchoolSettings
+            sender = (SchoolSettings.get_settings().sms_sender_id or "").strip()
+            if sender:
+                return sender
+        except Exception:
+            pass
+        return getattr(settings, "DARSMS_SENDER_ID", "HODARI")
+
+    def send(self, phone: str, message: str) -> Dict:
+        return self.send_bulk([phone], message)
+
+    def send_bulk(self, phones: List[str], message: str) -> Dict:
+        """Send one message to many numbers in a single API call."""
+        result = {"success": False, "provider": "darsms", "sent_to": [], "invalid": []}
+        if not self.api_key:
+            logger.warning("DarSMS API key not configured")
+            result["error"] = "DARSMS_API_KEY is not set in the server's .env file"
+            return result
+
+        recipients = []
+        for p in phones:
+            n = normalize_tz_phone(p)
+            if n and n not in recipients:
+                recipients.append(n)
+            elif not n:
+                result["invalid"].append(p)
+        if not recipients:
+            result["error"] = "No valid Tanzanian mobile numbers to send to"
+            return result
+
+        try:
+            response = requests.post(
+                self.api_url,
+                json={"senderId": self.sender_id, "to": recipients, "message": message},
+                headers={"X-API-Key": self.api_key, "Content-Type": "application/json"},
+                timeout=self.timeout,
+            )
+        except requests.exceptions.RequestException as e:
+            logger.error(f"DarSMS request failed: {e}")
+            result["error"] = str(e)
+            return result
+
+        try:
+            data = response.json()
+        except ValueError:
+            data = {}
+        explicit_failure = isinstance(data, dict) and (
+            data.get("success") is False or str(data.get("status", "")).lower() in ("error", "failed"))
+        if 200 <= response.status_code < 300 and not explicit_failure:
+            result.update(success=True, sent_to=recipients, response=data)
+            if isinstance(data, dict):
+                inner = data.get("data") if isinstance(data.get("data"), dict) else data
+                result["message_id"] = str(inner.get("id") or inner.get("messageId") or inner.get("batchId") or "")
+            return result
+
+        detail = (data.get("message") or data.get("error")) if isinstance(data, dict) else None
+        logger.error(f"DarSMS API error: {response.status_code} - {response.text[:500]}")
+        result["error"] = f"DarSMS error {response.status_code}: {detail or response.text[:200]}"
+        return result
+
+
+class ConsoleSMSProvider(SMSProvider):
+    """Logs SMS instead of sending (local development)."""
+
+    def send(self, phone: str, message: str) -> Dict:
+        logger.info(f"[SMS:{phone}] {message}")
+        return {"success": True, "provider": "console", "message_id": ""}
+
+
+def sms_status() -> Dict:
+    """Summary of the SMS setup for the settings page (never includes the API key)."""
+    provider = (getattr(settings, "SMS_PROVIDER", "") or "").lower()
+    if provider == "darsms":
+        from urllib.parse import urlparse
+        configured = bool(getattr(settings, "DARSMS_API_KEY", ""))
+        return {
+            "provider": "DarSMS", "configured": configured,
+            "sender_id": DarSMSProvider._sender_id(),
+            "endpoint": urlparse(getattr(settings, "DARSMS_API_URL", "")).netloc,
+            "detail": "working through DarSMS" if configured
+                      else "Not configured: set DARSMS_API_KEY in the server's .env file, then restart.",
+        }
+    if provider == "console":
+        return {"provider": "Console", "configured": False, "sender_id": "", "endpoint": "",
+                "detail": "Off: SMS_PROVIDER=console only writes messages to the server log."}
+    return {"provider": provider or "none", "configured": False, "sender_id": "", "endpoint": "",
+            "detail": f"Provider '{provider}' is not set up. Use SMS_PROVIDER=darsms in the server's .env file."}
+
+
 class NotificationService:
     """
     Service for sending attendance notifications via SMS and email.
@@ -236,12 +354,29 @@ Hodari Christian School
     @staticmethod
     def _get_sms_provider() -> SMSProvider:
         """Get configured SMS provider instance"""
-        provider_name = NotificationService.SMS_PROVIDER.lower()
-        
+        provider_name = (getattr(settings, 'SMS_PROVIDER', '') or NotificationService.SMS_PROVIDER).lower()
+
+        if provider_name == 'darsms':
+            return DarSMSProvider()
+        if provider_name == 'console':
+            return ConsoleSMSProvider()
         if provider_name == 'hodari':
             return HodariSMSProvider()
-        else:
-            return CloudServiceSMSProvider()
+        return CloudServiceSMSProvider()
+
+    @staticmethod
+    def send_bulk_sms(phones: List[str], message: str) -> Dict:
+        """Send the same message to many numbers (one API call where the provider supports it)."""
+        provider = NotificationService._get_sms_provider()
+        if hasattr(provider, 'send_bulk'):
+            return provider.send_bulk(list(phones), message)
+        results = [provider.send(p, message) for p in phones]
+        return {
+            'success': any(r.get('success') for r in results),
+            'provider': results[0].get('provider', 'unknown') if results else 'unknown',
+            'sent_to': [p for p, r in zip(phones, results) if r.get('success')],
+            'error': next((r.get('error') for r in results if not r.get('success')), None),
+        }
     
     @staticmethod
     def send_sms(phone: str, message: str) -> Dict:
@@ -520,11 +655,7 @@ Hodari Christian School
         """
         try:
             # Create Message record for SMS queue
-            msg_record = Message.objects.create(
-                phone=phone,
-                message=message,
-                status=0  # Pending
-            )
+            msg_record = Message.queue(phone, message)
             
             # Log notification attempt
             NotificationLog.objects.create(
@@ -603,11 +734,7 @@ Hodari Christian School
             )
             
             # Queue SMS
-            msg_record = Message.objects.create(
-                phone=parent.phone,
-                message=message,
-                status=0  # Pending
-            )
+            msg_record = Message.queue(parent.phone, message)
             
             # Log notification
             NotificationLog.objects.create(

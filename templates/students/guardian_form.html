@@ -1,119 +1,115 @@
 {% extends "base.html" %}
 {% load role_tags %}
-{% block title %}Add Guardian — {{ brand.school_name }}{% endblock %}
+{% block title %}{% if edit_mode %}Edit Guardian{% else %}Add Guardian{% endif %} — {{ brand.school_name }}{% endblock %}
 
 {% block topbar_greeting %}Parent / Guardian Management{% endblock %}
 
 {% block content %}
 {% include "students/_top_tabs.html" %}
 <div class="page-hdr">
+  {% if edit_mode %}
+  <h1 style="font-family:Merriweather,serif; font-size:24px; color:#1A1A2E">Edit Guardian</h1>
+  <p>Update contact details for {{ guardian.full_name }}.</p>
+  {% else %}
   <h1 style="font-family:Merriweather,serif; font-size:24px; color:#1A1A2E">Add New Guardian</h1>
   <p>Create a standalone guardian record. You can link students to this record later.</p>
+  {% endif %}
 </div>
 
-{% has_perm user "students.add_parentguardian" as can_create %}
+{% if edit_mode %}{% has_perm user "students.change_parentguardian" as can_create %}{% else %}{% has_perm user "students.add_parentguardian" as can_create %}{% endif %}
 {% if can_create %}
 <div class="card" style="max-width:800px; margin:24px 0">
-  <form method="post">
+  <form method="post" class="guardian-form">
     {% csrf_token %}
-    
+    {% include "students/_guardian_error_summary.html" %}
+
     <div class="form-section">
       <div class="form-section-title">Contact Information</div>
-      <div class="form-grid">
-        <div class="form-group">
-          <label class="form-label">Full Name*</label>
-          <input type="text" name="full_name" class="form-input" required placeholder="e.g. Mary Jane">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Primary Phone*</label>
-          <input type="text" name="phone" class="form-input" required placeholder="e.g. +255 767 000 000">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Secondary Phone</label>
-          <input type="text" name="secondary_phone" class="form-input" placeholder="e.g. +255 743 000 000">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Email Address</label>
-          <input type="email" name="email" class="form-input" placeholder="e.g. parent@example.com">
-        </div>
-      </div>
+      {% include "students/_guardian_contact_fields.html" with required_fields=True %}
     </div>
 
+    {% if edit_mode %}
+    <div class="form-section">
+      <div class="form-section-title">Linked Learners</div>
+      {% for link in linked_students %}
+      <div style="display:grid; grid-template-columns:minmax(0,1fr) 200px auto; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid #F1F5F9">
+        <div style="min-width:0">
+          <div style="font-weight:600; font-size:13px">{{ link.student.first_name }} {{ link.student.last_name }}</div>
+          <div style="font-size:11px; color:#8492A6">{{ link.student.class_name }} · ADM {{ link.student.admission_no }}</div>
+        </div>
+        <div>
+          <label for="relationship_{{ link.pk }}" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Relationship to {{ link.student.first_name }}</label>
+          <select name="relationship_{{ link.pk }}" id="relationship_{{ link.pk }}" class="form-select">
+            {% for code, label in relationships %}
+            <option value="{{ code }}"{% if code == link.form_relationship %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer; white-space:nowrap">
+          <input type="checkbox" name="primary_{{ link.pk }}"{% if link.form_primary %} checked{% endif %} style="width:16px; height:16px">
+          Primary contact
+        </label>
+      </div>
+      {% empty %}
+      <p class="form-help">No learners linked yet. Link one from the learner's profile.</p>
+      {% endfor %}
+      {% if linked_students %}
+      <p class="form-help" style="margin-top:8px">Making this guardian the primary contact replaces the learner's current primary contact.</p>
+      {% endif %}
+    </div>
+    {% else %}
     <div class="form-section">
       <div class="form-section-title">Link to Student <span style="color:#8492A6; font-weight:400">(optional)</span></div>
       <div class="form-group">
-        <label class="form-label">Search for Student</label>
-        <div style="position:relative">
+        <label class="form-label" for="studentSearch">Search for Student</label>
+        <div style="position:relative{% if values.student %}; display:none{% endif %}">
           <input type="text" class="form-input" id="studentSearch" placeholder="Type name or admission number..." autocomplete="off">
           <div id="studentResults" style="position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid #DDE3EE; border-radius:8px; box-shadow:0 10px 20px rgba(0,0,0,0.1); display:none; z-index:100; margin-top:4px; max-height:250px; overflow-y:auto"></div>
         </div>
-        <div id="selectedStudent" style="margin-top:8px; padding:10px 12px; background:#F0F4FB; border:1px solid #023AA5; border-radius:8px; font-size:13px; display:none; align-items:center; justify-content:space-between">
-          <span id="selStudentName"></span>
+        <div id="selectedStudent" style="margin-top:8px; padding:10px 12px; background:#F0F4FB; border:1px solid #023AA5; border-radius:8px; font-size:13px; display:{% if values.student %}flex{% else %}none{% endif %}; align-items:center; justify-content:space-between">
+          <span id="selStudentName">{% if values.student %}{{ values.student.first_name }} {{ values.student.last_name }} — {{ values.student.admission_no }}{% endif %}</span>
           <button type="button" onclick="clearStudent()" style="background:none; border:none; color:#8492A6; cursor:pointer; font-size:12px">Change</button>
         </div>
       </div>
-      <input type="hidden" name="student_id" id="studentId">
-    </div>
-
-    <div class="form-section">
-      <div class="form-section-title">Billing & Preferences</div>
-      <div class="form-grid">
+      <input type="hidden" name="student_id" id="studentId" value="{{ values.student.pk|default:'' }}">
+      <div id="studentLinkDetails" class="form-grid" style="margin-top:12px{% if not values.student %}; display:none{% endif %}">
         <div class="form-group">
-          <label class="form-label">Preferred Invoice Name</label>
-          <input type="text" name="preferred_invoice_name" class="form-input" placeholder="e.g. The Jane Family">
-          <p class="form-help">Name to appear on all school invoices.</p>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Preferred Language</label>
-          <select name="preferred_language" class="form-select">
-            <option value="en">English</option>
-            <option value="sw">Swahili</option>
+          <label class="form-label" for="id_relationship">Relationship to Student*</label>
+          <select name="relationship" id="id_relationship" class="form-select">
+            {% for code, label in relationships %}
+            <option value="{{ code }}"{% if code == values.relationship %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
           </select>
         </div>
-      </div>
-      <div class="form-group" style="margin-top:16px">
-        <label class="form-label">Physical Address</label>
-        <textarea name="address" class="form-input" rows="2" placeholder="Street, Area, City..."></textarea>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; padding-top:24px">
+          <input type="checkbox" name="is_primary" id="is_primary"{% if values.is_primary %} checked{% endif %} style="width:18px; height:18px">
+          Set as primary contact <span style="color:#8492A6; font-size:11px">(replaces the current one)</span>
+        </label>
       </div>
     </div>
 
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px">
-      <div style="padding:14px; background:#EEF4FF; border:1px solid #B6C9F5; border-radius:8px">
-        <label style="display:flex; align-items:flex-start; gap:8px; font-size:13px; cursor:pointer">
-          <input type="checkbox" name="portal_access" id="portal_access" style="width:18px; height:18px; accent-color:var(--green); margin-top:1px">
-          <span><strong>Portal Access</strong> — create a login account for this guardian</span>
-        </label>
-      </div>
-      <div style="padding:14px; background:#FEF3C7; border:1px solid #FCD34D; border-radius:8px">
-        <label style="display:flex; align-items:flex-start; gap:8px; font-size:13px; cursor:pointer">
-          <input type="checkbox" name="pdpa_consent_given" id="pdpa" style="width:18px; height:18px; accent-color:var(--green); margin-top:1px">
-          <span><strong>PDPA Consent</strong> (required)</span>
-        </label>
-        <div style="display:flex; gap:16px; margin-top:8px; margin-left:26px">
-          <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer">
-            <input type="radio" name="pdpa_consent_method" value="in_person" style="accent-color:var(--green)">
-            In-person
-          </label>
-          <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer">
-            <input type="radio" name="pdpa_consent_method" value="digital" style="accent-color:var(--green)">
-            Digital
-          </label>
-        </div>
-        <div style="margin-top:8px; margin-left:26px; display:flex; align-items:center; gap:8px; font-size:12px">
-          <span>Consent statement version*</span>
-          <input type="text" name="pdpa_consent_version" id="pdpa_version" placeholder="e.g. v1.0" required style="flex:1; padding:6px 8px; border:1px solid var(--border); border-radius:6px">
-        </div>
-      </div>
-    </div>
+    {% include "students/_guardian_consent_fields.html" %}
+    {% endif %}
 
     <div class="form-actions">
-      <a href="{% url 'students:guardian_list' %}" class="btn-secondary">Cancel</a>
-      <button type="submit" class="btn-primary" style="padding:10px 24px">Create Guardian Record</button>
+      <a href="{% if edit_mode %}{% url 'students:guardian_detail' guardian.pk %}{% else %}{% url 'students:guardian_list' %}{% endif %}" class="btn-secondary">Cancel</a>
+      <button type="submit" class="btn-primary" style="padding:10px 24px">{% if edit_mode %}Save Changes{% else %}Create Guardian Record{% endif %}</button>
     </div>
   </form>
 </div>
 {% endif %}
 
+{% if errors or general_error %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var target = document.querySelector('.guardian-form [aria-invalid="true"]') || document.getElementById('form-error-summary');
+    if (!target) return;
+    target.scrollIntoView({behavior: 'smooth', block: 'center'});
+    try { target.focus({preventScroll: true}); } catch (e) { target.focus(); }
+  });
+</script>
+{% endif %}
+{% if can_create and not edit_mode %}
 <script>
 const studentInput = document.getElementById('studentSearch');
 const studentResults = document.getElementById('studentResults');
@@ -156,14 +152,17 @@ function selectStudent(s) {
   studentResults.style.display = 'none';
   studentInput.parentElement.style.display = 'none';
   selectedStudentDiv.style.display = 'flex';
+  document.getElementById('studentLinkDetails').style.display = 'grid';
 }
 function clearStudent() {
   studentIdInput.value = '';
   selectedStudentDiv.style.display = 'none';
   studentInput.parentElement.style.display = 'block';
+  document.getElementById('studentLinkDetails').style.display = 'none';
 }
 document.addEventListener('click', e => {
   if (!studentResults.contains(e.target) && e.target !== studentInput) studentResults.style.display = 'none';
 });
 </script>
+{% endif %}
 {% endblock %}

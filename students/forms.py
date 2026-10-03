@@ -66,6 +66,45 @@ class StudentCreateForm(forms.ModelForm):
         return dob
 
 
+class StudentEditForm(StudentCreateForm):
+    """Edit an existing learner's personal details.
+
+    Limited to the fields the edit page shows. Class, stream and enrolment
+    date change through promotion/transfer and the photo through its own
+    upload, so they must not be required (or blanked) here.
+    """
+    class Meta(StudentCreateForm.Meta):
+        fields = [
+            "first_name",
+            "last_name",
+            "preferred_name",
+            "date_of_birth",
+            "gender",
+            "phone",
+            "nationality",
+            "religion",
+            "blood_type",
+            "allergies_medical",
+            "status",
+        ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # StudentCreateForm.__init__ always adds class_name; it is not edited
+        # here, except for an older record with no class at all, which the
+        # model would otherwise refuse to save.
+        if self.instance.pk and (self.instance.class_name or "").strip():
+            self.fields.pop("class_name", None)
+
+    def clean(self):
+        cleaned = super().clean()
+        # class_name is not in Meta.fields, so set it on the instance here,
+        # before the model's own "Class is required" check runs.
+        if "class_name" in self.fields and cleaned.get("class_name"):
+            self.instance.class_name = cleaned["class_name"]
+        return cleaned
+
+
 class StudentPhotoUploadForm(forms.ModelForm):
     """Form for uploading student photos"""
     class Meta:

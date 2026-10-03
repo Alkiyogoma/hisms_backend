@@ -212,6 +212,31 @@ class Message(TimeStampedModel):
             models.Index(fields=["phone", "status"]),
         ]
 
+    @classmethod
+    def queue(cls, phone, message):
+        """Create a pending SMS and send it in the background once the transaction commits."""
+        from django.db import transaction
+        msg = cls.objects.create(phone=phone, message=message, status=0)
+
+        def _dispatch():
+            try:
+                from attendance.tasks import send_sms_notification
+                send_sms_notification.delay(msg.id)
+            except Exception as exc:  # broker down: the periodic sweep picks it up
+                import logging
+                logging.getLogger(__name__).error("Could not queue SMS %s: %s", msg.id, exc)
+
+        transaction.on_commit(_dispatch)
+        return msg
+
+    def mark_expired(self, reason):
+        """Give up on this message for good (too old to be useful)."""
+        from attendance.notification_service import NotificationService
+        self.status = 2
+        self.error_message = reason
+        self.retry_count = max(self.retry_count, NotificationService.SMS_MAX_RETRIES)
+        self.save(update_fields=['status', 'error_message', 'retry_count'])
+
     def mark_sent(self):
         """Mark message as successfully sent"""
         self.status = 1

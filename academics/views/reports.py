@@ -68,6 +68,30 @@ from academics.grading_utils import (
 )
 
 
+def _action_error(exc):
+    """Plain wording for a failed report action. Rule violations (validation,
+    permission) are shown as written; anything unexpected is logged and the
+    user is told nothing was changed instead of seeing internal error text."""
+    import logging
+    if isinstance(exc, ValidationError):
+        return " ".join(exc.messages)
+    if isinstance(exc, PermissionDenied):
+        return str(exc) or "You do not have permission to do that."
+    logging.getLogger(__name__).exception("Report action failed")
+    return "The system could not complete this action, so nothing was changed. Please try again."
+
+
+def _back_to(request, fallback):
+    """Return to the page the action came from (keeping its filters) when it is on this site."""
+    from django.utils.http import url_has_allowed_host_and_scheme
+    referer = request.META.get("HTTP_REFERER")
+    if referer and url_has_allowed_host_and_scheme(
+        referer, allowed_hosts={request.get_host()}, require_https=request.is_secure(),
+    ):
+        return redirect(referer)
+    return redirect(fallback)
+
+
 class ReportRouterView(RoleRequiredMixin, View):
     """Router to send users to their appropriate reports view based on role."""
     login_url = "/accounts/login/"
@@ -322,6 +346,13 @@ def _build_report_card_context(report):
         if count > 0:
             ctx["computed_average"] = total / count
 
+    # How many subjects the (approved-only) average covers, for display.
+    from academics.score_progress import student_progress
+    progress = student_progress(report.student, report.term)
+    ctx["average_included_subjects"] = progress["included_subjects"]
+    ctx["average_total_subjects"] = progress["total_subjects"]
+    ctx["report_is_complete"] = progress["is_complete"]
+
     # Cambridge Checkpoint (FR-ACAD-005) -- Grades 6, 7, 8, and 9
     if report.student.class_name in ["Grade 6", "Grade 7", "Grade 8", "Grade 9"]:
         from academics.models import CambridgeCheckpointScore
@@ -418,18 +449,22 @@ class HOSSignOffActionView(RoleRequiredMixin, View):
             try:
                 report = ReportCard.objects.get(pk=report_id)
                 if action == "reject":
-                    reject_report_for_edit(report, request.user, reason=reason)
+                    reject_report_for_edit(
+                        report, request.user, reason=reason, subjects=request.POST.getlist("subjects"),
+                    )
                     messages.success(request, f"Report for {report.student.first_name} returned to teacher for correction.")
                 else:
                     sign_off_report(report, request.user)
                     messages.success(request, f"Report for {report.student.first_name} signed off and published.")
+            except ReportCard.DoesNotExist:
+                messages.error(request, "That report no longer exists — it may have been deleted. Refresh the page.")
             except Exception as e:
-                messages.error(request, str(e))
+                messages.error(request, f"Nothing was changed: {_action_error(e)}")
         elif class_name and term_id:
             reports = ReportCard.objects.filter(student__class_name=class_name, term_id=term_id).exclude(status=ReportCardStatus.PUBLISHED)
             processed_count = 0
-            err_count = 0
-            for r in reports:
+            blocked = []
+            for r in reports.select_related("student"):
                 try:
                     if action == "reject":
                         reject_report_for_edit(r, request.user, reason=reason)
@@ -441,15 +476,23 @@ class HOSSignOffActionView(RoleRequiredMixin, View):
                     logging.getLogger(__name__).warning(
                         "Bulk %s failed for report %s: %s", action, r.pk, exc,
                     )
-                    err_count += 1
-            
-            msg = f"Bulk {action}: {processed_count} successful, {err_count} blocked."
-            messages.success(request, msg)
-            
-        referer = request.META.get('HTTP_REFERER')
-        if referer:
-            return redirect(referer)
-        return redirect("academics:analytics")
+                    blocked.append(f"{r.student.first_name} {r.student.last_name} ({_action_error(exc)})")
+
+            verb = "returned" if action == "reject" else "signed off"
+            if not processed_count and not blocked:
+                messages.info(request, f"There were no unpublished reports in {class_name} to process.")
+            elif not blocked:
+                messages.success(request, f"{processed_count} report(s) in {class_name} {verb}.")
+            else:
+                level = messages.warning if processed_count else messages.error
+                level(
+                    request,
+                    f"{processed_count} report(s) {verb}; {len(blocked)} not {verb}: " + "; ".join(blocked),
+                )
+        else:
+            messages.error(request, "Nothing was changed: no report or class was selected.")
+
+        return _back_to(request, "academics:analytics")
 
 
 class ReportReviewQueueView(RoleRequiredMixin, TemplateView):
@@ -519,14 +562,25 @@ class ReportReviewQueueView(RoleRequiredMixin, TemplateView):
         primary_student_ids = [rc.student_id for rc in reports if not rc.is_ecd_report]
         ecd_student_ids = [rc.student_id for rc in reports if rc.is_ecd_report]
 
-        # Batch load ExamScore statuses for Primary students
-        student_statuses = defaultdict(set)
+        # Per-subject progress for non-ECD students: a report is approved only
+        # when every class subject is approved, not just the ones with scores.
+        from academics.score_progress import build_progress, expected_subjects_for_class
+        progress_by_student = {}
         if primary_student_ids:
-            score_batch = ExamScore.objects.filter(
-                student_id__in=primary_student_ids, term=term
-            ).values("student_id", "status").distinct()
-            for row in score_batch:
-                student_statuses[row["student_id"]].add(row["status"])
+            rows_by_student = defaultdict(list)
+            for sc in ExamScore.objects.filter(student_id__in=primary_student_ids, term=term):
+                rows_by_student[sc.student_id].append(sc)
+            expected_by_class = {}
+            weights = get_exam_weights()
+            for rc in reports:
+                if rc.is_ecd_report:
+                    continue
+                cls = rc.student.class_name
+                if cls not in expected_by_class:
+                    expected_by_class[cls] = expected_subjects_for_class(cls)
+                progress_by_student[rc.student_id] = build_progress(
+                    rows_by_student.get(rc.student_id, []), expected_by_class[cls], weights,
+                )
 
         # Batch load ECDEvaluation ratings for ECD students
         ecd_complete = set()
@@ -553,13 +607,17 @@ class ReportReviewQueueView(RoleRequiredMixin, TemplateView):
         for rc in reports:
             comment_ok = len((rc.teacher_comments or "").strip()) >= 50
 
+            progress = None
             if rc.is_ecd_report:
                 all_approved = rc.student_id in ecd_complete
                 pending_count = 0
             else:
-                statuses = student_statuses.get(rc.student_id, set())
-                all_approved = bool(statuses) and all(s == ScoreStatus.APPROVED for s in statuses)
-                pending_count = sum(1 for s in statuses if s in {ScoreStatus.SUBMITTED, ScoreStatus.RETURNED})
+                progress = progress_by_student.get(rc.student_id)
+                all_approved = bool(progress and progress["is_complete"])
+                pending_count = sum(
+                    1 for v in (progress["subjects"].values() if progress else [])
+                    if v["status"] in {ScoreStatus.SUBMITTED, ScoreStatus.RETURNED}
+                )
 
             rows.append({
                 "report": rc,
@@ -571,6 +629,9 @@ class ReportReviewQueueView(RoleRequiredMixin, TemplateView):
                 "class_name": rc.student.class_name,
                 "teacher": rc.generated_by,
                 "is_ecd": rc.is_ecd_report,
+                "approved_subjects": progress["approved_subjects"] if progress else 0,
+                "total_subjects": progress["total_subjects"] if progress else 0,
+                "subject_names": sorted(progress["subjects"]) if progress else [],
             })
 
         ctx["reports"] = rows
@@ -583,15 +644,27 @@ class ReportReviewQueueView(RoleRequiredMixin, TemplateView):
             comments_submitted=True,
         ).exclude(status=ReportCardStatus.PUBLISHED).select_related("student", "generated_by")
 
+        # Progress for pending reports not already in the (filtered) list above.
+        missing_ids = [
+            rc.student_id for rc in pending_reports
+            if not rc.is_ecd_report and rc.student_id not in progress_by_student
+        ]
+        if missing_ids:
+            from academics.score_progress import class_progress
+            by_class = defaultdict(list)
+            for rc in pending_reports:
+                if rc.student_id in missing_ids:
+                    by_class[rc.student.class_name].append(rc.student_id)
+            for cls, ids in by_class.items():
+                progress_by_student.update(class_progress(ids, term.id, cls))
+
         pending_rows = []
         for rc in pending_reports:
             if rc.is_ecd_report:
                 all_a = rc.student_id in ecd_complete
-                p_count = 0
             else:
-                sts = student_statuses.get(rc.student_id, set())
-                all_a = bool(sts) and all(s == ScoreStatus.APPROVED for s in sts)
-                p_count = sum(1 for s in sts if s in {ScoreStatus.SUBMITTED, ScoreStatus.RETURNED})
+                p = progress_by_student.get(rc.student_id)
+                all_a = bool(p and p["is_complete"])
             comment_ok = len((rc.teacher_comments or "").strip()) >= 50
             pending_rows.append({"all_scores_approved": all_a, "comment_ok": comment_ok})
 
@@ -617,13 +690,13 @@ class ReportReviewQueueView(RoleRequiredMixin, TemplateView):
 
         if not report_id:
             messages.error(request, "No report specified.")
-            return redirect("academics:report_review_queue")
+            return _back_to(request, "academics:report_review_queue")
 
         try:
             report = ReportCard.objects.get(pk=report_id)
         except ReportCard.DoesNotExist:
             messages.error(request, "Report not found.")
-            return redirect("academics:report_review_queue")
+            return _back_to(request, "academics:report_review_queue")
 
         try:
             if action == "ecd_hod_approve":
@@ -632,7 +705,7 @@ class ReportReviewQueueView(RoleRequiredMixin, TemplateView):
                     raise PermissionDenied("Only ECD HOD or Super Admin can approve ECD reports.")
                 if not report.is_ecd_report:
                     messages.error(request, "This action is only for ECD reports.")
-                    return redirect("academics:report_review_queue")
+                    return _back_to(request, "academics:report_review_queue")
                 report.ecd_hod_approved_by = request.user
                 report.ecd_hod_approved_at = timezone.now()
                 report.save(update_fields=["ecd_hod_approved_by", "ecd_hod_approved_at", "updated_at"])
@@ -649,7 +722,9 @@ class ReportReviewQueueView(RoleRequiredMixin, TemplateView):
                 # GRD-009: Only HOS, Super Admin, or HOD can reject reports.
                 if not request.user.has_role(UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD):
                     raise PermissionDenied("Only HOS, Super Admin, or HOD can reject reports.")
-                reject_report_for_edit(report, request.user, reason=reason)
+                reject_report_for_edit(
+                    report, request.user, reason=reason, subjects=request.POST.getlist("subjects"),
+                )
                 messages.success(request, f"Report for {report.student.first_name} returned for correction.")
             elif action == "revoke":
                 # GRD-016: Only HOS or Super Admin can revoke.
@@ -657,7 +732,7 @@ class ReportReviewQueueView(RoleRequiredMixin, TemplateView):
                     raise PermissionDenied("Only HOS or Super Admin can revoke a signed-off report.")
                 if not reason:
                     messages.error(request, "A reason is required to revoke a report sign-off.")
-                    return redirect("academics:report_review_queue")
+                    return _back_to(request, "academics:report_review_queue")
                 revoke_report_signoff(report, request.user, reason=reason)
                 messages.success(request, f"Report sign-off revoked for {report.student.first_name}.")
             else:
@@ -667,9 +742,9 @@ class ReportReviewQueueView(RoleRequiredMixin, TemplateView):
                 sign_off_report(report, request.user)
                 messages.success(request, f"Report for {report.student.first_name} signed off and published.")
         except Exception as e:
-            messages.error(request, str(e))
+            messages.error(request, f"Nothing was changed: {_action_error(e)}")
 
-        return redirect("academics:report_review_queue")
+        return _back_to(request, "academics:report_review_queue")
 
 
 class AcademicAnalyticsView(RoleRequiredMixin, TemplateView):

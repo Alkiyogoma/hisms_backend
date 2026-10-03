@@ -106,7 +106,7 @@
                     </button>
 
                     <button type="button" class="hf-btn hf-btn-secondary" style="font-size:11px; padding:5px 12px; color:var(--red); border-color:var(--red)"
-                      onclick="confirmDeleteModal({title:'Return for Correction?',body:'Return the report for <strong>{{ report.student.get_full_name }}</strong> to the teacher for correction?',detail:'The report will be moved back to Draft status.',confirmText:'Return Report',url:'{% url 'academics:signoff_action' %}',type:'warning',extraData:[{name:'report_id',value:'{{ report.id }}'},{name:'action',value:'reject'}]})">
+                      onclick="confirmDeleteModal({title:'Return for Correction?',body:'Return the report for <strong>{{ report.student.get_full_name }}</strong> to the teacher for correction?',detail:'The report moves back to Draft. Scores are not changed — use the Review Queue to reopen specific subjects.',confirmText:'Return Report',url:'{% url 'academics:signoff_action' %}',type:'warning',extraData:[{name:'report_id',value:'{{ report.id }}'},{name:'action',value:'reject'}]})">
                       Return
                     </button>
                 {% elif report.status == 'pending_sign_off' and can_signoff and signoff_blocked %}

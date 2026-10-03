@@ -44,6 +44,7 @@
   <div style="margin-top:20px;">
     <form method="post" id="inquiry-form">
       {% csrf_token %}
+    {% include "_partials/form_error_summary.html" with form=form %}
       {{ form.sibling_matched_parent }}
       {{ form.sibling_link_decision }}
       {% if form.previous_school_other %}<div style="display:none">{{ form.previous_school_other }}</div>{% endif %}
@@ -285,6 +286,28 @@
       tabBtns.forEach(function(btn) {
         btn.addEventListener('click', function() {
           switchTab(this.getAttribute('data-tab'));
+        });
+      });
+
+      // After a failed save: flag every tab that holds a problem, open the
+      // first one, and make the summary links switch to the right tab.
+      var invalid = document.querySelectorAll('#inquiry-form [aria-invalid="true"]');
+      var firstPanel = null;
+      invalid.forEach(function(el) {
+        var panel = el.closest('.tab-content');
+        if (!panel) return;
+        firstPanel = firstPanel || panel;
+        var btn = document.querySelector('.tab-btn[data-tab="' + panel.id + '"]');
+        if (btn && !btn.querySelector('.tab-err-dot')) {
+          btn.insertAdjacentHTML('beforeend', ' <span class="tab-err-dot" title="Has errors" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#DC2626;vertical-align:middle"></span>');
+        }
+      });
+      if (firstPanel) switchTab(firstPanel.id);
+      document.querySelectorAll('.form-error-summary a[href^="#"]').forEach(function(a) {
+        a.addEventListener('click', function() {
+          var el = document.getElementById(a.getAttribute('href').slice(1));
+          var panel = el && el.closest('.tab-content');
+          if (panel) switchTab(panel.id);
         });
       });
     });

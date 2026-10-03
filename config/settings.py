@@ -335,8 +335,17 @@ HODARI_SMS_API_KEY = os.getenv('HODARI_SMS_API_KEY', '')
 HODARI_SMS_API_URL = os.getenv('HODARI_SMS_API_URL', 'https://api.hodari.ac.tz/sms/send')
 HODARI_SMS_SENDER_ID = os.getenv('HODARI_SMS_SENDER_ID', 'HODARI')
 
-# SMS Provider selection: 'cloudservice' or 'hodari'
-SMS_PROVIDER = os.getenv('SMS_PROVIDER', 'cloudservice')
+# DarSMS bulk SMS (https://darsms.co.tz). Sender ID comes from Settings > System
+# (SchoolSettings.sms_sender_id), falling back to DARSMS_SENDER_ID.
+DARSMS_API_KEY = os.getenv('DARSMS_API_KEY', '')
+DARSMS_API_URL = os.getenv('DARSMS_API_URL', 'https://dev.darsms.co.tz/api/v1/integrations/sms/send')
+DARSMS_SENDER_ID = os.getenv('DARSMS_SENDER_ID', 'HODARI')
+DARSMS_TIMEOUT = int(os.getenv('DARSMS_TIMEOUT', '15'))
+# Queued SMS older than this are dropped instead of sent late (e.g. a check-in alert).
+SMS_MAX_AGE_MINUTES = int(os.getenv('SMS_MAX_AGE_MINUTES', '15'))
+
+# SMS Provider selection: 'darsms', 'cloudservice', 'hodari' or 'console' (log only)
+SMS_PROVIDER = os.getenv('SMS_PROVIDER', 'darsms')
 
 # Admissions contact details — stored in SchoolSettings model, env vars are fallback only
 ADMISSIONS_PHONE = os.getenv('ADMISSIONS_PHONE', '')
