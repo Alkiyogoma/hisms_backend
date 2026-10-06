@@ -521,6 +521,7 @@ class PrimaryScoreEntryView(RoleRequiredMixin, TemplateView):
                 and not own_scores.filter(status__in=[ScoreStatus.DRAFT, ScoreStatus.RETURNED]).exists()
             )
             ctx["returned_count"] = len(returned_student_ids)
+            ctx["submit_subjects"] = sorted(ctx.get("editable_subjects") or [])
             ctx["returned_student_ids"] = returned_student_ids
 
         return ctx
@@ -837,6 +838,8 @@ class PrimaryBulkSubmissionAPIView(RoleRequiredMixin, View):
             return JsonResponse({"error": "Invalid JSON"}, status=400)
         class_name = data.get("class_name")
         term_id = data.get("term")
+        # Optional: submit a single subject instead of all of the user's subjects.
+        subject = (data.get("subject") or "").strip()
         
         if not (class_name and term_id):
             return JsonResponse({"error": "Missing parameters"}, status=400)
@@ -866,7 +869,7 @@ class PrimaryBulkSubmissionAPIView(RoleRequiredMixin, View):
         today = _tz.now().date()
         submitted_types = (
             ExamScore.objects
-            .filter(student__class_name=class_name, term=term)
+            .filter(student__class_name=class_name, term=term, **({"subject_name": subject} if subject else {}))
             .exclude(exam_type__in=["quiz", "QZ"])
             .values_list("exam_type", flat=True)
             .distinct()
@@ -876,7 +879,7 @@ class PrimaryBulkSubmissionAPIView(RoleRequiredMixin, View):
             if not allowed:
                 has_returned = ExamScore.objects.filter(
                     student__class_name=class_name, term=term, exam_type=et,
-                    status=ScoreStatus.RETURNED
+                    status=ScoreStatus.RETURNED, **({"subject_name": subject} if subject else {})
                 ).exists()
                 if not has_returned:
                     return JsonResponse(
@@ -904,6 +907,8 @@ class PrimaryBulkSubmissionAPIView(RoleRequiredMixin, View):
                     allowed_subjects = class_info.get("subjects", set())
                     # Only the teacher's own subjects — never other teachers' drafts.
                     score_qs = score_qs.filter(subject_name__in=allowed_subjects)
+                if subject:
+                    score_qs = score_qs.filter(subject_name=subject)
                 score_ids = list(score_qs.values_list('id', flat=True))
                 score_qs.update(
                     status=ScoreStatus.SUBMITTED, 
@@ -1070,6 +1075,7 @@ class LowerSecondaryScoreEntryView(RoleRequiredMixin, TemplateView):
                 and not own_scores.filter(status__in=[ScoreStatus.DRAFT, ScoreStatus.RETURNED]).exists()
             )
             ctx["returned_count"] = len(returned_student_ids)
+            ctx["submit_subjects"] = sorted(ctx.get("editable_subjects") or [])
             ctx["returned_student_ids"] = returned_student_ids
 
         return ctx
@@ -1362,6 +1368,8 @@ class LowerSecondaryBulkSubmissionAPIView(RoleRequiredMixin, View):
             return JsonResponse({"error": "Invalid JSON"}, status=400)
         class_name = data.get("class_name")
         term_id = data.get("term")
+        # Optional: submit a single subject instead of all of the user's subjects.
+        subject = (data.get("subject") or "").strip()
 
         if not (class_name and term_id):
             return JsonResponse({"error": "Missing parameters"}, status=400)
@@ -1384,7 +1392,7 @@ class LowerSecondaryBulkSubmissionAPIView(RoleRequiredMixin, View):
         today = _tz.now().date()
         submitted_types = (
             ExamScore.objects
-            .filter(student__class_name=class_name, term=term)
+            .filter(student__class_name=class_name, term=term, **({"subject_name": subject} if subject else {}))
             .exclude(exam_type__in=["quiz", "QZ"])
             .values_list("exam_type", flat=True).distinct()
         )
@@ -1393,7 +1401,7 @@ class LowerSecondaryBulkSubmissionAPIView(RoleRequiredMixin, View):
             if not allowed:
                 has_returned = ExamScore.objects.filter(
                     student__class_name=class_name, term=term, exam_type=et,
-                    status=ScoreStatus.RETURNED
+                    status=ScoreStatus.RETURNED, **({"subject_name": subject} if subject else {})
                 ).exists()
                 if not has_returned:
                     return JsonResponse({"error": f"Cannot submit: {msg}"}, status=400)
@@ -1417,6 +1425,8 @@ class LowerSecondaryBulkSubmissionAPIView(RoleRequiredMixin, View):
                     allowed_subjects = class_info.get("subjects", set())
                     # Only the teacher's own subjects — never other teachers' drafts.
                     score_qs = score_qs.filter(subject_name__in=allowed_subjects)
+                if subject:
+                    score_qs = score_qs.filter(subject_name=subject)
                 score_ids = list(score_qs.values_list("id", flat=True))
                 score_qs.update(
                     status=ScoreStatus.SUBMITTED, is_locked=True, updated_at=timezone.now()

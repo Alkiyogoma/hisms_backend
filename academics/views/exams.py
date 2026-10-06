@@ -513,17 +513,26 @@ class ExamScoreCorrectionView(RoleRequiredMixin, View):
 class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
     """FR-ACAD-006: Dedicated HOD approval queue for submitted exam scores.
     Shows scores with status=SUBMITTED, allows approve/return/bulk actions.
+
+    Only HODs, the Head of School and Super Admin may approve or return.
+    Teachers get a read-only view of the status of their own subjects' scores.
     """
     template_name = "academics/exam_score_approval_queue.html"
-    allowed_roles = [UserRole.SUPER_ADMIN, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD]
+    allowed_roles = [UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD, UserRole.TEACHER]
     required_permission = "academics.view_examscore"
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        from academics.models import ScoreStatus, GradeClass, Department
+        from academics.models import ScoreStatus
+        from academics.approval_policy import (
+            approval_block_reason, approver_class_names, can_approve_grades, taught_class_names,
+        )
 
         term = get_current_term()
         ctx["current_term"] = term
+        user = self.request.user
+        can_approve = can_approve_grades(user)
+        ctx["can_approve"] = can_approve
 
         # Filters
         selected_class = self.request.GET.get("class_name", "").strip()
@@ -531,25 +540,29 @@ class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
         ctx["selected_class"] = selected_class
         ctx["selected_subject"] = selected_subject
 
-        # Base queryset: submitted scores for review
-        qs = ExamScore.objects.filter(
-            status=ScoreStatus.SUBMITTED
-        ).select_related("student", "entered_by")
+        if can_approve:
+            # Base queryset: submitted scores for review
+            qs = ExamScore.objects.filter(
+                status=ScoreStatus.SUBMITTED
+            ).select_related("student", "entered_by")
+            # FR-ACAD-011: HOD Scoping
+            scope = approver_class_names(user)
+            if scope is not None:
+                qs = qs.filter(student__class_name__in=scope)
+        else:
+            # Teachers: read-only sign-off status of their own subjects' scores.
+            qs = ExamScore.objects.filter(
+                status__in=[ScoreStatus.SUBMITTED, ScoreStatus.APPROVED, ScoreStatus.RETURNED]
+            ).select_related("student", "entered_by")
+            from django.db.models import Q
+            own = Q(entered_by=user)
+            for class_name, info in get_teacher_assigned_classes_from_tca(user).items():
+                if info["subjects"]:
+                    own |= Q(student__class_name=class_name, subject_name__in=info["subjects"])
+            qs = qs.filter(own)
 
         if term:
             qs = qs.filter(term=term)
-
-        # FR-ACAD-011: HOD Scoping
-        role = self.request.user.role
-        if role == UserRole.PRIMARY_HOD:
-            primary_classes = GradeClass.objects.filter(department=Department.PRIMARY).values_list("name", flat=True)
-            qs = qs.filter(student__class_name__in=primary_classes)
-        elif role == UserRole.ECD_HOD:
-            ecd_classes = GradeClass.objects.filter(department=Department.ECD).values_list("name", flat=True)
-            qs = qs.filter(student__class_name__in=ecd_classes)
-        elif role == UserRole.LOWER_SECONDARY_HOD:
-            ls_classes = GradeClass.objects.filter(department=Department.LOWER_SECONDARY).values_list("name", flat=True)
-            qs = qs.filter(student__class_name__in=ls_classes)
 
         if selected_class:
             qs = qs.filter(student__class_name=selected_class)
@@ -565,23 +578,32 @@ class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
         )
 
         # Build detailed entries per group
+        taught = taught_class_names(user, term) if can_approve else set()
         queue_details = []
         for item in queue_items:
-            scores = qs.filter(
+            scores = list(qs.filter(
                 student__class_name=item["student__class_name"],
                 subject_name=item["subject_name"],
                 exam_type=item["exam_type"],
-            ).order_by("student__last_name", "student__first_name")
+            ).order_by("student__last_name", "student__first_name"))
+            block_reason = ""
+            if can_approve:
+                for sc in scores:
+                    sc.block_reason = approval_block_reason(user, sc, taught)
+                reasons = {sc.block_reason for sc in scores}
+                if all(reasons):
+                    block_reason = scores[0].block_reason if len(reasons) == 1 else "You cannot approve these scores."
             queue_details.append({
                 "class_name": item["student__class_name"],
                 "subject_name": item["subject_name"],
                 "exam_type": item["exam_type"],
                 "score_count": item["score_count"],
-                "scores": list(scores),
+                "scores": scores,
+                "block_reason": block_reason,
             })
 
         ctx["queue_details"] = queue_details
-        ctx["total_pending"] = qs.count()
+        ctx["total_pending"] = qs.filter(status=ScoreStatus.SUBMITTED).count()
 
         # Group queue_details by exam_type for tab panels
         from collections import OrderedDict
@@ -616,8 +638,14 @@ class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
 
     def post(self, request, *args, **kwargs):
         from academics.models import ScoreStatus
+        from academics.approval_policy import (
+            approval_block_reason, approver_class_names, can_approve_grades, taught_class_names,
+        )
         from communications.email_service import dispatch_notification
         from audit.models import log_event
+
+        if not can_approve_grades(request.user):
+            raise PermissionDenied("Only a Head of Department or the Head of School can approve grades.")
 
         action = request.POST.get("action", "")
         score_ids = request.POST.getlist("score_ids")
@@ -627,10 +655,24 @@ class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
             messages.error(request, "No scores selected.")
             return redirect("academics:exam_score_approval_queue")
 
-        scores = ExamScore.objects.filter(pk__in=score_ids, status=ScoreStatus.SUBMITTED)
+        scores = ExamScore.objects.filter(
+            pk__in=score_ids, status=ScoreStatus.SUBMITTED
+        ).select_related("student", "term")
+        scope = approver_class_names(request.user)
+        if scope is not None:
+            scores = scores.filter(student__class_name__in=scope)
         updated = 0
+        blocked = {}
+        taught_by_term = {}
 
         for score in scores:
+            if score.term_id not in taught_by_term:
+                taught_by_term[score.term_id] = taught_class_names(request.user, score.term)
+            # Nobody approves or returns grades for a class they teach or scores they entered.
+            reason_blocked = approval_block_reason(request.user, score, taught_by_term[score.term_id])
+            if reason_blocked:
+                blocked[reason_blocked] = blocked.get(reason_blocked, 0) + 1
+                continue
             if action == "approve":
                 score.status = ScoreStatus.APPROVED
                 score.approved_by = request.user
@@ -704,7 +746,10 @@ class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
                 updated += 1
 
         action_label = "approved" if action == "approve" else "returned"
-        messages.success(request, f"{updated} score(s) {action_label}.")
+        if updated or not blocked:
+            messages.success(request, f"{updated} score(s) {action_label}.")
+        for msg, count in blocked.items():
+            messages.error(request, f"{count} score(s) not {action_label}: {msg}")
         return redirect("academics:exam_score_approval_queue")
 
 

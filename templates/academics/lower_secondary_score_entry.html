@@ -228,6 +228,12 @@
         </div>
         {% has_perm user "academics.change_examscore" as can_submit %}
         {% if can_submit %}
+        {% if submit_subjects|length > 1 %}
+        <select id="submit-subject" class="hf-select" title="Submit one subject or all of your subjects" style="min-width:160px">
+            <option value="">All my subjects</option>
+            {% for subj in submit_subjects %}<option value="{{ subj }}">{{ subj }}</option>{% endfor %}
+        </select>
+        {% endif %}
         <button id="submit-hod-btn" onclick="submitAllToHOD()" class="hf-btn hf-btn-success" {% if class_submitted %}disabled style="background:#059669;cursor:default"{% endif %}>{% if class_submitted %}&#10003; Submitted{% elif returned_count > 0 %}Submit {{ returned_count }} to HOD{% else %}Submit all to HOD{% endif %}</button>
         {% endif %}
     </div>
@@ -721,7 +727,7 @@ async function submitAllToHOD() {
         fetch(API + "submit-all/", {
             method: "POST",
             headers: { "Content-Type": "application/json", "X-CSRFToken": CSRF },
-            body: JSON.stringify({ class_name: CLASS_NAME, term: TERM_ID })
+            body: JSON.stringify({ class_name: CLASS_NAME, term: TERM_ID, subject: (document.getElementById("submit-subject") || {}).value || "" })
         }).then(function(r) {
             if (r.ok) {
                 r.json().then(function(d) {

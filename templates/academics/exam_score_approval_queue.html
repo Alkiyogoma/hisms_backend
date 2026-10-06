@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Grade Approval — {{ brand.school_name }}{% endblock %}
-{% block topbar_greeting %}Grade Approval{% endblock %}
+{% block topbar_greeting %}{% if can_approve %}Grade Approval{% else %}Grade Sign-Off Status{% endif %}{% endblock %}
 {% block topbar_date %}{{ current_term.name|default:"No active term" }}{% endblock %}
 
 {% block extra_head %}
@@ -38,8 +38,17 @@
 {% block content %}
 {% include "academics/_top_tabs_progress.html" %}
 
+{% if not can_approve %}
+<div class="card" style="margin-bottom:16px;padding:12px 16px;font-size:13px;color:var(--text-secondary)">
+  This is the sign-off status of the scores you submitted. Only a Head of Department or the Head of School can approve grades.
+</div>
+{% endif %}
 {% if not queue_details %}
+  {% if can_approve %}
   {% include '_partials/empty_state.html' with icon='check' title='All Clear' desc='No scores pending HOD review for this term.' cta_url='academics:analytics' cta_label='View Analytics Dashboard' %}
+  {% else %}
+  {% include '_partials/empty_state.html' with icon='check' title='Nothing submitted yet' desc='Scores you submit to the HOD will appear here with their sign-off status.' %}
+  {% endif %}
 {% else %}
 
 <!-- Gradient Metric Cards -->
@@ -116,6 +125,9 @@
             <span style="font-size:12px;color:var(--text-muted)">{{ group.score_count }} score{{ group.score_count|pluralize }}</span>
           </div>
         </div>
+        {% if can_approve and group.block_reason %}
+        <div style="font-size:12px;color:var(--text-muted);max-width:320px;text-align:right">{{ group.block_reason }}</div>
+        {% elif can_approve %}
         <div style="display:flex;gap:6px;align-items:center">
           <button type="button" class="hf-btn hf-btn-secondary" style="font-size:11px;padding:5px 12px" onclick="var cbs=document.querySelectorAll('.cb-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}');var allChecked=Array.from(cbs).every(cb=>cb.checked);cbs.forEach(cb=>cb.checked=!allChecked)">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:2px"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
@@ -130,23 +142,25 @@
             Return All
           </button>
         </div>
+        {% endif %}
       </div>
 
       <table class="h-table">
         <thead>
           <tr>
-            <th style="width:36px"><input type="checkbox" onchange="toggleGroup('{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}', this.checked)"></th>
+            {% if can_approve %}<th style="width:36px">{% if not group.block_reason %}<input type="checkbox" onchange="toggleGroup('{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}', this.checked)">{% endif %}</th>{% endif %}
             <th>Student</th>
             <th>Score</th>
             <th>Entered By</th>
             <th>Date</th>
             <th>Status</th>
+            {% if can_approve %}<th style="text-align:right">Actions</th>{% endif %}
           </tr>
         </thead>
         <tbody>
           {% for score in group.scores %}
           <tr>
-            <td><input type="checkbox" name="score_ids" value="{{ score.id }}" class="cb-{{ forloop.parentloop.parentloop.counter0 }}-{{ forloop.parentloop.counter0 }}"></td>
+            {% if can_approve %}<td>{% if score.block_reason %}<span title="{{ score.block_reason }}" style="color:var(--text-muted)">&mdash;</span>{% else %}<input type="checkbox" name="score_ids" value="{{ score.id }}" id="cb-score-{{ score.id }}" class="cb-{{ forloop.parentloop.parentloop.counter0 }}-{{ forloop.parentloop.counter0 }}">{% endif %}</td>{% endif %}
             <td>
               <div style="font-weight:600;font-size:13px;color:var(--text-primary)">{{ score.student.get_full_name }}</div>
               <div style="font-size:11px;color:var(--text-muted)">{{ score.student.admission_no }}</div>
@@ -166,6 +180,16 @@
                 <span class="chip chip-grey">Pending</span>
               {% endif %}
             </td>
+            {% if can_approve %}
+            <td style="text-align:right;white-space:nowrap">
+              {% if score.block_reason %}
+                <span style="font-size:11px;color:var(--text-muted)" title="{{ score.block_reason }}">Not allowed</span>
+              {% elif score.status == 'submitted' %}
+                <button type="button" class="hf-btn hf-btn-primary" style="font-size:11px;padding:4px 10px;background:#16A34A;border-color:#16A34A" onclick="approveRow({{ score.id }}, '{{ score.student.get_full_name|escapejs }}')">Approve</button>
+                <button type="button" class="hf-btn hf-btn-secondary" style="font-size:11px;padding:4px 10px;color:var(--red);border-color:var(--red-bd)" onclick="returnRow({{ score.id }})">Return</button>
+              {% endif %}
+            </td>
+            {% endif %}
           </tr>
           {% endfor %}
         </tbody>
@@ -198,7 +222,6 @@
 {% endif %}
 
 <script>
-let pendingGroupIdx = null;
 
 function switchExamTab(e, tabId) {
   e.preventDefault();
@@ -222,7 +245,36 @@ function showInfoModal(title, body) {
   });
 }
 
+var pendingSelector = null;
+
+function selectOnly(selector) {
+  document.querySelectorAll('input[name="score_ids"]').forEach(function(cb) { cb.checked = false; });
+  document.querySelectorAll(selector).forEach(function(cb) { cb.checked = true; });
+  return document.querySelectorAll(selector + ':checked').length;
+}
+
+function approveRow(scoreId, studentName) {
+  if (!selectOnly('#cb-score-' + scoreId)) return;
+  confirmDeleteModal({
+    title: "Approve this score?",
+    body: 'Approve the score for <strong>' + studentName + '</strong>? This locks the score and notifies the teacher.',
+    confirmText: "Approve",
+    type: "warning",
+    onConfirm: function() {
+      document.getElementById('action-input').value = 'approve';
+      document.getElementById('approval-form').submit();
+    }
+  });
+}
+
+function returnRow(scoreId) {
+  if (!selectOnly('#cb-score-' + scoreId)) return;
+  pendingSelector = '#cb-score-' + scoreId;
+  document.getElementById('returnModal').style.display = 'flex';
+}
+
 function submitAction(idx, action) {
+  selectOnly('.cb-' + idx);
   var allCbs = document.querySelectorAll('.cb-' + idx);
   allCbs.forEach(function(cb) { cb.checked = true; });
   var checked = document.querySelectorAll('.cb-' + idx + ':checked');
@@ -244,6 +296,7 @@ function submitAction(idx, action) {
 }
 
 function submitReturn(idx) {
+  selectOnly('.cb-' + idx);
   var allCbs = document.querySelectorAll('.cb-' + idx);
   allCbs.forEach(function(cb) { cb.checked = true; });
   var checked = document.querySelectorAll('.cb-' + idx + ':checked');
@@ -251,14 +304,14 @@ function submitReturn(idx) {
     showToast("No scores available to return.", "warning");
     return;
   }
-  pendingGroupIdx = idx;
+  pendingSelector = '.cb-' + idx;
   document.getElementById('returnModal').style.display = 'flex';
 }
 
 function closeReturnModal() {
   document.getElementById('returnModal').style.display = 'none';
   document.getElementById('return-reason').value = '';
-  pendingGroupIdx = null;
+  pendingSelector = null;
 }
 
 function confirmReturn() {
@@ -267,7 +320,7 @@ function confirmReturn() {
     showInfoModal("Reason Required", "A reason is required when returning scores for correction.");
     return;
   }
-  const count = document.querySelectorAll('.cb-' + pendingGroupIdx + ':checked').length;
+  const count = document.querySelectorAll(pendingSelector + ':checked').length;
   confirmDeleteModal({
     title: "Return Scores for Correction?",
     body: 'You are about to return <strong>' + count + '</strong> score(s) to the teacher.',
