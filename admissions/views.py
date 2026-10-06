@@ -3382,6 +3382,7 @@ class ParentFormLinkView(View):
     def _context(self, invite):
         import json as _json
         from admissions.models import AdmissionFormInviteStatus
+        from admissions.fees import form_fee_context
         applicant = invite.applicant
         draft = dict(invite.draft_data or {})
         if not draft:
@@ -3407,6 +3408,7 @@ class ParentFormLinkView(View):
             "grade_options_json": _json.dumps(
                 list(GradeClass.objects.order_by("sort_order", "name").values_list("name", flat=True))
             ),
+            **form_fee_context(applicant),
         }
 
     def _invite_or_none(self, token):
@@ -3443,9 +3445,10 @@ class ParentFormLinkView(View):
                 return JsonResponse({"ok": True, "uploaded": uploaded})
             if request.POST.get("action") == "submit_admission":
                 invoice = submit_parent_form(invite=invite, data=data, files=request.FILES)
+                from admissions.fees import invoice_summary
                 return JsonResponse({
                     "ok": True, "ref": invite.applicant.reference_number,
-                    "invoice": invoice.invoice_number, "total": float(invoice.total_due),
+                    "invoice": invoice_summary(invoice),
                 })
         except ValidationError as e:
             return JsonResponse({"ok": False, "error": " ".join(e.messages)}, status=400)

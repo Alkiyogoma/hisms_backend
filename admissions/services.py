@@ -1315,23 +1315,11 @@ def generate_admission_invoice(*, applicant: Applicant, actor, reason: str = "ge
     if existing:
         return existing, False
 
-    settings = SchoolSettings.get_settings()
-    admission_fee = settings.admission_fee or 700000
-    development_fee = 700000
-    checkpoint_fee = 300000
-    stem_fee = 180000
-    breakfast_fee = 300000
-    uniform_prices = {"polo": 20000, "sweater": 25000, "tee": 15000}
-    uniform_labels = {"polo": "Polo T-shirt (white / blue / yellow)", "sweater": "Hodari sweater", "tee": "Sports team T-shirt (red / blue / green)"}
-    ECD_GRADES = ["Pre-KG", "Kindergarten", "Preschool", "ABC"]
-    UPPER_GRADES = ["Grade 7", "Grade 8", "Grade 9"]
+    from admissions.fees import child_lines, fee_schedule
 
-    def tuition_for(g):
-        if g in ECD_GRADES:
-            return 3200000
-        if g in UPPER_GRADES:
-            return 3800000
-        return 3500000
+    settings = SchoolSettings.get_settings()
+    schedule = fee_schedule()
+    admission_fee = schedule["admission"]
 
     children_data = []
     try:
@@ -1343,29 +1331,13 @@ def generate_admission_invoice(*, applicant: Applicant, actor, reason: str = "ge
     if not children_data:
         children_data = [{"name": applicant.child_full_name, "grade": applicant.grade_applying_for, "isNew": True, "breakfast": False, "stem": False, "uniform": {}}]
 
+    # Same fee book and line labels as the form's on-screen invoice.
     line_items = []
     for ch in children_data:
+        ch = dict(ch, grade=ch.get("grade") or applicant.grade_applying_for)
         ch_name = ch.get("name") or applicant.child_full_name
-        ch_grade = ch.get("grade") or applicant.grade_applying_for
-        is_new = ch.get("isNew", True)
-        has_stem = ch.get("stem", False)
-        has_breakfast = ch.get("breakfast", False)
-        uniforms = ch.get("uniform", {})
-
-        line_items.append({"description": f"Tuition — Term 1 ({ch_name} · {ch_grade})", "amount": tuition_for(ch_grade)})
-        line_items.append({"description": f"Development fee (annual) — {ch_name}", "amount": development_fee})
-        if is_new:
-            line_items.append({"description": f"Admission fee (one-time) — {ch_name}", "amount": admission_fee})
-        if ch_grade == "Grade 6":
-            line_items.append({"description": f"Cambridge Checkpoint — {ch_name}", "amount": checkpoint_fee})
-        if has_stem:
-            line_items.append({"description": f"STEM — Term 1 ({ch_name})", "amount": stem_fee})
-        if has_breakfast:
-            line_items.append({"description": f"Breakfast — Term 1 ({ch_name})", "amount": breakfast_fee})
-        for uk, price in uniform_prices.items():
-            qty = int(uniforms.get(uk) or 0)
-            if qty > 0:
-                line_items.append({"description": f"{uniform_labels[uk]} × {qty} ({ch_name})", "amount": price * qty})
+        for line in child_lines(ch, schedule):
+            line_items.append({"description": f"{line['label']} ({ch_name} · {ch['grade']})", "amount": line["amount"]})
 
     total_due = sum(li["amount"] for li in line_items)
     if total_due == 0:
@@ -1453,7 +1425,7 @@ def generate_admission_invoice(*, applicant: Applicant, actor, reason: str = "ge
                     f"Dear {applicant.parent_full_name},\n\n"
                     f"An admission fee invoice has been generated for {applicant.child_full_name}.\n\n"
                     f"Invoice Number: {inv_no}\n"
-                    f"Amount Due: TZS {admission_fee:,.0f}\n"
+                    f"Amount Due: TZS {total_due:,.0f}\n"
                     f"Due Date: {invoice.due_date.strftime('%d %B %Y') if invoice.due_date else ''}\n\n"
                     f"Payment can be made via Bank Transfer (DTB 0225556001 or CRDB 0150829302900) "
                     f"or Mobile Money ({contact.get('phone', '')}). Please send proof of payment "

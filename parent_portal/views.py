@@ -1108,6 +1108,8 @@ class ParentAdmissionFormView(ParentOnlyMixin, TemplateView):
             ctx["no_applicant"] = True
             return ctx
         ctx["applicant"] = applicant
+        from admissions.fees import form_fee_context
+        ctx.update(form_fee_context(applicant))
         if applicant.status in (ApplicantStatus.FORM_SUBMITTED, ApplicantStatus.INVOICE_GENERATED,
                                 ApplicantStatus.INVOICE_PAID, ApplicantStatus.ENROLLED):
             ctx["form_submitted"] = True
@@ -1214,9 +1216,11 @@ class ParentAdmissionFormView(ParentOnlyMixin, TemplateView):
             except Exception:
                 pass
 
+            from admissions.fees import admission_invoice_for, invoice_summary
             return JsonResponse({
                 "ok": True,
                 "ref": applicant.reference_number or f"ADM-{applicant.id:04d}",
+                "invoice": invoice_summary(admission_invoice_for(applicant)),
                 "message": "Admission form submitted successfully.",
             })
 
