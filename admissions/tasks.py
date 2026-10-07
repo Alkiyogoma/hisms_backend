@@ -487,7 +487,7 @@ def send_form_outstanding_reminder_task():
                         body=(
                             f"The admission form for {app.child_full_name} ({app.reference_number}) "
                             f"has not been completed 14 days after the offer was sent.\n\n"
-                            f"Learner: {app.child_full_name}\n"
+                            f"Student: {app.child_full_name}\n"
                             f"Grade: {app.grade_applying_for}\n"
                             f"Parent: {app.parent_full_name}\n"
                             f"Phone: {app.parent_phone or 'not provided'}\n\n"
@@ -553,7 +553,7 @@ def send_invoice_30day_reminder_task():
                         subject=f"Invoice still outstanding: {app.child_full_name} — {app.reference_number}",
                         body=(
                             f"This is an automatic reminder that the following admission invoice is now 30 days overdue.\n\n"
-                            f"Learner: {app.child_full_name}\n"
+                            f"Student: {app.child_full_name}\n"
                             f"Grade: {app.grade_applying_for}\n"
                             f"Parent: {app.parent_full_name}\n"
                             f"Invoice: {invoice.invoice_number if invoice else 'N/A'}\n"

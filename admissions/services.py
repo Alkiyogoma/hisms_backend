@@ -21,6 +21,14 @@ from students.services import generate_admission_number
 from users.models import UserRole
 
 
+def _applicant_photo_document(applicant):
+    """Name of the passport photo uploaded with the application, or None."""
+    doc = applicant.documents.filter(
+        document_type=ApplicantDocumentType.STUDENT_PHOTO,
+    ).exclude(file="").first()
+    return doc.file.name if doc and doc.file else None
+
+
 def _parse_inquiry_notes(applicant):
     """Return the applicant's ``notes`` JSON as a dict (empty dict if not JSON).
 
@@ -517,7 +525,7 @@ def mark_logistics_sent(*, applicant: Applicant, actor) -> None:
         if parent_email:
             from core.email_templates import send_dynamic_email
             tpl_context = {
-                "parent_name": applicant.parent_full_name or "Parent/Guardian",
+                "parent_name": applicant.parent_full_name or "Parent",
                 "child_name": applicant.child_full_name,
                 "assessment_date": assessment.scheduled_date,
                 "assessment_dates": assessment.scheduled_date.strftime("%A, %d %B %Y") if assessment.scheduled_date else "",
@@ -890,7 +898,8 @@ def complete_enrolment(*, applicant: Applicant, actor, override_duplicate: bool 
         date_of_birth=applicant.child_date_of_birth,
         class_name=applicant.grade_applying_for.strip(),
         stream_name="",
-        photo=applicant.photo,
+        # The parent form stores the passport photo as a document.
+        photo=applicant.photo or _applicant_photo_document(applicant),
         academic_year=ay,
         **(student_details or {}),
     )
@@ -1190,7 +1199,7 @@ def complete_enrolment(*, applicant: Applicant, actor, override_duplicate: bool 
             template_type="admission_welcome",
             to_email=parent_email,
             context={
-                "parent_name": applicant.parent_full_name or "Parent/Guardian",
+                "parent_name": applicant.parent_full_name or "Parent",
                 "child_name": applicant.child_full_name,
                 "admission_no": student.admission_no,
                 "grade": student.class_name,
@@ -1246,9 +1255,9 @@ def direct_enrol(*, actor, reason: str, note: str, child: dict, parent: dict,
     """
     from admissions.models import DirectEnrolmentReason, EntryRoute
     if reason not in DirectEnrolmentReason.values:
-        raise ValidationError("Choose why this learner is being enrolled directly.")
+        raise ValidationError("Choose why this student is being enrolled directly.")
     if not actor.has_perm("students.add_student") and getattr(actor, "role", None) != UserRole.SUPER_ADMIN:
-        raise ValidationError("You do not have permission to enrol learners directly.")
+        raise ValidationError("You do not have permission to enrol students directly.")
 
     full_name = f"{child['first_name'].strip()} {child['last_name'].strip()}"
     applicant = Applicant(
@@ -1400,7 +1409,7 @@ def generate_admission_invoice(*, applicant: Applicant, actor, reason: str = "ge
         from core.email_templates import send_dynamic_email
         contact = settings.get_admissions_contact()
         e07_context = {
-            "parent_name": applicant.parent_full_name or "Parent/Guardian",
+            "parent_name": applicant.parent_full_name or "Parent",
             "child_name": applicant.child_full_name,
             "ref": applicant.reference_number,
             "reference_number": applicant.reference_number,

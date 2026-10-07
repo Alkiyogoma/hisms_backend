@@ -162,8 +162,9 @@ class SubjectForm(forms.ModelForm):
 
     class Meta:
         model = Subject
-        fields = ["name", "code", "color", "departments", "classes", "is_active", "is_enrichment"]
+        fields = ["name", "code", "color", "departments", "classes", "is_active", "assessment_mode"]
         widgets = {
+            "assessment_mode": forms.RadioSelect(),
             "color": forms.TextInput(attrs={"type": "color", "style": "height: 42px; padding: 2px;"}),
             "classes": forms.CheckboxSelectMultiple(),
         }
@@ -175,6 +176,8 @@ class SubjectForm(forms.ModelForm):
         for name, field in self.fields.items():
             if isinstance(field.widget, forms.CheckboxSelectMultiple):
                 field.widget.attrs["class"] = "hf-checkbox-group mt-1"
+            elif isinstance(field.widget, forms.RadioSelect):
+                continue
             elif isinstance(field.widget, (forms.Select, forms.SelectMultiple)):
                 field.widget.attrs["class"] = "hf-select mt-1"
             elif not isinstance(field.widget, forms.CheckboxInput):

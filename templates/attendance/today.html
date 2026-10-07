@@ -73,7 +73,7 @@ if ('serviceWorker' in navigator) {
 
   {% include "attendance/_tabs.html" %}
 
-  <p class="at-lead">Who is in school {% if date == today %}today{% else %}on {{ date|date:"j F" }}{% endif %}, out of {{ summary.total }} enrolled{% if class_name %} in {{ class_name }}{% endif %}. Click any figure to list the learners behind it. Marks save as you tap — no save button; whatever stands at {{ lock_hour }}:00 is the record for the day.</p>
+  <p class="at-lead">Who is in school {% if date == today %}today{% else %}on {{ date|date:"j F" }}{% endif %}, out of {{ summary.total }} enrolled{% if class_name %} in {{ class_name }}{% endif %}. Click any figure to list the students behind it. Marks save as you tap — no save button; whatever stands at {{ lock_hour }}:00 is the record for the day.</p>
 
   {% if non_school_reason %}
     <div class="at-note">{{ date|date:"l j F" }} is {{ non_school_reason }}, so it is not counted as a school day in reports or the printed register.</div>
@@ -81,7 +81,7 @@ if ('serviceWorker' in navigator) {
   {% if is_locked %}
     <div class="at-note">
       {% if is_super_admin %}This register is locked. As super admin you can still change records; every change is logged with the previous value.
-      {% else %}This register is locked: attendance can only be marked on the day, before {{ lock_hour }}:00. Use <b>Request correction</b> on a learner to ask the super admin for a change.{% endif %}
+      {% else %}This register is locked: attendance can only be marked on the day, before {{ lock_hour }}:00. Use <b>Request correction</b> on a student to ask the super admin for a change.{% endif %}
     </div>
   {% endif %}
 
@@ -94,13 +94,13 @@ if ('serviceWorker' in navigator) {
       <button type="button" class="at-stat s-blue" data-s="all"><div class="k">Enrolled</div><div class="v">{{ summary.total }}</div><div class="n">On roll</div></button>
       <button type="button" class="at-stat s-grey" data-s="unm"><div class="k">Not yet marked</div><div class="v">{{ summary.unconfirmed }}</div><div class="n">Excluded from the %</div></button>
     </div>
-    <p class="at-openline">Of {{ summary.total }} enrolled, <b>{{ summary.marked }} {{ summary.marked|pluralize:"has,have" }} been marked</b> and <b>{{ summary.unconfirmed }} {{ summary.unconfirmed|pluralize:"is,are" }} still unmarked</b>. Attendance {% if date == today %}today{% else %}on this day{% endif %} is calculated on the {{ summary.marked }} marked — unmarked learners count as neither present nor absent.</p>
+    <p class="at-openline">Of {{ summary.total }} enrolled, <b>{{ summary.marked }} {{ summary.marked|pluralize:"has,have" }} been marked</b> and <b>{{ summary.unconfirmed }} {{ summary.unconfirmed|pluralize:"is,are" }} still unmarked</b>. Attendance {% if date == today %}today{% else %}on this day{% endif %} is calculated on the {{ summary.marked }} marked — unmarked students count as neither present nor absent.</p>
 
     {% if class_status %}
     <div class="at-card {% if unmarked_classes %}at-alert{% else %}at-ok{% endif %}">
       {% if unmarked_classes %}
         <h2>Registers not yet marked — {{ unmarked_classes|length }} class{{ unmarked_classes|length|pluralize:"es" }}</h2>
-        <p class="hint">{{ unmarked_class_learners }} learner{{ unmarked_class_learners|pluralize }} unmarked{% if not is_locked %} — chase before {{ lock_hour }}:00{% endif %}. Green confirmed · amber confirmed after 09:00 · red not yet. Click a class to open its register.</p>
+        <p class="hint">{{ unmarked_class_learners }} student{{ unmarked_class_learners|pluralize }} unmarked{% if not is_locked %} — chase before {{ lock_hour }}:00{% endif %}. Green confirmed · amber confirmed after 09:00 · red not yet. Click a class to open its register.</p>
       {% else %}
         <h2>All registers marked</h2>
         <p class="hint">Every class has confirmed its register. Green confirmed · amber confirmed after 09:00.</p>
@@ -127,7 +127,7 @@ if ('serviceWorker' in navigator) {
   </form>
 
   <div class="at-card">
-    <h2 id="tTitle">All learners {% if date == today %}today{% else %}on {{ date|date:"j M" }}{% endif %}</h2>
+    <h2 id="tTitle">All students {% if date == today %}today{% else %}on {{ date|date:"j M" }}{% endif %}</h2>
     <p class="hint" id="tHint">Everyone enrolled, with the day's status.</p>
     <div class="at-scroll">
       <table class="at-table" id="att-table">
@@ -135,18 +135,18 @@ if ('serviceWorker' in navigator) {
           <th>Student information</th><th>Admission no.</th><th>Term rate</th>
           <th>Mark attendance
             {% if can_mark and class_name and not is_locked %}
-            <span class="at-bulk"><button type="button" class="bp" onclick="markAllStudents('present')" title="Mark every unmarked learner Present">All P</button><button type="button" class="ba" onclick="markAllStudents('absent')" title="Mark every unmarked learner Absent">All A</button></span>
+            <span class="at-bulk"><button type="button" class="bp" onclick="markAllStudents('present')" title="Mark every unmarked student Present">All P</button><button type="button" class="ba" onclick="markAllStudents('absent')" title="Mark every unmarked student Absent">All A</button></span>
             {% endif %}
           </th>
           <th>This week</th><th>Marked at</th><th>Checked out</th>
         </tr></thead>
         <tbody>
           {% for row in rows %}{% include "attendance/_row.html" %}{% endfor %}
-          <tr id="att-none" style="{% if rows %}display:none{% endif %}"><td colspan="7"><div class="at-empty">{% if rows %}No learners match.{% else %}No learners on roll{% if class_name %} in {{ class_name }}{% endif %}.{% endif %}</div></td></tr>
+          <tr id="att-none" style="{% if rows %}display:none{% endif %}"><td colspan="7"><div class="at-empty">{% if rows %}No students match.{% else %}No students on roll{% if class_name %} in {{ class_name }}{% endif %}.{% endif %}</div></td></tr>
         </tbody>
       </table>
     </div>
-    <div class="at-basis" id="tBasis">Unmarked learners appear with a grey tag so they stay visible, but are excluded from the percentage. Term rate counts this term's marked days only.</div>
+    <div class="at-basis" id="tBasis">Unmarked students appear with a grey tag so they stay visible, but are excluded from the percentage. Term rate counts this term's marked days only.</div>
   </div>
 
   <div style="margin-top:8px;padding:8px 0;text-align:center;font-size:11px;color:var(--at-muted)">
@@ -171,7 +171,7 @@ if ('serviceWorker' in navigator) {
     <div class="hf2-group" style="margin-top:12px">
       <label class="hf2-label" for="reqCorrectionReason">Reason <span style="color:var(--red)">*</span></label>
       <textarea name="reason" id="reqCorrectionReason" class="hf2-textarea" rows="3" required
-        placeholder="e.g. Learner arrived after the register was taken"></textarea>
+        placeholder="e.g. Student arrived after the register was taken"></textarea>
     </div>
     <div id="reqCorrectionError" class="field-error" style="display:none; margin-top:8px; color:var(--red); font-size:12px"></div>
   </form>
@@ -202,8 +202,8 @@ function getCsrfToken() { return CSRF_TOKEN; }
 /* ---- tiles: click a figure to list the learners behind it ---- */
 var DAY = {% if date == today %}"today"{% else %}"on {{ date|date:'j M' }}"{% endif %};
 var TV = {
-  all:  {T: "All learners " + DAY, H: "Everyone enrolled, with the day's status.", B: "Unmarked learners appear with a grey tag so they stay visible, but are excluded from the percentage. Term rate counts this term's marked days only.", f: function(s){ return true; }},
-  pres: {T: "In school " + DAY, H: "Marked present or late. Late learners are in school, so they count here, but are reported separately.", B: "Lateness also has its own figure so punctuality does not disappear inside the present count.", f: function(s){ return s === "P" || s === "L"; }},
+  all:  {T: "All students " + DAY, H: "Everyone enrolled, with the day's status.", B: "Unmarked students appear with a grey tag so they stay visible, but are excluded from the percentage. Term rate counts this term's marked days only.", f: function(s){ return true; }},
+  pres: {T: "In school " + DAY, H: "Marked present or late. Late students are in school, so they count here, but are reported separately.", B: "Lateness also has its own figure so punctuality does not disappear inside the present count.", f: function(s){ return s === "P" || s === "L"; }},
   abs:  {T: "Not in school " + DAY, H: "Marked absent. These require follow-up with parents.", B: "Excused absences are listed separately — also not in school, but authorised.", f: function(s){ return s === "A"; }},
   late: {T: "Late " + DAY, H: "Arrived late. In school, counted as present in the headline figure.", B: "Repeated lateness is visible in Attendance Reports over a date range.", f: function(s){ return s === "L"; }},
   exc:  {T: "Excused " + DAY, H: "Authorised absences. The reason is held against the record and visible to authorised staff only.", B: "The status is open to everyone; the reason is not, since it is often medical.", f: function(s){ return s === "E"; }},
@@ -220,7 +220,7 @@ function applyFilter() {
   var none = document.getElementById("att-none");
   if (document.querySelector('#att-table tr[id^="att-row-"]')) {
     none.style.display = shown ? "none" : "";
-    none.querySelector(".at-empty").textContent = "No learners match.";
+    none.querySelector(".at-empty").textContent = "No students match.";
   }
   document.getElementById("tTitle").textContent = v.T + (tSel === "all" && !q ? "" : " · " + shown);
   document.getElementById("tHint").textContent = v.H;
@@ -277,7 +277,7 @@ function markAttendance(el, studentId, date, status) {
 }
 function markWithReason(studentId, date, status, name) {
   var scrim = document.getElementById("exScrim"), input = document.getElementById("exReason");
-  document.getElementById("exWho").textContent = name || "this learner";
+  document.getElementById("exWho").textContent = name || "this student";
   input.value = ""; input.classList.remove("err");
   scrim.classList.add("on");
   setTimeout(function(){ input.focus(); }, 30);
@@ -308,7 +308,7 @@ function markAllStudents(status) {
   var label = status === "present" ? "Present" : "Absent", date = document.getElementById("att-date").value;
   confirmDeleteModal({
     title: "Mark " + toMark.length + " unmarked as " + label + "?",
-    body: "Every learner not yet marked in this class will be marked <strong>" + label + "</strong>. Learners already marked keep their status.",
+    body: "Every student not yet marked in this class will be marked <strong>" + label + "</strong>. Students already marked keep their status.",
     confirmText: "Mark " + label, type: status === "present" ? "info" : "warning",
     onConfirm: function() {
       closeConfirmDeleteModal();

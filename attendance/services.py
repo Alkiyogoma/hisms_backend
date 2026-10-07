@@ -765,7 +765,7 @@ class StudentSearchService:
                 'name': guardian_rel.full_name,
                 'phone': guardian_rel.phone,
                 'email': guardian_rel.email or '',
-                'relationship': guardian_rel.studentguardian_set.filter(student=student).first().get_relationship_display() if guardian_rel.studentguardian_set.filter(student=student).exists() else 'Guardian'
+                'relationship': guardian_rel.studentguardian_set.filter(student=student).first().get_relationship_display() if guardian_rel.studentguardian_set.filter(student=student).exists() else 'Parent'
             })
         
         # From Laravel parent system

@@ -41,7 +41,7 @@ class ReportsDashboardView(RoleRequiredMixin, TemplateView):
             {
                 "title": "Attendance Reports",
                 "icon": "check-circle",
-                "description": "Attendance by class, learner or whole school over any date range, and the printable register.",
+                "description": "Attendance by class, student or whole school over any date range, and the printable register.",
                 "url": "attendance:reports",
             },
         ]

@@ -1,18 +1,18 @@
 {% extends "base.html" %}
 {% load role_tags %}
-{% block title %}{% if edit_mode %}Edit Guardian{% else %}Add Guardian{% endif %} — {{ brand.school_name }}{% endblock %}
+{% block title %}{% if edit_mode %}Edit Parent{% else %}Add Parent{% endif %} — {{ brand.school_name }}{% endblock %}
 
-{% block topbar_greeting %}Parent / Guardian Management{% endblock %}
+{% block topbar_greeting %}Parent Management{% endblock %}
 
 {% block content %}
 {% include "students/_top_tabs.html" %}
 <div class="page-hdr">
   {% if edit_mode %}
-  <h1 style="font-family:Merriweather,serif; font-size:24px; color:#1A1A2E">Edit Guardian</h1>
+  <h1 style="font-family:Merriweather,serif; font-size:24px; color:#1A1A2E">Edit Parent</h1>
   <p>Update contact details for {{ guardian.full_name }}.</p>
   {% else %}
-  <h1 style="font-family:Merriweather,serif; font-size:24px; color:#1A1A2E">Add New Guardian</h1>
-  <p>Create a standalone guardian record. You can link students to this record later.</p>
+  <h1 style="font-family:Merriweather,serif; font-size:24px; color:#1A1A2E">Add New Parent</h1>
+  <p>Create a standalone parent record. You can link students to this record later.</p>
   {% endif %}
 </div>
 
@@ -30,7 +30,7 @@
 
     {% if edit_mode %}
     <div class="form-section">
-      <div class="form-section-title">Linked Learners</div>
+      <div class="form-section-title">Linked Students</div>
       {% for link in linked_students %}
       <div style="display:grid; grid-template-columns:minmax(0,1fr) 200px auto; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid #F1F5F9">
         <div style="min-width:0">
@@ -51,10 +51,10 @@
         </label>
       </div>
       {% empty %}
-      <p class="form-help">No learners linked yet. Link one from the learner's profile.</p>
+      <p class="form-help">No students linked yet. Link one from the student's profile.</p>
       {% endfor %}
       {% if linked_students %}
-      <p class="form-help" style="margin-top:8px">Making this guardian the primary contact replaces the learner's current primary contact.</p>
+      <p class="form-help" style="margin-top:8px">Making this parent the primary contact replaces the student's current primary contact.</p>
       {% endif %}
     </div>
     {% else %}
@@ -93,7 +93,7 @@
 
     <div class="form-actions">
       <a href="{% if edit_mode %}{% url 'students:guardian_detail' guardian.pk %}{% else %}{% url 'students:guardian_list' %}{% endif %}" class="btn-secondary">Cancel</a>
-      <button type="submit" class="btn-primary" style="padding:10px 24px">{% if edit_mode %}Save Changes{% else %}Create Guardian Record{% endif %}</button>
+      <button type="submit" class="btn-primary" style="padding:10px 24px">{% if edit_mode %}Save Changes{% else %}Create Parent Record{% endif %}</button>
     </div>
   </form>
 </div>

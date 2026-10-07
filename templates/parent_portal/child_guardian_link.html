@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Link Guardian — {{ student.first_name }}{% endblock %}
+{% block title %}Link Parent — {{ student.first_name }}{% endblock %}
 {% block content %}
 <div class="page-hdr">
   <div>
-    <h1>Link Guardian to {{ student.first_name }} {{ student.last_name }}</h1>
-    <p>Add an additional guardian or next of kin</p>
+    <h1>Link Parent to {{ student.first_name }} {{ student.last_name }}</h1>
+    <p>Add an additional parent or next of kin</p>
   </div>
-  <a href="{% url 'parent_portal:guardian_list' student.id %}" class="hf-btn hf-btn-secondary">Back to Guardians</a>
+  <a href="{% url 'parent_portal:guardian_list' student.id %}" class="hf-btn hf-btn-secondary">Back to Parents</a>
 </div>
 
 {% if error %}
@@ -19,8 +19,8 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#023AA5" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
     </div>
     <div>
-      <h3 style="margin:0;font-size:15px;font-weight:700">Request a New Guardian</h3>
-      <p style="margin:0;font-size:13px;color:#64748B">Send a request to the school office to create and link a new guardian record.</p>
+      <h3 style="margin:0;font-size:15px;font-weight:700">Request a New Parent</h3>
+      <p style="margin:0;font-size:13px;color:#64748B">Send a request to the school office to create and link a new parent record.</p>
     </div>
   </div>
 
@@ -28,7 +28,7 @@
     {% csrf_token %}
     <input type="hidden" name="action" value="request_guardian">
     <div class="form-group" style="margin-bottom:14px">
-      <label class="form-label">Guardian Full Name</label>
+      <label class="form-label">Parent Full Name</label>
       <input type="text" name="guardian_name" class="form-input" placeholder="e.g. Jane Doe" required>
     </div>
     <div class="form-group" style="margin-bottom:14px">

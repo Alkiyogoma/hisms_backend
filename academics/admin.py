@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 
 from academics.models import (
     AcademicYear, LessonPlan, Term, ExamTypeConfiguration, ECDTemplateConfiguration,
-    ExamScore, ReportCard, ECDEvaluation, Subject, GradeClass, Room,
+    ExamScore, ExamScoreAmendment, ReportCard, ECDEvaluation, Subject, GradeClass, Room,
     ProgressionConfig, ProgressionCase, PromotionRun, ECDDomainConfig, ClassCapacity,
 )
 
@@ -110,8 +110,21 @@ class RoomAdmin(admin.ModelAdmin):
     search_fields = ("name", "building")
 
 
+class ExamScoreAmendmentInline(admin.TabularInline):
+    """Read-only history of changes made after HOD approval."""
+    model = ExamScoreAmendment
+    extra = 0
+    can_delete = False
+    fields = ("previous_score", "new_score", "changed_by", "created_at", "reason")
+    readonly_fields = fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(ExamScore)
 class ExamScoreAdmin(admin.ModelAdmin):
+    inlines = [ExamScoreAmendmentInline]
     list_display = ("student", "term", "subject_name", "exam_type", "score", "status", "entered_by")
     list_filter = ("status", "exam_type", "term", "subject_name")
     search_fields = ("student__admission_no", "student__first_name", "student__last_name", "subject_name")

@@ -90,7 +90,7 @@ def _notify_finance_officers_sibling_detected(
             object_id=student.pk,
             description=(
                 f"Auto-detected sibling link: {student.admission_no} "
-                f"shares guardian with {sib.admission_no}"
+                f"shares parent with {sib.admission_no}"
             ),
         )
 

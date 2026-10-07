@@ -501,10 +501,10 @@ function stepParents(){
       field('Current church','guardians.'+i+'.church',{opt:true,span:true})+
     '</div></div>';
   }
-  return '<p class="eyebrow">Admission form · Section 2 of 9</p><h1 class="step-t">Parent and guardian details</h1>'+
-  '<p class="lede">The first contact listed receives all invoices, reports and school notices. Add a second parent or guardian if there is one.</p>'+
-  g(0,'Primary parent or guardian')+
-  (S.secondGuardian ? g(1,'Second parent or guardian') : '<button class="addbtn" data-act="addguardian">+ Add a second parent or guardian</button>');
+  return '<p class="eyebrow">Admission form · Section 2 of 9</p><h1 class="step-t">Parent details</h1>'+
+  '<p class="lede">The first contact listed receives all invoices, reports and school notices. Add a second parent if there is one.</p>'+
+  g(0,'Primary parent')+
+  (S.secondGuardian ? g(1,'Second parent') : '<button class="addbtn" data-act="addguardian">+ Add a second parent</button>');
 }
 
 function stepHealth(){
@@ -744,7 +744,7 @@ function stepConsent(){
   '<fieldset><legend>Signature</legend><div class="grid">'+
     field('Type your full name to sign','signature',{ph:'As written above'})+
     field('Date','signDate',{type:'date'})+
-    '<p class="hint wide" style="grid-column:1/-1">By typing your name you declare that you are the parent or legal guardian of the children listed, and that the information you have given is true and current.</p>'+
+    '<p class="hint wide" style="grid-column:1/-1">By typing your name you declare that you are the parent of the children listed, and that the information you have given is true and current.</p>'+
   '</div></fieldset>';
 }
 
@@ -753,10 +753,10 @@ function stepReview(){
   var _editBtn = FORM_SUBMITTED ? '' : '<button class="linkbtn" data-goto="1">Edit</button>';
   return '<p class="eyebrow">Admission form · Review</p><h1 class="step-t">Check everything over</h1>'+
   '<p class="lede">'+(FORM_SUBMITTED ? 'This form has been submitted. Contact the school office to make changes.' : 'Nothing is submitted until you press Generate invoice. Use Edit to go back to any section.')+'</p>'+
-  '<div class="rev"><div class="rev-h"><h3>Parent or guardian</h3>'+((!FORM_SUBMITTED)?'<button class="linkbtn" data-goto="1">Edit</button>':'')+'</div>'+
+  '<div class="rev"><div class="rev-h"><h3>Parent</h3>'+((!FORM_SUBMITTED)?'<button class="linkbtn" data-goto="1">Edit</button>':'')+'</div>'+
     '<dl><dt>Name</dt><dd>'+(esc(g.name)||'—')+'</dd><dt>Phone</dt><dd>'+(esc(g.phone)||'—')+'</dd>'+
     '<dt>Email</dt><dd>'+(esc(g.email)||'—')+'</dd><dt>Address</dt><dd>'+(esc(g.address)||'—')+'</dd>'+
-    (S.secondGuardian?'<dt>Second guardian</dt><dd>'+(esc(S.guardians[1].name)||'—')+'</dd>':'')+'</dl></div>'+
+    (S.secondGuardian?'<dt>Second parent</dt><dd>'+(esc(S.guardians[1].name)||'—')+'</dd>':'')+'</dl></div>'+
   S.children.map(function(c,i){
   return '<div class="rev"><div class="rev-h"><div class="pip">'+(i+1)+'</div><h3>'+esc(c.name||'Student '+(i+1))+'</h3>'+((!FORM_SUBMITTED)?'<button class="linkbtn" data-goto="0">Edit</button>':'')+'</div>'+
     '<dl><dt>Grade</dt><dd>'+esc(c.grade)+'</dd><dt>Status</dt><dd>'+(c.isNew?'New student':'Returning')+'</dd>'+
@@ -864,8 +864,8 @@ function renderAside(){
 var REQ = {
   0: function(){ return S.children.flatMap(function(c,i){return [['children.'+i+'.name','Enter the student\u2019s full name'],['children.'+i+'.dob','Enter the date of birth'],['children.'+i+'.gender','Select a gender'],['children.'+i+'.religion','Enter the child\u2019s religion'],['children.'+i+'.prevSchool','Enter the previous school, or write "None"']]}); },
   1: function(){
-    var r = [['guardians.0.name','Enter the parent or guardian\u2019s name'],['guardians.0.phone','Enter a phone number we can reach you on'],['guardians.0.email','Enter an email address'],['guardians.0.address','Enter a home address'],['guardians.0.rel','Select a relationship'],['guardians.0.workplace','Enter a place of work']];
-    if(S.secondGuardian) r.push(['guardians.1.name','Enter this guardian\u2019s name or remove them'],['guardians.1.workplace','Enter a place of work']);
+    var r = [['guardians.0.name','Enter the parent\u2019s name'],['guardians.0.phone','Enter a phone number we can reach you on'],['guardians.0.email','Enter an email address'],['guardians.0.address','Enter a home address'],['guardians.0.rel','Select a relationship'],['guardians.0.workplace','Enter a place of work']];
+    if(S.secondGuardian) r.push(['guardians.1.name','Enter this parent\u2019s name or remove them'],['guardians.1.workplace','Enter a place of work']);
     return r;
   },
   2: function(){ return S.children.flatMap(function(c,i){return [['children.'+i+'.health','Select a general state of health'],['children.'+i+'.hospital','Name the hospital or clinic you want us to use']]}); },

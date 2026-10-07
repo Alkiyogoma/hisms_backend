@@ -243,6 +243,11 @@ def get_class_capacity(grade_class, academic_year=None):
     return 25
 
 
+class AssessmentMode(models.TextChoices):
+    MARKS = "marks", "Mark-bearing (Quiz, Mid Term, End Term)"
+    REMARK = "remark", "Remark only (once per term, no marks)"
+
+
 class Subject(TimeStampedModel):
     name = models.CharField(max_length=80, unique=True)
     code = models.CharField(max_length=10, unique=True, null=True, blank=True, help_text="e.g. MATH, ENG")
@@ -251,6 +256,11 @@ class Subject(TimeStampedModel):
     departments = models.JSONField(default=list, blank=True, help_text="List of departments this subject belongs to")
     is_active = models.BooleanField(default=True)
     is_enrichment = models.BooleanField(default=False, help_text="Enrichment subjects (Bible, ICT, PE, etc.) use letter grades and one grade per term")
+    assessment_mode = models.CharField(
+        max_length=10, choices=AssessmentMode.choices, default=AssessmentMode.MARKS,
+        help_text="Mark-bearing subjects take Quiz, Mid Term and End Term marks; "
+                  "remark-only subjects take one remark per term. Applies to Primary and Lower Secondary.",
+    )
     classes = models.ManyToManyField(GradeClass, related_name="subjects", blank=True)
 
     def __str__(self) -> str:
@@ -270,6 +280,10 @@ class Subject(TimeStampedModel):
                         f'(departments: {", ".join(subject_depts)}). '
                         f'Remove the class or add its department to this subject.'
                     )
+
+    @property
+    def is_remark_only(self) -> bool:
+        return self.assessment_mode == AssessmentMode.REMARK
 
     def get_departments_display(self):
         labels = dict(Department.choices)
@@ -694,6 +708,14 @@ class ScoreStatus(models.TextChoices):
     APPROVED = "approved", "HOD Approved"
     RETURNED = "returned", "Returned for Correction"
 
+class ExamScoreQuerySet(models.QuerySet):
+    def mark_bearing(self):
+        """Leave out remark-only subjects (they take no marks; any stored are ignored)."""
+        return self.exclude(
+            subject_name__in=Subject.objects.filter(assessment_mode=AssessmentMode.REMARK).values("name")
+        )
+
+
 class ExamScore(TimeStampedModel):
     """
     Individual exam score for a student in a subject.
@@ -732,6 +754,8 @@ class ExamScore(TimeStampedModel):
     )
     approved_at = models.DateTimeField(null=True, blank=True)
     hod_feedback = models.TextField(blank=True)
+
+    objects = ExamScoreQuerySet.as_manager()
 
     # Correction tracking
     corrected_by = models.ForeignKey(
@@ -778,6 +802,51 @@ class ExamScore(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.student_id} | {self.subject_name} | {self.exam_type} | {self.score}"
+
+
+class SubjectRemark(models.TextChoices):
+    OUTSTANDING = "Outstanding", "Outstanding"
+    HIGH = "High", "High"
+    GOOD = "Good", "Good"
+    ASPIRING = "Aspiring", "Aspiring"
+    BASIC = "Basic", "Basic"
+    NEEDS_IMPROVEMENT = "Needs Improvement", "Needs Improvement"
+
+
+class SubjectTermRemark(TimeStampedModel):
+    """The once-per-term remark for a remark-only subject (no marks).
+    Editable until the learner's report goes for sign-off."""
+    student = models.ForeignKey("students.Student", on_delete=models.PROTECT, related_name="subject_remarks")
+    term = models.ForeignKey(Term, on_delete=models.PROTECT, related_name="subject_remarks")
+    subject_name = models.CharField(max_length=80, db_index=True)
+    remark = models.CharField(max_length=20, choices=SubjectRemark.choices)
+    entered_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="subject_remarks_entered"
+    )
+
+    class Meta:
+        unique_together = ("student", "term", "subject_name")
+
+    def __str__(self) -> str:
+        return f"{self.student_id} | {self.subject_name} | {self.remark}"
+
+
+class ExamScoreAmendment(TimeStampedModel):
+    """A change to a score after HOD approval, made by the Head of School or
+    Super Admin. One row per change, so the full history is kept."""
+    score = models.ForeignKey(ExamScore, on_delete=models.CASCADE, related_name="amendments")
+    previous_score = models.DecimalField(max_digits=5, decimal_places=2)
+    new_score = models.DecimalField(max_digits=5, decimal_places=2)
+    reason = models.TextField()
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="score_amendments"
+    )
+
+    class Meta:
+        ordering = ["created_at", "pk"]
+
+    def __str__(self) -> str:
+        return f"{self.score_id}: {self.previous_score} -> {self.new_score}"
 
 
 class ReportCardStatus(models.TextChoices):
@@ -838,9 +907,9 @@ class ReportCard(TimeStampedModel):
     ecd_remarks = models.CharField(max_length=50, blank=True, help_text="Override auto-computed ECD remarks label (Outstanding/Good/Satisfactory/Needs Improvement)")
 
     # Parent signature
-    parent_signed = models.BooleanField(default=False, help_text="Whether parent/guardian has signed the report card")
-    parent_signed_at = models.DateTimeField(null=True, blank=True, help_text="When parent/guardian signed")
-    parent_signature_name = models.CharField(max_length=255, blank=True, help_text="Name of parent/guardian who signed")
+    parent_signed = models.BooleanField(default=False, help_text="Whether parent has signed the report card")
+    parent_signed_at = models.DateTimeField(null=True, blank=True, help_text="When parent signed")
+    parent_signature_name = models.CharField(max_length=255, blank=True, help_text="Name of parent who signed")
 
     class Meta:
         unique_together = ("student", "term")
@@ -862,7 +931,7 @@ class ReportCard(TimeStampedModel):
             student=self.student,
             term=self.term,
             status=ScoreStatus.APPROVED,
-        )
+        ).mark_bearing()
         if not scores.exists():
             return None
 
@@ -894,7 +963,6 @@ class ReportCard(TimeStampedModel):
 
     def populate_attendance_summary(self, start_date=None, end_date=None):
         """FR-ATT-013: Populate attendance summary fields from AttendanceEntry records."""
-        from attendance.models import PRESENT_STATUSES, AttendanceEntry, AttendanceStatus
         from django.utils import timezone
 
         if start_date is None and self.term.start_date:
@@ -906,14 +974,16 @@ class ReportCard(TimeStampedModel):
         if end_date is None:
             end_date = timezone.now().date()
 
-        qs = AttendanceEntry.objects.filter(student=self.student, date__range=[start_date, end_date])
-        # Days present includes days late; days late is "of which late".
-        self.attendance_days_present = qs.filter(status__in=PRESENT_STATUSES).count()
-        self.attendance_days_late = qs.filter(status=AttendanceStatus.LATE).count()
-        self.attendance_days_absent = qs.filter(status=AttendanceStatus.ABSENT).count()
-        total = self.attendance_days_present + self.attendance_days_absent
-        if total > 0:
-            self.attendance_rate = round((self.attendance_days_present / total) * 100, 2)
+        # School days only (no weekends/holidays/days before enrolment);
+        # unmarked days are never counted as absent. Present includes late;
+        # absent includes excused.
+        from attendance import analytics
+        row = analytics.learner_attendance(self.student, start_date, end_date)["row"] or {}
+        self.attendance_days_present = row.get("in_school", 0)
+        self.attendance_days_late = row.get("late", 0)
+        self.attendance_days_absent = row.get("absent", 0) + row.get("excused", 0)
+        if row.get("rate") is not None:
+            self.attendance_rate = row["rate"]
         self.save(update_fields=[
             'attendance_days_present', 'attendance_days_absent',
             'attendance_days_late', 'attendance_rate', 'updated_at',

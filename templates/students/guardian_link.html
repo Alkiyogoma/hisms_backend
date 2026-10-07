@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Link Guardian — {{ student.first_name }}{% endblock %}
+{% block title %}Link Parent — {{ student.first_name }}{% endblock %}
 
-{% block topbar_greeting %}Add Guardian{% endblock %}
+{% block topbar_greeting %}Add Parent{% endblock %}
 
 {% block content %}
 {% include "students/_top_tabs.html" %}
@@ -19,8 +19,8 @@
 
 <div class="card" style="max-width:800px; margin:24px auto">
   <div class="tabs-nav" style="margin-bottom:20px">
-    <div class="tab-item active" id="tabExisting" onclick="switchMode('existing')">Link Existing Guardian</div>
-    <div class="tab-item" id="tabNew" onclick="switchMode('new')">Create New Guardian</div>
+    <div class="tab-item active" id="tabExisting" onclick="switchMode('existing')">Link Existing Parent</div>
+    <div class="tab-item" id="tabNew" onclick="switchMode('new')">Create New Parent</div>
   </div>
 
   <form method="post" id="guardianForm">
@@ -29,17 +29,17 @@
     <input type="hidden" name="mode" id="linkMode" value="{{ mode|default:'existing' }}">
     <input type="hidden" name="guardian_id" id="guardianId" value="{{ values.guardian.pk|default:'' }}">
 
-    {# Scenario 1: Existing Guardian Search #}
+    {# Scenario 1: Existing Parent Search #}
     <div id="sectionExisting">
       <div class="form-group">
-        <label class="form-label" for="guardianSearch"{% if errors.guardian_id %} style="color:#DC2626"{% endif %}>Search for Guardian (Name or Phone)*</label>
+        <label class="form-label" for="guardianSearch"{% if errors.guardian_id %} style="color:#DC2626"{% endif %}>Search for Parent (Name or Phone)*</label>
         <div style="position:relative{% if values.guardian %}; display:none{% endif %}">
           <input type="text" class="form-input" id="guardianSearch" placeholder="Type name or phone number..." autocomplete="off"{% if errors.guardian_id %} aria-invalid="true" aria-describedby="guardian_id_error" style="border-color:#DC2626"{% endif %}>
           <div id="searchResults" style="position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid #DDE3EE; border-radius:8px; box-shadow:0 10px 20px rgba(0,0,0,0.1); display:none; z-index:100; margin-top:4px; max-height:300px; overflow-y:auto">
           </div>
         </div>
         {% if errors.guardian_id %}<p class="hf2-error" id="guardian_id_error">{{ errors.guardian_id }}</p>{% endif %}
-        <p class="form-help">Tip: The system will automatically detect siblings if the guardian is already linked to other students.</p>
+        <p class="form-help">Tip: The system will automatically detect siblings if the parent is already linked to other students.</p>
       </div>
 
       <div id="selectedGuardian" style="display:{% if values.guardian %}block{% else %}none{% endif %}; margin-top:16px; padding:16px; background:#F0F4FB; border:1px solid #023AA5; border-radius:8px">
@@ -67,7 +67,7 @@
       </div>
     </div>
 
-    {# Scenario 2: New Guardian Info #}
+    {# Scenario 2: New Parent Info #}
     <div id="sectionNew" style="display:none">
       {% include "students/_guardian_contact_fields.html" %}
       {% include "students/_guardian_consent_fields.html" %}
@@ -94,7 +94,7 @@
 
     <div class="form-actions" style="margin-top:32px">
       <a href="{% url 'students:detail' student.pk %}" class="btn-secondary">Cancel</a>
-      <button type="submit" class="btn-primary" style="padding:10px 24px">Link Guardian to Profile</button>
+      <button type="submit" class="btn-primary" style="padding:10px 24px">Link Parent to Profile</button>
     </div>
   </form>
 </div>
@@ -142,7 +142,7 @@
         .then(data => {
           resultsDiv.innerHTML = '';
           if (data.results.length === 0) {
-            resultsDiv.innerHTML = '<div style="padding:12px; color:#8492A6; font-size:13px">No guardians found. Try creating a new one.</div>';
+            resultsDiv.innerHTML = '<div style="padding:12px; color:#8492A6; font-size:13px">No parents found. Try creating a new one.</div>';
           } else {
             data.results.forEach(g => {
               const item = document.createElement('div');
@@ -173,7 +173,7 @@
     var sibAlert = document.getElementById('siblingAlertLink');
     var sibText = document.getElementById('selSibsText');
     if (g.siblings && g.siblings.length > 0) {
-      sibText.innerHTML = 'The following student(s) are already linked to this guardian: ' + g.siblings + '.';
+      sibText.innerHTML = 'The following student(s) are already linked to this parent: ' + g.siblings + '.';
       sibAlert.style.display = 'block';
       sibAlert.style.opacity = '1';
       sibAlert.style.transform = 'none';
@@ -218,13 +218,13 @@
     if (typeof showToast !== 'function') { setTimeout(_checkUrlParams, 100); return; }
     const params = new URLSearchParams(window.location.search);
     if (params.get('error') === 'pdpa_consent') {
-      showToast('PDPA consent must be recorded before linking this guardian. Please update the guardian\'s profile first.', 'error');
+      showToast('PDPA consent must be recorded before linking this parent. Please update the parent\'s profile first.', 'error');
       params.delete('error');
       const newUrl = params.toString() ? window.location.pathname + '?' + params.toString() : window.location.pathname;
       window.history.replaceState({}, '', newUrl);
     }
     if (params.get('success') === '1') {
-      showToast('Guardian linked successfully!', 'success');
+      showToast('Parent linked successfully!', 'success');
       params.delete('success');
       const newUrl = params.toString() ? window.location.pathname + '?' + params.toString() : window.location.pathname;
       window.history.replaceState({}, '', newUrl);

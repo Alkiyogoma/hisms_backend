@@ -200,7 +200,7 @@ def format_parent_notes(value):
             g = guardians[0]
     if g:
         html.append('<div style="margin-bottom:14px">')
-        html.append('<div style="font-weight:700;font-size:13px;margin-bottom:6px;color:var(--hodari-blue)">Parent / Guardian</div>')
+        html.append('<div style="font-weight:700;font-size:13px;margin-bottom:6px;color:var(--hodari-blue)">Parent</div>')
         fields = [("Name", g.get("name")), ("Phone", g.get("phone")), ("Email", g.get("email")),
                   ("Relationship", g.get("rel")), ("National ID", g.get("nid")),
                   ("Address", g.get("address")), ("Occupation", g.get("occupation")),

@@ -87,7 +87,7 @@ class StudentEditFormErrorTests(TestCase):
             resp = self.client.post(self.url, self._page_fields(nationality="Tanzanian"))
         self.assertEqual(resp.status_code, 200)
         msgs = self._messages(resp)
-        self.assertTrue(any(m.startswith("The learner's record could not be saved: Student ID") for m in msgs), msgs)
+        self.assertTrue(any(m.startswith("The student's record could not be saved: Student ID") for m in msgs), msgs)
         content = resp.content.decode()
         self.assertIn('id="form-error-summary"', content)
         self.assertIn("cannot be changed after creation", content)
@@ -145,7 +145,7 @@ class GuardianFormErrorTests(TestCase):
 
     def test_edit_page_shows_current_details(self):
         content = self.client.get(self.url).content.decode()
-        self.assertIn("Edit Guardian", content)
+        self.assertIn("Edit Parent", content)
         self.assertIn('value="mary@example.com"', content)
         self.assertIn(">Arusha</textarea>", content)
         self.assertIn('value="sw" selected', content)
@@ -235,7 +235,7 @@ class GuardianLinkDataTests(TestCase):
     def test_guardian_page_has_edit_button_and_language(self):
         content = self.client.get(reverse("students:guardian_detail", args=[self.mother.pk])).content.decode()
         self.assertIn(reverse("students:guardian_edit", args=[self.mother.pk]), content)
-        self.assertIn("Edit Guardian", content)
+        self.assertIn("Edit Parent", content)
         self.assertIn("Preferred Language", content)
         self.assertIn("Swahili", content)
 
@@ -293,7 +293,7 @@ class GuardianLinkDataTests(TestCase):
         })
         self.assertEqual(resp.status_code, 200)
         content = resp.content.decode()
-        self.assertIn("search for and select a guardian", content)
+        self.assertIn("search for and select a parent", content)
         self.assertNotIn("Full Name is required", content)
 
     def test_link_existing_as_primary_moves_primary(self):

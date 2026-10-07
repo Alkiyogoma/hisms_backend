@@ -236,7 +236,7 @@ def submit_parent_form(*, invite, data, files):
     if not grade or not GradeClass.objects.filter(name__iexact=grade).exists():
         errors.append("Choose the grade the child is joining.")
     if not _clean_str(guardian.get("name"), 150) or not _clean_str(guardian.get("phone"), 32):
-        errors.append("Enter the parent or guardian's name and phone number.")
+        errors.append("Enter the parent's name and phone number.")
     if not (data.get("consent") or {}).get("core"):
         errors.append("Consent to hold the child's data is required.")
     missing = [UPLOADS[k][1] for k in required_uploads(child) if not uploaded.get(k)]

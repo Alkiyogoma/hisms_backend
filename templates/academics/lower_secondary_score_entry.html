@@ -180,6 +180,19 @@
     line-height: 1.3;
 }
 .score-feedback.visible { display: block; }
+
+/* Approved-grade change (Head of School / Super Admin) */
+.score-amend-link {
+    display: block; width: 100%; margin-top: 4px; padding: 2px 0;
+    background: none; border: none; cursor: pointer;
+    font-size: 10px; font-weight: 600; color: #023AA5; text-decoration: underline;
+}
+.score-amend-note {
+    font-size: 10px; color: #475569; background: #F8FAFC;
+    border: 1px solid #E2E8F0; border-radius: 6px;
+    padding: 4px 8px; margin-top: 4px; line-height: 1.35;
+}
+.score-amend-note .fb-label { font-weight: 700; color: #334155; text-transform: uppercase; font-size: 9px; }
 .score-feedback .fb-label {
     font-weight: 700;
     color: #991B1B;
@@ -271,8 +284,22 @@
             <div class="subject-section" style="opacity:{% if editable_subjects and sub not in editable_subjects %}0.7{% else %}1{% endif %}">
                 <div class="subject-header">
                     <span>{{ sub }}{% if editable_subjects and sub not in editable_subjects %} <span style="font-size:10px;font-weight:400;color:#94A3B8;margin-left:6px">(read-only)</span>{% endif %}</span>
+                    {% if sub in remark_subjects %}
+                    <span style="font-size:11px; font-weight:600; color:#64748B">Remark only &middot; once per term</span>
+                    {% else %}
                     <span id="avg-{{ sub|slugify }}" style="font-family:'JetBrains Mono'; color:#64748B">Avg: --%</span>
+                    {% endif %}
                 </div>
+                {% if sub in remark_subjects %}
+                <div class="score-box" style="background:{% if editable_subjects and sub not in editable_subjects %}#F1F5F9{% else %}#F8FAFC{% endif %}; max-width:360px">
+                    <label for="remark-{{ sub|slugify }}" style="display:block; font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:6px">Term remark</label>
+                    <select id="remark-{{ sub|slugify }}" class="hf-select remark-input-val" data-subject="{{ sub }}" style="width:100%"
+                            {% if editable_subjects and sub not in editable_subjects %}data-readonly="1" disabled{% endif %}>
+                        <option value="">Not entered</option>
+                        {% for c in remark_choices %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+                    </select>
+                </div>
+                {% else %}
                 <div class="score-grid">
                     {% for et in exam_types %}
                     <div class="score-box" style="background:{% if editable_subjects and sub not in editable_subjects %}#F1F5F9{% elif et.code in open_exam_codes %}#F8FAFC{% else %}#F1F5F9{% endif %}">
@@ -289,9 +316,11 @@
                         {% endif %}
                         <div class="score-status-badge" id="badge-{{ sub|slugify }}-{{ et.code }}"></div>
                         <div class="score-feedback" id="fb-{{ sub|slugify }}-{{ et.code }}"></div>
+                        <div class="score-amend" id="am-{{ sub|slugify }}-{{ et.code }}"></div>
                     </div>
                     {% endfor %}
                 </div>
+                {% endif %}
             </div>
             {% endfor %}
         </div>
@@ -304,6 +333,32 @@
             </div>
         </div>
     </div>
+</div>
+
+<div id="amendModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);align-items:center;justify-content:center" onclick="if(event.target===this)closeAmendModal()">
+  <div style="background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.2);width:100%;max-width:480px;margin:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border)">
+      <h3 style="margin:0;font-size:16px;font-weight:700;color:var(--text-primary)">Change approved mark</h3>
+      <button type="button" onclick="closeAmendModal()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted);padding:0 4px">&times;</button>
+    </div>
+    <div style="padding:20px 22px;display:flex;flex-direction:column;gap:12px">
+      <p id="amend-context" style="font-size:13px;color:var(--text-secondary);margin:0"></p>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label class="hf-label" for="amend-score">New mark</label>
+        <input type="number" id="amend-score" class="hf-input" step="1" min="0" style="max-width:140px">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label class="hf-label" for="amend-reason">Reason (required)</label>
+        <textarea id="amend-reason" style="width:100%;min-height:90px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--font-ui);resize:vertical" placeholder="e.g. Mark was mis-keyed; script re-marked on appeal"></textarea>
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin:0">The previous mark, the new mark, your name, the time and this reason are kept as a note on the grade.</p>
+      <div id="amend-error" style="font-size:12px;color:var(--red)"></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 22px;border-top:1px solid var(--border)">
+      <button type="button" class="hf-btn hf-btn-secondary" onclick="closeAmendModal()">Cancel</button>
+      <button type="button" id="amend-save" class="hf-btn hf-btn-primary" onclick="submitAmend()">Save change</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -378,6 +433,8 @@ async function loadStudent(id) {
   document.querySelectorAll(".score-input-val").forEach(i => { i.value = ""; i.readOnly = false; i.removeAttribute("data-returned"); });
   document.querySelectorAll(".score-status-badge").forEach(b => { b.className = 'score-status-badge'; b.textContent = ''; });
   document.querySelectorAll(".score-feedback").forEach(f => { f.classList.remove('visible'); f.innerHTML = ''; });
+  document.querySelectorAll(".score-amend").forEach(a => { a.innerHTML = ''; });
+  document.querySelectorAll(".remark-input-val").forEach(sel => { sel.value = ''; });
   
   const r = await fetch(API + "scores/" + id + "/?term=" + TERM_ID);
   const d = await r.json();
@@ -407,6 +464,7 @@ async function loadStudent(id) {
                    }
                    if(sc === 'approved' || (d.scores[subject][type].is_locked && sc !== 'returned')) inp.readOnly = true;
                    if (CLOSED_EXAM_CODES.indexOf(type) !== -1 && sc !== 'returned') inp.readOnly = true;
+                   renderAmend(subject, type, d.scores[subject][type], d.can_amend);
                    if (badge) {
                        badge.className = 'score-status-badge';
                        if (sc === 'approved') { badge.classList.add('badge-approved'); badge.textContent = 'Approved'; }
@@ -438,9 +496,83 @@ async function loadStudent(id) {
       if (CLOSED_EXAM_CODES.indexOf(inp.dataset.type) !== -1 && !inp.hasAttribute("data-returned")) inp.readOnly = true;
   });
   
+  applyRemarks(d);
   currentProgress = d.progress || null;
   calcGrandAverage();
   updateProgress();
+}
+
+/* Approved grades: show every change as a note on the score, and let the
+   Head of School / Super Admin change the mark with a mandatory reason. */
+function renderAmend(subject, type, sd, canAmend) {
+  const slug = subject.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const box = document.getElementById("am-" + slug + "-" + type);
+  if (!box) return;
+  box.innerHTML = '';
+  (sd.amendments || []).forEach(a => {
+    const note = document.createElement('div');
+    note.className = 'score-amend-note';
+    const label = document.createElement('span');
+    label.className = 'fb-label';
+    label.textContent = 'Changed: ';
+    note.appendChild(label);
+    note.appendChild(document.createTextNode(
+      a.previous_score + ' \u2192 ' + a.new_score + ' by ' + a.changed_by + ', ' + a.changed_at + '. Reason: ' + a.reason
+    ));
+    box.appendChild(note);
+  });
+  if (canAmend && sd.status === 'approved' && sd.id) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'score-amend-link';
+    btn.textContent = 'Change approved mark';
+    btn.addEventListener('click', () => openAmendModal(sd.id, subject, type, sd.score));
+    box.appendChild(btn);
+  }
+}
+
+let amendScoreId = null;
+function openAmendModal(scoreId, subject, type, currentScore) {
+  amendScoreId = scoreId;
+  const inp = document.querySelector(`input[data-subject="${subject}"][data-type="${type}"]`);
+  const typeName = inp ? inp.dataset.typeName : type;
+  document.getElementById('amend-context').textContent =
+    (current ? current.first_name + ' ' + current.last_name + ' \u2014 ' : '') + subject + ', ' + typeName + '. Current mark: ' + currentScore + '.';
+  const sc = document.getElementById('amend-score');
+  sc.value = '';
+  sc.max = inp ? inp.dataset.max_score : 100;
+  document.getElementById('amend-reason').value = '';
+  document.getElementById('amend-error').textContent = '';
+  document.getElementById('amendModal').style.display = 'flex';
+  sc.focus();
+}
+function closeAmendModal() {
+  document.getElementById('amendModal').style.display = 'none';
+  amendScoreId = null;
+}
+async function submitAmend() {
+  const err = document.getElementById('amend-error');
+  const score = document.getElementById('amend-score').value.trim();
+  const reason = document.getElementById('amend-reason').value.trim();
+  if (score === '') { err.textContent = 'Enter the new mark.'; return; }
+  if (!reason) { err.textContent = 'A reason is required. The change is not saved without one.'; return; }
+  const btn = document.getElementById('amend-save');
+  btn.disabled = true;
+  try {
+    const r = await fetch('/academics/exam-scores/' + amendScoreId + '/correct/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      body: JSON.stringify({ score: score, reason: reason }),
+    });
+    let resp = {};
+    try { resp = await r.json(); } catch (e) {}
+    if (!r.ok) { err.textContent = resp.error || ('The mark was not changed (error ' + r.status + ').'); return; }
+    closeAmendModal();
+    showToast('Approved mark changed. The previous mark and reason are kept on the record.', 'success');
+    reloadScores();
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function reloadScores() {
@@ -468,6 +600,7 @@ async function reloadScores() {
                   else { allApproved = false; }
                   if(sc === 'approved' || (d.scores[subject][type].is_locked && sc !== 'returned')) inp.readOnly = true;
                   if (CLOSED_EXAM_CODES.indexOf(type) !== -1 && sc !== 'returned') inp.readOnly = true;
+                  renderAmend(subject, type, d.scores[subject][type], d.can_amend);
                   if (badge) {
                       badge.className = 'score-status-badge';
                       if (sc === 'approved') { badge.classList.add('badge-approved'); badge.textContent = 'Approved'; }
@@ -485,6 +618,7 @@ async function reloadScores() {
       });
       applyProgress(current.id, d.progress);
   }
+  applyRemarks(d);
   currentProgress = d.progress || null;
   calcGrandAverage();
 }
@@ -501,6 +635,17 @@ function applyProgress(id, p) {
   else if (p.status === 'submitted') { chip.textContent = "Submitted"; chip.className = "status-chip status-saved"; }
   else if (p.status === 'partial') { chip.textContent = p.approved_subjects + "/" + p.total_subjects + " approved"; chip.className = "status-chip status-saved"; }
   else if (p.status === 'draft') { chip.textContent = "Saved"; chip.className = "status-chip status-saved"; }
+}
+
+/* Remark-only subjects: one remark per term, editable until the report
+   goes for sign-off. */
+function applyRemarks(d) {
+  const remarks = d.remarks || {};
+  document.querySelectorAll(".remark-input-val").forEach(sel => {
+    sel.value = remarks[sel.dataset.subject] || '';
+    sel.disabled = sel.hasAttribute('data-readonly') || !!d.remarks_locked;
+    sel.title = d.remarks_locked ? 'The report has gone for sign-off; remarks can no longer be changed.' : '';
+  });
 }
 
 function calcSubjectAverage(slug) {
@@ -580,8 +725,8 @@ function calcGrandAverage() {
         grandDisplay.style.color = "#94A3B8";
     }
     if (grandNote) {
-        if (p && p.total_subjects) {
-            grandNote.textContent = (p.included_subjects || 0) + " of " + p.total_subjects + " subjects approved"
+        if (p && p.mark_subjects) {
+            grandNote.textContent = (p.included_subjects || 0) + " of " + p.mark_subjects + " subjects approved"
                 + (p.is_complete ? "" : " · incomplete");
         } else {
             grandNote.textContent = "Approved scores only";
@@ -633,8 +778,13 @@ async function saveAllScores() {
         focusScoreCell(invalidCells[0].inp);
         return;
     }
-    if(Object.keys(scores).length === 0) {
-        showToast("There are no scores to save for this learner yet.", "warning");
+    const remarks = {};
+    document.querySelectorAll(".remark-input-val").forEach(sel => {
+        if (!sel.disabled) remarks[sel.dataset.subject] = sel.value;
+    });
+    if(Object.keys(scores).length === 0 && !Object.values(remarks).some(v => v)
+       && !document.querySelector(".remark-input-val:not([disabled])")) {
+        showToast("There are no scores to save for this student yet.", "warning");
         return;
     }
 
@@ -643,7 +793,7 @@ async function saveAllScores() {
         r = await fetch(API + "scores/" + current.id + "/", {
             method: "POST",
             headers: { "Content-Type": "application/json", "X-CSRFToken": CSRF },
-            body: JSON.stringify({ term: TERM_ID, scores: scores })
+            body: JSON.stringify({ term: TERM_ID, scores: scores, remarks: remarks })
         });
     } catch (e) {
         showToast("Scores were not saved: the server could not be reached. Check your connection and try again.", "error");

@@ -25,10 +25,26 @@ class LearnerReportView(StudentDetailView):
         term = next((t for t in terms if str(t.pk) == term_param), None) \
             or performance.default_learner_term(student, terms)
         record = performance.learner_record(student, term)
+        # Same rule as the printed report card: a subject's mark and grade only
+        # once all its assessments are approved; the overall average, grade,
+        # position and trend only once every mark-bearing subject is.
+        from academics.score_progress import exam_summary
+        exam = exam_summary(student, term) if term else None
+        done = {r["subject"] for r in exam["rows"] if r["complete"]} if exam else set()
+        for r in record["subjects"]:
+            r["awaiting"] = r["subject"] not in done
+        record["below_pass"] = [r for r in record["below_pass"] if not r["awaiting"]]
+        term_complete = bool(exam and exam["complete"])
+        for h in record["history"]:
+            h["awaiting"] = h["current"] and not term_complete
         start, end = analytics.term_range(term)
         attendance = analytics.learner_attendance(student, start, end)
         class_name = record.get("class_name") or student.class_name
+        from academics.views.reports import _remark_rows
         ctx.update({
+            "remark_rows": _remark_rows(student, term) if term else [],
+            "exam": exam,
+            "term_complete": term_complete,
             "term": term,
             "record": record,
             "grade_label": get_grade_label(record["grade"]) if record["grade"] else "",

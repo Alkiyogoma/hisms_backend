@@ -93,6 +93,21 @@ class Student(TimeStampedModel):
             models.Index(fields=["status", "class_name"]),
         ]
 
+    def photo_file(self):
+        """The learner's photograph: the one uploaded on the profile, else the
+        passport photo from their admission application. None when there is none."""
+        if self.photo:
+            return self.photo
+        if self.image:
+            return self.image
+        applicant = getattr(self, "from_applicant", None) if self.pk else None
+        if applicant is None:
+            return None
+        if applicant.photo:
+            return applicant.photo
+        doc = applicant.documents.filter(document_type="student_photo").exclude(file="").first()
+        return doc.file if doc and doc.file else None
+
     def get_full_name(self) -> str:
         return f"{self.first_name} {self.last_name}"
 
@@ -353,9 +368,9 @@ class ParentGuardian(TimeStampedModel):
     def clean(self):
         super().clean()
         if not self.full_name.strip():
-            raise ValidationError("Guardian full name is required.")
+            raise ValidationError("Parent full name is required.")
         if not self.phone.strip():
-            raise ValidationError("Guardian phone is required.")
+            raise ValidationError("Parent phone is required.")
 
     def has_given_consent(self):
         """FR-PAR-004: Check if PDPA consent has been recorded (method, date, version)."""

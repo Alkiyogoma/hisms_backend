@@ -43,7 +43,7 @@
 {% endblock %}
 
 {% block topbar_greeting %}
-<h1 class="topbar-title">Learner Progress Report</h1>
+<h1 class="topbar-title">Student Progress Report</h1>
 {% endblock %}
 
 {% block content %}
@@ -55,7 +55,7 @@
     <a href="{% url 'ptc:student_picker' %}" style="padding:8px 16px;border-radius:7px;font-size:13px;font-weight:600;background:#fff;color:var(--hodari-blue);border:1.5px solid var(--hodari-blue);text-decoration:none">Back</a>
   </div>
 
-  <!-- 1. Header — Learner Information -->
+  <!-- 1. Header — Student Information -->
   <div style="background:#fff;border:1px solid var(--border);border-radius:12px 12px 0 0;padding:24px 28px">
     {% include "includes/hodari_print_header.html" %}
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
@@ -64,7 +64,7 @@
     </div>
     <div class="learner-grid">
       <div>
-        <div class="learner-grid-label">Learner Name</div>
+        <div class="learner-grid-label">Student Name</div>
         <div class="learner-grid-value">{{ student.get_full_name }}</div>
       </div>
       <div>
@@ -279,8 +279,8 @@
     </div>
     {% endif %}
 
-    <!-- 6. Learner Attributes -->
-    <h3 style="font-size:15px;font-weight:700;color:var(--text-primary);margin:24px 0 14px;border-bottom:2px solid var(--border);padding-bottom:6px">Learner Attributes</h3>
+    <!-- 6. Student Attributes -->
+    <h3 style="font-size:15px;font-weight:700;color:var(--text-primary);margin:24px 0 14px;border-bottom:2px solid var(--border);padding-bottom:6px">Student Attributes</h3>
 
     <!-- FR-PTC-036: Term comparison toggle -->
     {% if prev_ptc_window %}
@@ -421,7 +421,7 @@
     <!-- Parent Signature & Meeting Date (OI-PTC-02) -->
     <div class="signatures" style="margin-top:28px;display:grid;grid-template-columns:1fr 1fr;gap:24px">
       <div>
-        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);font-weight:600;margin-bottom:4px">Parent / Guardian Signature</div>
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);font-weight:600;margin-bottom:4px">Parent Signature</div>
         <div style="border-bottom:1px solid var(--border);height:24px"></div>
       </div>
       <div>
@@ -432,7 +432,7 @@
 
     <!-- Footer -->
     <div style="margin-top:30px;padding-top:14px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted);display:flex;justify-content:space-between">
-      <div>&copy; {% now "Y" %} {{ brand.school_name }} &bull; Learner Progress Report - Internal Use Only</div>
+      <div>&copy; {% now "Y" %} {{ brand.school_name }} &bull; Student Progress Report - Internal Use Only</div>
       <div>Generated: {% now "d F Y H:i" %}</div>
     </div>
   </div>

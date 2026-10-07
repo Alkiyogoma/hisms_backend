@@ -305,7 +305,7 @@ class AttendancePrintView(AttendanceAccessMixin, TemplateView):
             student = get_object_or_404(Student, pk=self.request.GET.get("student"))
             today, start, end, classes, class_name = resolve_filters(self.request)
             ctx.update(learner_context(self.request, student, start, end, today, for_print=True))
-            ctx["doc_title"] = "Learner Attendance Record"
+            ctx["doc_title"] = "Student Attendance Record"
         elif kind == "today":
             from attendance.views import AttendanceTodayView
             view = AttendanceTodayView()

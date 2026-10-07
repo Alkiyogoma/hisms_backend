@@ -462,52 +462,44 @@ class ExamScoreEntryView(RoleRequiredMixin, TemplateView):
 
 
 class ExamScoreCorrectionView(RoleRequiredMixin, View):
-    """Authorised correction of locked scores. GRD-003: Super Admin only after HOD approval."""
-    allowed_roles = [UserRole.SUPER_ADMIN]
-    required_permission = "academics.change_examscore"
+    """Change a grade after HOD approval (Head of School / Super Admin only).
+    A reason is mandatory; each change is kept as an ExamScoreAmendment."""
+    allowed_roles = [UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
+    # The role check below is the real gate (Head of School holds view only).
+    required_permission = "academics.view_examscore"
 
     def post(self, request, pk):
-        score = get_object_or_404(ExamScore, pk=pk)
-        new_val = request.POST.get("score")
-        reason = request.POST.get("reason", "").strip()
-        
-        if not reason:
-            messages.error(request, "Reason is required for correction.")
-            return redirect("academics:exam_scores_entry")
-            
-        try:
-            old_val = score.score
-            score.previous_score = old_val
-            score.score = float(new_val)
-            score.corrected_by = request.user
-            score.correction_reason = reason
-            score.is_locked = True # Re-lock
-            score.full_clean()
-            score.save()
-            
-            from audit.models import log_event
-            log_event(
-                actor=request.user,
-                action_type="EXAM_SCORE_CORRECTED",
-                model_name="ExamScore",
-                object_id=score.pk,
-                description=f"Score corrected from {old_val} to {score.score} for {score.student.admission_no}",
-                before_value=str(old_val),
-                after_value=str(score.score),
-                request=request
+        from academics.approval_policy import can_amend_approved_grades
+        from academics.services import amend_approved_score
+
+        if not can_amend_approved_grades(request.user):
+            return JsonResponse(
+                {"error": "Only the Head of School or Super Admin can change an approved grade."}, status=403
             )
+        score = get_object_or_404(ExamScore, pk=pk)
+        try:
+            data = json.loads(request.body) if request.content_type == "application/json" else request.POST
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+        try:
+            amendment = amend_approved_score(
+                score, data.get("score", ""), data.get("reason", ""), request.user, request=request,
+            )
+        except ValidationError as e:
+            return JsonResponse({"error": " ".join(e.messages)}, status=400)
+        return JsonResponse({"ok": True, "amendment": amendment_payload(amendment)})
 
-            # FR-ACAD-003: Auto-recalculate weighted average on correction
-            from academics.services import recalculate_report_card_average
-            rc = ReportCard.objects.filter(student=score.student, term=score.term).first()
-            if rc:
-                recalculate_report_card_average(rc)
 
-            messages.success(request, "Score corrected successfully.")
-        except Exception as e:
-            messages.error(request, str(e))
-            
-        return redirect("academics:exam_scores_entry")
+def amendment_payload(a):
+    """JSON shape of one approved-grade change, shown as a note on the score."""
+    by = a.changed_by
+    return {
+        "previous_score": float(a.previous_score),
+        "new_score": float(a.new_score),
+        "reason": a.reason,
+        "changed_by": by.get_full_name() or by.username,
+        "changed_at": timezone.localtime(a.created_at).strftime("%d %b %Y %H:%M"),
+    }
 
 
 class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):

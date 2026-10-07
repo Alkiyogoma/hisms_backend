@@ -118,7 +118,7 @@
       {% endif %}{% endwith %}
 
       <div class="card" style="margin-top:16px">
-        <div class="card-title">Parent / Guardian</div>
+        <div class="card-title">Parent</div>
         <div class="info-row"><div class="info-lbl">Name</div><div class="info-val">{{ applicant.parent_full_name }}</div></div>
         <div class="info-row"><div class="info-lbl">Phone</div><div class="info-val">{{ applicant.parent_phone }}</div></div>
         {% if applicant.parent_email %}
@@ -130,7 +130,7 @@
       {% for p in additional_parents %}
       <div class="card" style="margin-top:16px">
         <div class="card-title-row">
-          <div class="card-title" style="margin:0">Additional Parent / Guardian {{ forloop.counter|add:1 }}</div>
+          <div class="card-title" style="margin:0">Additional Parent {{ forloop.counter|add:1 }}</div>
         </div>
         {% if p.full_name %}<div class="info-row"><div class="info-lbl">Name</div><div class="info-val">{{ p.full_name }}</div></div>{% endif %}
         {% if p.relationship %}<div class="info-row"><div class="info-lbl">Relationship</div><div class="info-val">{{ p.relationship|capfirst }}</div></div>{% endif %}

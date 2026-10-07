@@ -86,7 +86,7 @@
         {% if student %}
           {% field form.status %}
           {% if form.class_name %}
-            {% field form.class_name hint="This learner has no class on record. Choose one to save." %}
+            {% field form.class_name hint="This student has no class on record. Choose one to save." %}
           {% endif %}
         {% endif %}
       </div>
@@ -155,22 +155,22 @@
     </div>
     {% endif %}
 
-    {# Parent/Guardian section — only shown for new student creation #}
+    {# Parent section — only shown for new student creation #}
     {% if not student %}
     <div class="hf2-section">
-      <div class="hf2-section-title">Parent / Guardian <span style="color:#DC2626">*</span></div>
+      <div class="hf2-section-title">Parent <span style="color:#DC2626">*</span></div>
       <div class="hf2-grid-1" style="margin-bottom:8px">
         <div class="form-group">
-          <label class="form-label" style="color:#DC2626">Link to Existing Guardian <span style="color:#DC2626">*</span></label>
+          <label class="form-label" style="color:#DC2626">Link to Existing Parent <span style="color:#DC2626">*</span></label>
           <div style="position:relative">
             <input type="text" id="guardianSearchStudent" class="form-input" placeholder="Search by name or phone..." autocomplete="off" style="width:100%">
             <div id="guardianSearchResults" style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #DDE3EE;border-radius:8px;box-shadow:0 10px 20px rgba(0,0,0,0.1);display:none;z-index:100;margin-top:4px;max-height:300px;overflow-y:auto"></div>
           </div>
-          <span class="form-help">Search for an existing guardian to link this student to. A guardian must be linked to create the student record.</span>
+          <span class="form-help">Search for an existing parent to link this student to. A parent must be linked to create the student record.</span>
         </div>
       </div>
 
-      {# Selected guardian summary #}
+      {# Selected parent summary #}
       <div id="selectedGuardianStudent" style="display:none;padding:12px;background:#F0F4FB;border:1px solid #023AA5;border-radius:8px;margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div>
@@ -221,14 +221,14 @@
   {% if student %}
   <div style="display:flex; flex-direction:column; gap:16px">
 
-    {# Linked Guardians #}
+    {# Linked Parents #}
     <div class="sidebar-card" style="overflow:hidden">
       <div class="sc-header" style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid #F1F5F9">
         <div style="display:flex; align-items:center; gap:8px">
           <div style="width:28px; height:28px; border-radius:8px; background:#EEF4FF; color:#023AA5; display:flex; align-items:center; justify-content:center">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </div>
-          <span style="font-size:13px; font-weight:700; color:#1E293B">Guardians</span>
+          <span style="font-size:13px; font-weight:700; color:#1E293B">Parents</span>
         </div>
         {% if linked_guardians %}
           <span style="font-size:10px; font-weight:700; background:#DBEAFE; color:#1D4ED8; padding:2px 7px; border-radius:10px">{{ linked_guardians|length }}</span>
@@ -259,14 +259,14 @@
             </div>
           </a>
           {% endfor %}
-          <a href="{% url 'students:guardian_link' student.pk %}" style="display:block; text-align:center; font-size:12px; font-weight:600; color:var(--hodari-blue); text-decoration:none; padding:6px">+ Link another guardian</a>
+          <a href="{% url 'students:guardian_link' student.pk %}" style="display:block; text-align:center; font-size:12px; font-weight:600; color:var(--hodari-blue); text-decoration:none; padding:6px">+ Link another parent</a>
         {% else %}
           <div style="text-align:center; padding:20px 12px">
             <div style="width:36px; height:36px; border-radius:10px; background:#F1F5F9; color:#94A3B8; display:flex; align-items:center; justify-content:center; margin:0 auto 8px">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="23" y1="11" x2="17" y2="11"/><line x1="20" y1="8" x2="20" y2="14"/></svg>
             </div>
-            <div style="font-size:12px; font-weight:600; color:#64748B; margin-bottom:2px">No guardians linked</div>
-            <a href="{% url 'students:guardian_link' student.pk %}" style="font-size:12px; font-weight:600; color:var(--hodari-blue); text-decoration:none">+ Link a guardian</a>
+            <div style="font-size:12px; font-weight:600; color:#64748B; margin-bottom:2px">No parents linked</div>
+            <a href="{% url 'students:guardian_link' student.pk %}" style="font-size:12px; font-weight:600; color:var(--hodari-blue); text-decoration:none">+ Link a parent</a>
           </div>
         {% endif %}
       </div>
@@ -494,7 +494,7 @@
           .then(function(data) {
             resultsDiv.innerHTML = '';
             if (data.results.length === 0) {
-              resultsDiv.innerHTML = '<div style="padding:12px;color:#8492A6;font-size:13px">No guardians found. Leave blank to create one later.</div>';
+              resultsDiv.innerHTML = '<div style="padding:12px;color:#8492A6;font-size:13px">No parents found. Leave blank to create one later.</div>';
             } else {
               data.results.forEach(function(g) {
                 var item = document.createElement('div');
@@ -522,7 +522,7 @@
       document.getElementById('selGuardianContact').innerText = g.phone + (g.email ? ' · ' + g.email : '');
 
       if (g.siblings && g.siblings.length > 0) {
-        sibTextEl.innerHTML = 'The following student(s) are already linked to this guardian: ' + g.siblings + '.';
+        sibTextEl.innerHTML = 'The following student(s) are already linked to this parent: ' + g.siblings + '.';
         siblingAlert.style.display = 'block';
         siblingAlert.style.opacity = '1';
         siblingAlert.style.transform = 'none';

@@ -55,31 +55,11 @@ def generate_class_reports(term_id, class_name, user):
                 # Skip this student — comment not yet entered
                 continue
 
-            # calculate overall average using dynamic exam weights with gap detection
-            scores = ExamScore.objects.filter(student=student, term=term, status=ScoreStatus.APPROVED)
-            # Group by subject
-            subjects = {}
-            for s in scores:
-                if s.subject_name not in subjects:
-                    subjects[s.subject_name] = {}
-                subjects[s.subject_name][s.exam_type] = float(s.score)
-            
-            exam_weights = get_exam_weights()
-            total_weighted_sum = Decimal(0)
-            valid_subject_count = 0
-            
-            for subj, exams in subjects.items():
-                grade_result = compute_grade_with_gaps(
-                    scores=exams,
-                    weights=exam_weights,
-                )
-                if grade_result["average"] is not None:
-                    total_weighted_sum += Decimal(str(grade_result["average"]))
-                    valid_subject_count += 1
-            
-            if valid_subject_count > 0:
-                report.overall_average = total_weighted_sum / valid_subject_count
-        
+            # Exam average: approved, mark-bearing subjects only, and only once
+            # every one is fully assessed (None until then).
+            from academics.score_progress import exam_summary
+            report.overall_average = exam_summary(student, term)["average"]
+
         report.save()
 
         # FR-ATT-013: Populate attendance summary for this report card
@@ -107,33 +87,9 @@ def recalculate_report_card_average(report_card):
     if report_card.is_ecd_report:
         return
 
-    scores = ExamScore.objects.filter(
-        student=report_card.student,
-        term=report_card.term,
-        status=ScoreStatus.APPROVED,
-    )
-    subjects = {}
-    for s in scores:
-        if s.subject_name not in subjects:
-            subjects[s.subject_name] = {}
-        subjects[s.subject_name][s.exam_type] = float(s.score)
-
-    exam_weights = get_exam_weights()
-    total_weighted_sum = Decimal(0)
-    valid_subject_count = 0
-    for subj, exams in subjects.items():
-        grade_result = compute_grade_with_gaps(
-            scores=exams,
-            weights=exam_weights,
-        )
-        if grade_result["average"] is not None:
-            total_weighted_sum += Decimal(str(grade_result["average"]))
-            valid_subject_count += 1
-
-    if valid_subject_count > 0:
-        report_card.overall_average = total_weighted_sum / valid_subject_count
-    else:
-        report_card.overall_average = None
+    # Approved, mark-bearing subjects only; None until the term is fully assessed.
+    from academics.score_progress import exam_summary
+    report_card.overall_average = exam_summary(report_card.student, report_card.term)["average"]
     report_card.save(update_fields=["overall_average", "updated_at"])
 
 
@@ -208,27 +164,10 @@ def sign_off_report(report_card, user):
             
     report_card.populate_attendance_summary()
 
-    # Recompute overall_average if missing (was skipped at generation time when scores/comments were incomplete)
-    if report_card.overall_average is None and not report_card.is_ecd_report:
-        scores = ExamScore.objects.filter(student=report_card.student, term=report_card.term, status=ScoreStatus.APPROVED)
-        subjects = {}
-        for s in scores:
-            if s.subject_name not in subjects:
-                subjects[s.subject_name] = {}
-            subjects[s.subject_name][s.exam_type] = float(s.score)
-        exam_weights = get_exam_weights()
-        total_weighted_sum = Decimal(0)
-        valid_subject_count = 0
-        for subj, exams in subjects.items():
-            grade_result = compute_grade_with_gaps(
-                scores=exams,
-                weights=exam_weights,
-            )
-            if grade_result["average"] is not None:
-                total_weighted_sum += Decimal(str(grade_result["average"]))
-                valid_subject_count += 1
-        if valid_subject_count > 0:
-            report_card.overall_average = total_weighted_sum / valid_subject_count
+    # Exam average from approved, mark-bearing subjects; None while incomplete.
+    if not report_card.is_ecd_report:
+        from academics.score_progress import exam_summary
+        report_card.overall_average = exam_summary(report_card.student, report_card.term)["average"]
 
     report_card.status = ReportCardStatus.PUBLISHED
     report_card.signed_off_by = user
@@ -576,3 +515,59 @@ def calculate_progression_cases(config: ProgressionConfig, triggered_by, recalcu
         "total": created_count + skipped_count,
         "failed_details": failed_details,
     }
+
+
+def amend_approved_score(score, new_score, reason, user, request=None):
+    """Change a score after HOD approval (Head of School / Super Admin only).
+
+    A reason is mandatory; nothing is saved without one. The previous mark,
+    new mark, who, when and why are kept as an ExamScoreAmendment row.
+    """
+    from academics.approval_policy import can_amend_approved_grades
+    from academics.models import ExamScoreAmendment
+    from audit.models import log_event
+
+    if not can_amend_approved_grades(user):
+        raise ValidationError("Only the Head of School or Super Admin can change an approved grade.")
+    reason = (reason or "").strip()
+    if not reason:
+        raise ValidationError("A reason is required to change an approved grade.")
+    try:
+        new_score = Decimal(str(new_score).strip())
+    except ArithmeticError:
+        raise ValidationError("Enter the new mark as a whole number.")
+    if not new_score.is_finite():
+        raise ValidationError("Enter the new mark as a whole number.")
+
+    with transaction.atomic():
+        score = ExamScore.objects.select_for_update().select_related("student", "term").get(pk=score.pk)
+        if score.status != ScoreStatus.APPROVED:
+            raise ValidationError("Only HOD-approved grades can be changed here.")
+        old_score = score.score
+        if new_score == old_score:
+            raise ValidationError("The new mark is the same as the current mark.")
+        score.score = new_score
+        score.full_clean()  # range + whole-number checks
+        score.save(update_fields=["score", "updated_at"])
+        amendment = ExamScoreAmendment.objects.create(
+            score=score, previous_score=old_score, new_score=new_score,
+            reason=reason, changed_by=user,
+        )
+        log_event(
+            actor=user,
+            action_type="EXAM_SCORE_CORRECTED",
+            model_name="ExamScore",
+            object_id=score.pk,
+            description=(
+                f"Approved score changed from {old_score} to {new_score} for "
+                f"{score.student.admission_no} in {score.subject_name} ({score.exam_type}). Reason: {reason}"
+            ),
+            before_value=str(old_score),
+            after_value=str(new_score),
+            request=request,
+        )
+
+    rc = ReportCard.objects.filter(student=score.student, term=score.term).first()
+    if rc:
+        recalculate_report_card_average(rc)
+    return amendment

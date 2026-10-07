@@ -504,7 +504,7 @@ class ParentAttendanceView(RoleRequiredMixin, TemplateView):
 
         guardian = ParentGuardian.objects.filter(user=self.request.user).first()
         if not guardian:
-            ctx["note"] = "No guardian profile is linked to this account yet."
+            ctx["note"] = "No parent profile is linked to this account yet."
             return ctx
 
         students = Student.objects.filter(studentguardian__guardian=guardian).distinct()

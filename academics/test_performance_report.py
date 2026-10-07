@@ -227,7 +227,7 @@ class LearnerProfileAndProgressReportTests(PerformanceReportTests):
         self.assertEqual(resp.context["record"]["average"], 51.5)
         self.assertContains(resp, "Print progress report")
         self.assertNotContains(resp, "Discipline Incidents</h2>")
-        self.assertNotContains(resp, "No guardians linked")
+        self.assertNotContains(resp, "No parents linked")
         self.assertNotContains(resp, "Recent Attendance</div>")  # no attendance marked
         empty = Student.objects.create(admission_no="Z1", first_name="Zuri", last_name="Learner",
                                        class_name="Grade 4", status=StudentStatus.ACTIVE)
@@ -240,9 +240,11 @@ class LearnerProfileAndProgressReportTests(PerformanceReportTests):
         resp = self.client.get(reverse("academics:learner_report", args=[self.amani.pk]), {"term": self.term1.pk})
         self.assertEqual(resp.status_code, 200)
         self.assertTemplateUsed(resp, "academics/learner_report_print.html")
-        self.assertContains(resp, "Learner Progress Report")
-        self.assertContains(resp, "58.0")
-        self.assertContains(resp, "Parent / guardian")
+        self.assertContains(resp, "Student Progress Report")
+        # Term 1 is only partly assessed: no running average is printed.
+        self.assertContains(resp, "Awaiting end of term")
+        self.assertNotContains(resp, "58.0")
+        self.assertContains(resp, "Parent<br>")
         # Without a PDF engine the download falls back to the print page.
         import sys
         from unittest import mock

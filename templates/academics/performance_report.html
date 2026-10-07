@@ -280,7 +280,7 @@
       <div class="num">{% if summary.average is not None %}{{ summary.average }}<em>%</em>{% else %}&mdash;{% endif %}</div>
       {% if summary.average_grade %}<span class="pr-g g-{% if summary.average_grade == 'A+' %}Ap{% else %}{{ summary.average_grade }}{% endif %}">{{ summary.average_grade }}</span>{% endif %}
     </div>
-    <div class="sub">{{ summary.count }} result{{ summary.count|pluralize }} &middot; {{ summary.learners }} learner{{ summary.learners|pluralize }}</div>
+    <div class="sub">{{ summary.count }} result{{ summary.count|pluralize }} &middot; {{ summary.learners }} student{{ summary.learners|pluralize }}</div>
   </div>
   <div class="pr-stat s-pass">
     <div class="lab">Pass rate</div>
@@ -312,11 +312,11 @@
   <div class="pr-card-h">
     <div>
       <div class="pr-card-t">Who needs help</div>
-      <div class="pr-card-s">{% if group == 'learner' %}One row per learner, by average across {% if selected_subject %}{{ selected_subject }}{% else %}the subjects in view{% endif %}{% else %}One row per learner per subject{% endif %} &mdash; lowest first.</div>
+      <div class="pr-card-s">{% if group == 'learner' %}One row per student, by average across {% if selected_subject %}{{ selected_subject }}{% else %}the subjects in view{% endif %}{% else %}One row per student per subject{% endif %} &mdash; lowest first.</div>
     </div>
     <div class="pr-seg" role="group" aria-label="Group rows">
       <a class="{% if group == 'result' %}on{% endif %}" href="{% querystring group='result' page=None %}">By subject result</a>
-      <a class="{% if group == 'learner' %}on{% endif %}" href="{% querystring group='learner' page=None %}">By learner</a>
+      <a class="{% if group == 'learner' %}on{% endif %}" href="{% querystring group='learner' page=None %}">By student</a>
     </div>
   </div>
   <div class="pr-toolbar">
@@ -328,7 +328,7 @@
     <form method="get" class="pr-search" role="search">
       {% for k, vals in request.GET.lists %}{% if k != 'q' and k != 'page' %}{% for v in vals %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}{% endif %}{% endfor %}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-      <input type="search" name="q" value="{{ query }}" placeholder="Search learner or adm. no" aria-label="Search learner">
+      <input type="search" name="q" value="{{ query }}" placeholder="Search student or adm. no" aria-label="Search student">
     </form>
   </div>
 
@@ -337,7 +337,7 @@
     <table class="pr-table">
       <thead><tr>
         <th class="pr-hide-md">#</th>
-        <th>Learner</th><th>Class</th>
+        <th>Student</th><th>Class</th>
         {% if group == 'result' %}<th>Subject</th>{% endif %}
         <th>{% if group == 'learner' %}Average{% elif selected_type %}Mark{% else %}Weighted avg{% endif %} &middot; Grade</th>
         <th>Status</th>
@@ -360,19 +360,19 @@
       </tbody>
     </table>
   </div>
-  <c-pagination :page_obj="page_obj" label="{% if group == 'learner' %}learners{% else %}results{% endif %}" :rows="page_sizes" />
+  <c-pagination :page_obj="page_obj" label="{% if group == 'learner' %}students{% else %}results{% endif %}" :rows="page_sizes" />
   {% elif query %}
     <c-empty-state title="No match for “{{ query }}”" desc="Check the spelling, or clear the search to see everyone." icon="search" icon_color="grey" />
   {% elif show != 'all' and summary.count %}
-    <c-empty-state title="Nobody in this group" desc="No {% if group == 'learner' %}learner{% else %}result{% endif %} in this selection is {{ show_label|lower }}." icon="check" icon_color="green" />
+    <c-empty-state title="Nobody in this group" desc="No {% if group == 'learner' %}student{% else %}result{% endif %} in this selection is {{ show_label|lower }}." icon="check" icon_color="green" />
   {% else %}
     <c-empty-state title="No approved marks yet" desc="No marks have been entered and approved for this selection. Try another term, assessment type or class." icon="search" icon_color="grey" />
   {% endif %}
   <div class="pr-foot">
-    {% if help_total %}{{ help_total }} {% if group == 'learner' %}learner{{ help_total|pluralize }}{% else %}result{{ help_total|pluralize }}{% endif %} shown, lowest first. {% endif %}
-    {% if group == 'learner' %}A learner needs help when their average, or any single subject, is below {{ pass_mark }}%. {% endif %}
+    {% if help_total %}{{ help_total }} {% if group == 'learner' %}student{{ help_total|pluralize }}{% else %}result{{ help_total|pluralize }}{% endif %} shown, lowest first. {% endif %}
+    {% if group == 'learner' %}A student needs help when their average, or any single subject, is below {{ pass_mark }}%. {% endif %}
     {% if not selected_type %}Weighted averages use the configured assessment weights, rescaled over the assessments marked so far. {% endif %}
-    {% if not selected_term %}With all terms selected, each mark is the average of the learner's term results.{% endif %}
+    {% if not selected_term %}With all terms selected, each mark is the average of the student's term results.{% endif %}
   </div>
 </section>
 
@@ -401,7 +401,7 @@
         <div class="nm" title="{{ c.name }}">{{ c.name }}</div>
         <div class="track"><div class="fill f-{{ c.band }}" style="width:{{ c.average|floatformat:0 }}%"></div><span class="pass" style="left:{{ pass_mark }}%" title="Pass mark {{ pass_mark }}%"></span></div>
         <div class="v t-{{ c.band }}">{{ c.average }}%</div>
-        <div class="n">{{ c.learners }} learner{{ c.learners|pluralize }}{% if c.below_pass %} &middot; <span class="t-support">{{ c.below_pass }} below pass</span>{% endif %}</div>
+        <div class="n">{{ c.learners }} student{{ c.learners|pluralize }}{% if c.below_pass %} &middot; <span class="t-support">{{ c.below_pass }} below pass</span>{% endif %}</div>
       </div>
     {% empty %}
       <c-empty-state title="No approved {{ focus_subject }} marks" desc="No class in your scope has approved marks for this subject yet." icon="search" icon_color="grey" />
@@ -440,7 +440,7 @@
         {% for row in matrix.rows %}
         <tr{% if row.name == selected_class %} class="sel"{% endif %}>
           <th class="rowh">{{ row.name }}</th>
-          {% for c in row.cells %}{% if c %}<td class="{{ c.band }}" title="{{ c.n }} learner{{ c.n|pluralize }}">{{ c.average|floatformat:1 }}</td>{% else %}<td class="none">&ndash;</td>{% endif %}{% endfor %}
+          {% for c in row.cells %}{% if c %}<td class="{{ c.band }}" title="{{ c.n }} student{{ c.n|pluralize }}">{{ c.average|floatformat:1 }}</td>{% else %}<td class="none">&ndash;</td>{% endif %}{% endfor %}
           <td class="tot {{ row.overall.band }}">{{ row.overall.average|floatformat:1 }}</td>
         </tr>
         {% endfor %}

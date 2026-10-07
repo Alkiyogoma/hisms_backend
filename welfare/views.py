@@ -456,7 +456,7 @@ def _validate_note_form(data, *, allowed_students, earliest_date, final, mode):
     allowed_ids = set(allowed_students.values_list("pk", flat=True))
     students = [pk for pk in data["student_ids"] if pk in allowed_ids]
     if data["student_ids"] and len(students) != len(data["student_ids"]):
-        errors.append("You can only write welfare notes for learners in your class(es).")
+        errors.append("You can only write welfare notes for students in your class(es).")
     if not students:
         errors.append("Choose the child this note is about.")
     if mode != "new" and len(students) > 1:
@@ -510,7 +510,7 @@ def _validate_note_form(data, *, allowed_students, earliest_date, final, mode):
         parsed = parse_datetime(raw) if raw else None
         if parsed is None:
             if final:
-                errors.append("Say when you spoke to the parent or guardian.")
+                errors.append("Say when you spoke to the parent.")
         else:
             if timezone.is_naive(parsed):
                 parsed = timezone.make_aware(parsed)

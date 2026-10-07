@@ -136,7 +136,7 @@
     <div><span>Assessment</span><b>{{ selected_type_label }}</b></div>
     <div><span>Class</span><b>{{ selected_class|default:"All classes" }}</b></div>
     <div><span>Subject</span><b>{{ selected_subject|default:"All subjects" }}</b></div>
-    <div><span>Learners</span><b>{{ summary.learners }}</b></div>
+    <div><span>Students</span><b>{{ summary.learners }}</b></div>
     <div><span>Prepared by</span><b>{{ request.user.get_full_name|default:request.user.username }}</b></div>
     <div><span>Generated</span><b>{{ generated_at|date:"j M Y, H:i" }}</b></div>
   </div>
@@ -153,11 +153,11 @@
   {% else %}
 
   <!-- 1. Who needs help -->
-  <h2>1. Who needs help <small>{{ show_label }}{% if group == 'learner' %} &middot; by learner{% endif %}{% if query %} &middot; matching “{{ query }}”{% endif %} &middot; lowest first</small></h2>
+  <h2>1. Who needs help <small>{{ show_label }}{% if group == 'learner' %} &middot; by student{% endif %}{% if query %} &middot; matching “{{ query }}”{% endif %} &middot; lowest first</small></h2>
   {% if help_rows %}
   <table class="t">
     <thead><tr>
-      <th class="n">#</th><th>Learner</th><th>Adm. no</th><th>Class</th>
+      <th class="n">#</th><th>Student</th><th>Adm. no</th><th>Class</th>
       {% if group == 'result' %}<th>Subject</th>{% endif %}
       <th class="r">{% if group == 'learner' %}Average{% elif selected_type %}Mark{% else %}Wtd avg{% endif %}</th>
       <th class="c">Grade</th><th>Status</th>
@@ -180,7 +180,7 @@
     </tbody>
   </table>
   {% else %}
-    <div class="empty">{% if summary.count %}No {% if group == 'learner' %}learner{% else %}result{% endif %} in this selection is {{ show_label|lower }}.{% else %}No approved marks for this selection yet.{% endif %}</div>
+    <div class="empty">{% if summary.count %}No {% if group == 'learner' %}student{% else %}result{% endif %} in this selection is {{ show_label|lower }}.{% else %}No approved marks for this selection yet.{% endif %}</div>
   {% endif %}
 
   <!-- 2. Subject performance across classes -->
@@ -232,7 +232,7 @@
       <h2>4. {{ focus_subject }} by class</h2>
       {% if by_class %}
       <table class="t bars">
-        <thead><tr><th>Class</th><th>Average</th><th class="r">%</th><th class="r">Learners</th></tr></thead>
+        <thead><tr><th>Class</th><th>Average</th><th class="r">%</th><th class="r">Students</th></tr></thead>
         <tbody>
         {% for c in by_class %}
           <tr><td style="white-space:nowrap">{{ c.name }}</td><td><div class="bar"><i class="f-{{ c.band }}" style="width:{{ c.average|floatformat:0 }}%"></i><u style="left:{{ pass_mark }}%"></u></div></td>
@@ -251,7 +251,7 @@
     <ul>
       <li>Only marks that have been entered <b>and approved</b> are included. Assessments not yet marked are left out, never counted as zero.</li>
       {% if not selected_type %}<li>Weighted averages use the configured assessment weights, rescaled over the assessments marked so far.</li>{% endif %}
-      {% if not selected_term %}<li>With all terms selected, each mark is the average of the learner's term results.</li>{% endif %}
+      {% if not selected_term %}<li>With all terms selected, each mark is the average of the student's term results.</li>{% endif %}
       <li>Pass mark {{ pass_mark }}% (grade C). Requires support: {{ critical_mark }}&ndash;{{ pass_mark|add:-1 }}% (D). Critical: below {{ critical_mark }}% (E). The marker on each bar is the pass mark.</li>
       <li>Scope: {{ scope.label }} &mdash; limited to what the preparer's role allows.</li>
     </ul>

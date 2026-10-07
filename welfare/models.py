@@ -226,9 +226,9 @@ class WelfareObservation(TimeStampedModel):
     reviewed_at = models.DateTimeField(null=True, blank=True)
     
     # Parent signature
-    parent_signed = models.BooleanField(default=False, help_text="Whether parent/guardian has signed the welfare report")
-    parent_signed_at = models.DateTimeField(null=True, blank=True, help_text="When parent/guardian signed")
-    parent_signature_name = models.CharField(max_length=255, blank=True, help_text="Name of parent/guardian who signed")
+    parent_signed = models.BooleanField(default=False, help_text="Whether parent has signed the welfare report")
+    parent_signed_at = models.DateTimeField(null=True, blank=True, help_text="When parent signed")
+    parent_signature_name = models.CharField(max_length=255, blank=True, help_text="Name of parent who signed")
 
     class Meta:
         ordering = ["-observation_date", "-created_at"]

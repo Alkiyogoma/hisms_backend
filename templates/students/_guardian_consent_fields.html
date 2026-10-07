@@ -1,4 +1,4 @@
-{# PDPA consent (required, FR-PDPA-002 / FR-PAR-004) and portal access for a new guardian. #}
+{# PDPA consent (required, FR-PDPA-002 / FR-PAR-004) and portal access for a new parent. #}
 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px; margin-top:16px">
   <div style="padding:14px; background:#FEF3C7; border:{% if errors.pdpa %}1.5px solid #DC2626{% else %}1px solid #FCD34D{% endif %}; border-radius:8px">
     <label style="display:flex; align-items:flex-start; gap:8px; font-size:13px; cursor:pointer">
@@ -24,7 +24,7 @@
   <div style="padding:14px; background:#EEF4FF; border:1px solid #B6C9F5; border-radius:8px">
     <label style="display:flex; align-items:flex-start; gap:8px; font-size:13px; cursor:pointer">
       <input type="checkbox" name="portal_access" id="portal_access"{% if values.portal_access %} checked{% endif %} style="width:18px; height:18px; accent-color:var(--green); margin-top:1px">
-      <span><strong>Portal Access</strong> — create a login account so this guardian can view attendance, report cards, invoices and school communications online.</span>
+      <span><strong>Portal Access</strong> — create a login account so this parent can view attendance, report cards, invoices and school communications online.</span>
     </label>
   </div>
 </div>

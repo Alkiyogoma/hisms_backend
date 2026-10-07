@@ -143,10 +143,10 @@ class Command(BaseCommand):
 
                 dispatch_notification(
                     user=teacher,
-                    title="PTC Learner Attributes",
+                    title="PTC Student Attributes",
                     message=(
                         f"PTC is in {days_until} days. "
-                        f"Please complete learner attribute ratings for your class."
+                        f"Please complete student attribute ratings for your class."
                     ),
                     link="/ptc/attributes/",
                     actor=actor,
@@ -188,7 +188,7 @@ class Command(BaseCommand):
                 if has_subjects:
                     parts.append("subject comments")
                 if is_ct:
-                    parts.append("learner attribute ratings")
+                    parts.append("student attribute ratings")
 
                 dispatch_notification(
                     user=teacher,
@@ -307,9 +307,9 @@ class Command(BaseCommand):
                 if incomplete_count > 0:
                     dispatch_notification(
                         user=teacher,
-                        title="PTC Learner Attributes Reminder",
+                        title="PTC Student Attributes Reminder",
                         message=(
-                            f"Reminder: PTC is in 3 days. Learner attribute ratings "
+                            f"Reminder: PTC is in 3 days. Student attribute ratings "
                             f"are incomplete for {incomplete_count} students."
                         ),
                         link="/ptc/attributes/",

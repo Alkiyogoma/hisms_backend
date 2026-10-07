@@ -44,6 +44,7 @@ from academics.models import (
     Subject,
 )
 from academics.services import generate_class_reports, sign_off_report, calculate_progression_cases
+from academics.views.exams import amendment_payload
 from audit.models import log_event
 from students.models import Student, StudentStatus, EnrollmentHistory
 from users.models import UserRole
@@ -400,7 +401,9 @@ class PrimaryScoreEntryView(RoleRequiredMixin, TemplateView):
     """New focused score entry view for Primary students matching ECD UI."""
     template_name = "academics/primary_score_entry.html"
     allowed_roles = [UserRole.TEACHER, UserRole.PRIMARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
-    required_permission = "academics.change_examscore"
+    # Viewing needs either permission (Head of School holds view only, and
+    # changes approved grades from this page); saving still needs change.
+    required_permissions_any = ["academics.change_examscore", "academics.view_examscore"]
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -502,6 +505,9 @@ class PrimaryScoreEntryView(RoleRequiredMixin, TemplateView):
                 ctx["editable_subjects"] = set(subs)
         
         ctx["academics_tab"] = "primary_assessment"
+        from academics.remarks import REMARK_CHOICES, remark_subject_names
+        ctx["remark_subjects"] = remark_subject_names(ctx.get("subjects") or [])
+        ctx["remark_choices"] = REMARK_CHOICES
 
         if selected_class and ctx.get("current_term"):
             from academics.models import ExamScore, ScoreStatus
@@ -521,7 +527,8 @@ class PrimaryScoreEntryView(RoleRequiredMixin, TemplateView):
                 and not own_scores.filter(status__in=[ScoreStatus.DRAFT, ScoreStatus.RETURNED]).exists()
             )
             ctx["returned_count"] = len(returned_student_ids)
-            ctx["submit_subjects"] = sorted(ctx.get("editable_subjects") or [])
+            # Remark-only subjects have no marks to submit to the HOD.
+            ctx["submit_subjects"] = sorted(set(ctx.get("editable_subjects") or []) - ctx["remark_subjects"])
             ctx["returned_student_ids"] = returned_student_ids
 
         return ctx
@@ -594,7 +601,9 @@ class PrimaryStudentsAPIView(RoleRequiredMixin, View):
 class PrimaryScoreAPIView(RoleRequiredMixin, View):
     """API for getting/saving all primary scores for a student in a term."""
     allowed_roles = [UserRole.TEACHER, UserRole.PRIMARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
-    required_permission = "academics.change_examscore"
+    # Viewing needs either permission (Head of School holds view only, and
+    # changes approved grades from this page); saving still needs change.
+    required_permissions_any = ["academics.change_examscore", "academics.view_examscore"]
 
     def _student_in_teacher_classes(self, request, student) -> bool:
         if request.user.role == UserRole.TEACHER:
@@ -616,7 +625,9 @@ class PrimaryScoreAPIView(RoleRequiredMixin, View):
         if not self._student_in_teacher_classes(request, student):
             return JsonResponse({"error": "Access denied"}, status=403)
         
-        scores = ExamScore.objects.filter(student_id=student_id, term_id=term_id)
+        scores = ExamScore.objects.filter(student_id=student_id, term_id=term_id).prefetch_related(
+            "amendments__changed_by"
+        )
         rc = ReportCard.objects.filter(student_id=student_id, term_id=term_id).first()
         rc_status = rc.status if rc else ReportCardStatus.DRAFT
         
@@ -631,18 +642,31 @@ class PrimaryScoreAPIView(RoleRequiredMixin, View):
                 "status": s.status,
                 "correction_reason": s.correction_reason or "",
                 "hod_feedback": s.hod_feedback or "",
+                "id": s.pk,
+                "amendments": [amendment_payload(a) for a in s.amendments.all()],
             }
 
+        from academics.approval_policy import can_amend_approved_grades
+        from academics.remarks import remark_subject_names, remarks_for, remarks_locked
         from academics.score_progress import build_progress, expected_subjects_for_class
+        remarks = remarks_for(student, term_id)
         return JsonResponse({
             "scores": score_data,
             "report_card_status": rc_status,
-            "progress": build_progress(scores, expected_subjects_for_class(student.class_name)),
+            "can_amend": can_amend_approved_grades(request.user),
+            "progress": build_progress(
+                scores, expected_subjects_for_class(student.class_name),
+                remark_subjects=remark_subject_names(), remarks=remarks,
+            ),
+            "remarks": remarks,
+            "remarks_locked": remarks_locked(student, term_id),
         })
 
     def post(self, request, student_id):
         if not request.user.has_role(UserRole.TEACHER, UserRole.PRIMARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN):
             return JsonResponse({"error": "Permission denied"}, status=403)
+        if not (request.user.role == UserRole.SUPER_ADMIN or request.user.has_perm("academics.change_examscore")):
+            return JsonResponse({"error": "You do not have permission to enter scores."}, status=403)
 
         try:
             data = json.loads(request.body)
@@ -674,6 +698,14 @@ class PrimaryScoreAPIView(RoleRequiredMixin, View):
         skipped_subjects = set()
         soft_warnings = []
 
+        # Remark-only subjects take a term remark and never marks.
+        from academics.remarks import remark_subject_names, save_remarks
+        remarks_in = data.get("remarks") or {}
+        if not isinstance(remarks_in, dict):
+            return JsonResponse({"error": "Invalid remarks"}, status=400)
+        no_marks = remark_subject_names(all_subject_scores)
+        all_subject_scores = {k: v for k, v in all_subject_scores.items() if k not in no_marks}
+
         # TEACHER scoped to only their assigned subjects per class
         if request.user.role == UserRole.TEACHER:
             from core.teacher_context import get_teacher_assigned_classes_from_tca
@@ -691,6 +723,16 @@ class PrimaryScoreAPIView(RoleRequiredMixin, View):
         problems = _invalid_score_cells(all_subject_scores, active_configs)
         if problems:
             return _invalid_scores_response(problems)
+
+        remarks_updated, remark_errors = save_remarks(
+            student, term, remarks_in, request.user,
+            allowed_subjects if request.user.role == UserRole.TEACHER else None,
+        )
+        if remark_errors:
+            return JsonResponse({"error": "Nothing was saved. " + " ".join(remark_errors)}, status=400)
+        if remarks_updated:
+            from academics.score_progress import sync_report_status
+            sync_report_status(student, term)
 
         updated = 0
         locked_cells = []
@@ -807,7 +849,7 @@ class PrimaryScoreAPIView(RoleRequiredMixin, View):
                     if rc:
                         recalculate_report_card_average(rc)
             
-        if locked_cells and not updated:
+        if locked_cells and not updated and not remarks_updated:
             return JsonResponse({
                 "error": (
                     "Already submitted to the HOD and locked: " + ", ".join(locked_cells)
@@ -815,7 +857,7 @@ class PrimaryScoreAPIView(RoleRequiredMixin, View):
                 ),
                 "locked": locked_cells,
             }, status=403)
-        response_data = {"success": True, "updated": updated}
+        response_data = {"success": True, "updated": updated, "remarks_updated": remarks_updated}
         if locked_cells:
             response_data["locked"] = locked_cells
         if skipped_subjects:
@@ -962,7 +1004,9 @@ class LowerSecondaryScoreEntryView(RoleRequiredMixin, TemplateView):
     """Score entry view for Lower Secondary students (Grade 7–9)."""
     template_name = "academics/lower_secondary_score_entry.html"
     allowed_roles = [UserRole.TEACHER, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
-    required_permission = "academics.change_examscore"
+    # Viewing needs either permission (Head of School holds view only, and
+    # changes approved grades from this page); saving still needs change.
+    required_permissions_any = ["academics.change_examscore", "academics.view_examscore"]
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -1056,6 +1100,9 @@ class LowerSecondaryScoreEntryView(RoleRequiredMixin, TemplateView):
                 ctx["editable_subjects"] = set(subs)
 
         ctx["academics_tab"] = "lower_secondary_assessment"
+        from academics.remarks import REMARK_CHOICES, remark_subject_names
+        ctx["remark_subjects"] = remark_subject_names(ctx.get("subjects") or [])
+        ctx["remark_choices"] = REMARK_CHOICES
 
         if selected_class and ctx.get("current_term"):
             from academics.models import ExamScore, ScoreStatus
@@ -1075,7 +1122,8 @@ class LowerSecondaryScoreEntryView(RoleRequiredMixin, TemplateView):
                 and not own_scores.filter(status__in=[ScoreStatus.DRAFT, ScoreStatus.RETURNED]).exists()
             )
             ctx["returned_count"] = len(returned_student_ids)
-            ctx["submit_subjects"] = sorted(ctx.get("editable_subjects") or [])
+            # Remark-only subjects have no marks to submit to the HOD.
+            ctx["submit_subjects"] = sorted(set(ctx.get("editable_subjects") or []) - ctx["remark_subjects"])
             ctx["returned_student_ids"] = returned_student_ids
 
         return ctx
@@ -1146,7 +1194,9 @@ class LowerSecondaryStudentsAPIView(RoleRequiredMixin, View):
 class LowerSecondaryScoreAPIView(RoleRequiredMixin, View):
     """API for getting/saving all Lower Secondary scores for a student in a term."""
     allowed_roles = [UserRole.TEACHER, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
-    required_permission = "academics.change_examscore"
+    # Viewing needs either permission (Head of School holds view only, and
+    # changes approved grades from this page); saving still needs change.
+    required_permissions_any = ["academics.change_examscore", "academics.view_examscore"]
 
     def _student_in_teacher_classes(self, request, student) -> bool:
         if request.user.role == UserRole.TEACHER:
@@ -1168,7 +1218,9 @@ class LowerSecondaryScoreAPIView(RoleRequiredMixin, View):
         if not self._student_in_teacher_classes(request, student):
             return JsonResponse({"error": "Access denied"}, status=403)
 
-        scores = ExamScore.objects.filter(student_id=student_id, term_id=term_id)
+        scores = ExamScore.objects.filter(student_id=student_id, term_id=term_id).prefetch_related(
+            "amendments__changed_by"
+        )
         rc = ReportCard.objects.filter(student_id=student_id, term_id=term_id).first()
         rc_status = rc.status if rc else ReportCardStatus.DRAFT
 
@@ -1182,18 +1234,31 @@ class LowerSecondaryScoreAPIView(RoleRequiredMixin, View):
                 "status": s.status,
                 "correction_reason": s.correction_reason or "",
                 "hod_feedback": s.hod_feedback or "",
+                "id": s.pk,
+                "amendments": [amendment_payload(a) for a in s.amendments.all()],
             }
 
+        from academics.approval_policy import can_amend_approved_grades
+        from academics.remarks import remark_subject_names, remarks_for, remarks_locked
         from academics.score_progress import build_progress, expected_subjects_for_class
+        remarks = remarks_for(student, term_id)
         return JsonResponse({
             "scores": score_data,
             "report_card_status": rc_status,
-            "progress": build_progress(scores, expected_subjects_for_class(student.class_name)),
+            "can_amend": can_amend_approved_grades(request.user),
+            "progress": build_progress(
+                scores, expected_subjects_for_class(student.class_name),
+                remark_subjects=remark_subject_names(), remarks=remarks,
+            ),
+            "remarks": remarks,
+            "remarks_locked": remarks_locked(student, term_id),
         })
 
     def post(self, request, student_id):
         if not request.user.has_role(UserRole.TEACHER, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN):
             return JsonResponse({"error": "Permission denied"}, status=403)
+        if not (request.user.role == UserRole.SUPER_ADMIN or request.user.has_perm("academics.change_examscore")):
+            return JsonResponse({"error": "You do not have permission to enter scores."}, status=403)
 
         try:
             data = json.loads(request.body)
@@ -1221,6 +1286,14 @@ class LowerSecondaryScoreAPIView(RoleRequiredMixin, View):
         skipped_subjects = set()
         soft_warnings = []
 
+        # Remark-only subjects take a term remark and never marks.
+        from academics.remarks import remark_subject_names, save_remarks
+        remarks_in = data.get("remarks") or {}
+        if not isinstance(remarks_in, dict):
+            return JsonResponse({"error": "Invalid remarks"}, status=400)
+        no_marks = remark_subject_names(all_subject_scores)
+        all_subject_scores = {k: v for k, v in all_subject_scores.items() if k not in no_marks}
+
         if request.user.role == UserRole.TEACHER:
             from core.teacher_context import get_teacher_assigned_classes_from_tca
             tca = get_teacher_assigned_classes_from_tca(request.user)
@@ -1237,6 +1310,16 @@ class LowerSecondaryScoreAPIView(RoleRequiredMixin, View):
         problems = _invalid_score_cells(all_subject_scores, active_configs)
         if problems:
             return _invalid_scores_response(problems)
+
+        remarks_updated, remark_errors = save_remarks(
+            student, term, remarks_in, request.user,
+            allowed_subjects if request.user.role == UserRole.TEACHER else None,
+        )
+        if remark_errors:
+            return JsonResponse({"error": "Nothing was saved. " + " ".join(remark_errors)}, status=400)
+        if remarks_updated:
+            from academics.score_progress import sync_report_status
+            sync_report_status(student, term)
 
         updated = 0
         locked_cells = []
@@ -1338,7 +1421,7 @@ class LowerSecondaryScoreAPIView(RoleRequiredMixin, View):
                     if rc:
                         recalculate_report_card_average(rc)
 
-        if locked_cells and not updated:
+        if locked_cells and not updated and not remarks_updated:
             return JsonResponse({
                 "error": (
                     "Already submitted to the HOD and locked: " + ", ".join(locked_cells)
@@ -1346,7 +1429,7 @@ class LowerSecondaryScoreAPIView(RoleRequiredMixin, View):
                 ),
                 "locked": locked_cells,
             }, status=403)
-        response_data = {"success": True, "updated": updated}
+        response_data = {"success": True, "updated": updated, "remarks_updated": remarks_updated}
         if locked_cells:
             response_data["locked"] = locked_cells
         if skipped_subjects:

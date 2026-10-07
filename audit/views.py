@@ -451,7 +451,7 @@ class PersonalDataExportView(RoleRequiredMixin, TemplateView):
             if target_type == "guardian":
                 target = get_object_or_404(ParentGuardian, pk=target_id)
                 data = export_guardian_data(target)
-                base = f"dsar_export_guardian_{target_id}"
+                base = f"dsar_export_parent_{target_id}"
                 label = target.full_name
             else:
                 target = get_object_or_404(Student, pk=target_id)

@@ -9,7 +9,7 @@ MESSAGE_TEMPLATES = {
     },
     "EVENT_REMINDER": {
         "subject": "Upcoming School Event Reminder",
-        "body": "Dear Parent/Guardian, we look forward to seeing you at [Event Name] scheduled for [Date] at [Time]. Your participation is highly valued."
+        "body": "Dear Parent, we look forward to seeing you at [Event Name] scheduled for [Date] at [Time]. Your participation is highly valued."
     },
     "FEE_REMINDER": {
         "subject": "Fee Payment Reminder",

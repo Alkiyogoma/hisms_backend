@@ -1598,7 +1598,7 @@ class SendInvoiceReminderView(RoleRequiredMixin, View):
             else:
                 messages.success(request, f"Reminder sent to {primary_guardian.guardian.full_name}.")
         else:
-            messages.error(request, "Primary guardian contact not found.")
+            messages.error(request, "Primary parent contact not found.")
 
         return redirect("finance:invoice_detail", pk=pk)
 
@@ -3175,7 +3175,7 @@ class SendBulkReminderView(RoleRequiredMixin, View):
                 ).select_related("guardian").first()
 
                 if not guardian_link:
-                    errors.append(f"{student}: No primary guardian found")
+                    errors.append(f"{student}: No primary parent found")
                     continue
 
                 guardian = guardian_link.guardian
@@ -3185,7 +3185,7 @@ class SendBulkReminderView(RoleRequiredMixin, View):
                     msg_body = custom_message
                 else:
                     msg_body = (
-                        f"Dear Parent/Guardian, this is a friendly reminder that the fee balance "
+                        f"Dear Parent, this is a friendly reminder that the fee balance "
                         f"for {student.first_name} {student.last_name} "
                         f"(TZS {balance:,.0f}) is now overdue by "
                         f"{(timezone.now().date() - invoice.due_date).days} days. "

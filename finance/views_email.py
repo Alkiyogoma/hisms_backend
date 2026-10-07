@@ -62,7 +62,7 @@ class SendInvoiceEmailView(RoleRequiredMixin, View):
         if not sg or not sg.guardian.email:
             messages.error(
                 request,
-                "Primary guardian has no email address on file.",
+                "Primary parent has no email address on file.",
             )
             return redirect("finance:invoice_detail", pk=pk)
 
