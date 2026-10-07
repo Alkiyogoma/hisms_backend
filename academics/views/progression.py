@@ -135,7 +135,7 @@ class StudentAcademicRecordView(RoleRequiredMixin, TemplateView):
             else:
                 scores_qs = ExamScore.objects.filter(
                     student=student, term=rc.term, status=ScoreStatus.APPROVED
-                ).select_related("exam_type_config")
+                ).mark_bearing().select_related("exam_type_config")
 
                 if not scores_qs.exists():
                     continue

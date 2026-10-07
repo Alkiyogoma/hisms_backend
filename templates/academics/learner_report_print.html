@@ -143,7 +143,7 @@
     <div class="kpi"><span>Trend</span><b class="{% if record.trend == 'improving' %}up{% elif record.trend == 'declining' %}down{% endif %}">{% if record.trend == 'improving' %}↑ {{ record.trend_diff }}{% elif record.trend == 'declining' %}↓ {{ record.trend_diff|cut:'-' }}{% elif record.trend == 'stable' %}→{% else %}—{% endif %}</b><small>{% if record.trend %}vs previous term{% else %}first term on record{% endif %}</small></div>
   </div>
 
-  <h2>1. Subject results <small>approved marks only · % per assessment</small></h2>
+  <h2>1. Subject results <small>mark-bearing subjects · approved marks only · % per assessment</small></h2>
   {% if record.subjects %}
   <div class="scroll"><table class="t">
     <thead><tr>
@@ -170,9 +170,19 @@
     <div class="empty">No approved marks for {{ student.first_name }} {% if term %}in {{ term.name }}, {{ term.academic_year.name }}{% endif %} yet. Marks appear once they are entered and approved.</div>
   {% endif %}
 
+  {% if remark_rows %}
+  <h2>2. Subjects assessed by remark <small>once per term · no marks</small></h2>
+  <table class="t">
+    <thead><tr><th>Subject</th><th style="width:40%">Remark</th></tr></thead>
+    <tbody>{% for subj, remark in remark_rows %}
+      <tr><td><b>{{ subj }}</b></td><td>{% if remark %}{{ remark }}{% else %}<span class="na">Not entered</span>{% endif %}</td></tr>
+    {% endfor %}</tbody>
+  </table>
+  {% endif %}
+
   <div class="two">
     <div>
-      <h2>2. Attendance <small>{{ attendance.period.label }}</small></h2>
+      <h2>{% if remark_rows %}3{% else %}2{% endif %}. Attendance <small>{{ attendance.period.label }}</small></h2>
       {% if a and a.marked %}
       <table class="t">
         <thead><tr><th>In school</th><th>Late</th><th>Absent</th><th>Excused</th><th>Not marked</th><th class="r">Rate</th></tr></thead>
@@ -183,7 +193,7 @@
       {% else %}<div class="empty">No attendance marked in this term yet.</div>{% endif %}
     </div>
     <div>
-      <h2>3. Progress across terms</h2>
+      <h2>{% if remark_rows %}4{% else %}3{% endif %}. Progress across terms</h2>
       {% if record.history %}
       <table class="t">
         <thead><tr><th>Term</th><th class="r">Average</th><th class="ctr">Grade</th><th class="r">Subjects</th></tr></thead>
@@ -197,12 +207,13 @@
   </div>
   {% endwith %}
 
-  <h2>4. Comments</h2>
+  <h2>{% if remark_rows %}5{% else %}4{% endif %}. Comments</h2>
   <div class="comments"><div class="comment"><b>Class teacher</b>&nbsp;</div><div class="comment"><b>Head of School</b>&nbsp;</div></div>
 
   <div class="notes">
     <b>How to read this report</b>
     <ul>
+      <li>Remark-only subjects take a remark once per term and no marks, so they are not part of the average or position.</li>
       <li>Only marks that have been entered <b>and approved</b> are included; assessments not yet marked are left out, never counted as zero. Each subject mark is the weighted average of the assessments marked so far, with the weights shown under each assessment rescaled over those marked.</li>
       <li>Grades: {% for g, r, l in scale %}{{ g }} {{ r }} ({{ l }}){% if not forloop.last %} · {% endif %}{% endfor %}. Pass mark {{ pass_mark }}% (grade C).</li>
       <li>Attendance = days in school ÷ days marked. Late counts as in school; excused counts as absent but authorised; unmarked days are left out. Weekends and holidays are omitted.</li>
@@ -212,7 +223,7 @@
   <div class="signatures">
     <div><div class="sig-line"></div><div class="sig-label">Class teacher<br><span>{{ class_teacher|default:"Signature and date" }}</span></div></div>
     <div><div class="sig-line"></div><div class="sig-label">Head of School<br><span>Signature and date</span></div></div>
-    <div><div class="sig-line"></div><div class="sig-label">Parent / guardian<br><span>Signature and date</span></div></div>
+    <div><div class="sig-line"></div><div class="sig-label">Parent<br><span>Signature and date</span></div></div>
   </div>
 </main>
 

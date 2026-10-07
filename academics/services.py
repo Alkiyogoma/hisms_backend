@@ -56,7 +56,7 @@ def generate_class_reports(term_id, class_name, user):
                 continue
 
             # calculate overall average using dynamic exam weights with gap detection
-            scores = ExamScore.objects.filter(student=student, term=term, status=ScoreStatus.APPROVED)
+            scores = ExamScore.objects.filter(student=student, term=term, status=ScoreStatus.APPROVED).mark_bearing()
             # Group by subject
             subjects = {}
             for s in scores:
@@ -111,7 +111,7 @@ def recalculate_report_card_average(report_card):
         student=report_card.student,
         term=report_card.term,
         status=ScoreStatus.APPROVED,
-    )
+    ).mark_bearing()
     subjects = {}
     for s in scores:
         if s.subject_name not in subjects:
@@ -210,7 +210,7 @@ def sign_off_report(report_card, user):
 
     # Recompute overall_average if missing (was skipped at generation time when scores/comments were incomplete)
     if report_card.overall_average is None and not report_card.is_ecd_report:
-        scores = ExamScore.objects.filter(student=report_card.student, term=report_card.term, status=ScoreStatus.APPROVED)
+        scores = ExamScore.objects.filter(student=report_card.student, term=report_card.term, status=ScoreStatus.APPROVED).mark_bearing()
         subjects = {}
         for s in scores:
             if s.subject_name not in subjects:
@@ -576,3 +576,59 @@ def calculate_progression_cases(config: ProgressionConfig, triggered_by, recalcu
         "total": created_count + skipped_count,
         "failed_details": failed_details,
     }
+
+
+def amend_approved_score(score, new_score, reason, user, request=None):
+    """Change a score after HOD approval (Head of School / Super Admin only).
+
+    A reason is mandatory; nothing is saved without one. The previous mark,
+    new mark, who, when and why are kept as an ExamScoreAmendment row.
+    """
+    from academics.approval_policy import can_amend_approved_grades
+    from academics.models import ExamScoreAmendment
+    from audit.models import log_event
+
+    if not can_amend_approved_grades(user):
+        raise ValidationError("Only the Head of School or Super Admin can change an approved grade.")
+    reason = (reason or "").strip()
+    if not reason:
+        raise ValidationError("A reason is required to change an approved grade.")
+    try:
+        new_score = Decimal(str(new_score).strip())
+    except ArithmeticError:
+        raise ValidationError("Enter the new mark as a whole number.")
+    if not new_score.is_finite():
+        raise ValidationError("Enter the new mark as a whole number.")
+
+    with transaction.atomic():
+        score = ExamScore.objects.select_for_update().select_related("student", "term").get(pk=score.pk)
+        if score.status != ScoreStatus.APPROVED:
+            raise ValidationError("Only HOD-approved grades can be changed here.")
+        old_score = score.score
+        if new_score == old_score:
+            raise ValidationError("The new mark is the same as the current mark.")
+        score.score = new_score
+        score.full_clean()  # range + whole-number checks
+        score.save(update_fields=["score", "updated_at"])
+        amendment = ExamScoreAmendment.objects.create(
+            score=score, previous_score=old_score, new_score=new_score,
+            reason=reason, changed_by=user,
+        )
+        log_event(
+            actor=user,
+            action_type="EXAM_SCORE_CORRECTED",
+            model_name="ExamScore",
+            object_id=score.pk,
+            description=(
+                f"Approved score changed from {old_score} to {new_score} for "
+                f"{score.student.admission_no} in {score.subject_name} ({score.exam_type}). Reason: {reason}"
+            ),
+            before_value=str(old_score),
+            after_value=str(new_score),
+            request=request,
+        )
+
+    rc = ReportCard.objects.filter(student=score.student, term=score.term).first()
+    if rc:
+        recalculate_report_card_average(rc)
+    return amendment

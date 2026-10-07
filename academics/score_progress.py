@@ -5,6 +5,9 @@ Approval and locking live on individual ExamScore rows (one learner, one
 subject, one assessment type). A learner's report is complete only when every
 subject taught to the class has scores and all of them are HOD-approved. The
 grand average uses approved scores only and reports how many subjects it covers.
+
+Remark-only subjects take no marks: one is done once its term remark is
+entered, and any marks stored against it are ignored.
 """
 from academics.grading_utils import compute_grade_with_gaps
 from academics.models import ExamScore, GradeClass, ScoreStatus, get_exam_weights
@@ -38,19 +41,23 @@ def _subject_status(statuses):
     return ScoreStatus.APPROVED
 
 
-def build_progress(scores, expected_subjects, weights=None):
+def build_progress(scores, expected_subjects, weights=None, remark_subjects=frozenset(), remarks=None):
     """
     Summarise one learner's scores (an iterable of ExamScore for one term).
 
     Subjects that have scores but are not in ``expected_subjects`` are still
-    reported, so nothing a teacher entered is hidden.
+    reported, so nothing a teacher entered is hidden. ``remark_subjects`` are
+    remark-only; ``remarks`` is the learner's {subject: remark} for the term.
     """
     if weights is None:
         weights = get_exam_weights() or {"quiz": 20, "mid_term": 30, "end_of_term": 50}
+    remarks = remarks or {}
 
     statuses = {}
     approved = {}
     for s in scores:
+        if s.subject_name in remark_subjects:
+            continue
         statuses.setdefault(s.subject_name, set()).add(s.status)
         if s.status == ScoreStatus.APPROVED:
             approved.setdefault(s.subject_name, {})[s.exam_type] = float(s.score)
@@ -59,6 +66,12 @@ def build_progress(scores, expected_subjects, weights=None):
     subjects = {}
     averages = []
     for name in all_subjects:
+        if name in remark_subjects:
+            subjects[name] = {
+                "status": ScoreStatus.APPROVED if remarks.get(name) else "not_started",
+                "approved_average": None, "remark_only": True,
+            }
+            continue
         status = _subject_status(statuses.get(name, set()))
         avg = None
         if name in approved:
@@ -87,6 +100,7 @@ def build_progress(scores, expected_subjects, weights=None):
     return {
         "subjects": subjects,
         "total_subjects": total,
+        "mark_subjects": sum(1 for v in subjects.values() if not v.get("remark_only")),
         "approved_subjects": approved_count,
         "included_subjects": len(averages),
         "grand_average": round(sum(averages) / len(averages), 2) if averages else None,
@@ -96,20 +110,34 @@ def build_progress(scores, expected_subjects, weights=None):
 
 
 def student_progress(student, term, expected_subjects=None):
+    from academics.remarks import remark_subject_names, remarks_for
     if expected_subjects is None:
         expected_subjects = expected_subjects_for_class(student.class_name)
     scores = ExamScore.objects.filter(student=student, term=term)
-    return build_progress(scores, expected_subjects)
+    return build_progress(
+        scores, expected_subjects, remark_subjects=remark_subject_names(),
+        remarks=remarks_for(student, term),
+    )
 
 
 def class_progress(student_ids, term_id, class_name):
     """{student_id: progress} for a whole class in two queries."""
     expected = expected_subjects_for_class(class_name)
     weights = get_exam_weights() or {"quiz": 20, "mid_term": 30, "end_of_term": 50}
+    from academics.models import SubjectTermRemark
+    from academics.remarks import remark_subject_names
+    remark_subjects = remark_subject_names()
     by_student = {sid: [] for sid in student_ids}
     for s in ExamScore.objects.filter(student_id__in=student_ids, term_id=term_id):
         by_student[s.student_id].append(s)
-    return {sid: build_progress(rows, expected, weights) for sid, rows in by_student.items()}
+    remarks = {sid: {} for sid in student_ids}
+    for sid, subject, remark in SubjectTermRemark.objects.filter(
+            student_id__in=student_ids, term_id=term_id).values_list("student_id", "subject_name", "remark"):
+        remarks.setdefault(sid, {})[subject] = remark
+    return {
+        sid: build_progress(rows, expected, weights, remark_subjects, remarks.get(sid))
+        for sid, rows in by_student.items()
+    }
 
 
 def sync_report_status(student, term):

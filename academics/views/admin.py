@@ -502,6 +502,7 @@ class SubjectEditView(RoleRequiredMixin, UpdateView):
             "departments": subject.departments or [],
             "classes": list(subject.classes.values_list("id", flat=True)),
             "is_active": subject.is_active,
+            "assessment_mode": subject.assessment_mode,
         })
 
     def form_valid(self, form):

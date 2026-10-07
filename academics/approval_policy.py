@@ -17,11 +17,19 @@ from users.models import UserRole
 
 SECTION_HEAD_ROLES = (UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD)
 GRADE_APPROVER_ROLES = SECTION_HEAD_ROLES + (UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN)
+# Only these may change a grade after HOD approval.
+GRADE_AMENDER_ROLES = (UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN)
 
 
 def can_approve_grades(user) -> bool:
     return bool(user and user.is_authenticated) and (
         user.is_superuser or user.has_role(*GRADE_APPROVER_ROLES)
+    )
+
+
+def can_amend_approved_grades(user) -> bool:
+    return bool(user and user.is_authenticated) and (
+        user.is_superuser or user.has_role(*GRADE_AMENDER_ROLES)
     )
 
 

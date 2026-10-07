@@ -429,7 +429,8 @@
             </tbody>
         </table>
 
-        <!-- REMARKS ONLY TABLE -->
+        <!-- REMARKS ONLY TABLE: remark-only subjects (set in the Subjects module) -->
+        {% if remark_rows %}
         <table class="remarks-table">
             <thead>
                 <tr>
@@ -438,24 +439,15 @@
                 </tr>
             </thead>
             <tbody>
-                {% for subj, data in subjects.items %}
-                    {% if not data.quiz and not data.mid and not data.end and not data.avg %}
+                {% for subj, remark in remark_rows %}
                     <tr>
                         <td class="subject-col">{{ subj }}</td>
-                        <td class="remark-val-col">
-                            {% if data.grade_letter == 'A*' %}Outstanding
-                            {% elif data.grade_letter == 'A' %}High
-                            {% elif data.grade_letter == 'B' %}Good
-                            {% elif data.grade_letter == 'C' %}Aspiring
-                            {% elif data.grade_letter == 'D' %}Basic
-                            {% else %}Outstanding
-                            {% endif %}
-                        </td>
+                        <td class="remark-val-col">{{ remark }}</td>
                     </tr>
-                    {% endif %}
                 {% endfor %}
             </tbody>
         </table>
+        {% endif %}
 
         <!-- GRADING SCALE -->
         <table class="grading-scale">

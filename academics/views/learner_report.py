@@ -28,7 +28,9 @@ class LearnerReportView(StudentDetailView):
         start, end = analytics.term_range(term)
         attendance = analytics.learner_attendance(student, start, end)
         class_name = record.get("class_name") or student.class_name
+        from academics.views.reports import _remark_rows
         ctx.update({
+            "remark_rows": _remark_rows(student, term) if term else [],
             "term": term,
             "record": record,
             "grade_label": get_grade_label(record["grade"]) if record["grade"] else "",

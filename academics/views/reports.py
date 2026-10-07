@@ -277,6 +277,16 @@ class ReportCardListView(RoleRequiredMixin, TemplateView):
         return ctx
 
 
+def _remark_rows(student, term):
+    """[(subject, remark)] for the remark-only subjects of the learner's class,
+    plus any other remark recorded for them; remark is "" when not entered."""
+    from academics.remarks import remark_subject_names, remarks_for
+    from academics.score_progress import expected_subjects_for_class
+    remarks = remarks_for(student, term)
+    names = remark_subject_names(expected_subjects_for_class(student.class_name) | set(remarks))
+    return [(name, remarks.get(name, "")) for name in sorted(names)]
+
+
 def _build_report_card_context(report):
     """
     Build the shared context dict for report card rendering (both preview and PDF).
@@ -311,7 +321,7 @@ def _build_report_card_context(report):
     # Subject scores with weighted averages and gap detection
     scores = ExamScore.objects.filter(
         student=report.student, term=report.term, status=ScoreStatus.APPROVED
-    )
+    ).mark_bearing()
     subjects = {}
     for s in scores:
         if s.subject_name not in subjects:
@@ -335,6 +345,7 @@ def _build_report_card_context(report):
         subjects[subj]["redistributed_weights"] = grade_result["redistributed_weights"]
         subjects[subj]["makeup_required"] = grade_result["makeup_required"]
     ctx["subjects"] = subjects
+    ctx["remark_rows"] = _remark_rows(report.student, report.term)
 
     # Compute overall_average if not set on the report
     if report.overall_average is None and subjects:
@@ -351,7 +362,7 @@ def _build_report_card_context(report):
     from academics.score_progress import student_progress
     progress = student_progress(report.student, report.term)
     ctx["average_included_subjects"] = progress["included_subjects"]
-    ctx["average_total_subjects"] = progress["total_subjects"]
+    ctx["average_total_subjects"] = progress["mark_subjects"]
     ctx["report_is_complete"] = progress["is_complete"]
 
     # Cambridge Checkpoint (FR-ACAD-005) -- Grades 6, 7, 8, and 9
@@ -571,6 +582,13 @@ class ReportReviewQueueView(AllowedRolesEnforcedMixin, RoleRequiredMixin, Templa
             rows_by_student = defaultdict(list)
             for sc in ExamScore.objects.filter(student_id__in=primary_student_ids, term=term):
                 rows_by_student[sc.student_id].append(sc)
+            from academics.models import SubjectTermRemark
+            from academics.remarks import remark_subject_names
+            remark_subjects = remark_subject_names()
+            remarks_by_student = defaultdict(dict)
+            for sid, subject, remark in SubjectTermRemark.objects.filter(
+                    student_id__in=primary_student_ids, term=term).values_list("student_id", "subject_name", "remark"):
+                remarks_by_student[sid][subject] = remark
             expected_by_class = {}
             weights = get_exam_weights()
             for rc in reports:
@@ -581,6 +599,7 @@ class ReportReviewQueueView(AllowedRolesEnforcedMixin, RoleRequiredMixin, Templa
                     expected_by_class[cls] = expected_subjects_for_class(cls)
                 progress_by_student[rc.student_id] = build_progress(
                     rows_by_student.get(rc.student_id, []), expected_by_class[cls], weights,
+                    remark_subjects, remarks_by_student.get(rc.student_id),
                 )
 
         # Batch load ECDEvaluation ratings for ECD students

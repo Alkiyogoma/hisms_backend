@@ -192,7 +192,7 @@ def compute_results(scope, terms, year, exam_type=None, student_ids=None):
     from students.models import Student
 
     term_ids = [t.id for t in terms]
-    qs = ExamScore.objects.filter(term_id__in=term_ids, status=ScoreStatus.APPROVED)
+    qs = ExamScore.objects.filter(term_id__in=term_ids, status=ScoreStatus.APPROVED).mark_bearing()
     if exam_type:
         qs = qs.filter(exam_type=exam_type)
     if student_ids is not None:
@@ -381,7 +381,7 @@ def class_subject_matrix(results, scope):
 def learner_terms(student):
     """Terms in which the learner has approved marks, oldest first."""
     from academics.models import Term
-    ids = (ExamScore.objects.filter(student=student, status=ScoreStatus.APPROVED)
+    ids = (ExamScore.objects.filter(student=student, status=ScoreStatus.APPROVED).mark_bearing()
            .values_list("term_id", flat=True).distinct())
     return list(Term.objects.filter(id__in=list(ids)).select_related("academic_year")
                 .order_by("start_date", "pk"))
@@ -418,7 +418,7 @@ def learner_record(student, term):
         subject_avgs = {g["name"]: g["average"] for g in _group(classmates, "subject")}
         cells = defaultdict(lambda: defaultdict(list))
         for subject, etype, score, max_score in ExamScore.objects.filter(
-                student=student, term=term, status=ScoreStatus.APPROVED).values_list(
+                student=student, term=term, status=ScoreStatus.APPROVED).mark_bearing().values_list(
                 "subject_name", "exam_type", "score", "max_score"):
             cells[subject][etype].append(float(score) / (float(max_score or 100) or 100.0) * 100.0)
         for r in sorted(mine, key=lambda r: r["subject"]):
