@@ -61,6 +61,7 @@ def _export_students_for_user(user):
     return qs.filter(class_name__in=names) if names else Student.objects.none()
 from users.models import UserRole
 from core.permissions import RoleRequiredMixin
+from academics.approval_policy import AllowedRolesEnforcedMixin
 from core.teacher_context import get_teacher_assigned_classes, get_teacher_assigned_classes_from_tca, is_ecd_teacher
 from academics.grading_utils import (
     compute_grade_with_gaps, get_grade_from_score, get_grade_label, get_full_grade_display,
@@ -110,7 +111,7 @@ class ReportRouterView(RoleRequiredMixin, View):
             return redirect("/")
 
 
-class HOSSignOffListView(RoleRequiredMixin, TemplateView):
+class HOSSignOffListView(AllowedRolesEnforcedMixin, RoleRequiredMixin, TemplateView):
     template_name = "academics/hos_signoff_list.html"
     login_url = "/accounts/login/"
     allowed_roles = [UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
@@ -430,7 +431,7 @@ class HOSReportPreviewView(RoleRequiredMixin, TemplateView):
         return ctx
 
 
-class HOSSignOffActionView(RoleRequiredMixin, View):
+class HOSSignOffActionView(AllowedRolesEnforcedMixin, RoleRequiredMixin, View):
     allowed_roles = [UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD]
     required_permission = "academics.change_reportcard"
     def post(self, request, *args, **kwargs):
@@ -495,7 +496,7 @@ class HOSSignOffActionView(RoleRequiredMixin, View):
         return _back_to(request, "academics:analytics")
 
 
-class ReportReviewQueueView(RoleRequiredMixin, TemplateView):
+class ReportReviewQueueView(AllowedRolesEnforcedMixin, RoleRequiredMixin, TemplateView):
     """HOD/HOS review queue for reports with submitted comments + approved scores."""
     template_name = "academics/report_review_queue.html"
     allowed_roles = [UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]

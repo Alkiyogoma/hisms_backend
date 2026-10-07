@@ -17,6 +17,9 @@
   {% if can_hos_signoff %}
   <a href="{% url 'academics:analytics' %}" class="sub-tab {% if academics_tab == 'analytics' %}active{% endif %}">Analytics</a>
   {% endif %}
+  {% if perms.academics.view_examscore and user_is_hod or perms.academics.view_examscore and user.role == 'teacher' %}
+  <a href="{% url 'academics:performance_report' %}" class="sub-tab {% if academics_tab == 'performance' %}active{% endif %}">Performance Report</a>
+  {% endif %}
   {% if user_is_hod %}
   <a href="{% url 'academics:at_risk_list' %}" class="sub-tab {% if academics_tab == 'at_risk' %}active{% endif %}">At Risk</a>
   {% endif %}

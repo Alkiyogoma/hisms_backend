@@ -29,6 +29,8 @@ from academics.views import (
     ReportRouterView,
     AcademicAnalyticsView,
     AtRiskStudentsListView,
+    PerformanceReportView,
+    LearnerReportView,
     ExamScoreCorrectionView,
     ExamScoreApprovalQueueView,
     ECDEvaluationEntryView,
@@ -94,6 +96,8 @@ urlpatterns = [
     path("exam-scores/<int:pk>/correct/", ExamScoreCorrectionView.as_view(), name="exam_score_correction"),
     path("analytics/", AcademicAnalyticsView.as_view(), name="analytics"),
     path("analytics/at-risk/", AtRiskStudentsListView.as_view(), name="at_risk_list"),
+    path("performance/", PerformanceReportView.as_view(), name="performance_report"),
+    path("student/<int:pk>/progress-report/", LearnerReportView.as_view(), name="learner_report"),
 
     path("reports/", ReportRouterView.as_view(), name="reports_router"),
     path("hos-signoff/", HOSSignOffListView.as_view(), name="hos_signoff_list"),

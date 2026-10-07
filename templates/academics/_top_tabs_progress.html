@@ -9,7 +9,7 @@
   <a href="{% url 'academics:lower_secondary_assessment' %}" class="sub-tab {% if academics_tab == 'lower_secondary_assessment' %}active{% endif %}">Lower Secondary Assessment</a>
   {% endif %}
   {% if perms.academics.view_examscore %}
-  <a href="{% url 'academics:exam_score_approval_queue' %}" class="sub-tab {% if academics_tab == 'approval_queue' %}active{% endif %}">Grade Approval</a>
+  <a href="{% url 'academics:exam_score_approval_queue' %}" class="sub-tab {% if academics_tab == 'approval_queue' %}active{% endif %}">{% if user.role == 'teacher' %}Sign-Off Status{% else %}Grade Approval{% endif %}</a>
   {% endif %}
   {% if perms.academics.change_examscore %}
   <a href="{% url 'academics:cambridge_checkpoint_entry' %}" class="sub-tab {% if academics_tab == 'cambridge' %}active{% endif %}">Checkpoint</a>

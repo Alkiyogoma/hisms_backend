@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ doc_title }}{% if kind == 'student' %} — {{ student.first_name }} {{ student.last_name }}{% elif class_name %} — {{ class_name }}{% endif %}{% if period %} — {{ period.label }}{% elif date %} — {{ date|date:"j M Y" }}{% endif %}</title>
+{% if not is_pdf %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@500;700&family=Merriweather:wght@700&display=swap" rel="stylesheet">
+{% endif %}
+{% include "attendance/_register_css.html" %}
+<style>
+  :root { --blue:#023AA5; --ink:#1A1A2E; --muted:#6B778C; --border:#DDE3EE;
+    --green:#1E8A4C; --green-bg:#EAF6EE; --red:#C0392B; --red-bg:#FDECEA; --amber:#C27803; --amber-bg:#FFF6E5; --purple:#5B4FCF; --purple-bg:#EFEDFB; --grey-bg:#F0F2F6;
+    --font-ui:'Roboto', Arial, sans-serif; --font-display:'Merriweather', Georgia, serif; }
+  @page { size:A4 {% if kind == 'register' %}landscape{% else %}portrait{% endif %}; margin:12mm 11mm 15mm;
+    @bottom-left { content:"Hodari Christian School \00B7  {{ doc_title }} \00B7  Confidential"; font:8pt Roboto, Arial, sans-serif; color:#8492A6; }
+    @bottom-right { content:"Page " counter(page) " of " counter(pages); font:8pt Roboto, Arial, sans-serif; color:#8492A6; }
+  }
+  * { box-sizing:border-box; }
+  body { font-family:var(--font-ui); color:var(--ink); background:#EEF1F6; margin:0; padding:24px 16px; font-size:10pt; line-height:1.4; }
+  .toolbar { max-width:{% if kind == 'register' %}297mm{% else %}210mm{% endif %}; margin:0 auto 14px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; font-size:13px; color:#5B6578; }
+  .toolbar .btns { display:flex; gap:8px; flex-wrap:wrap; }
+  .btn { padding:8px 16px; border-radius:7px; font-size:13px; font-weight:600; cursor:pointer; text-decoration:none; border:none; font-family:inherit; display:inline-block; }
+  .btn-primary { background:var(--blue); color:#fff; } .btn-outline { background:#fff; color:var(--blue); border:1.5px solid var(--blue); }
+  .sheet { max-width:{% if kind == 'register' %}297mm{% else %}210mm{% endif %}; margin:0 auto; background:#fff; padding:12mm 11mm; box-shadow:0 6px 30px rgba(15,35,95,.12); border-radius:6px; }
+
+  /* letterhead (from includes/hodari_print_styles.html, without its global reset) */
+  .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; }
+  .header-left { display:flex; gap:14px; align-items:center; }
+  .school-logo { width:64px; } .school-info { line-height:1.15; }
+  .school-name { font-family:var(--font-display); font-weight:bold; text-transform:uppercase; margin-bottom:4px; font-size:13.5pt; }
+  .school-details { font-size:8.5pt; }
+  .student-photo { width:70px; height:84px; object-fit:cover; border-radius:4px; font-size:8pt; }
+  .student-photo-placeholder { display:none; }
+  .header-separator { border-bottom:1.5px solid #000; margin-bottom:10px; }
+
+  .doc-title { display:flex; justify-content:space-between; align-items:flex-end; gap:12px; margin:2px 0 10px; }
+  .doc-title h1 { font-family:var(--font-display); font-size:16pt; color:var(--blue); margin:0; }
+  .doc-title .scope { font-size:8.5pt; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--blue); background:#EAF1FD; padding:4px 10px; border-radius:20px; white-space:nowrap; }
+  .meta { display:grid; grid-template-columns:repeat(4,1fr); border:1px solid var(--border); border-radius:6px; margin-bottom:12px; }
+  .meta div { padding:6px 10px; border-right:1px solid var(--border); border-bottom:1px solid var(--border); }
+  .meta div:nth-child(4n) { border-right:none; } .meta div:nth-last-child(-n+4) { border-bottom:none; }
+  .meta span { display:block; font-size:7pt; letter-spacing:.8px; text-transform:uppercase; color:var(--muted); font-weight:700; }
+  .meta b { font-size:9.5pt; font-weight:600; }
+  .kpis { display:grid; grid-template-columns:repeat(6,1fr); gap:7px; margin-bottom:12px; }
+  .kpi { border:1px solid var(--border); border-radius:6px; padding:7px 9px; }
+  .kpi span { display:block; font-size:6.8pt; letter-spacing:.7px; text-transform:uppercase; color:var(--muted); font-weight:700; }
+  .kpi b { display:block; font-size:15pt; line-height:1.15; margin-top:3px; font-family:'Roboto Mono', Consolas, monospace; }
+  .kpi small { font-size:7.5pt; color:var(--muted); }
+  .k-green { background:var(--green-bg); border-color:#CDE9D7; } .k-green b { color:var(--green); }
+  .k-red { background:var(--red-bg); border-color:#F6CFC9; } .k-red b { color:var(--red); }
+  .k-amber { background:var(--amber-bg); border-color:#F3E0B5; } .k-amber b { color:var(--amber); }
+  .k-purple { background:var(--purple-bg); border-color:#DCD8F6; } .k-purple b { color:var(--purple); }
+  .k-grey { background:var(--grey-bg); } .k-blue b { color:var(--blue); }
+
+  h2 { font-size:11pt; color:var(--blue); margin:14px 0 5px; padding-bottom:4px; border-bottom:2px solid var(--blue); break-after:avoid; page-break-after:avoid; }
+  h2 small { font-weight:400; color:var(--muted); font-size:8.5pt; margin-left:6px; }
+  table.t { width:100%; border-collapse:collapse; font-size:8.7pt; }
+  table.t th { background:var(--blue); color:#fff; text-align:left; font-size:7.3pt; letter-spacing:.5px; text-transform:uppercase; padding:5px 6px; border:1px solid var(--blue); }
+  table.t td { padding:4px 6px; border:1px solid #DDE3EE; vertical-align:middle; }
+  table.t tbody tr:nth-child(even) td { background:#F7F9FC; }
+  table.t thead { display:table-header-group; }
+  table.t tr { break-inside:avoid; page-break-inside:avoid; }
+  .r { text-align:right; } .ctr { text-align:center; } .mono { font-family:'Roboto Mono', Consolas, monospace; white-space:nowrap; }
+  .n { color:#8492A6; width:24px; }
+  .st { display:inline-block; padding:1px 7px; border-radius:10px; font-size:7.6pt; font-weight:700; white-space:nowrap; }
+  .st-green { background:var(--green-bg); color:var(--green); } .st-red { background:var(--red-bg); color:var(--red); }
+  .st-amber { background:var(--amber-bg); color:var(--amber); } .st-purple { background:var(--purple-bg); color:var(--purple); }
+  .st-grey, .st-none { background:var(--grey-bg); color:#7A808D; }
+  .b-green { color:var(--green); font-weight:700; } .b-amber { color:var(--amber); font-weight:700; } .b-red { color:var(--red); font-weight:700; } .b-none { color:#9AA0AE; }
+  .bar { height:7px; background:#E8ECF3; border-radius:4px; position:relative; min-width:110px; }
+  .bar i { display:block; height:100%; border-radius:4px; }
+  .bar u { position:absolute; top:-3px; bottom:-3px; width:1.5px; background:#5B6578; }
+  .f-green { background:#2FA866; } .f-amber { background:#E39A3B; } .f-red { background:#C8302A; } .f-none { background:#D3D8E2; }
+  .days { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:6px; }
+  .days div { text-align:center; font-size:7pt; color:#8492A6; }
+  .days .c { display:block; width:19px; height:19px; line-height:19px; border-radius:4px; font-weight:700; font-size:8.5pt; margin-bottom:1px; }
+  .c-P { background:var(--green-bg); color:var(--green); } .c-A { background:var(--red-bg); color:var(--red); }
+  .c-L { background:var(--amber-bg); color:var(--amber); } .c-E { background:var(--purple-bg); color:var(--purple); }
+  .c-U { background:var(--grey-bg); color:#AEB4C0; } .c-F, .c- { border:1px dashed #DCE2EC; color:transparent; }
+  .ml { font-size:8pt; font-weight:700; color:#3C4559; margin:8px 0 4px; }
+  .notes { margin-top:12px; font-size:8pt; color:#5B6578; border:1px solid var(--border); border-radius:6px; padding:8px 10px; break-inside:avoid; page-break-inside:avoid; }
+  .notes ul { margin:4px 0 0 16px; padding:0; } .notes li { margin:1px 0; }
+  .empty { padding:10px; border:1px dashed var(--border); border-radius:6px; color:var(--muted); font-size:9pt; text-align:center; }
+  .signatures { display:grid; grid-template-columns:1fr 1fr 1fr; gap:28px; margin-top:22px; padding-top:14px; border-top:1px solid var(--border); break-inside:avoid; page-break-inside:avoid; align-items:start; }
+  .sig-line { border-bottom:1.5px solid #474747; height:36px; }
+  .sig-label { font-size:9pt; font-weight:700; color:#474747; margin-top:6px; line-height:1.3; }
+  .sig-label span { font-weight:400; }
+  .rs th, .rs td { font-size:8pt; padding:3px 2px; }
+  .rs .c { width:15px; height:15px; line-height:15px; font-size:8pt; }
+  .rs td.nm { min-width:0; } .rs td.nm small { font-size:7pt; }
+  .rs-head { border-bottom-width:1.5px; }
+
+  @media print {
+    body { background:#fff; padding:0; }
+    .toolbar { display:none !important; }
+    .sheet { box-shadow:none; border-radius:0; padding:0; max-width:none; }
+    * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .rs-grid { overflow:visible; }
+  }
+  @media screen and (max-width:700px) {
+    .sheet { padding:16px; } .meta { grid-template-columns:repeat(2,1fr); } .kpis { grid-template-columns:repeat(3,1fr); }
+    .meta div:nth-child(4n) { border-right:1px solid var(--border); } .meta div:nth-child(2n) { border-right:none; }
+    .signatures { grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+{% if not is_pdf %}
+<div class="toolbar">
+  <span>A4 {% if kind == 'register' %}landscape {% endif %}document. In the print dialog choose <b>Save as PDF</b> to export, or download it directly.</span>
+  <div class="btns">
+    <a class="btn btn-outline" href="{% if kind == 'register' %}{% url 'attendance:register' %}{% elif kind == 'today' %}{% url 'attendance:today' %}{% else %}{% url 'attendance:reports' %}{% endif %}{% querystring kind=None autoprint=None format=None %}">&larr; Back</a>
+    <a class="btn btn-outline" href="{% querystring format='pdf' autoprint=None %}">Download PDF</a>
+    <button class="btn btn-primary" type="button" onclick="window.print()">Print</button>
+  </div>
+</div>
+{% endif %}
+
+<main class="sheet">
+  {% include "includes/hodari_print_header.html" %}
+
+{% if kind == 'register' %}
+  <div class="doc-title"><h1>Daily Attendance Register</h1><span class="scope">{{ class_name|default:"No class" }}</span></div>
+  {% include "attendance/_register_sheet.html" with letterhead=True %}
+
+{% elif kind == 'student' %}
+  <div class="doc-title"><h1>Learner Attendance Record</h1><span class="scope">{{ period.label }}</span></div>
+  <div class="meta">
+    <div><span>Learner</span><b>{{ student.first_name }} {{ student.last_name }}</b></div>
+    <div><span>Admission no.</span><b>{{ student.admission_no }}</b></div>
+    <div><span>Class</span><b>{{ row.class_name|default:student.class_name }}</b></div>
+    <div><span>Admitted</span><b>{{ student.enrolment_date|date:"j M Y"|default:"—" }}</b></div>
+    <div><span>Period</span><b>{{ period.label }}</b></div>
+    <div><span>School days</span><b>{{ period.days|length }}{% if row and row.admitted_in_period %} · {{ row.on_roll_days }} on roll{% endif %}</b></div>
+    <div><span>Prepared by</span><b>{{ request.user.get_full_name|default:request.user.username }}</b></div>
+    <div><span>Generated</span><b>{{ generated_at|date:"j M Y, H:i" }}</b></div>
+  </div>
+  {% if row %}
+  <div class="kpis">
+    <div class="kpi k-blue"><span>Attendance</span><b class="b-{{ row.band }}">{% if row.rate is not None %}{{ row.rate }}%{% else %}—{% endif %}</b><small>{{ row.in_school }} of {{ row.marked }} marked</small></div>
+    <div class="kpi k-green"><span>In school</span><b>{{ row.in_school }}</b><small>incl. late</small></div>
+    <div class="kpi k-red"><span>Absent</span><b>{{ row.absent }}</b><small>longest run {{ pattern.longest_absent_run }}</small></div>
+    <div class="kpi k-purple"><span>Excused</span><b>{{ row.excused }}</b><small>authorised</small></div>
+    <div class="kpi k-amber"><span>Late</span><b>{{ row.late }}</b><small>arrived late</small></div>
+    <div class="kpi k-grey"><span>Not marked</span><b>{{ row.unmarked }}</b><small>excluded</small></div>
+  </div>
+  <h2>Day by day <small>every school day in the period, in order</small></h2>
+  {% for m in pattern.months %}
+    <div class="ml">{{ m.label }}</div>
+    <div class="days">{% for c in m.cells %}<div><span class="c c-{{ c.code }}">{% if c.code == 'U' %}–{% elif c.code == 'F' or not c.code %}&nbsp;{% else %}{{ c.code }}{% endif %}</span>{{ c.date|date:"D j" }}</div>{% endfor %}</div>
+  {% endfor %}
+  {% if row.absent and pattern.worst_weekday %}<p style="font-size:9pt;margin:8px 0 0">Most absences fall on a <b>{{ pattern.worst_weekday.0 }}</b> ({{ pattern.worst_weekday.1 }} of {{ row.absent }}).</p>{% endif %}
+  {% else %}<div class="empty">No school days for this learner in the period.</div>{% endif %}
+
+{% elif kind == 'today' %}
+  <div class="doc-title"><h1>Daily Attendance Roster</h1><span class="scope">{{ class_name|default:"Whole school" }}</span></div>
+  <div class="meta">
+    <div><span>Date</span><b>{{ date|date:"l j F Y" }}</b></div>
+    <div><span>Class</span><b>{{ class_name|default:"All classes" }}</b></div>
+    <div><span>On roll</span><b>{{ summary.total }}</b></div>
+    <div><span>Marked</span><b>{{ summary.marked }} of {{ summary.total }}</b></div>
+    <div><span>Register</span><b>{% if is_locked %}Closed at {{ lock_hour }}:00{% else %}Open until {{ lock_hour }}:00{% endif %}</b></div>
+    <div><span>Term</span><b>{{ current_term.name|default:"—" }}{% if current_term %}, {{ current_term.academic_year.name }}{% endif %}</b></div>
+    <div><span>Prepared by</span><b>{{ request.user.get_full_name|default:request.user.username }}</b></div>
+    <div><span>Generated</span><b>{{ generated_at|date:"j M Y, H:i" }}</b></div>
+  </div>
+  <div class="kpis">
+    <div class="kpi k-green"><span>In school</span><b>{{ summary.present }}</b><small>{% if summary.marked %}{{ summary.present_pct }}% of marked{% else %}none marked{% endif %}</small></div>
+    <div class="kpi k-red"><span>Absent</span><b>{{ summary.absent }}</b><small>follow up</small></div>
+    <div class="kpi k-amber"><span>Late</span><b>{{ summary.late }}</b><small>in school</small></div>
+    <div class="kpi k-purple"><span>Excused</span><b>{{ summary.excused }}</b><small>authorised</small></div>
+    <div class="kpi k-blue"><span>Enrolled</span><b>{{ summary.total }}</b><small>on roll</small></div>
+    <div class="kpi k-grey"><span>Not marked</span><b>{{ summary.unconfirmed }}</b><small>excluded from %</small></div>
+  </div>
+  {% if non_school_reason %}<div class="empty" style="margin-bottom:8px">{{ date|date:"l j F" }} is {{ non_school_reason }}.</div>{% endif %}
+  <h2>Roster <small>{{ rows|length }} learner{{ rows|length|pluralize }}</small></h2>
+  {% if rows %}
+  <table class="t">
+    <thead><tr><th class="n">#</th><th>Learner</th><th>Adm. no</th>{% if not class_name %}<th>Class</th>{% endif %}<th>Status</th><th>Marked at</th><th>Checked out</th><th class="r">Term rate</th></tr></thead>
+    <tbody>
+    {% for row in rows %}
+      <tr><td class="n">{{ forloop.counter }}</td><td><b>{{ row.student.first_name }} {{ row.student.last_name }}</b></td><td class="mono">{{ row.student.admission_no }}</td>
+        {% if not class_name %}<td style="white-space:nowrap">{{ row.student.class_name }}</td>{% endif %}
+        <td>{% if row.code == 'P' %}<span class="st st-green">Present</span>{% elif row.code == 'L' %}<span class="st st-amber">Late</span>{% elif row.code == 'A' %}<span class="st st-red">Absent</span>{% elif row.code == 'E' %}<span class="st st-purple">Excused</span>{% else %}<span class="st st-grey">Not marked</span>{% endif %}</td>
+        <td class="mono">{% if row.entry and row.code != 'U' %}{{ row.entry.marked_at|time:"H:i" }}{% else %}—{% endif %}</td>
+        <td class="mono">{% if row.entry.check_out_time %}{{ row.entry.check_out_time|time:"H:i" }}{% else %}—{% endif %}</td>
+        <td class="r mono">{% if row.attendance_rate is not None %}{{ row.attendance_rate }}%{% else %}—{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<div class="empty">No learners on roll.</div>{% endif %}
+  {% if class_status and not class_name %}
+  <h2>Registers <small>{{ unmarked_classes|length }} class{{ unmarked_classes|length|pluralize:"es" }} not fully marked</small></h2>
+  <table class="t">
+    <thead><tr><th>Class</th><th class="r">On roll</th><th class="r">Unmarked</th><th>Status</th></tr></thead>
+    <tbody>{% for c in class_status %}<tr><td>{{ c.name }}</td><td class="r">{{ c.on_roll }}</td><td class="r">{{ c.unmarked }}</td><td><span class="st st-{{ c.state }}">{{ c.text }}</span></td></tr>{% endfor %}</tbody>
+  </table>
+  {% endif %}
+
+{% else %}
+  <div class="doc-title"><h1>Attendance Report</h1><span class="scope">{% if student_row %}{{ student_row.name }}{% elif class_name %}{{ class_name }}{% else %}Whole school{% endif %}</span></div>
+  <div class="meta">
+    <div><span>Period</span><b>{{ period.label }}</b></div>
+    <div><span>School days</span><b>{{ period.days|length }}</b></div>
+    <div><span>Class</span><b>{{ class_name|default:"All classes" }}</b></div>
+    <div><span>Learners</span><b>{% if student_row %}{{ student_row.name }}{% else %}{{ summary.learners }} on roll{% endif %}</b></div>
+    <div><span>Learner-days marked</span><b>{{ summary.marked }}</b></div>
+    <div><span>Not marked</span><b>{{ summary.unmarked }}</b></div>
+    <div><span>Prepared by</span><b>{{ request.user.get_full_name|default:request.user.username }}</b></div>
+    <div><span>Generated</span><b>{{ generated_at|date:"j M Y, H:i" }}</b></div>
+  </div>
+  <div class="kpis">
+    <div class="kpi k-green"><span>Average attendance</span><b>{% if summary.average is not None %}{{ summary.average }}%{% else %}—{% endif %}</b><small>target {{ target }}%</small></div>
+    <div class="kpi k-amber"><span>Flagged &lt;{{ flag }}%</span><b>{{ summary.flagged }}</b><small>requires support</small></div>
+    <div class="kpi k-red"><span>Persistent &lt;{{ persistent }}%</span><b>{{ summary.persistent }}</b><small>immediate action</small></div>
+    <div class="kpi k-purple"><span>Habitually late</span><b>{{ summary.habitually_late }}</b><small>{{ habitual_late }}+ late</small></div>
+    <div class="kpi k-grey"><span>Unmarked days</span><b>{{ summary.unmarked }}</b><small>excluded</small></div>
+    <div class="kpi k-blue"><span>Absent / excused</span><b>{{ summary.absent }}/{{ summary.excused }}</b><small>{{ summary.late }} late</small></div>
+  </div>
+
+  <h2>1. {% if show == 'flag' %}Flagged learners — below {{ flag }}%{% elif show == 'pers' %}Persistent absence — below {{ persistent }}%{% elif show == 'late' %}Habitually late{% elif show == 'unm' %}Unconfirmed registers{% elif show == 'cls' %}Attendance by class{% else %}All learners{% endif %} <small>{% if show == 'late' %}most late first{% elif show == 'unm' or show == 'cls' %}{% else %}lowest attendance first{% endif %}{% if query %} · matching “{{ query }}”{% endif %}</small></h2>
+  {% if show == 'unm' %}
+    {% if issues %}
+    <table class="t"><thead><tr><th>Date</th><th>Class</th><th>Class teacher</th><th class="r">Unconfirmed</th><th>Status</th></tr></thead>
+      <tbody>{% for i in issues %}<tr><td style="white-space:nowrap">{{ i.date|date:"D j M Y" }}</td><td>{{ i.class_name }}</td><td>{{ i.teacher|default:"—" }}</td><td class="r">{% if i.unmarked %}{{ i.unmarked }} of {{ i.on_roll }}{% else %}—{% endif %}</td><td><span class="st st-{{ i.state }}">{{ i.label }}</span></td></tr>{% endfor %}</tbody></table>
+    {% else %}<div class="empty">Every register in this period was confirmed on time.</div>{% endif %}
+  {% elif show != 'cls' %}
+    {% if rows %}
+    <table class="t">
+      <thead><tr><th class="n">#</th><th>Learner</th><th>Adm. no</th><th>Class</th><th class="r">Rate</th><th class="r">Marked</th><th class="r">Absent</th><th class="r">Excused</th><th class="r">Late</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr><td class="n">{{ forloop.counter }}</td><td style="white-space:nowrap"><b>{{ r.name }}</b></td><td class="mono">{{ r.admission_no }}</td><td style="white-space:nowrap">{{ r.class_name }}</td>
+          <td class="r mono b-{{ r.band }}">{% if r.rate is not None %}{{ r.rate }}%{% else %}—{% endif %}</td><td class="r">{{ r.marked }}</td><td class="r">{{ r.absent }}</td><td class="r">{{ r.excused }}</td><td class="r">{{ r.late }}</td>
+          <td><span class="st st-{{ r.tag.0 }}">{% if show == 'late' %}{% if r.late >= 8 %}Habitually late{% else %}Watch{% endif %}{% else %}{{ r.tag.1 }}{% endif %}</span></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<div class="empty">No learners in this selection.</div>{% endif %}
+  {% endif %}
+
+  <h2>{% if show == 'cls' %}1b{% else %}2{% endif %}. Attendance by class <small>marker at the {{ target }}% target</small></h2>
+  {% if classes_summary %}
+  <table class="t">
+    <thead><tr><th>Class</th><th style="width:34%">Attendance</th><th class="r">%</th><th class="r">Learners</th><th class="r">Absent</th><th class="r">Excused</th><th class="r">Late</th><th class="r">Not marked</th></tr></thead>
+    <tbody>{% for c in classes_summary %}
+      <tr><td style="white-space:nowrap">{{ c.name }}</td>
+        <td><div class="bar"><i class="f-{{ c.band }}" style="width:{% if c.average is not None %}{{ c.average|floatformat:0 }}{% else %}0{% endif %}%"></i><u style="left:{{ target }}%"></u></div></td>
+        <td class="r mono b-{{ c.band }}">{% if c.average is not None %}{{ c.average }}{% else %}—{% endif %}</td><td class="r">{{ c.learners }}</td><td class="r">{{ c.absent }}</td><td class="r">{{ c.excused }}</td><td class="r">{{ c.late }}</td><td class="r">{{ c.unmarked }}</td></tr>
+    {% endfor %}</tbody>
+  </table>
+  {% else %}<div class="empty">No learners in this selection.</div>{% endif %}
+
+  {% if chart.points %}
+  <h2>3. Over time <small>learner-days per {{ chart.unit }}{% if chart.unit == 'week' %} (school days in brackets){% endif %}</small></h2>
+  <table class="t">
+    <thead><tr><th>{% if chart.unit == 'day' %}Day{% else %}Week{% endif %}</th><th class="r">Present</th><th class="r">Late</th><th class="r">Excused</th><th class="r">Absent</th><th class="r">Not marked</th><th class="r">Attendance</th></tr></thead>
+    <tbody>{% for p in chart.points %}
+      <tr><td style="white-space:nowrap">{% if chart.unit == 'week' %}{{ p.label }} · {% endif %}{{ p.title }}{% if chart.unit == 'week' %} ({{ p.days }}){% endif %}</td>
+        {% if p.future %}<td colspan="6" class="ctr b-none">Not marked yet</td>{% else %}
+        <td class="r">{{ p.totals.P }}</td><td class="r">{{ p.totals.L }}</td><td class="r">{{ p.totals.E }}</td><td class="r">{{ p.totals.A }}</td><td class="r">{{ p.totals.U }}</td><td class="r mono">{% if p.rate is not None %}{{ p.rate }}%{% else %}—{% endif %}</td>{% endif %}</tr>
+    {% endfor %}</tbody>
+  </table>
+  {% endif %}
+
+  {% if show != 'unm' and issues %}
+  <h2>4. Unconfirmed registers <small>{{ issues|length }} class-day{{ issues|length|pluralize }}</small></h2>
+  <table class="t"><thead><tr><th>Date</th><th>Class</th><th>Class teacher</th><th class="r">Unconfirmed</th><th>Status</th></tr></thead>
+    <tbody>{% for i in issues %}<tr><td style="white-space:nowrap">{{ i.date|date:"D j M Y" }}</td><td>{{ i.class_name }}</td><td>{{ i.teacher|default:"—" }}</td><td class="r">{% if i.unmarked %}{{ i.unmarked }} of {{ i.on_roll }}{% else %}—{% endif %}</td><td><span class="st st-{{ i.state }}">{{ i.label }}</span></td></tr>{% endfor %}</tbody></table>
+  {% endif %}
+{% endif %}
+
+{% if kind != 'register' %}
+  <div class="notes">
+    <b>How to read this {% if kind == 'today' %}roster{% else %}report{% endif %}</b>
+    <ul>
+      <li>Attendance = days in school ÷ days marked. Learners not yet marked count as neither present nor absent and are left out of every percentage.</li>
+      <li>Late learners are in school and counted as present; lateness is also shown as its own figure. Excused is not in school and shown separately. Reasons for excusal are never printed.</li>
+      {% if kind != 'today' %}<li>Weekends, school holidays and days outside term dates are omitted. Learners admitted during the period are counted from their admission date.{% for n in notes %} {{ n }}{% endfor %}</li>{% endif %}
+      {% if kind == 'report' %}<li>Target {{ target }}%. Flagged: {{ persistent }}–{{ flag|add:-1 }}%. Persistent absence: below {{ persistent }}%. Habitually late: {{ habitual_late }} or more late arrivals.</li>{% endif %}
+    </ul>
+  </div>
+  <div class="signatures">
+    <div><div class="sig-line"></div><div class="sig-label">Prepared by<br><span>{{ request.user.get_full_name|default:request.user.username }}</span></div></div>
+    <div><div class="sig-line"></div><div class="sig-label">{% if kind == 'report' %}Head of Department{% else %}Class teacher{% endif %}<br><span>Signature and date</span></div></div>
+    <div><div class="sig-line"></div><div class="sig-label">Head of School<br><span>Signature and date</span></div></div>
+  </div>
+{% endif %}
+</main>
+
+{% if not is_pdf %}
+<script>
+  if ({% if print_now %}true || {% endif %}new URLSearchParams(location.search).get('autoprint') === '1') {
+    window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 350); });
+  }
+</script>
+{% endif %}
+</body>
+</html>

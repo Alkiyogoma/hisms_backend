@@ -138,9 +138,10 @@ class Student(TimeStampedModel):
         if hasattr(end_date, 'date'):
             end_date = end_date.date()
         
+        # Unmarked (unconfirmed) days are neither present nor absent.
         total_entries = self.attendance_entries.filter(
             date__range=[start_date, end_date]
-        ).count()
+        ).exclude(status=AttendanceStatus.UNCONFIRMED).count()
         
         if total_entries == 0:
             return 0

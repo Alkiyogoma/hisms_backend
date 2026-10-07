@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+{% block title %}Attendance Reports — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Attendance{% endblock %}
+{% block extra_head %}
+{% include "attendance/_styles.html" %}
+<style>
+  .at-chart-wrap { position:relative; }
+  .at-chart { width:100%; min-width:560px; height:240px; display:block; }
+  .at-chart .xl { cursor:pointer; }
+  .at-chart .xl:hover { fill:var(--hodari-blue); text-decoration:underline; }
+  .at-tip { position:absolute; pointer-events:none; background:#1E2533; color:#fff; font-size:12px; padding:8px 11px; border-radius:8px; line-height:1.55; white-space:nowrap; display:none; z-index:5; box-shadow:0 6px 18px rgba(0,0,0,.2); }
+  .at-tip b { display:block; margin-bottom:2px; }
+  .at-tip i { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+  .at-student { position:relative; }
+  .at-student .clear { position:absolute; right:8px; bottom:9px; border:0; background:none; color:var(--at-muted); cursor:pointer; font-size:16px; line-height:1; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="at">
+  <div class="at-top">
+    <div>
+      <h1>Attendance Reports</h1>
+      <div class="sub">Patterns over a date range, separate from today's register · {{ period.label }}{% if class_name %} · {{ class_name }}{% else %} · whole school{% endif %}</div>
+    </div>
+    <div class="at-actions">
+      <span class="at-chip">Target {{ target }}% · Flag {{ flag }}% · Persistent {{ persistent }}%</span>
+      <a class="hf-btn hf-btn-secondary" target="_blank" rel="noopener" href="{% url 'attendance:print' %}{% querystring kind='report' page=None autoprint=1 %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z"/></svg>
+        Print
+      </a>
+      <a class="hf-btn hf-btn-primary" href="{% url 'attendance:print' %}{% querystring kind='report' page=None format='pdf' %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v3h16v-3"/></svg>
+        Export PDF
+      </a>
+    </div>
+  </div>
+
+  {% include "attendance/_tabs.html" %}
+
+  <form class="at-filters" id="rep-filters" method="get">
+    <input type="hidden" name="show" value="{{ show }}">
+    <div class="at-fg"><label for="f-class">Class / Grade</label>
+      <select id="f-class" name="class_name">
+        <option value="">All classes</option>
+        {% for c in class_options %}<option value="{{ c }}"{% if c == class_name %} selected{% endif %}>{{ c }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="at-fg sm"><label for="f-start">Start date</label><input id="f-start" type="date" name="start" value="{{ start|date:'Y-m-d' }}"></div>
+    <div class="at-fg sm"><label for="f-end">End date</label><input id="f-end" type="date" name="end" value="{{ end|date:'Y-m-d' }}"></div>
+    <div class="at-fg at-student"><label for="f-student">Student</label>
+      <input id="f-student" list="f-students" placeholder="All learners — type a name…" autocomplete="off" value="{% if student_row %}{{ student_row.name }} · {{ student_row.admission_no }}{% endif %}">
+      <input type="hidden" name="student" id="f-student-id" value="{% if student_row %}{{ student_row.id }}{% endif %}">
+      {% if student_row %}<button type="button" class="clear" id="f-student-clear" title="All learners">&times;</button>{% endif %}
+      <datalist id="f-students">{% for r in roster %}<option value="{{ r.name }} · {{ r.admission_no }}" data-id="{{ r.id }}">{{ r.class_name }}</option>{% endfor %}</datalist>
+    </div>
+    <div class="at-auto">Filters apply automatically. Click a figure to list those learners; click a learner for their pattern over the range.</div>
+    <div class="at-quick">
+      {% for q in quick %}<a href="{% querystring start=q.start|date:'Y-m-d' end=q.end|date:'Y-m-d' page=None %}" class="{% if q.on %}on{% endif %}">{{ q.label }}</a>{% endfor %}
+    </div>
+  </form>
+
+  <div class="at-body">
+  {% if notes %}<p class="at-lead" style="margin-top:-4px">{{ period.days|length }} school day{{ period.days|length|pluralize }} in range. {% for n in notes %}{{ n }} {% endfor %}</p>{% endif %}
+
+  <div class="at-stats">
+    <a href="{% querystring show='all' page=None %}" class="at-stat s-green{% if show == 'all' %} on{% endif %}"><div class="k">Average attendance</div><div class="v">{% if summary.average is not None %}{{ summary.average }}%{% else %}—{% endif %}</div><div class="n">Target {{ target }}% · {{ summary.marked }} learner-day{{ summary.marked|pluralize }} marked</div></a>
+    <a href="{% querystring show='flag' page=None %}" class="at-stat s-amber{% if show == 'flag' %} on{% endif %}"><div class="k">Flagged · below {{ flag }}%</div><div class="v">{{ summary.flagged }}</div><div class="n">Requires support</div></a>
+    <a href="{% querystring show='pers' page=None %}" class="at-stat s-red{% if show == 'pers' %} on{% endif %}"><div class="k">Persistent · below {{ persistent }}%</div><div class="v">{{ summary.persistent }}</div><div class="n">Immediate action</div></a>
+    <a href="{% querystring show='late' page=None %}" class="at-stat s-purple{% if show == 'late' %} on{% endif %}"><div class="k">Habitually late</div><div class="v">{{ summary.habitually_late }}</div><div class="n">{{ habitual_late }}+ late arrivals · {{ summary.late }} in all</div></a>
+    <a href="{% querystring show='unm' page=None %}" class="at-stat s-grey{% if show == 'unm' %} on{% endif %}"><div class="k">Unmarked learner-days</div><div class="v">{{ summary.unmarked }}</div><div class="n">Excluded from the %</div></a>
+    <a href="{% querystring show='cls' page=None %}" class="at-stat s-blue{% if show == 'cls' %} on{% endif %}"><div class="k">By class</div><div class="v">{{ class_count }}</div><div class="n">Compare classes</div></a>
+  </div>
+  <p class="at-openline">{{ summary.learners }} learner{{ summary.learners|pluralize }} on roll · <b>{{ summary.in_school }}</b> days in school (incl. <b>{{ summary.late }}</b> late) · <b>{{ summary.absent }}</b> absent · <b>{{ summary.excused }}</b> excused, out of {{ summary.marked }} marked. Unmarked days count as neither present nor absent.</p>
+
+  <div class="at-card">
+    <div class="at-card-h">
+      <div><h2>Status comparison</h2><p class="hint" style="margin-bottom:0">{{ period.label }}, {% if chart.unit == 'week' %}learners per school day, one point per week{% else %}learners, one point per school day{% endif %} — {% if student_row %}{{ student_row.name }}{% elif class_name %}{{ class_name }}{% else %}all classes{% endif %}. Click a {{ chart.unit }} to report on it alone.</p></div>
+      <div class="at-legend">
+        <span><i style="background:var(--at-green)"></i>Present</span><span><i style="background:var(--at-amber)"></i>Late</span>
+        <span><i style="background:var(--at-purple)"></i>Excused</span><span><i style="background:var(--at-red)"></i>Absent</span>
+        <span><i style="background:#C8CDD8"></i>Not marked</span>
+      </div>
+    </div>
+    {% if chart.points %}
+    <div class="at-scroll at-chart-wrap"><svg id="chart" class="at-chart" viewBox="0 0 980 240" preserveAspectRatio="none"></svg><div class="at-tip" id="chartTip"></div></div>
+    {{ chart|json_script:"chart-data" }}
+    {% else %}
+    <div class="at-empty">No school days in this range{% if notes %} — {{ notes|join:" " }}{% endif %}.</div>
+    {% endif %}
+  </div>
+
+  {% if student_row %}
+  <div class="at-card">
+    {% with row=student_row %}
+    <div class="at-card-h"><div><h2>{{ row.name }} — day by day</h2><p class="hint" style="margin-bottom:0">{{ row.class_name }} · {{ row.admission_no }}{% if row.admitted_in_period %} · admitted {{ row.enrolment_date|date:"j M Y" }}{% endif %}</p></div>
+      <button type="button" class="hf-btn hf-btn-secondary" data-learner="{{ row.id }}" style="font-size:12px">Open full pattern</button></div>
+    <div class="at-mini">
+      <div><div class="k">Rate</div><div class="v c-{{ row.band }}">{% if row.rate is not None %}{{ row.rate }}%{% else %}—{% endif %}</div></div>
+      <div><div class="k">Absent</div><div class="v c-red">{{ row.absent }}</div></div>
+      <div><div class="k">Excused</div><div class="v" style="color:var(--at-purple)">{{ row.excused }}</div></div>
+      <div><div class="k">Late</div><div class="v c-amber">{{ row.late }}</div></div>
+      <div><div class="k">Longest run absent</div><div class="v">{{ pattern.longest_absent_run }}</div></div>
+      <div><div class="k">Not marked</div><div class="v c-none">{{ row.unmarked }}</div></div>
+    </div>
+    {% for m in pattern.months %}
+      <div class="at-month"><div class="ml">{{ m.label }}</div><div class="at-daygrid">
+        {% for c in m.cells %}<div class="dcw" title="{{ c.date|date:'D j M' }}"><span class="dc dc-{{ c.code }}">{% if c.code == 'U' %}–{% elif c.code == 'F' or not c.code %}&nbsp;{% else %}{{ c.code }}{% endif %}</span><small>{{ c.date|date:'j' }}</small></div>{% endfor %}
+      </div></div>
+    {% endfor %}
+    {% endwith %}
+  </div>
+  {% endif %}
+
+  <div class="at-card">
+    {% if show == 'cls' %}
+      <h2>Attendance by class</h2>
+      <p class="hint">Whether low attendance is one child or a whole class. Click a class to report on it alone. The marker is the {{ target }}% target.</p>
+      {% for c in classes_summary %}
+        <a class="at-barrow" href="{% querystring class_name=c.name show='all' page=None %}">
+          <div class="lb">{{ c.name }}</div>
+          <div class="tr"><div class="fl f-{{ c.band }}" style="width:{% if c.average is not None %}{{ c.average|floatformat:0 }}{% else %}0{% endif %}%"></div><span class="tg" style="left:{{ target }}%"></span></div>
+          <div class="vv c-{{ c.band }}">{% if c.average is not None %}{{ c.average }}%{% else %}—{% endif %}</div>
+          <div class="ex">{{ c.learners }} learners · {{ c.absent }} A · {{ c.excused }} E · {{ c.late }} L</div>
+        </a>
+      {% empty %}<div class="at-empty">No learners in this selection.</div>{% endfor %}
+      <div class="at-basis">One low class points to something local. Low across the board points to the calendar or the marking.</div>
+
+    {% elif show == 'unm' %}
+      <h2>Unconfirmed registers</h2>
+      <p class="hint">Days where a register was never or only partly confirmed, and registers confirmed after 09:00 — {{ issue_learner_days }} learner-day{{ issue_learner_days|pluralize }} unmarked.</p>
+      <div class="at-scroll"><table class="at-table">
+        <thead><tr><th>Date</th><th>Class</th><th>Class teacher</th><th class="num">Learners unconfirmed</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+        {% for i in issues %}
+          <tr><td style="white-space:nowrap">{{ i.date|date:"D j M Y" }}</td><td>{{ i.class_name }}</td><td>{{ i.teacher|default:"—" }}</td>
+            <td class="num">{% if i.unmarked %}<b>{{ i.unmarked }}</b> <span class="at-muted">of {{ i.on_roll }}</span>{% else %}<span class="at-muted">—</span>{% endif %}</td>
+            <td><span class="at-tag t-{{ i.state }}">{{ i.label }}</span></td>
+            <td><a class="hf-btn hf-btn-outline" style="font-size:11px;padding:3px 9px" href="{% url 'attendance:today' %}?date={{ i.date|date:'Y-m-d' }}&class_name={{ i.class_name|urlencode }}">Open register</a></td></tr>
+        {% empty %}
+          <tr><td colspan="6"><div class="at-empty">Every register in this range was confirmed on time.</div></td></tr>
+        {% endfor %}
+        </tbody></table></div>
+      <div class="at-basis">Unconfirmed learners are not absent learners — they are excluded from every percentage. Past registers are corrected through a correction request.</div>
+
+    {% else %}
+      <div class="at-card-h">
+        <div>
+          <h2>{% if show == 'flag' %}Flagged — below {{ flag }}%{% elif show == 'pers' %}Persistent absence — below {{ persistent }}%{% elif show == 'late' %}Habitually late{% else %}All learners{% endif %} <span class="at-muted" style="font-weight:600">· {{ page_obj.paginator.count }}</span></h2>
+          <p class="hint" style="margin-bottom:0">{% if show == 'flag' %}Attendance below the {{ flag }}% flag but at or above {{ persistent }}%.{% elif show == 'pers' %}Below {{ persistent }}% attendance. Immediate follow-up with parents.{% elif show == 'late' %}{{ habitual_late }} or more late arrivals. Reported separately so punctuality stays visible.{% else %}Lowest attendance first over the selected range. Absent and excused both count as not in school; excused is shown separately.{% endif %}</p>
+        </div>
+        <form method="get" class="at-fg" style="min-width:200px">
+          {% for k, v in request.GET.items %}{% if k != 'q' and k != 'page' %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endif %}{% endfor %}
+          <input type="search" name="q" value="{{ query }}" placeholder="Search learners…" aria-label="Search learners">
+        </form>
+      </div>
+      <div class="at-scroll"><table class="at-table">
+        {% if show == 'late' %}
+        <thead><tr><th>Student information</th><th>Admission no.</th><th class="num">Late days</th><th class="num">Share of days</th><th>Rate</th><th>Status</th></tr></thead>
+        <tbody>
+        {% for r in page_obj %}
+          <tr><td><button type="button" class="at-nm" data-learner="{{ r.id }}">{{ r.name }}<small>{{ r.class_name }}</small></button></td>
+            <td class="at-mono">{{ r.admission_no }}</td><td class="num"><b>{{ r.late }}</b></td><td class="num">{{ r.late_share }}%</td>
+            <td>{% include "attendance/_meter.html" with pct=r.rate band=r.band %}</td>
+            <td>{% if r.late >= 8 %}<span class="at-tag t-red">Habitually late</span>{% else %}<span class="at-tag t-amber">Watch</span>{% endif %}</td></tr>
+        {% empty %}<tr><td colspan="6"><div class="at-empty">No learner was late {{ habitual_late }} or more times in this range.</div></td></tr>{% endfor %}
+        </tbody>
+        {% else %}
+        <thead><tr><th>Student information</th><th>Admission no.</th><th>Rate</th><th class="num">Days marked</th><th class="num">Absent</th><th class="num">Excused</th><th class="num">Late</th><th>Status</th></tr></thead>
+        <tbody>
+        {% for r in page_obj %}
+          <tr><td><button type="button" class="at-nm" data-learner="{{ r.id }}">{{ r.name }}<small>{{ r.class_name }}{% if r.admitted_in_period %} · from {{ r.enrolment_date|date:"j M" }}{% endif %}</small></button></td>
+            <td class="at-mono">{{ r.admission_no }}</td>
+            <td>{% include "attendance/_meter.html" with pct=r.rate band=r.band %}</td>
+            <td class="num">{{ r.marked }}{% if r.unmarked %}<span class="at-muted"> +{{ r.unmarked }}</span>{% endif %}</td>
+            <td class="num">{{ r.absent }}</td>
+            <td class="num"><span class="at-tag t-purple">{{ r.excused }}</span></td>
+            <td class="num">{{ r.late }}</td>
+            <td><span class="at-tag t-{{ r.tag.0 }}">{{ r.tag.1 }}</span></td></tr>
+        {% empty %}<tr><td colspan="8"><div class="at-empty">{% if query %}No learners match “{{ query }}”.{% elif show == 'all' %}No learners in this selection.{% else %}No learners fall in this band — good news.{% endif %}</div></td></tr>{% endfor %}
+        </tbody>
+        {% endif %}
+      </table></div>
+      {% if page_obj.paginator.num_pages > 1 or page_obj.paginator.count > 25 %}
+      <div class="at-paging">
+        <span>Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} · Rows
+          {% for s in page_sizes %}<a href="{% querystring page_size=s page=None %}" style="padding:2px 8px{% if s == page_size %};background:var(--at-blue-bg);color:var(--hodari-blue){% endif %}">{{ s }}</a>{% endfor %}</span>
+        <span class="pg">
+          {% if page_obj.has_previous %}<a href="{% querystring page=page_obj.previous_page_number %}">&larr; Prev</a>{% endif %}
+          <span class="cur">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+          {% if page_obj.has_next %}<a href="{% querystring page=page_obj.next_page_number %}">Next &rarr;</a>{% endif %}
+        </span>
+      </div>
+      {% endif %}
+      <div class="at-basis">{% if show == 'late' %}A learner can hold a high attendance rate and still arrive late most days.{% elif show == 'pers' %}Missing a fifth of school. The excused column shows whether this is a truancy or a medical conversation.{% elif show == 'flag' %}Below {{ flag }}% is where most Cambridge-curriculum schools set a target for improvement.{% else %}Counted from each learner's admission date. Days never marked are excluded from the calculation entirely; “+n” shows a learner's unmarked days.{% endif %}</div>
+    {% endif %}
+  </div>
+  </div>
+</div>
+
+{% include "attendance/_learner_modal.html" with learner_start=start learner_end=end %}
+
+<script>
+(function() {
+  var form = document.getElementById("rep-filters");
+  function go(){ document.body.classList.add("is-loading"); form.submit(); }
+  ["f-class", "f-start", "f-end"].forEach(function(id){ document.getElementById(id).addEventListener("change", go); });
+  var stu = document.getElementById("f-student"), sid = document.getElementById("f-student-id");
+  stu.addEventListener("change", function() {
+    var opt = Array.prototype.find.call(document.querySelectorAll("#f-students option"), function(o){ return o.value === stu.value; });
+    if (opt) { sid.value = opt.getAttribute("data-id"); go(); }
+    else if (!stu.value.trim()) { sid.value = ""; go(); }
+  });
+  var clr = document.getElementById("f-student-clear");
+  if (clr) clr.addEventListener("click", function(){ stu.value = ""; sid.value = ""; go(); });
+})();
+
+(function() {
+  var el = document.getElementById("chart-data");
+  if (!el) return;
+  var data = JSON.parse(el.textContent), P = data.points;
+  var svg = document.getElementById("chart"), tip = document.getElementById("chartTip");
+  var W = 980, H = 240, PL = 46, PR = 18, PT = 14, PB = 40, n = P.length;
+  var S = [["present", "#1E8A4C", "Present"], ["late", "#C27803", "Late"], ["excused", "#5B4FCF", "Excused"], ["absent", "#C0392B", "Absent"], ["unmarked", "#AEB4C0", "Not marked"]];
+  var max = 0;
+  P.forEach(function(p){ S.forEach(function(s){ if (p[s[0]] != null) max = Math.max(max, p[s[0]]); }); });
+  var step = Math.max(1, Math.ceil(max / 4 / 5) * 5); if (max <= 8) step = Math.max(1, Math.ceil(max / 4));
+  max = step * 4 || 4;
+  var x = function(i){ return n === 1 ? (PL + W - PR) / 2 : PL + (W - PL - PR) * (i / (n - 1)); };
+  var y = function(v){ return H - PB - (H - PT - PB) * (v / max); };
+  var g = "";
+  for (var t = 0; t <= max; t += step) {
+    g += '<line x1="' + PL + '" y1="' + y(t) + '" x2="' + (W - PR) + '" y2="' + y(t) + '" stroke="#EDF0F5"/>' +
+         '<text x="' + (PL - 10) + '" y="' + (y(t) + 4) + '" text-anchor="end" font-size="11.5" fill="#AEB4C0">' + t + '</text>';
+  }
+  var firstFuture = -1;
+  P.forEach(function(p, i){ if (p.future && firstFuture < 0) firstFuture = i; });
+  if (firstFuture >= 0) {
+    var fx = firstFuture === 0 ? PL : (x(firstFuture - 1) + x(firstFuture)) / 2;
+    g += '<rect x="' + fx + '" y="' + PT + '" width="' + (W - PR - fx) + '" height="' + (H - PT - PB) + '" fill="#F4F5F8" opacity=".85"/>' +
+         '<text x="' + ((fx + W - PR) / 2) + '" y="' + (PT + 18) + '" text-anchor="middle" font-size="12" fill="#9AA0AE">Not marked yet</text>';
+  }
+  S.forEach(function(s) {
+    var pts = []; P.forEach(function(p, i){ if (p[s[0]] != null) pts.push([x(i), y(p[s[0]])]); });
+    if (pts.length > 1) g += '<path d="' + pts.map(function(q, i){ return (i ? "L" : "M") + q[0] + " " + q[1]; }).join(" ") + '" fill="none" stroke="' + s[1] + '" stroke-width="' + (s[0] === "unmarked" ? 1.6 : 2.4) + '"' + (s[0] === "unmarked" ? ' stroke-dasharray="4 4"' : '') + ' stroke-linecap="round" stroke-linejoin="round"/>';
+    pts.forEach(function(q){ g += '<circle cx="' + q[0] + '" cy="' + q[1] + '" r="' + (n > 40 ? 2.5 : 4.5) + '" fill="#fff" stroke="' + s[1] + '" stroke-width="2.2"/>'; });
+  });
+  var every = Math.max(1, Math.ceil(n / 16));
+  P.forEach(function(p, i) {
+    g += '<rect class="hit" data-i="' + i + '" x="' + (x(i) - (W - PL - PR) / Math.max(n, 2) / 2) + '" y="' + PT + '" width="' + ((W - PL - PR) / Math.max(n, 2)) + '" height="' + (H - PT - PB) + '" fill="transparent"/>';
+    if (i % every === 0 || i === n - 1)
+      g += '<text class="xl" data-i="' + i + '" x="' + x(i) + '" y="' + (H - PB + 22) + '" text-anchor="middle" font-size="12" font-weight="' + (p.future ? 400 : 600) + '" fill="' + (p.future ? "#C0C5D0" : "#5A6170") + '">' + p.label + '</text>';
+  });
+  svg.innerHTML = g;
+  var wrap = svg.parentElement;
+  svg.addEventListener("mousemove", function(e) {
+    var i = e.target.getAttribute && e.target.getAttribute("data-i");
+    if (i === null || i === undefined) { tip.style.display = "none"; return; }
+    var p = P[+i], h = "<b>" + p.title + "</b>";
+    if (p.future) h += "Not marked yet";
+    else {
+      var K = {present: "P", late: "L", excused: "E", absent: "A", unmarked: "U"};
+      S.forEach(function(s){ h += '<i style="background:' + s[1] + '"></i>' + s[2] + ": " + p[s[0]] + (data.unit === "week" ? " a day (" + p.totals[K[s[0]]] + " in " + p.days + " day" + (p.days === 1 ? "" : "s") + ")" : "") + "<br>"; });
+      h += "Attendance: " + (p.rate == null ? "—" : p.rate + "%");
+    }
+    tip.innerHTML = h; tip.style.display = "block";
+    var r = wrap.getBoundingClientRect(), left = e.clientX - r.left + wrap.scrollLeft + 14;
+    if (left + tip.offsetWidth > wrap.scrollWidth - 6) left -= tip.offsetWidth + 28;
+    tip.style.left = left + "px"; tip.style.top = Math.max(4, e.clientY - r.top - 20) + "px";
+  });
+  svg.addEventListener("mouseleave", function(){ tip.style.display = "none"; });
+  svg.addEventListener("click", function(e) {
+    var i = e.target.getAttribute && e.target.getAttribute("data-i");
+    if (i === null || i === undefined) return;
+    var p = P[+i], q = new URLSearchParams(location.search);
+    q.set("start", p.start); q.set("end", p.end); q.delete("page");
+    document.body.classList.add("is-loading");
+    location.search = q.toString();
+  });
+})();
+</script>
+{% endblock %}

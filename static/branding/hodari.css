@@ -2964,3 +2964,14 @@ body {
 .es-action button {
   text-decoration: none
 }
+
+/* Phone top bar: title and icons only. The date / school line and the
+   Sign out button are dropped (Sign Out stays in the side menu). */
+@media (max-width: 640px) {
+  .topbar { padding: 0 16px; height: 56px; gap: 10px; }
+  .topbar-left { min-width: 0; flex: 1 1 auto; }
+  .topbar-greeting { display: flex; align-items: center; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 16px; }
+  .topbar-date, .topbar-signout, .topbar-right .topbar-badge { display: none !important; }
+  .topbar-right { gap: 8px; flex-shrink: 0; }
+  .topbar-avatar { width: 34px; height: 34px; }
+}

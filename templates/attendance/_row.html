@@ -1,28 +1,50 @@
-<style>
-.hidden { display: none !important; }
-.att-grade-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  border: 2px solid transparent;
-  transition: all .15s;
-  user-select: none;
-}
-.att-grade-P { background: var(--green-bg, #E8F5EC); color: var(--green, #1B7B34); border-color: var(--green-bd, #B7DFBF); }
-.att-grade-L { background: var(--amber-bg, #FEF3C7); color: var(--amber, #92550A); border-color: var(--amber-bd, #FCD34D); }
-.att-grade-A { background: #FEF2F2; color: #9B1C1C; border-color: #FECACA; }
-.att-grade-E { background: var(--hodari-blue-light, #E8EEF9); color: var(--hodari-blue, #023AA5); border-color: #BFCFE9; }
-.att-grade-btn.selected-P { background: var(--green, #1B7B34); color: #fff; border-color: var(--green, #1B7B34); }
-.att-grade-btn.selected-L { background: #D97706; color: #fff; border-color: #D97706; }
-.att-grade-btn.selected-A { background: #9B1C1C; color: #fff; border-color: #9B1C1C; }
-.att-grade-btn.selected-E { background: var(--hodari-blue, #023AA5); color: #fff; border-color: var(--hodari-blue, #023AA5); }
-.att-grade-btn:hover { opacity: 0.8; transform: scale(1.05); }
-.att-grade-btn:active { transform: scale(0.95); }
-.att-grade-group { display: flex; gap: 6px; flex-shrink: 0; }
-</style>
+{% with s=row.student e=row.entry %}
+<tr id="att-row-{{ s.id }}" data-status="{{ row.code }}" data-name="{{ s.first_name|lower }} {{ s.last_name|lower }} {{ s.admission_no|lower }}">
+  <td>
+    <button type="button" class="at-nm" data-learner="{{ s.id }}">{{ s.first_name }} {{ s.last_name }}<small>{{ s.class_name }}</small></button>
+  </td>
+  <td class="at-mono">{{ s.admission_no }}</td>
+  <td>
+    {% if row.attendance_rate is not None %}
+      {% with b=row.attendance_rate|floatformat:0 %}
+      <div class="at-meter" title="This term so far, on days marked">
+        <div class="at-mtrack"><div class="at-mfill {% if row.attendance_rate < 80 %}f-red{% elif row.attendance_rate < 90 %}f-amber{% else %}f-green{% endif %}" style="width:{{ b }}%"></div></div>
+        <div class="at-mval {% if row.attendance_rate < 80 %}c-red{% elif row.attendance_rate < 90 %}c-amber{% else %}c-green{% endif %}">{{ row.attendance_rate }}%</div>
+      </div>
+      {% endwith %}
+    {% else %}<span class="at-muted" style="font-size:12px">No marks yet</span>{% endif %}
+  </td>
+  <td>
+    {% if can_mark %}
+    <div class="att-grade-group" data-student-id="{{ s.id }}" data-date="{{ date|date:'Y-m-d' }}"{% if is_locked and not is_super_admin %} style="opacity:.45; pointer-events:none"{% endif %}>
+      <button type="button" class="att-grade-btn att-grade-P{% if row.code == 'P' %} selected-P{% endif %}" onclick="markAttendance(this, '{{ s.id }}', '{{ date|date:'Y-m-d' }}', 'present')" title="Present">P</button>
+      <button type="button" class="att-grade-btn att-grade-L{% if row.code == 'L' %} selected-L{% endif %}" onclick="markAttendance(this, '{{ s.id }}', '{{ date|date:'Y-m-d' }}', 'late')" title="Late">L</button>
+      <button type="button" class="att-grade-btn att-grade-A{% if row.code == 'A' %} selected-A{% endif %}" onclick="markAttendance(this, '{{ s.id }}', '{{ date|date:'Y-m-d' }}', 'absent')" title="Absent">A</button>
+      <button type="button" class="att-grade-btn att-grade-E{% if row.code == 'E' %} selected-E{% endif %}" onclick="markWithReason('{{ s.id }}', '{{ date|date:'Y-m-d' }}', 'excused', '{{ s.first_name|escapejs }} {{ s.last_name|escapejs }}')" title="Excused">E</button>
+    </div>
+    {% if is_locked and not is_super_admin %}
+    <button type="button" class="hf-btn hf-btn-outline" style="margin-top:6px; font-size:11px; padding:2px 8px"
+      onclick="requestCorrection('{{ s.id }}', '{{ date|date:'Y-m-d' }}', '{{ s.first_name|escapejs }} {{ s.last_name|escapejs }}')">Request correction</button>
+    {% endif %}
+    {% else %}
+      {% if row.code == 'P' %}<span class="at-tag t-green">Present</span>{% elif row.code == 'L' %}<span class="at-tag t-amber">Late</span>{% elif row.code == 'A' %}<span class="at-tag t-red">Absent</span>{% elif row.code == 'E' %}<span class="at-tag t-purple">Excused</span>{% else %}<span class="at-tag t-grey">Not marked</span>{% endif %}
+    {% endif %}
+    {% if row.code == 'E' %}
+      <div class="at-sub" style="max-width:220px">{% if row.can_view_reason %}{% if e.reason %}Reason: {{ e.reason }}{% else %}No reason recorded{% endif %}{% else %}Reason restricted{% endif %}</div>
+    {% endif %}
+  </td>
+  <td>
+    <div class="at-wk" title="This week">
+      {% for d, c in row.week %}<div><i class="w-{{ c }}" title="{{ d|date:'D j M' }}: {% if c == 'P' %}Present{% elif c == 'L' %}Late{% elif c == 'A' %}Absent{% elif c == 'E' %}Excused{% else %}Not marked{% endif %}"></i><small>{{ d|date:'D'|slice:':1' }}</small></div>{% endfor %}
+    </div>
+  </td>
+  <td style="white-space:nowrap">
+    {% if e and row.code != 'U' %}{{ e.marked_at|time:'H:i' }}{% if e.corrected_at %} <span class="at-sub" style="display:inline">· corrected</span>{% elif row.edited %} <span class="at-sub" style="display:inline">· edited</span>{% endif %}{% else %}<span class="at-muted">—</span>{% endif %}
+  </td>
+  <td style="white-space:nowrap">
+    {% if e and e.check_out_time %}{{ e.check_out_time|time:'H:i' }}
+    {% elif show_checkout_gaps and row.code == 'P' or show_checkout_gaps and row.code == 'L' %}<span class="at-tag t-red">Not scanned</span>
+    {% else %}<span class="at-muted">—</span>{% endif %}
+  </td>
+</tr>
+{% endwith %}

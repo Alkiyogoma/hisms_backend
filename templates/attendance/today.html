@@ -1,9 +1,7 @@
 {% extends "base.html" %}
-{% load role_tags %}
 {% block title %}Daily Attendance — {{ brand.school_name }}{% endblock %}
-{% block topbar_greeting %}Daily Attendance{% endblock %}
+{% block topbar_greeting %}Attendance{% endblock %}
 {% block extra_head %}
-{% include "includes/hodari_print_styles.html" %}
 <link rel="manifest" href="{% url 'attendance:pwa_manifest' %}">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Attendance">
@@ -14,72 +12,146 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
+{% include "attendance/_styles.html" %}
 <style>
-  @media print {
-    .section-hdr { display: none !important; }
-  }
+  .att-grade-group { display:flex; gap:6px; flex-shrink:0; }
+  .att-grade-btn { width:38px; height:34px; border-radius:9px; font-size:13px; font-weight:700; cursor:pointer; border:1.5px solid transparent; transition:transform .1s, background .1s; font-family:inherit; padding:0; }
+  .att-grade-P { background:var(--at-green-bg); color:var(--at-green); border-color:var(--at-green-bd); }
+  .att-grade-L { background:var(--at-amber-bg); color:var(--at-amber); border-color:var(--at-amber-bd); }
+  .att-grade-A { background:var(--at-red-bg); color:var(--at-red); border-color:var(--at-red-bd); }
+  .att-grade-E { background:var(--at-purple-bg); color:var(--at-purple); border-color:var(--at-purple-bd); }
+  .att-grade-btn.selected-P { background:var(--at-green); color:#fff; border-color:var(--at-green); }
+  .att-grade-btn.selected-L { background:var(--at-amber); color:#fff; border-color:var(--at-amber); }
+  .att-grade-btn.selected-A { background:var(--at-red); color:#fff; border-color:var(--at-red); }
+  .att-grade-btn.selected-E { background:var(--at-purple); color:#fff; border-color:var(--at-purple); }
+  .att-grade-btn:hover { transform:scale(1.05); } .att-grade-btn:active { transform:scale(.95); }
+  .att-grade-btn.saving { opacity:.55; }
+  .at-bulk { display:inline-flex; gap:4px; margin-left:6px; vertical-align:middle; }
+  .at-bulk button { font-size:10.5px; padding:2px 8px; border-radius:20px; cursor:pointer; font-weight:700; font-family:inherit; }
+  .at-bulk .bp { background:var(--at-green-bg); color:var(--at-green); border:1px solid var(--at-green-bd); }
+  .at-bulk .ba { background:var(--at-red-bg); color:var(--at-red); border:1px solid var(--at-red-bd); }
+  /* excuse prompt */
+  .at-exmodal { background:#fff; border-radius:16px; max-width:420px; width:100%; padding:26px 24px 0; text-align:center; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,.25); }
+  .at-exmodal .ic { width:62px; height:62px; border-radius:50%; background:var(--at-amber-bg); margin:0 auto 16px; display:flex; align-items:center; justify-content:center; font-size:28px; color:var(--at-amber); }
+  .at-exmodal h3 { margin:0 0 7px; font-size:20px; }
+  .at-exmodal p { font-size:14px; color:#5A6170; margin:0 0 18px; }
+  .at-exmodal input { width:100%; padding:13px 14px; border:2px solid var(--hodari-blue); border-radius:10px; font-size:14px; font-family:inherit; }
+  .at-exmodal input.err { border-color:var(--at-red); }
+  .at-exmodal .pr { font-size:12px; color:var(--at-muted); margin:10px 0 20px; }
+  .at-exrow { display:flex; margin:0 -24px; border-top:1px solid var(--at-line); }
+  .at-exrow button { flex:1; padding:16px; border:none; font-size:15px; font-weight:600; cursor:pointer; font-family:inherit; background:#fff; color:var(--at-ink); }
+  .at-exrow .ok { background:var(--at-amber); color:#fff; }
 </style>
 {% endblock %}
 
-{% load hodari_forms %}
 {% block content %}
-<!-- Print-only branded header -->
-<div class="print-only doc-container" style="max-width:900px;margin:0 auto 20px;background:#fff;padding:24px 28px;border:1px solid #DDE3EE;border-radius:12px">
-  {% include "includes/hodari_print_header.html" %}
-  <div style="height:1px;background:var(--border);margin:16px 0"></div>
-  <div style="display:flex;justify-content:space-between;align-items:center">
+<div class="at">
+  <div class="at-top">
     <div>
-      <div style="font-family:var(--font-display);font-size:18pt;font-weight:bold;color:var(--hodari-blue);text-transform:uppercase">Daily Attendance</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">{{ today|date:"l, d M Y" }}</div>
+      <h1>Daily Attendance</h1>
+      <div class="sub">{{ date|date:"l, d F Y" }} · {{ brand.school_name|default:"Hodari Christian School" }}{% if class_name %} · {{ class_name }}{% endif %}</div>
+    </div>
+    <div class="at-actions">
+      {% if is_locked %}
+        <span class="at-chip locked">Register closed at {{ lock_hour }}:00</span>
+      {% else %}
+        <span class="at-chip">Register open until {{ lock_hour }}:00</span>
+      {% endif %}
+      <a class="hf-btn hf-btn-secondary" target="_blank" rel="noopener"
+         href="{% url 'attendance:print' %}?kind=today&date={{ date|date:'Y-m-d' }}&class_name={{ class_name|urlencode }}&autoprint=1">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z"/></svg>
+        Print Roster
+      </a>
+      {% if is_super_admin %}
+      <c-button variant="secondary" size="sm" id="openCorrectionRequests"
+        hx-get="{% url 'attendance:correction_requests' %}" hx-target="#hui-drawer-root" hx-swap="innerHTML">
+        Correction requests{% if pending_correction_count %} <span class="chip chip-amber" style="margin-left:6px; font-size:10px">{{ pending_correction_count }}</span>{% endif %}
+      </c-button>
+      {% endif %}
     </div>
   </div>
-</div>
-<div class="section-hdr">
-  <div>
-      <span class="section-title">Daily attendance</span>
-      <p class="print-hide" style="margin:-6px 0 12px;font-size:13px;color:var(--text-muted)">
-        This view displays attendance data for reporting and monitoring purposes only.
-      </p>
-  </div>
-  <div style="display:flex; gap:10px; align-items:center" class="print-hide">
-    <span class="chip chip-blue">85% Attendance Threshold</span>
-    <button onclick="window.print()" class="hf-btn hf-btn-secondary" style="font-size:12px">
-      <svg style="width:14px; height:14px; vertical-align:middle; margin-right:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z"/></svg>
-      Print Roster
-    </button>
-  </div>
-</div>
 
-<!-- Summary Metrics Grid -->
-{% include "attendance/_metrics.html" %}
+  {% include "attendance/_tabs.html" %}
 
-<!-- Filter Bar (full width, above chart) -->
-<style>
-#attendance-filters-form .hf-input,
-#attendance-filters-form .hf-select,
-#att-student-search {
-  height: 36px !important;
-  box-sizing: border-box;
-}
-</style>
-<div class="print-hide" style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; margin-bottom:12px">
+  <p class="at-lead">Who is in school {% if date == today %}today{% else %}on {{ date|date:"j F" }}{% endif %}, out of {{ summary.total }} enrolled{% if class_name %} in {{ class_name }}{% endif %}. Click any figure to list the learners behind it. Marks save as you tap — no save button; whatever stands at {{ lock_hour }}:00 is the record for the day.</p>
+
+  {% if non_school_reason %}
+    <div class="at-note">{{ date|date:"l j F" }} is {{ non_school_reason }}, so it is not counted as a school day in reports or the printed register.</div>
+  {% endif %}
   {% if is_locked %}
-  <div style="flex:1 1 320px; padding:10px 14px; border-radius:8px; background:#FEF3C7; color:#92400E; font-size:13px">
-    {% if is_super_admin %}
-      This register is locked. As super admin you can still change records; every change is logged with the previous value.
-    {% else %}
-      This register is locked. Attendance can only be marked on the day, before {{ lock_hour }}:00. Use <strong>Request correction</strong> on a learner to ask the super admin for a change.
+    <div class="at-note">
+      {% if is_super_admin %}This register is locked. As super admin you can still change records; every change is logged with the previous value.
+      {% else %}This register is locked: attendance can only be marked on the day, before {{ lock_hour }}:00. Use <b>Request correction</b> on a learner to ask the super admin for a change.{% endif %}
+    </div>
+  {% endif %}
+
+  <div id="att-live" hx-get="{{ request.get_full_path }}" hx-trigger="attendance-updated from:body delay:400ms" hx-select="#att-live" hx-swap="outerHTML">
+    <div class="at-stats" id="tStats">
+      <button type="button" class="at-stat s-green" data-s="pres"><div class="k">In school</div><div class="v">{{ summary.present }}</div><div class="n">{% if summary.marked %}{{ summary.present_pct }}% of those marked{% else %}No one marked yet{% endif %}{% if summary.late %} · incl. {{ summary.late }} late{% endif %}</div></button>
+      <button type="button" class="at-stat s-red" data-s="abs"><div class="k">Absent</div><div class="v">{{ summary.absent }}</div><div class="n">Requires follow-up</div></button>
+      <button type="button" class="at-stat s-amber" data-s="late"><div class="k">Late</div><div class="v">{{ summary.late }}</div><div class="n">In school, arrived late</div></button>
+      <button type="button" class="at-stat s-purple" data-s="exc"><div class="k">Excused</div><div class="v">{{ summary.excused }}</div><div class="n">Authorised absence</div></button>
+      <button type="button" class="at-stat s-blue" data-s="all"><div class="k">Enrolled</div><div class="v">{{ summary.total }}</div><div class="n">On roll</div></button>
+      <button type="button" class="at-stat s-grey" data-s="unm"><div class="k">Not yet marked</div><div class="v">{{ summary.unconfirmed }}</div><div class="n">Excluded from the %</div></button>
+    </div>
+    <p class="at-openline">Of {{ summary.total }} enrolled, <b>{{ summary.marked }} {{ summary.marked|pluralize:"has,have" }} been marked</b> and <b>{{ summary.unconfirmed }} {{ summary.unconfirmed|pluralize:"is,are" }} still unmarked</b>. Attendance {% if date == today %}today{% else %}on this day{% endif %} is calculated on the {{ summary.marked }} marked — unmarked learners count as neither present nor absent.</p>
+
+    {% if class_status %}
+    <div class="at-card {% if unmarked_classes %}at-alert{% else %}at-ok{% endif %}">
+      {% if unmarked_classes %}
+        <h2>Registers not yet marked — {{ unmarked_classes|length }} class{{ unmarked_classes|length|pluralize:"es" }}</h2>
+        <p class="hint">{{ unmarked_class_learners }} learner{{ unmarked_class_learners|pluralize }} unmarked{% if not is_locked %} — chase before {{ lock_hour }}:00{% endif %}. Green confirmed · amber confirmed after 09:00 · red not yet. Click a class to open its register.</p>
+      {% else %}
+        <h2>All registers marked</h2>
+        <p class="hint">Every class has confirmed its register. Green confirmed · amber confirmed after 09:00.</p>
+      {% endif %}
+      <div class="at-clsgrid">
+        {% for c in class_status %}
+          <a class="at-clstile" href="?date={{ date|date:'Y-m-d' }}&class_name={{ c.name|urlencode }}"><div><b>{{ c.name }}</b><small>{{ c.text }}</small></div><span class="at-dot d-{{ c.state }}"></span></a>
+        {% endfor %}
+      </div>
+    </div>
     {% endif %}
   </div>
-  {% elif date == max_date %}
-  <div style="flex:1 1 320px; font-size:12px; color:var(--text-muted)">Register open until {{ lock_hour }}:00 today.</div>
-  {% endif %}
-  {% if is_super_admin %}
-  <c-button variant="secondary" size="sm" id="openCorrectionRequests"
-    hx-get="{% url 'attendance:correction_requests' %}" hx-target="#hui-drawer-root" hx-swap="innerHTML">
-    Correction requests{% if pending_correction_count %} <span class="chip chip-amber" style="margin-left:6px; font-size:10px">{{ pending_correction_count }}</span>{% endif %}
-  </c-button>
-  {% endif %}
+
+  <form class="at-filters" id="att-filters" method="get">
+    <div class="at-fg"><label for="att-search">Search student</label><input id="att-search" type="search" placeholder="Search by name or admission no…" autocomplete="off"></div>
+    <div class="at-fg sm"><label for="att-date">Attendance date</label><input id="att-date" type="date" name="date" value="{{ date|date:'Y-m-d' }}" max="{{ max_date|date:'Y-m-d' }}"></div>
+    <div class="at-fg"><label for="att-class">Class / Grade</label>
+      <select id="att-class" name="class_name">
+        <option value="">All classes</option>
+        {% for c in class_options %}<option value="{{ c }}"{% if c == class_name %} selected{% endif %}>{{ c }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="at-auto">Filters apply automatically.{% if auto_selected_subject %} Class chosen from your timetable ({{ auto_selected_subject }}).{% endif %}</div>
+  </form>
+
+  <div class="at-card">
+    <h2 id="tTitle">All learners {% if date == today %}today{% else %}on {{ date|date:"j M" }}{% endif %}</h2>
+    <p class="hint" id="tHint">Everyone enrolled, with the day's status.</p>
+    <div class="at-scroll">
+      <table class="at-table" id="att-table">
+        <thead><tr>
+          <th>Student information</th><th>Admission no.</th><th>Term rate</th>
+          <th>Mark attendance
+            {% if can_mark and class_name and not is_locked %}
+            <span class="at-bulk"><button type="button" class="bp" onclick="markAllStudents('present')" title="Mark every unmarked learner Present">All P</button><button type="button" class="ba" onclick="markAllStudents('absent')" title="Mark every unmarked learner Absent">All A</button></span>
+            {% endif %}
+          </th>
+          <th>This week</th><th>Marked at</th><th>Checked out</th>
+        </tr></thead>
+        <tbody>
+          {% for row in rows %}{% include "attendance/_row.html" %}{% endfor %}
+          <tr id="att-none" style="{% if rows %}display:none{% endif %}"><td colspan="7"><div class="at-empty">{% if rows %}No learners match.{% else %}No learners on roll{% if class_name %} in {{ class_name }}{% endif %}.{% endif %}</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="at-basis" id="tBasis">Unmarked learners appear with a grey tag so they stay visible, but are excluded from the percentage. Term rate counts this term's marked days only.</div>
+  </div>
+
+  <div style="margin-top:8px;padding:8px 0;text-align:center;font-size:11px;color:var(--at-muted)">
+    <a href="{% url 'attendance:pwa_download' %}" style="color:inherit">Download Attendance App</a>
+  </div>
 </div>
 
 <c-modal id="reqCorrectionModal" title="Request a correction" size="sm">
@@ -108,772 +180,175 @@ if ('serviceWorker' in navigator) {
     <c-button type="submit" form="reqCorrectionForm">Send to super admin</c-button>
   </c-slot>
 </c-modal>
-<div class="card print-hide" style="margin-bottom:12px; padding:12px 16px">
-  <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;">
-    <div style="flex:0 0 220px; min-width:180px">
-      <label class="hf-label" style="font-size:12px; margin-bottom:2px; display:block">Search Student</label>
-      <input id="att-student-search" type="text" class="hf-input" placeholder="Search by name..." style="height:36px; font-size:13px; width:100%" oninput="filterStudentRows(this.value)">
-    </div>
-    <form id="attendance-filters-form" method="get" style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin:0; padding:0">
-      <div style="flex:0 0 180px; min-width:140px">
-        <label class="hf-label" style="font-size:12px; margin-bottom:2px; display:block">Attendance Date</label>
-        <input id="attendance-date" type="date" name="date" class="hf-input" value="{{ date|date:'Y-m-d' }}" max="{{ max_date|date:'Y-m-d' }}" style="height:36px; font-size:13px">
-      </div>
-      <div style="flex:0 0 200px; min-width:150px">
-        <label class="hf-label" style="font-size:12px; margin-bottom:2px; display:block">Select Class / Grade</label>
-        {{ filter_form.class_name }}
-      </div>
-      <div style="display:flex; gap:6px; align-items:center; padding-bottom:0">
-        <button type="button" id="attendance-reset" class="hf-btn hf-btn-secondary" style="height:36px; display:inline-flex; align-items:center; font-size:13px; padding:0 14px">Reset</button>
-        <span style="font-size:11px; color:var(--text-muted); white-space:nowrap">Filters apply automatically.</span>
-      </div>
-    </form>
+
+{% include "attendance/_learner_modal.html" with learner_start=current_term.start_date learner_end=today %}
+
+<div class="at-scrim" id="exScrim" role="dialog" aria-modal="true" aria-labelledby="exTitle">
+  <div class="at-exmodal at">
+    <div class="ic">&#9888;</div>
+    <h3 id="exTitle">Mark Excused</h3>
+    <p>Provide a reason for excusing <b id="exWho"></b>:</p>
+    <input id="exReason" placeholder="Reason for excusal…" maxlength="300">
+    <div class="pr">Held against the record and visible to authorised staff only. Never shown on the printed register.</div>
+    <div class="at-exrow"><button type="button" id="exCancel">Cancel</button><button type="button" class="ok" id="exOk">Confirm</button></div>
   </div>
 </div>
-
-<!-- Status Comparison Chart (full width below filters) -->
-<div id="attendance-status-chart" class="card print-hide" style="margin-bottom:16px; padding:20px 0 0 0; overflow:hidden;">
-  <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin:0 24px 16px 24px;">
-    <div>
-      <div style="font-size:15px; font-weight:700; color:var(--text-primary); letter-spacing:-0.2px">Status Comparison</div>
-      <div style="font-size:12px; color:var(--text-muted); margin-top:2px">Last 5 school days for filtered results</div>
-    </div>
-    <div id="status-chart-legend" style="display:flex; gap:16px; flex-wrap:wrap"></div>
-  </div>
-  <div style="position:relative; width:100%; min-height:220px; padding:8px 0 0 0; background: linear-gradient(180deg, #fafbfd 0%, #ffffff 100%); border-radius:0 0 12px 12px; border:1px solid #eef0f4; border-top:none;">
-    <svg id="attendance-status-svg" viewBox="0 0 600 220" preserveAspectRatio="none" style="width:100%; height:220px; overflow:visible; display:block;">
-      <defs>
-        <linearGradient id="grad-present" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#1B7B34" stop-opacity="0.2"/>
-          <stop offset="100%" stop-color="#1B7B34" stop-opacity="0.02"/>
-        </linearGradient>
-        <linearGradient id="grad-late" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.25"/>
-          <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.02"/>
-        </linearGradient>
-        <linearGradient id="grad-excused" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#6366f1" stop-opacity="0.2"/>
-          <stop offset="100%" stop-color="#6366f1" stop-opacity="0.02"/>
-        </linearGradient>
-        <linearGradient id="grad-absent" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#ef4444" stop-opacity="0.2"/>
-          <stop offset="100%" stop-color="#ef4444" stop-opacity="0.02"/>
-        </linearGradient>
-        <filter id="dot-shadow" x="-50%" y="-50%" width="200%" height="200%">
-          <feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.15"/>
-        </filter>
-      </defs>
-      <!-- Grid, labels, lines drawn by JS -->
-    </svg>
-    <div id="chart-tooltip" style="display:none; position:absolute; pointer-events:none; background:#1e293b; color:#fff; font-size:12px; padding:8px 12px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); z-index:100; white-space:nowrap; line-height:1.5; transition: opacity 0.15s ease;"></div>
-  </div>
-  {{ status_chart|json_script:"attendance-status-data" }}
-</div>
-
-<!-- Roster Table -->
-{% include "attendance/_row.html" %}
-<div class="card" style="padding:0; overflow:hidden">
-  <table class="h-table">
-    <thead>
-        <tr>
-          <th style="width:40px"></th>
-          <th>Student Information</th>
-          <th>Admission No.</th>
-          <th>Term Rate</th>
-          <th>
-            <div style="display:flex; align-items:center; gap:6px">
-              <span>Status</span>
-              {% if can_mark %}
-              <div style="display:flex; gap:4px" id="bulk-mark-btns" {% if is_locked and not is_super_admin %}style="opacity:0.4; pointer-events:none"{% endif %}>
-                <button type="button" class="chip chip-green" style="font-size:11px; padding:2px 10px; cursor:pointer; border:1px solid var(--green-bd, #B7DFBF)" onclick="markAllStudents('present')" title="Mark all as Present">All P</button>
-                <button type="button" class="chip chip-red" style="font-size:11px; padding:2px 10px; cursor:pointer; border:1px solid var(--red-bd, #FECACA)" onclick="markAllStudents('absent')" title="Mark all as Absent">All A</button>
-              </div>
-              {% endif %}
-            </div>
-          </th>
-          <th style="text-align:right">
-            <div style="display:inline-flex; align-items:center; gap:8px; justify-content:flex-end">
-            <button id="week-prev" class="hf-btn hf-btn-outline" title="Previous week" style="height:32px; padding:6px 8px; font-size:16px; line-height:1">&#8249;</button>
-            <span id="weekly-label" style="font-weight:600; color:var(--text); cursor:pointer; white-space:nowrap">Weekly</span>
-            <button id="week-next" class="hf-btn hf-btn-outline" title="Next week" style="height:32px; padding:6px 8px; font-size:16px; line-height:1">&#8250;</button>
-            </div>
-          </th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for row in rows %}
-        <tr id="att-row-{{ row.student.id }}">
-          {% include "attendance/_tr_content.html" with student=row.student entry=row.entry date=date statuses=statuses can_correct=can_correct can_mark=can_mark attendance_rate=row.attendance_rate is_below_threshold=row.is_below_threshold weekly_bars=row.weekly_bars %}
-        </tr>
-      {% empty %}
-        <tr>
-          <td colspan="6">{% include '_partials/empty_state.html' with title='No students loaded' desc='Select a date and class above to view attendance records.' icon='users' icon_color='grey' %}</td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-
-{% has_perm user "attendance.add_attendanceentry" as can_take_attendance %}
-{% if can_take_attendance and not class_name %}
-  <div class="queue-item qi-amber" style="margin-top:20px">
-    <div class="qi-body">
-      <div class="qi-label">Class selection required</div>
-      <div class="qi-sub">As a teacher, please select your assigned class to load the attendance roster.</div>
-    </div>
-  </div>
-{% elif class_name and not auto_selected_subject and can_take_attendance %}
-  <div class="queue-item qi-blue" style="margin-top:20px">
-    <div class="qi-body">
-      <div class="qi-label">{{ class_name }}</div>
-      <div class="qi-sub">Attendance class auto-selected from your assigned classes.</div>
-    </div>
-  </div>
-{% elif auto_selected_subject %}
-  <div class="queue-item qi-blue" style="margin-top:20px">
-    <div class="qi-body">
-      <div class="qi-label">{{ class_name }} — {{ auto_selected_subject }}</div>
-      <div class="qi-sub">Attendance class auto-selected from your current timetable period.</div>
-    </div>
-  </div>
-{% endif %}
-
-<div style="margin-top:20px;padding:8px 0;text-align:center;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted)">
-  <a href="{% url 'attendance:pwa_download' %}" style="color:var(--text-muted);text-decoration:none">Download Attendance App</a>
-</div>
-
-<script>
-// Week navigation using AJAX: update roster tbody without full-page refresh
-(function(){
-  function toDateInputString(d){
-    var yyyy = d.getFullYear();
-    var mm = String(d.getMonth()+1).padStart(2,'0');
-    var dd = String(d.getDate()).padStart(2,'0');
-    return yyyy + '-' + mm + '-' + dd;
-  }
-
-  function getMonday(d){
-    var date = new Date(d);
-    var day = date.getDay();
-    var diff = date.getDate() - day + (day === 0 ? -6 : 1);
-    return new Date(date.setDate(diff));
-  }
-
-  var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  function formatWeekLabel(monday){
-    var friday = new Date(monday);
-    friday.setDate(friday.getDate() + 4);
-    var mDay = monday.getDate();
-    var fDay = friday.getDate();
-    var mMonth = monthNames[monday.getMonth()];
-    var fMonth = monthNames[friday.getMonth()];
-    if(mMonth === fMonth){
-      return mDay + ' \u2013 ' + fDay + ' ' + mMonth;
-    }
-    return mDay + ' ' + mMonth + ' \u2013 ' + fDay + ' ' + fMonth;
-  }
-  function updateWeekLabel(){
-    if(!weeklyLabel) return;
-    var current = dateInput.value ? new Date(dateInput.value) : new Date();
-    var monday = getMonday(current);
-    weeklyLabel.textContent = formatWeekLabel(monday);
-  }
-
-  var form = document.getElementById('attendance-filters-form');
-  var dateInput = document.getElementById('attendance-date');
-  var prevBtn = document.getElementById('week-prev');
-  var nextBtn = document.getElementById('week-next');
-  var weeklyLabel = document.getElementById('weekly-label');
-  var resetBtn = document.getElementById('attendance-reset');
-  var tbody = document.querySelector('.h-table tbody');
-  var classSelect = document.querySelector('select[name="class_name"]');
-
-  if(!form || !dateInput || !tbody) return;
-
-  var today = new Date();
-
-  form.addEventListener('submit', function(event){
-    event.preventDefault();
-    fetchAndReplace();
-  });
-
-  resetBtn && resetBtn.addEventListener('click', function(){
-    dateInput.value = toDateInputString(today);
-    if(classSelect){
-      classSelect.value = '';
-    }
-    fetchAndReplace();
-    fetchTrend();
-  });
-
-  function serializeForm(f){
-    var params = new URLSearchParams(new FormData(f));
-    return params.toString();
-  }
-
-  function updateNextButtonState(){
-    var current = dateInput.value ? new Date(dateInput.value) : new Date();
-    var monday = getMonday(current);
-    var nextMonday = new Date(monday);
-    nextMonday.setDate(nextMonday.getDate() + 7);
-    if(nextMonday > today){
-      nextBtn.setAttribute('disabled','disabled');
-      nextBtn.style.opacity = 0.4;
-    } else {
-      nextBtn.removeAttribute('disabled');
-      nextBtn.style.opacity = '';
-    }
-  }
-
-  function fetchAndReplace(){
-    var url = window.location.pathname + '?' + serializeForm(form);
-    fetch(url, { method: 'GET', headers: { 'X-Requested-With':'XMLHttpRequest' } })
-      .then(function(resp){ return resp.text(); })
-      .then(function(html){
-        try {
-          var parser = new DOMParser();
-          var doc = parser.parseFromString(html, 'text/html');
-          var newTbody = doc.querySelector('.h-table tbody') || doc.querySelector('tbody');
-          if(newTbody){
-            tbody.innerHTML = newTbody.innerHTML;
-          }
-          // Preserve the top metrics block to avoid flicker on AJAX updates.
-          // Metrics are updated separately by HTMX triggers; do not replace here.
-          var statusChart = document.getElementById('attendance-status-chart');
-          var newStatusChart = doc.getElementById('attendance-status-chart');
-          if(newStatusChart && statusChart){
-            statusChart.outerHTML = newStatusChart.outerHTML;
-            statusChart = document.getElementById('attendance-status-chart');
-          }
-          updateNextButtonState();
-          drawStatusChart();
-        } catch (e){
-          console.error('AJAX roster: parse error', e);
-        }
-      }).catch(function(err){
-        console.error('Failed to load roster via AJAX', err);
-        // fallback to full submit
-        form.submit();
-      });
-  }
-
-  prevBtn && prevBtn.addEventListener('click', function(){
-    var current = dateInput.value ? new Date(dateInput.value) : new Date();
-    var monday = getMonday(current);
-    monday.setDate(monday.getDate() - 7);
-    dateInput.value = toDateInputString(monday);
-    updateWeekLabel();
-    fetchAndReplace();
-  });
-
-  nextBtn && nextBtn.addEventListener('click', function(){
-    if(nextBtn.hasAttribute('disabled')) return;
-    var current = dateInput.value ? new Date(dateInput.value) : new Date();
-    var monday = getMonday(current);
-    monday.setDate(monday.getDate() + 7);
-    // clamp to today
-    if(monday > today) monday = today;
-    dateInput.value = toDateInputString(monday);
-    updateWeekLabel();
-    fetchAndReplace();
-  });
-
-  // update button state + week label on manual date change
-  dateInput.addEventListener('change', function(){
-    updateNextButtonState();
-    updateWeekLabel();
-  });
-
-  // initialize
-  updateNextButtonState();
-  updateWeekLabel();
-
-  // Click weekly label -> load current week (this week's Monday)
-  weeklyLabel && weeklyLabel.addEventListener('click', function(){
-    var monday = getMonday(today);
-    if(monday > today) monday = today;
-    dateInput.value = toDateInputString(monday);
-    updateWeekLabel();
-    fetchAndReplace();
-    fetchTrend();
-  });
-
-  // Bind class select change to update roster and trend
-  if(classSelect){
-    classSelect.addEventListener('change', function(){
-      fetchAndReplace();
-      fetchTrend();
-    });
-  }
-
-  // On date input change also refresh roster and trend
-  dateInput.addEventListener('change', function(){
-    updateNextButtonState();
-    fetchAndReplace();
-    fetchTrend();
-  });
-
-  // Trend fetching and drawing
-  function fetchTrend(){
-    var params = new URLSearchParams();
-    var cls = classSelect ? classSelect.value : '';
-    if(cls) params.set('class_name', cls);
-    params.set('days', 7);
-    var url = '/attendance/api/reports/trend-analysis/?' + params.toString();
-    fetch(url, { credentials: 'same-origin' })
-      .then(function(r){ return r.json(); })
-      .then(function(data){
-        if(data && data.weekly_trends){
-          drawTrend(data.weekly_trends.map(function(w){ return w.rate; }));
-        } else {
-          drawTrend([]);
-        }
-      }).catch(function(){ drawTrend([]); });
-  }
-
-  function drawTrend(values){
-    var container = document.getElementById('attendance-trend-spark');
-    if(!container) return;
-    var svg = container.querySelector('svg');
-    if(!svg) return;
-    var w = svg.viewBox.baseVal.width || svg.clientWidth || 300;
-    var h = svg.viewBox.baseVal.height || svg.clientHeight || 64;
-    var pointsLine = '';
-    var pointsFill = '';
-    var pad = 6;
-    var n = values.length || 1;
-    for(var i=0;i<n;i++){
-      var x = (i/(Math.max(n-1,1))) * (w - pad*2) + pad;
-      var v = values[i] != null ? values[i] : 0;
-      var y = h - pad - (v/100) * (h - pad*2);
-      pointsLine += x+','+y+' ';
-      pointsFill += x+','+y+' ';
-    }
-    if(pointsFill){
-      var firstX = (0/(Math.max(n-1,1))) * (w - pad*2) + pad;
-      pointsFill = firstX+','+(h-pad)+' '+ pointsFill + ( ( (n-1)/(Math.max(n-1,1)) ) * (w - pad*2) + pad) +','+(h-pad);
-    }
-    var lineEl = svg.querySelector('.trend-line');
-    var fillEl = svg.querySelector('.trend-fill');
-    if(lineEl) lineEl.setAttribute('points', pointsLine.trim());
-    if(fillEl) fillEl.setAttribute('points', pointsFill.trim());
-  }
-
-  function getStatusChartData(){
-    var script = document.getElementById('attendance-status-data');
-    if(!script) return [];
-    try {
-      return JSON.parse(script.textContent || '[]');
-    } catch (e) {
-      return [];
-    }
-  }
-
-  function drawStatusChart(){
-    var data = getStatusChartData();
-    var svg = document.getElementById('attendance-status-svg');
-    if(!svg || !data.length) return;
-
-    var W = 600, H = 220;
-    var padL = 48, padR = 24, padT = 20, padB = 36;
-    var chartW = W - padL - padR;
-    var chartH = H - padT - padB;
-
-    var allVals = [];
-    data.forEach(function(d){ allVals.push(d.present, d.late, d.excused, d.absent); });
-    var rawMax = Math.max.apply(null, allVals);
-    var maxVal = rawMax <= 0 ? 1 : Math.ceil(rawMax * 1.2);
-    // nice y-axis ticks
-    var yStep = Math.max(1, Math.ceil(maxVal / 5));
-    maxVal = yStep * 5;
-
-    var n = data.length;
-    var yBottom = padT + chartH;
-    function xPos(i){ return padL + (n > 1 ? (i / (n - 1)) * chartW : chartW / 2); }
-    function yPos(v){ return yBottom - 6 - ((v / maxVal) * (chartH - 10)); }
-
-    // --- helper: build smooth SVG path with cubic beziers ---
-    function smoothPath(key){
-      var pts = data.map(function(d, i){ return { x: xPos(i), y: yPos(d[key]) }; });
-      if(pts.length < 2) return '';
-      var d = 'M' + pts[0].x + ',' + pts[0].y;
-      for(var i = 0; i < pts.length - 1; i++){
-        var p0 = pts[Math.max(i - 1, 0)];
-        var p1 = pts[i];
-        var p2 = pts[i + 1];
-        var p3 = pts[Math.min(i + 2, pts.length - 1)];
-        var tension = 0.3;
-        var cp1x = p1.x + (p2.x - p0.x) * tension;
-        var cp1y = p1.y + (p2.y - p0.y) * tension;
-        var cp2x = p2.x - (p3.x - p1.x) * tension;
-        var cp2y = p2.y - (p3.y - p1.y) * tension;
-        d += ' C' + cp1x + ',' + cp1y + ' ' + cp2x + ',' + cp2y + ' ' + p2.x + ',' + p2.y;
-      }
-      return d;
-    }
-    function areaPath(key){
-      var line = smoothPath(key);
-      if(!line) return '';
-      var lastX = xPos(n - 1);
-      var firstX = xPos(0);
-      var floorY = yBottom - 6;
-      return line + ' L' + lastX + ',' + floorY + ' L' + firstX + ',' + floorY + ' Z';
-    }
-
-    // --- clear SVG defs + content (keep defs) ---
-    var defs = svg.querySelector('defs');
-    svg.innerHTML = '';
-    if(defs) svg.appendChild(defs);
-
-    var series = [
-      { key: 'present', color: '#1B7B34', gradId: 'grad-present', label: 'Present' },
-      { key: 'late',    color: '#f59e0b', gradId: 'grad-late',    label: 'Late' },
-      { key: 'excused', color: '#6366f1', gradId: 'grad-excused', label: 'Excused' },
-      { key: 'absent',  color: '#ef4444', gradId: 'grad-absent',  label: 'Absent' }
-    ];
-
-    // --- horizontal grid + y-axis labels ---
-    for(var t = 0; t <= 5; t++){
-      var yy = yPos(t * yStep);
-      var gridLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      gridLine.setAttribute('x1', padL); gridLine.setAttribute('y1', yy);
-      gridLine.setAttribute('x2', padL + chartW); gridLine.setAttribute('y2', yy);
-      gridLine.setAttribute('stroke', t === 0 ? '#e2e8f0' : '#f1f5f9');
-      gridLine.setAttribute('stroke-width', t === 0 ? '1' : '1');
-      if(t > 0) gridLine.setAttribute('stroke-dasharray', '4,3');
-      svg.appendChild(gridLine);
-
-      var yLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      yLabel.setAttribute('x', padL - 10); yLabel.setAttribute('y', yy + 4);
-      yLabel.setAttribute('text-anchor', 'end');
-      yLabel.setAttribute('font-size', '11'); yLabel.setAttribute('fill', '#94a3b8');
-      yLabel.setAttribute('font-family', 'system-ui, sans-serif');
-      yLabel.textContent = t * yStep;
-      svg.appendChild(yLabel);
-    }
-
-    // --- x-axis labels ---
-    data.forEach(function(d, i){
-      var xPosVal = xPos(i);
-      var xLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      xLabel.setAttribute('x', xPosVal); xLabel.setAttribute('y', H - 8);
-      xLabel.setAttribute('text-anchor', 'middle');
-      xLabel.setAttribute('font-size', '12'); xLabel.setAttribute('font-weight', '600');
-      xLabel.setAttribute('fill', '#64748b');
-      xLabel.setAttribute('font-family', 'system-ui, sans-serif');
-      xLabel.textContent = d.label;
-      svg.appendChild(xLabel);
-    });
-
-    // --- area fills + lines + dots for each series ---
-    series.forEach(function(s){
-      // area fill
-      var area = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      area.setAttribute('d', areaPath(s.key));
-      area.setAttribute('fill', 'url(#' + s.gradId + ')');
-      area.setAttribute('opacity', '0');
-      svg.appendChild(area);
-      // animate in
-      setTimeout(function(){ area.style.transition = 'opacity 0.6s ease'; area.setAttribute('opacity', '1'); }, 100);
-
-      // smooth line
-      var line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      line.setAttribute('d', smoothPath(s.key));
-      line.setAttribute('fill', 'none');
-      line.setAttribute('stroke', s.color);
-      line.setAttribute('stroke-width', '2.5');
-      line.setAttribute('stroke-linecap', 'round');
-      line.setAttribute('stroke-linejoin', 'round');
-      // animate stroke
-      svg.appendChild(line);
-      try {
-        var len = line.getTotalLength ? line.getTotalLength() : 0;
-        if(len > 0){ line.style.strokeDasharray = len; line.style.strokeDashoffset = len; setTimeout(function(){ line.style.transition = 'stroke-dashoffset 0.8s ease'; line.style.strokeDashoffset = '0'; }, 50); }
-      } catch(e){} // fallback: no animation if getTotalLength fails
-
-      // dots
-      data.forEach(function(d, i){
-        var cx = xPos(i), cy = yPos(d[s.key]);
-        var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        circle.setAttribute('cx', cx); circle.setAttribute('cy', cy);
-        circle.setAttribute('r', '0'); circle.setAttribute('fill', '#fff');
-        circle.setAttribute('stroke', s.color); circle.setAttribute('stroke-width', '2.5');
-        circle.setAttribute('filter', 'url(#dot-shadow)');
-        circle.style.transition = 'r 0.3s ease';
-        svg.appendChild(circle);
-        // animate in
-        setTimeout(function(){ circle.setAttribute('r', '4'); }, 200 + i * 80);
-
-        // hover: enlarge dot + show tooltip
-        circle.addEventListener('mouseenter', function(evt){
-          circle.setAttribute('r', '6'); circle.setAttribute('stroke-width', '3');
-          showChartTooltip(evt, d, s, i);
-        });
-        circle.addEventListener('mouseleave', function(){
-          circle.setAttribute('r', '4'); circle.setAttribute('stroke-width', '2.5');
-          hideChartTooltip();
-        });
-        circle.addEventListener('mousemove', function(evt){
-          moveChartTooltip(evt);
-        });
-      });
-    });
-
-    // --- Legend ---
-    var legendEl = document.getElementById('status-chart-legend');
-    if(legendEl){
-      legendEl.innerHTML = series.map(function(s){
-        return '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#475569;font-weight:500;">'
-          + '<span style="width:10px;height:10px;border-radius:50%;background:' + s.color + ';display:inline-block;box-shadow:0 0 0 2px ' + s.color + '22"></span>'
-          + s.label + '</span>';
-      }).join('');
-    }
-  }
-
-  function getTooltip(){ return document.getElementById('chart-tooltip'); }
-  function showChartTooltip(evt, datum, series, idx){
-    var tt = getTooltip(); if(!tt) return;
-    var lines = '<span style="font-weight:700;margin-bottom:2px">\u2022 ' + series.label + '</span>';
-    lines += '<br><span style="opacity:0.85">Day: ' + datum.label + '</span>';
-    lines += '<br><span style="opacity:0.85">Count: <b>' + datum[series.key] + '</b></span>';
-    tt.innerHTML = lines;
-    tt.style.display = 'block';
-    moveChartTooltip(evt);
-  }
-  function moveChartTooltip(evt){
-    var tt = getTooltip(); if(!tt) return;
-    var container = tt.parentElement;
-    var rect = container.getBoundingClientRect();
-    var x = evt.clientX - rect.left + 12;
-    var y = evt.clientY - rect.top - 10;
-    // keep inside container
-    var tw = tt.offsetWidth || 120;
-    if(x + tw > rect.width - 8) x = x - tw - 24;
-    if(y < 4) y = 4;
-    tt.style.left = x + 'px';
-    tt.style.top = y + 'px';
-    tt.style.opacity = '1';
-  }
-  function hideChartTooltip(){
-    var tt = getTooltip(); if(!tt) return;
-    tt.style.opacity = '0';
-    setTimeout(function(){ tt.style.display = 'none'; }, 200);
-  }
-
-  // initial trend load
-  fetchTrend();
-  drawStatusChart();
-})();
-</script>
-
-<style>
-/* Hide any metrics block rendered inside the filter card (preserve top metrics). */
-.card.print-hide .metrics {
-  display: none !important;
-}
-
-@media print {
-  /* Hide unnecessary elements for print */
-  .print-hide,
-  .no-print-area,
-  .sidebar,
-  .topbar,
-  #toast-container,
-  .queue-item,
-  .metrics,
-  .section-hdr,
-  a[href*="download"],
-  a[href*="app"] {
-    display: none !important;
-  }
-  
-  /* Hide the Mark Attendance column in every row */
-  .h-table th:last-child,
-  .h-table td:last-child {
-    display: none !important;
-  }
-
-  /* Optimize layout for printing */
-  body {
-    background: #fff !important;
-  }
-  .card {
-    box-shadow: none !important;
-    border: 1px solid #e2e8f0 !important;
-    margin-bottom: 20px !important;
-  }
-  .main-content {
-    margin-left: 0 !important;
-    padding: 0 !important;
-  }
-}
-</style>
 
 <script>
 var ATTENDANCE_MARK_URL = "{% url 'attendance:mark' %}";
 var CSRF_TOKEN = "{{ csrf_token }}";
-
 function getCsrfToken() { return CSRF_TOKEN; }
 
-function postMark(studentId, date, status, reason) {
-  var body = 'student_id=' + studentId + '&date=' + date + '&status=' + status + '&csrfmiddlewaretoken=' + getCsrfToken();
-  if (reason) body += '&reason=' + encodeURIComponent(reason);
-  return fetch(ATTENDANCE_MARK_URL, {
-    method: 'POST',
-    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body
-  }).then(function(r) {
-    if (!r.ok) {
-      return r.text().then(function(msg) {
-        showToast(msg || 'Could not save attendance.', 'error');
-        setTimeout(function() { location.reload(); }, 1500);
-        throw new Error(msg);
-      });
-    }
-    return r.text();
-  }).then(function(html) {
-    var tmp = document.createElement('table');
-    tmp.innerHTML = html;
-    var newRow = tmp.querySelector('tr');
-    var oldRow = document.getElementById('att-row-' + studentId);
-    if (newRow && oldRow) oldRow.replaceWith(newRow);
-    document.dispatchEvent(new Event('attendance-updated'));
+/* ---- tiles: click a figure to list the learners behind it ---- */
+var DAY = {% if date == today %}"today"{% else %}"on {{ date|date:'j M' }}"{% endif %};
+var TV = {
+  all:  {T: "All learners " + DAY, H: "Everyone enrolled, with the day's status.", B: "Unmarked learners appear with a grey tag so they stay visible, but are excluded from the percentage. Term rate counts this term's marked days only.", f: function(s){ return true; }},
+  pres: {T: "In school " + DAY, H: "Marked present or late. Late learners are in school, so they count here, but are reported separately.", B: "Lateness also has its own figure so punctuality does not disappear inside the present count.", f: function(s){ return s === "P" || s === "L"; }},
+  abs:  {T: "Not in school " + DAY, H: "Marked absent. These require follow-up with parents.", B: "Excused absences are listed separately — also not in school, but authorised.", f: function(s){ return s === "A"; }},
+  late: {T: "Late " + DAY, H: "Arrived late. In school, counted as present in the headline figure.", B: "Repeated lateness is visible in Attendance Reports over a date range.", f: function(s){ return s === "L"; }},
+  exc:  {T: "Excused " + DAY, H: "Authorised absences. The reason is held against the record and visible to authorised staff only.", B: "The status is open to everyone; the reason is not, since it is often medical.", f: function(s){ return s === "E"; }},
+  unm:  {T: "Not yet marked", H: "Register not confirmed. Not absent — simply unknown.", B: "Excluded from the percentage entirely, so the figure measures pupil presence, not teacher marking.", f: function(s){ return s === "U"; }}
+};
+var tSel = "all";
+function applyFilter() {
+  var v = TV[tSel], q = (document.getElementById("att-search").value || "").toLowerCase().trim(), shown = 0;
+  document.querySelectorAll('#att-table tr[id^="att-row-"]').forEach(function(tr) {
+    var ok = v.f(tr.dataset.status) && (!q || tr.dataset.name.indexOf(q) !== -1);
+    tr.style.display = ok ? "" : "none";
+    if (ok) shown++;
   });
-}
-
-function requestCorrection(studentId, date, name) {
-  var f = document.getElementById('reqCorrectionForm');
-  f.reset();
-  f.student_id.value = studentId;
-  f.date.value = date;
-  document.getElementById('reqCorrectionWho').textContent = name + ' \u00b7 ' + date;
-  document.getElementById('reqCorrectionError').style.display = 'none';
-  HodariUI.open('reqCorrectionModal');
-}
-
-document.getElementById('reqCorrectionForm').addEventListener('submit', function(e) {
-  e.preventDefault();
-  var f = this, err = document.getElementById('reqCorrectionError');
-  var body = new URLSearchParams(new FormData(f));
-  body.append('csrfmiddlewaretoken', getCsrfToken());
-  fetch("{% url 'attendance:request_correction' %}", { method: 'POST', body: body })
-    .then(function(r) { return r.ok ? null : r.text(); })
-    .then(function(msg) {
-      if (msg) { err.textContent = msg; err.style.display = 'block'; return; }
-      HodariUI.close('reqCorrectionModal');
-      showToast('Correction request sent to the super admin.', 'success');
-    });
-});
-
-// Super admin: corrections drawer. Reload the register after any approval so rows are current;
-// ?corrections=1 (used by the notification link) opens the drawer straight away.
-(function() {
-  var dirty = false;
-  document.body.addEventListener('att-corrections-changed', function() { dirty = true; });
-  document.body.addEventListener('hui:close', function(e) {
-    if (dirty && e.target.querySelector && e.target.querySelector('#corrDrawerBody')) location.reload();
-  });
-  var btn = document.getElementById('openCorrectionRequests');
-  if (btn && new URLSearchParams(location.search).get('corrections') === '1') {
-    window.addEventListener('load', function() { btn.click(); });
+  var none = document.getElementById("att-none");
+  if (document.querySelector('#att-table tr[id^="att-row-"]')) {
+    none.style.display = shown ? "none" : "";
+    none.querySelector(".at-empty").textContent = "No learners match.";
   }
+  document.getElementById("tTitle").textContent = v.T + (tSel === "all" && !q ? "" : " · " + shown);
+  document.getElementById("tHint").textContent = v.H;
+  document.getElementById("tBasis").textContent = v.B;
+  document.querySelectorAll("#tStats .at-stat").forEach(function(b){ b.classList.toggle("on", b.dataset.s === tSel); });
+}
+document.addEventListener("click", function(e) {
+  var t = e.target.closest("#tStats .at-stat");
+  if (!t) return;
+  tSel = (tSel === t.dataset.s && t.dataset.s !== "all") ? "all" : t.dataset.s;
+  applyFilter();
+  document.getElementById("att-table").scrollIntoView({behavior: "smooth", block: "nearest"});
+});
+document.getElementById("att-search").addEventListener("input", applyFilter);
+document.body.addEventListener("htmx:afterSwap", function(){ applyFilter(); });
+
+/* ---- filters submit on change ---- */
+(function() {
+  var f = document.getElementById("att-filters");
+  ["att-date", "att-class"].forEach(function(id) {
+    document.getElementById(id).addEventListener("change", function(){ document.body.classList.add("is-loading"); f.submit(); });
+  });
+  f.addEventListener("submit", function(e){ if (document.activeElement && document.activeElement.id === "att-search") e.preventDefault(); });
 })();
 
+/* ---- marking: no save button; whatever stands at the cut-off is the record ---- */
+function postMark(studentId, date, status, reason) {
+  var body = new URLSearchParams({student_id: studentId, date: date, status: status, csrfmiddlewaretoken: getCsrfToken()});
+  if (reason) body.append("reason", reason);
+  return fetch(ATTENDANCE_MARK_URL, {method: "POST", headers: {"X-Requested-With": "XMLHttpRequest"}, body: body})
+    .then(function(r) {
+      if (!r.ok) {
+        return r.text().then(function(msg) {
+          showToast(msg || "Could not save attendance.", "error");
+          setTimeout(function(){ location.reload(); }, 1500);
+          throw new Error(msg);
+        });
+      }
+      return r.text();
+    }).then(function(html) {
+      var tmp = document.createElement("table");
+      tmp.innerHTML = html;
+      var newRow = tmp.querySelector("tr"), oldRow = document.getElementById("att-row-" + studentId);
+      if (newRow && oldRow) oldRow.replaceWith(newRow);
+      applyFilter();
+      document.body.dispatchEvent(new Event("attendance-updated"));
+    });
+}
 function markAttendance(el, studentId, date, status) {
   var group = el.parentElement;
-  group.querySelectorAll('.att-grade-btn').forEach(function(b) {
-    b.className = b.className.replace(/selected-[PLAE]/g, '').trim();
-  });
-  el.classList.add('selected-' + status.charAt(0).toUpperCase());
+  group.querySelectorAll(".att-grade-btn").forEach(function(b){ b.className = b.className.replace(/ ?selected-[PLAE]/g, ""); });
+  el.classList.add("selected-" + el.textContent.trim(), "saving");
   postMark(studentId, date, status);
 }
-
-function markWithReason(studentId, date, status) {
-  confirmDeleteModal({
-    title: 'Mark Excused',
-    body: 'Provide a reason for excusing this student:',
-    confirmText: 'Confirm',
-    type: 'warning',
-    detail: '',
-    onConfirm: function() {
-      var detailDiv = document.getElementById('cdm-detail');
-      var reasonInput = detailDiv ? detailDiv.querySelector('input') : null;
-      var reason = reasonInput ? reasonInput.value.trim() : '';
-      if (!reason) {
-        if (detailDiv) {
-          detailDiv.querySelector('div').innerHTML = '<span style="color:#DC2626">Reason is required!</span>';
-        }
-        return;
-      }
-      closeConfirmDeleteModal();
-      var group = document.querySelector('[data-student-id="' + studentId + '"]');
-      if (group) {
-        group.querySelectorAll('.att-grade-btn').forEach(function(b) {
-          b.className = b.className.replace(/selected-[PLAE]/g, '').trim();
-        });
-        var btn = group.querySelector('.att-grade-E');
-        if (btn) {
-          btn.classList.add('selected-E');
-          btn.title = reason;
-        }
-      }
-      postMark(studentId, date, status, reason);
+function markWithReason(studentId, date, status, name) {
+  var scrim = document.getElementById("exScrim"), input = document.getElementById("exReason");
+  document.getElementById("exWho").textContent = name || "this learner";
+  input.value = ""; input.classList.remove("err");
+  scrim.classList.add("on");
+  setTimeout(function(){ input.focus(); }, 30);
+  function close(){ scrim.classList.remove("on"); document.getElementById("exOk").onclick = null; input.onkeydown = null; }
+  function ok() {
+    var reason = input.value.trim();
+    if (!reason) { input.classList.add("err"); input.focus(); return; }
+    close();
+    var group = document.querySelector('[data-student-id="' + studentId + '"]');
+    if (group) {
+      group.querySelectorAll(".att-grade-btn").forEach(function(b){ b.className = b.className.replace(/ ?selected-[PLAE]/g, ""); });
+      group.querySelector(".att-grade-E").classList.add("selected-E", "saving");
     }
-  });
-  setTimeout(function() {
-    var detailDiv = document.getElementById('cdm-detail');
-    if (detailDiv) {
-      detailDiv.style.display = 'block';
-      detailDiv.querySelector('div').innerHTML = '<input type="text" id="reason-input" class="hf-input" placeholder="Reason for excusal..." style="width:100%;font-size:13px;margin:0">';
-      var inp = document.getElementById('reason-input');
-      if (inp) {
-        inp.focus();
-        inp.addEventListener('keydown', function(e) {
-          if (e.key === 'Enter') { e.preventDefault(); document.getElementById('cdm-confirm-btn').click(); }
-        });
-      }
-    }
-  }, 100);
+    postMark(studentId, date, status, reason);
+  }
+  document.getElementById("exCancel").onclick = close;
+  document.getElementById("exOk").onclick = ok;
+  input.onkeydown = function(e){ if (e.key === "Enter") { e.preventDefault(); ok(); } if (e.key === "Escape") close(); };
+  scrim.onclick = function(e){ if (e.target === scrim) close(); };
 }
-
-function filterStudentRows(query) {
-  var q = query.toLowerCase().trim();
-  var rows = document.querySelectorAll('tr[id^="att-row-"]');
-  rows.forEach(function(row) {
-    if (!q) { row.style.display = ''; return; }
-    var nameCell = row.querySelector('td:nth-child(2)');
-    var name = nameCell ? nameCell.textContent.toLowerCase() : '';
-    row.style.display = name.indexOf(q) !== -1 ? '' : 'none';
-  });
-}
-
 function markAllStudents(status) {
-  var rows = document.querySelectorAll('tr[id^="att-row-"]');
-  var dateInput = document.getElementById('attendance-date');
-  var date = dateInput ? dateInput.value : '';
   var toMark = [];
-  rows.forEach(function(row) {
-    var group = row.querySelector('.att-grade-group');
-    if (!group) return;
-    var studentId = group.getAttribute('data-student-id');
-    toMark.push({studentId: studentId, row: row});
+  document.querySelectorAll('#att-table tr[id^="att-row-"]').forEach(function(tr) {
+    var g = tr.querySelector(".att-grade-group");
+    if (g && tr.dataset.status === "U") toMark.push(g.getAttribute("data-student-id"));
   });
-  if (toMark.length === 0) return;
-  var label = status === 'present' ? 'Present' : 'Absent';
+  if (!toMark.length) { showToast("Everyone in this class is already marked.", "info"); return; }
+  var label = status === "present" ? "Present" : "Absent", date = document.getElementById("att-date").value;
   confirmDeleteModal({
-    title: 'Mark All ' + label + '?',
-    body: 'Mark <strong>all ' + toMark.length + ' student(s)</strong> as ' + label + '? This will overwrite any existing status.',
-    confirmText: 'Mark All ' + label,
-    type: status === 'present' ? 'info' : 'warning',
+    title: "Mark " + toMark.length + " unmarked as " + label + "?",
+    body: "Every learner not yet marked in this class will be marked <strong>" + label + "</strong>. Learners already marked keep their status.",
+    confirmText: "Mark " + label, type: status === "present" ? "info" : "warning",
     onConfirm: function() {
       closeConfirmDeleteModal();
-      toMark.forEach(function(item, idx) {
-        setTimeout(function() {
-          postMark(item.studentId, date, status);
-        }, idx * 80);
-      });
+      toMark.forEach(function(id, i){ setTimeout(function(){ postMark(id, date, status); }, i * 80); });
     }
   });
 }
+
+/* ---- correction requests ---- */
+function requestCorrection(studentId, date, name) {
+  var f = document.getElementById("reqCorrectionForm");
+  f.reset(); f.student_id.value = studentId; f.date.value = date;
+  document.getElementById("reqCorrectionWho").textContent = name + " · " + date;
+  document.getElementById("reqCorrectionError").style.display = "none";
+  HodariUI.open("reqCorrectionModal");
+}
+document.getElementById("reqCorrectionForm").addEventListener("submit", function(e) {
+  e.preventDefault();
+  var f = this, err = document.getElementById("reqCorrectionError");
+  var body = new URLSearchParams(new FormData(f));
+  body.append("csrfmiddlewaretoken", getCsrfToken());
+  fetch("{% url 'attendance:request_correction' %}", {method: "POST", body: body})
+    .then(function(r){ return r.ok ? null : r.text(); })
+    .then(function(msg) {
+      if (msg) { err.textContent = msg; err.style.display = "block"; return; }
+      HodariUI.close("reqCorrectionModal");
+      showToast("Correction request sent to the super admin.", "success");
+    });
+});
+(function() {
+  var dirty = false;
+  document.body.addEventListener("att-corrections-changed", function(){ dirty = true; });
+  document.body.addEventListener("hui:close", function(e) {
+    if (dirty && e.target.querySelector && e.target.querySelector("#corrDrawerBody")) location.reload();
+  });
+  var btn = document.getElementById("openCorrectionRequests");
+  if (btn && new URLSearchParams(location.search).get("corrections") === "1") {
+    window.addEventListener("load", function(){ btn.click(); });
+  }
+})();
+applyFilter();
 </script>
 {% endblock %}

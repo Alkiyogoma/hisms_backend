@@ -12,7 +12,7 @@
   <link rel="stylesheet"
     href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Merriweather:wght@700&family=Roboto+Mono:wght@400;500&display=swap"
     media="print" onload="this.media='all'">
-  <link rel="stylesheet" href="{% static 'branding/hodari.css' %}?v=1.6">
+  <link rel="stylesheet" href="{% static 'branding/hodari.css' %}?v=1.7">
   <link rel="stylesheet" href="{% static 'branding/hodari-forms.css' %}?v=1.2">
   <link rel="stylesheet" href="{% static 'branding/hodari-components.css' %}?v=1.0">
   <style>
@@ -45,7 +45,6 @@
       .view-controls,
       .pagination,
       .view-as-banner,
-      #desktopWarning,
       #viewAsBanner,
       .messages-container,
       .message,
@@ -300,47 +299,7 @@
 </head>
 
 <body>
-  <!-- NFR-BROWSER-003: Desktop minimum width warning for non-parent portals -->
-  <div id="desktopWarning"
-    style="display:none;position:fixed;inset:0;z-index:100000;background:#fff;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px">
-    <div
-      style="width:64px;height:64px;border-radius:50%;background:#EEF4FF;display:flex;align-items:center;justify-content:center;margin-bottom:20px">
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#023AA5" stroke-width="2"
-        stroke-linecap="round">
-        <rect x="2" y="3" width="20" height="14" rx="2" />
-        <path d="M8 21h8M12 17v4" />
-      </svg>
-    </div>
-    <h2 style="font-size:20px;font-weight:700;color:#1A1A2E;margin:0 0 8px">Desktop Required</h2>
-    <p style="font-size:14px;color:#5A697D;margin:0 0 24px;max-width:380px;line-height:1.5">This portal is designed for
-      desktop use. Please access on a device with a screen width of at least 1024px.</p>
-    <a href="/attendance/pwa/app/"
-      style="display:inline-flex;align-items:center;gap:8px;padding:14px 32px;background:#023AA5;color:#fff;font-size:16px;font-weight:600;border-radius:12px;text-decoration:none;width:280px;justify-content:center;margin-bottom:12px">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-        stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 19V5M5 12l7-7 7 7" />
-      </svg>
-      Open Attendance App
-    </a>
-    <button id="installAppBtn" onclick="window.pwaInstallPrompt && window.pwaInstallPrompt.prompt()"
-      style="display:inline-flex;align-items:center;gap:8px;padding:14px 32px;background:#16A34A;color:#fff;font-size:16px;font-weight:600;border-radius:12px;border:none;cursor:pointer;width:280px;justify-content:center">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-        stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-        <polyline points="7 10 12 15 17 10" />
-        <line x1="12" y1="15" x2="12" y2="3" />
-      </svg>
-      Install App
-    </button>
-  </div>
   <script>
-    (function () {
-      var path = window.location.pathname;
-      var isMobileOk = path.indexOf('/parent/') === 0 || path.indexOf('/attendance/') === 0 || path.indexOf('/tasks/') === 0 || path.indexOf('/academics/reports/') === 0 || path.indexOf('/academics/progression/') === 0 || path.indexOf('/events/') === 0 || path.indexOf('/accounts/profile') === 0;
-      if (!isMobileOk && window.innerWidth < 1024) {
-        document.getElementById('desktopWarning').style.display = 'flex';
-      }
-    })();
     window.addEventListener('beforeinstallprompt', function (e) {
       e.preventDefault();
       window.pwaInstallPrompt = e;
@@ -725,7 +684,7 @@
         </a>
         {% endif %}
         {% if user.is_authenticated %}
-        <form method="post" action="{% url 'logout' %}" style="margin:0">
+        <form method="post" action="{% url 'logout' %}" class="topbar-signout" style="margin:0">
           {% csrf_token %}
           <button type="submit"
             style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 12px;font-size:12px;color:var(--text-secondary);cursor:pointer;font-family:var(--font-ui)">Sign

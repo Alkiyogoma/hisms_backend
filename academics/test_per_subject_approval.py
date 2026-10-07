@@ -336,3 +336,114 @@ class PerSubjectApprovalTests(TestCase):
         mig.reset_incomplete(apps, None)
         rc.refresh_from_db()
         self.assertEqual(rc.status, ReportCardStatus.PENDING_SIGN_OFF)
+
+    def test_teacher_can_submit_a_single_subject(self):
+        both = self.teachers["English"]
+        tca = TeacherClassAssignment.objects.get(teacher__user=both)
+        tca.subjects_taught = ["English", "Bible Studies"]
+        tca.save()
+        self._save("English", 67)
+        self._save("Bible Studies", 80)
+
+        self.client.force_login(both)
+        resp = self.client.post(
+            reverse("academics:api_primary_submit_all"),
+            data=json.dumps({"class_name": "Grade 4", "term": self.term.id, "subject": "English"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(self._score("English").status, ScoreStatus.SUBMITTED)
+        self.assertEqual(self._score("Bible Studies").status, ScoreStatus.DRAFT)
+        self.assertFalse(self._score("Bible Studies").is_locked)
+
+    # ── who may approve ──────────────────────────────────────────────
+    def test_teacher_cannot_approve_own_class_scores(self):
+        self._save("English", 67)
+        self._submit("English")
+        teacher = self.teachers["English"]
+        self.client.force_login(teacher)
+        resp = self.client.post(reverse("academics:exam_score_approval_queue"), {
+            "action": "approve", "score_ids": [self._score("English").pk],
+        })
+        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(self._score("English").status, ScoreStatus.SUBMITTED)
+
+    def test_teacher_sees_read_only_sign_off_status(self):
+        self._save("English", 67)
+        self._submit("English")
+        self._save("Bible Studies", 80)
+        self._submit("Bible Studies")
+        self.client.force_login(self.teachers["English"])
+        resp = self.client.get(reverse("academics:exam_score_approval_queue"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.context["can_approve"])
+        subjects = {g["subject_name"] for g in resp.context["queue_details"]}
+        self.assertEqual(subjects, {"English"})  # only their own subject
+        self.assertEqual(resp.context["total_pending"], 1)
+        self.assertNotContains(resp, 'type="checkbox" name="score_ids"')
+        self.assertNotContains(resp, "onclick=\"submitAction(")
+        self.assertNotContains(resp, "onclick=\"approveRow(")
+
+    def test_teacher_cannot_open_review_queue_or_sign_off(self):
+        self.client.force_login(self.teachers["English"])
+        for name in ("report_review_queue", "hos_signoff_list"):
+            self.assertEqual(self.client.get(reverse(f"academics:{name}")).status_code, 403, name)
+        self.assertEqual(self.client.post(reverse("academics:signoff_action"), {}).status_code, 403)
+
+    def test_head_of_school_can_approve(self):
+        self._save("English", 67)
+        self._submit("English")
+        self.client.force_login(self.hos)
+        self.client.post(reverse("academics:exam_score_approval_queue"), {
+            "action": "approve", "score_ids": [self._score("English").pk],
+        })
+        self.assertEqual(self._score("English").status, ScoreStatus.APPROVED)
+
+    def test_hod_cannot_approve_a_class_they_teach(self):
+        self._save("English", 67)
+        self._submit("English")
+        staff = StaffProfile.objects.create(
+            user=self.hod, employment_start_date=date(2024, 1, 1),
+            full_name="HOD", department="PRIMARY", job_title="HOD",
+        )
+        TeacherClassAssignment.objects.create(
+            teacher=staff, term=self.term, grade_class=self.gc, subjects_taught=["Bible Studies"],
+        )
+        self.client.force_login(self.hod)
+        resp = self.client.get(reverse("academics:exam_score_approval_queue"))
+        self.assertIn("You teach Grade 4", resp.context["queue_details"][0]["block_reason"])
+        self.assertNotContains(resp, 'type="checkbox" name="score_ids"')
+
+        self._approve("English")
+        self.assertEqual(self._score("English").status, ScoreStatus.SUBMITTED)
+
+    def test_hod_cannot_approve_other_department(self):
+        self._save("English", 67)
+        self._submit("English")
+        ls_hod = User.objects.create_user(
+            username="lshod2", email="lshod2@example.test", password="x", role=UserRole.LOWER_SECONDARY_HOD,
+        )
+        assign_role_group(ls_hod)
+        self.client.force_login(ls_hod)
+        self.client.post(reverse("academics:exam_score_approval_queue"), {
+            "action": "approve", "score_ids": [self._score("English").pk],
+        })
+        self.assertEqual(self._score("English").status, ScoreStatus.SUBMITTED)
+
+    def test_hod_can_approve_and_return_single_rows(self):
+        for subject in ("English", "Bible Studies"):
+            self._save(subject, 70)
+            self._submit(subject)
+        self.client.force_login(self.hod)
+        resp = self.client.get(reverse("academics:exam_score_approval_queue"))
+        self.assertContains(resp, f'onclick="approveRow({self._score("English").pk}')
+        self.assertContains(resp, f'onclick="returnRow({self._score("Bible Studies").pk})')
+
+        self.client.post(reverse("academics:exam_score_approval_queue"), {
+            "action": "approve", "score_ids": [self._score("English").pk],
+        })
+        self.client.post(reverse("academics:exam_score_approval_queue"), {
+            "action": "return", "reason": "Recheck", "score_ids": [self._score("Bible Studies").pk],
+        })
+        self.assertEqual(self._score("English").status, ScoreStatus.APPROVED)
+        self.assertEqual(self._score("Bible Studies").status, ScoreStatus.RETURNED)

@@ -14,6 +14,12 @@ from attendance.views import (
     StudentQRCodeView,
     BlankAttendanceRegisterView,
 )
+from attendance.views_reports import (
+    AttendanceLearnerView,
+    AttendancePrintView,
+    AttendanceRegisterView,
+    AttendanceReportsView,
+)
 from attendance.api_views import (
     send_otp,
     verify_otp,
@@ -57,6 +63,10 @@ app_name = "attendance"
 urlpatterns = [
     # Web views
     path("", AttendanceTodayView.as_view(), name="today"),
+    path("reports/", AttendanceReportsView.as_view(), name="reports"),
+    path("register/", AttendanceRegisterView.as_view(), name="register"),
+    path("learner/<int:pk>/", AttendanceLearnerView.as_view(), name="learner"),
+    path("print/", AttendancePrintView.as_view(), name="print"),
     path("correction-requests/", AttendanceCorrectionRequestListView.as_view(), name="correction_requests"),
     path("correction-requests/new/", AttendanceCorrectionRequestCreateView.as_view(), name="request_correction"),
     

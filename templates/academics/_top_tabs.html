@@ -22,7 +22,7 @@
   {% if perms.academics.view_reportcard %}
   <a href="{% url 'academics:report_card_list' %}" class="sub-tab {% if academics_tab == 'reports' %}active{% endif %}">Reports</a>
   {% endif %}
-  {% if perms.academics.view_reportcard %}
+  {% if user_is_hod %}
   <a href="{% url 'academics:report_review_queue' %}" class="sub-tab {% if academics_tab == 'review_queue' %}active{% endif %}">Review Queue</a>
   {% endif %}
   {% is_hos_signoff user as can_hos_signoff %}

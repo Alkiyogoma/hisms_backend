@@ -185,3 +185,60 @@ class ParentFormLinkTests(TestCase):
         AdmissionFormInvite.objects.update(expires_at=timezone.now() - timedelta(days=1))
         self.assertEqual(self.client.get(link).status_code, 410)
         self.assertEqual(self.client.get("/admissions/form/not-a-real-token/").status_code, 404)
+
+
+@patch("communications.email_service.dispatch_notification", lambda *a, **k: None)
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend", SITE_URL="https://school.test",
+    MEDIA_ROOT=_MEDIA,
+)
+class AdmissionInvoiceConsistencyTests(TestCase):
+    """The form, the invoice, the emails and Finance show one total and one
+    invoice number. Regression: ADM-0009 showed TSh 5,615,000 on screen but
+    the email said TZS 4,917,500 (the form hard-coded a 700,000 admission fee
+    while the server used School Settings)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        AcademicYear.objects.create(name=str(date.today().year), is_current=True)
+        GradeClass.objects.create(name="Grade 6", department=Department.PRIMARY)
+        cls.officer = make_user("office", UserRole.ADMIN_OFFICER)
+        from core.models import SchoolSettings
+        ss = SchoolSettings.get_settings()
+        ss.admission_fee = 2500  # a non-default value the form used to ignore
+        ss.save()
+
+    start = ParentFormLinkTests.start
+    post = ParentFormLinkTests.post
+
+    def test_one_total_and_number_everywhere(self):
+        from admissions.fees import child_lines, fee_schedule
+        _applicant, link = self.start()
+        page = self.client.get(link)
+        schedule = json.loads(page.context["fee_schedule_json"])
+        self.assertEqual(schedule["admission"], 2500)
+
+        child = {"grade": "Grade 6", "isNew": True, "breakfast": True,
+                 "uniform": {"polo": 3, "sweater": 1, "tee": 2}}
+        expected = sum(l["amount"] for l in child_lines(child, fee_schedule()))
+        self.assertEqual(expected, 3_500_000 + 700_000 + 2_500 + 300_000 + 300_000 + 60_000 + 25_000 + 30_000)
+
+        resp = self.post(link, "submit_admission", form_data(**child),
+                         birth=upload("b.pdf"), photo=upload("p.jpg"), report=upload("r.pdf"))
+        shown = resp.json()["invoice"]
+        invoice = Invoice.objects.get()
+
+        self.assertEqual(shown["total"], expected)
+        self.assertEqual(invoice.total_due, expected)
+        self.assertEqual(sum(l["amount"] for l in shown["lines"]), expected)
+        self.assertEqual(shown["number"], invoice.invoice_number)
+
+        amount = f"{expected:,.0f}"
+        bodies = [m.body for m in mail.outbox if invoice.invoice_number in m.body]
+        self.assertTrue(bodies)
+        for body in bodies:
+            self.assertIn(amount, body)
+
+        # Re-opening the submitted form shows the stored invoice, not a re-estimate.
+        reopened = json.loads(self.client.get(link).context["invoice_json"])
+        self.assertEqual(reopened, shown)

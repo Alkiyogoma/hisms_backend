@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Printable Register — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Attendance{% endblock %}
+{% block extra_head %}
+{% include "attendance/_styles.html" %}
+{% include "attendance/_register_css.html" %}
+<style>
+  .at-sheet { background:#fff; border:1px solid var(--at-line); border-radius:10px; padding:24px 26px; box-shadow:0 2px 14px rgba(20,30,60,.07); }
+  @media (max-width:700px) { .at-sheet { padding:16px 14px; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="at">
+  <div class="at-top">
+    <div>
+      <h1>Printable Register</h1>
+      <div class="sub">The register as it prints, for quality assurance visits</div>
+    </div>
+  </div>
+
+  {% include "attendance/_tabs.html" %}
+
+  <form class="at-filters" id="reg-filters" method="get">
+    <div class="at-fg"><label for="r-class">Class / Grade</label>
+      <select id="r-class" name="class_name">
+        {% for c in class_options %}<option value="{{ c }}"{% if c == class_name %} selected{% endif %}>{{ c }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="at-fg sm"><label for="r-start">Start date</label><input id="r-start" type="date" name="start" value="{{ start|date:'Y-m-d' }}"></div>
+    <div class="at-fg sm"><label for="r-end">End date</label><input id="r-end" type="date" name="end" value="{{ end|date:'Y-m-d' }}"></div>
+    <div class="at-fg" style="min-width:auto"><label>&nbsp;</label>
+      <a class="hf-btn hf-btn-primary" style="height:38px;display:inline-flex;align-items:center" target="_blank" rel="noopener" href="{% url 'attendance:print' %}?kind=register&class_name={{ class_name|urlencode }}&start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}&autoprint=1">Print</a></div>
+    <div class="at-fg" style="min-width:auto"><label>&nbsp;</label>
+      <a class="hf-btn hf-btn-secondary" style="height:38px;display:inline-flex;align-items:center" href="{% url 'attendance:print' %}?kind=register&class_name={{ class_name|urlencode }}&start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}&format=pdf">Download PDF</a></div>
+    <div class="at-auto">What you see below is exactly what prints. Weekends and school holidays are omitted.</div>
+    <div class="at-quick">
+      {% for q in quick %}<a href="?class_name={{ class_name|urlencode }}&start={{ q.start|date:'Y-m-d' }}&end={{ q.end|date:'Y-m-d' }}" class="{% if q.on %}on{% endif %}">{{ q.label }}</a>{% endfor %}
+    </div>
+  </form>
+
+  <div class="at-body">
+    <div class="at-sheet">{% include "attendance/_register_sheet.html" %}</div>
+    <p class="at-basis" style="border:none;padding-left:2px">Reasons for excused absence are deliberately not printed; they are held in the system and visible to authorised staff. Learners admitted mid-period are counted from their admission date only. Days not marked are shown as a dash and excluded from each learner's percentage.</p>
+  </div>
+</div>
+<script>
+(function() {
+  var f = document.getElementById("reg-filters");
+  ["r-class", "r-start", "r-end"].forEach(function(id) {
+    document.getElementById(id).addEventListener("change", function(){ document.body.classList.add("is-loading"); f.submit(); });
+  });
+})();
+</script>
+{% endblock %}

@@ -57,7 +57,7 @@ def _batch_attendance_rates(students, term):
     entries = AttendanceEntry.objects.filter(
         student_id__in=ids,
         date__range=[start_date, end_date],
-    ).values("student_id", "status")
+    ).exclude(status=AttendanceStatus.UNCONFIRMED).values("student_id", "status")
 
     from collections import defaultdict
     totals = defaultdict(int)
@@ -78,335 +78,184 @@ def _batch_attendance_rates(students, term):
     return rates
 
 
+
+def was_edited(entry) -> bool:
+    """Re-marked after it was first recorded (the register stays open to
+    correction until the cut-off)."""
+    return bool(entry and entry.marked_at and entry.created_at
+                and (entry.marked_at - entry.created_at).total_seconds() > 60)
+
+
+def render_register_row(request, student, entry, d):
+    """One <tr> of the Today register, as rendered on the page."""
+    from academics.utils import get_current_term
+    from attendance import analytics
+    from attendance.policy import can_view_excuse_reason
+    today = timezone.localdate()
+    rate = analytics.term_rates([student.pk], get_current_term(), today).get(student.pk)
+    weeks, week = analytics.week_codes([student.pk], d)
+    code = analytics.CODES.get(entry.status, "U") if entry else "U"
+    row = {
+        "student": student, "entry": entry, "code": code, "attendance_rate": rate,
+        "is_below_threshold": (rate or 100) < analytics.FLAG,
+        "week": list(zip(week, weeks[student.pk])),
+        "can_view_reason": can_view_excuse_reason(request.user, entry),
+        "edited": was_edited(entry),
+    }
+    can_change = request.user.has_perm("attendance.change_attendanceentry")
+    return render(request, "attendance/_row.html", {
+        "row": row, "date": d, "can_mark": can_change, "can_correct": can_change,
+        "is_locked": is_register_locked(d), "is_super_admin": is_super_admin(request.user),
+        "show_checkout_gaps": d < today or timezone.localtime().hour >= 16,
+    }).content.decode("utf-8")
+
+
 class AttendanceTodayView(RoleRequiredMixin, TemplateView):
+    """Today tab: the day's register for every class, marked inline.
+
+    Every figure is calculated on learners actually marked; unmarked learners
+    are shown but counted as neither present nor absent. All staff see every
+    class; only excusal reasons are restricted (see policy)."""
     template_name = "attendance/today.html"
     login_url = "/accounts/login/"
     required_permission = "attendance.view_attendanceentry"
 
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        if not self.request.user.has_perm("attendance.view_attendanceentry"):
-            raise PermissionDenied()
-        from academics.models import GradeClass, Department
-        
-        role = self.request.user.role
-        is_teacher = role == UserRole.TEACHER
-        teacher_assigned_classes = get_teacher_assigned_classes(self.request.user) if is_teacher else set()
-        
-        # TCA fallback: if teacher has no TimetableSlot assignments but has
-        # TeacherClassAssignment entries, use those for class scoping.
-        if is_teacher and not teacher_assigned_classes:
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and request.user.role == UserRole.PARENT:
+            return redirect("attendance:parent")
+        return super().dispatch(request, *args, **kwargs)
+
+    def _default_class(self, d):
+        """A teacher opening the register lands on their class: the one they
+        teach now (timetable), else their class-teacher class."""
+        from timetable.models import TimetableSlot
+        user = self.request.user
+        day = d.strftime("%a").lower()[:3]
+        slots = TimetableSlot.objects.filter(teacher=user, term__is_locked=False)
+        slot = None
+        if d == timezone.localdate():
+            now_time = timezone.localtime().time()
+            slot = slots.filter(day_of_week=day, start_time__lte=now_time, end_time__gte=now_time).first()
+        slot = slot or slots.filter(day_of_week=day).first()
+        if slot:
+            return slot.class_name, slot.subject_name
+        assigned = get_teacher_assigned_classes(user)
+        if not assigned:
             from core.teacher_context import get_teacher_assigned_classes_from_tca
-            tca_map = get_teacher_assigned_classes_from_tca(self.request.user)
-            teacher_assigned_classes = set(tca_map.keys())
-        
-        # FR-ATT-008: HOD Scoping — determine which classes each role can see
-        # for BOTH the student query and the filter form dropdown.
-        if role == UserRole.PRIMARY_HOD:
-            scoped_classes = set(
-                GradeClass.objects.filter(department=Department.PRIMARY)
-                .values_list('name', flat=True)
-            )
-        elif role == UserRole.ECD_HOD:
-            scoped_classes = set(
-                GradeClass.objects.filter(department=Department.ECD)
-                .values_list('name', flat=True)
-            )
-        elif is_teacher:
-            scoped_classes = teacher_assigned_classes
-        else:
-            scoped_classes = None  # show all
-        
-        # Debug: Log GET parameters to help identify the issue
-        import logging
-        logger = logging.getLogger(__name__)
-        if self.request.GET:
-            logger.info(f"AttendanceTodayView GET parameters: {dict(self.request.GET)}")
-        
-        try:
-            form = AttendanceFilterForm(
-                self.request.GET or None,
-                allowed_classes=scoped_classes if scoped_classes is not None else None,
-                include_all_option=scoped_classes is None,
-            )
-        except Exception as e:
-            logger.error(f"Error creating AttendanceFilterForm: {e}")
-            logger.error(f"GET data: {self.request.GET}")
-            # Create form without GET data as fallback
-            form = AttendanceFilterForm(
-                None,
-                allowed_classes=scoped_classes if scoped_classes is not None else None,
-                include_all_option=scoped_classes is None,
-            )
-        
-        # Handle form validation with better error handling
-        if form.is_valid():
-            d = form.cleaned_data.get("date") or timezone.localdate()
-            class_name = (form.cleaned_data.get("class_name") or "").strip()
-        else:
-            # If form is invalid, use defaults and log the errors for debugging
-            d = timezone.localdate()
-            class_name = ""
-            # Log form errors for debugging
-            if form.errors:
-                logger.warning(f"AttendanceFilterForm validation errors: {form.errors}")
-                logger.warning(f"Form data: {self.request.GET}")
-        
-        # Ensure d is always a date object
-        if not isinstance(d, (date_type, timezone.datetime)):
-            d = timezone.localdate()
-        # Future dates are not selectable: fall back to today.
-        if d > timezone.localdate():
-            d = timezone.localdate()
+            assigned = set(get_teacher_assigned_classes_from_tca(user).keys())
+        if assigned:
+            return sorted(assigned)[0], None
+        slot = slots.first()
+        return (slot.class_name, slot.subject_name) if slot else ("", None)
 
-        # FR-TT-006: Auto-select class based on current timetable slot.
-        # On weekends (Sat/Sun) fall back to the most recent school day (Fri > Thu > ...).
-        # Configurable via FRD_TT006_ATTENDANCE_AUTO_CLASS in settings.py.
-        from django.conf import settings as dj_settings
-        auto_class_enabled = getattr(dj_settings, "FRD_TT006_ATTENDANCE_AUTO_CLASS", True)
-        auto_selected_subject = None
-        if auto_class_enabled and not class_name and is_teacher:
-            from timetable.models import TimetableSlot
-            now_time = timezone.now().time()
-            day_of_week = d.strftime('%a').lower()[:3]  # 'mon', 'tue', etc.
-            school_days = ['mon', 'tue', 'wed', 'thu', 'fri']
-
-            slot = None
-            # 1) Try current period first (only if viewing today)
-            if d == timezone.localdate():
-                slot = TimetableSlot.objects.filter(
-                    teacher=self.request.user,
-                    day_of_week=day_of_week,
-                    start_time__lte=now_time,
-                    end_time__gte=now_time,
-                    term__is_locked=False
-                ).first()
-
-            # 2) Try current day (any time slot)
-            if not slot:
-                slot = TimetableSlot.objects.filter(
-                    teacher=self.request.user,
-                    day_of_week=day_of_week,
-                    term__is_locked=False
-                ).first()
-
-            # 3) Weekend fallback: try most recent school day (Fri → Thu → ...)
-            if not slot and day_of_week not in school_days:
-                for fallback_day in reversed(school_days):
-                    slot = TimetableSlot.objects.filter(
-                        teacher=self.request.user,
-                        day_of_week=fallback_day,
-                        term__is_locked=False
-                    ).first()
-                    if slot:
-                        break
-
-            # 4) Last resort: any slot for this teacher
-            if not slot:
-                slot = TimetableSlot.objects.filter(
-                    teacher=self.request.user,
-                    term__is_locked=False
-                ).first()
-
-            # 5) TCA fallback: if teacher has TeacherClassAssignment but no
-            #    timetable slots, use the first assigned class.
-            if not slot and teacher_assigned_classes:
-                class_name = next(iter(sorted(teacher_assigned_classes)))
-                data = self.request.GET.copy()
-                data["class_name"] = class_name
-                if not data.get("date"):
-                    data["date"] = d.strftime("%Y-%m-%d")
-                form = AttendanceFilterForm(
-                    data,
-                    allowed_classes=teacher_assigned_classes,
-                    include_all_option=False,
-                )
-
-            if slot:
-                class_name = slot.class_name
-                auto_selected_subject = slot.subject_name
-                # Re-bind form with auto-selected data to reflect in UI
-                data = self.request.GET.copy()
-                data["class_name"] = class_name
-                if not data.get("date"):
-                    data["date"] = d.strftime("%Y-%m-%d")
-                form = AttendanceFilterForm(
-                    data,
-                    allowed_classes=teacher_assigned_classes,
-                    include_all_option=False,
-                )
-
-        if is_teacher and class_name and class_name not in teacher_assigned_classes:
-            class_name = ""
-            auto_selected_subject = None
-
-        # Teachers should normally mark for a class; until timetable/class assignment exists
-        # we require a class filter for Teachers to prevent “mark everyone”.
-        students = Student.objects.filter(is_archived=False).order_by("last_name", "first_name")
-        if is_teacher:
-            students = students.filter(class_name__in=teacher_assigned_classes)
-            if class_name:
-                students = students.filter(class_name__iexact=class_name)
-            else:
-                students = Student.objects.none()
-        elif class_name:
-            students = students.filter(class_name__icontains=class_name)
-
-        from academics.models import Term
+    def get_context_data(self, **kwargs):
         from academics.utils import get_current_term
-        
-        # FR-ATT-008: HOD Scoping — use pre-computed scoped_classes (set at top of method)
-        if scoped_classes is not None:
-            students = students.filter(class_name__in=scoped_classes)
+        from attendance import analytics
+        from attendance.policy import can_view_excuse_reasons
 
+        ctx = super().get_context_data(**kwargs)
+        params = self.request.GET
+        user = self.request.user
+        today = timezone.localdate()
+        d = analytics.parse_date(params.get("date"), today)
+        if d > today:
+            d = today
 
-        entries = AttendanceEntry.objects.filter(date=d, student__in=students)
-        if class_name:
-            entries = entries.filter(class_name__icontains=class_name)
-        by_student = {e.student_id: e for e in entries.select_related("student")}
+        classes = analytics.class_names()
+        class_name = (params.get("class_name") or "").strip()
+        auto_selected_subject = None
+        if "class_name" not in params and user.role == UserRole.TEACHER:
+            class_name, auto_selected_subject = self._default_class(d)
+        if class_name not in classes:
+            class_name, auto_selected_subject = "", None
+        form = AttendanceFilterForm({"date": d.isoformat(), "class_name": class_name})
 
-        week_start = d - timedelta(days=d.weekday())
-        week_days = [week_start + timedelta(days=i) for i in range(5)]
-        week_entries = AttendanceEntry.objects.filter(date__in=week_days, student__in=students)
-        if class_name:
-            week_entries = week_entries.filter(class_name__icontains=class_name)
-        weekly_by_student = {}
-        for e in week_entries:
-            weekly_by_student.setdefault(e.student_id, {})[e.date] = e
+        # One school-day period for the chosen date, whatever the calendar says,
+        # so a register can still be opened on a non-teaching day.
+        period = analytics.Period(start=d, end=d, days=[d], today=today)
+        hols = analytics.holidays_between(d, d)
+        non_school_reason = ("a weekend" if d.weekday() >= 5 else (f"a holiday ({hols[d]})" if d in hols else ""))
 
-        status_counts_by_day = {day: {AttendanceStatus.PRESENT: 0, AttendanceStatus.LATE: 0, AttendanceStatus.EXCUSED: 0, AttendanceStatus.ABSENT: 0} for day in week_days}
-        for e in week_entries:
-            if e.status in status_counts_by_day[e.date]:
-                status_counts_by_day[e.date][e.status] += 1
+        everyone = [r for r in analytics.build_learners(period) if r["codes"][0] != analytics.NOT_ON_ROLL]
+        class_status = analytics.class_day_status(d, everyone, classes)
+        rank = {n: i for i, n in enumerate(classes)}
+        learners = sorted((r for r in everyone if not class_name or r["class_name"] == class_name),
+                          key=lambda r: (rank.get(r["class_name"], len(rank)), r["name"]))
 
-        status_chart = [
-            {
-                'label': week_day.strftime('%a'),
-                'present': status_counts_by_day[week_day][AttendanceStatus.PRESENT],
-                'late': status_counts_by_day[week_day][AttendanceStatus.LATE],
-                'excused': status_counts_by_day[week_day][AttendanceStatus.EXCUSED],
-                'absent': status_counts_by_day[week_day][AttendanceStatus.ABSENT],
-            }
-            for week_day in week_days
-        ]
-
-        status_totals = {
-            'present': sum(item['present'] for item in status_chart),
-            'late': sum(item['late'] for item in status_chart),
-            'excused': sum(item['excused'] for item in status_chart),
-            'absent': sum(item['absent'] for item in status_chart),
-        }
-
-        # FR-ATT-012: Threshold flagging
+        ids = [r["id"] for r in learners]
+        entries = {e.student_id: e for e in AttendanceEntry.objects.filter(date=d, student_id__in=ids)}
         current_term = get_current_term()
-        
-        threshold = 85.0 # FRD FR-ATT-012: default 85%
-        
-        # FR-ATT-012b: Previous term comparison data
-        # Guard: current_term.start_date can be None (Terms 1 & 2 have no dates set)
-        # Using None as a filter value crashes Django ORM ("Cannot use None as a query value").
-        prev_term = None
-        prev_term_rates = {}
-        if current_term and current_term.start_date:
-            prev_term = Term.objects.filter(
-                academic_year=current_term.academic_year,
-                start_date__lt=current_term.start_date,
-                is_locked=True,
-            ).order_by('-start_date').first()
-            ctx["prev_term"] = prev_term
-
-
+        rates = analytics.term_rates(ids, current_term, today)
+        weeks, week = analytics.week_codes(ids, d)
+        can_change = user.has_perm("attendance.change_attendanceentry")
+        show_reasons = can_view_excuse_reasons(user)
         rows = []
-        # ── Batch attendance rates to avoid N+1 (2 queries per student) ──
-        term_rates = _batch_attendance_rates(students[:200], current_term)
-        prev_term_rates = _batch_attendance_rates(students[:200], prev_term) if prev_term else {}
-
-        ctx["prev_term_rates"] = prev_term_rates
-
-        for s in students[:200]:
-            entry = by_student.get(s.id)
-            rate = term_rates.get(s.id)
-            is_below = rate < threshold if rate is not None else False
-
-            attendance_week = []
-            student_week_entries = weekly_by_student.get(s.id, {})
-            for week_day in week_days:
-                day_entry = student_week_entries.get(week_day)
-                if day_entry:
-                    if day_entry.status == AttendanceStatus.PRESENT:
-                        state = 'present'
-                    elif day_entry.status == AttendanceStatus.LATE:
-                        state = 'late'
-                    elif day_entry.status == AttendanceStatus.ABSENT:
-                        state = 'absent'
-                    elif day_entry.status == AttendanceStatus.EXCUSED:
-                        state = 'excused'
-                    else:
-                        state = 'other'
-                else:
-                    state = 'missing'
-                attendance_week.append({
-                    'date': week_day,
-                    'state': state,
-                })
-            
+        for r in learners:
+            entry = entries.get(r["id"])
+            code = r["codes"][0]
             rows.append({
-                "student": s,
+                "student": r["student"],
                 "entry": entry,
-                "attendance_rate": rate,
-                "is_below_threshold": is_below,
-                "weekly_bars": attendance_week,
+                "code": code,
+                "attendance_rate": rates.get(r["id"]),
+                "is_below_threshold": (rates.get(r["id"]) or 100) < analytics.FLAG,
+                "week": list(zip(week, weeks[r["id"]])),
+                "can_view_reason": show_reasons or bool(entry and entry.marked_by_id == user.pk),
+                "edited": was_edited(entry),
             })
 
-
-        # Summary counts (FR-ATT-003)
-        total_expected = students.count()
-        late = entries.filter(status=AttendanceStatus.LATE).count()
-        # Late learners are in school, so they count as present; the Late
-        # card shows how many of those present arrived late.
-        present = entries.filter(status=AttendanceStatus.PRESENT).count() + late
-        absent = entries.filter(status=AttendanceStatus.ABSENT).count()
-        excused = entries.filter(status=AttendanceStatus.EXCUSED).count()
-        unconfirmed = total_expected - len(entries)
-        
+        def count(code):
+            return sum(1 for r in learners if r["codes"][0] == code)
+        late = count("L")
+        present = count("P") + late
+        absent, excused, unconfirmed = count("A"), count("E"), count("U")
+        marked = present + absent + excused
         ctx["summary"] = {
-            "total": total_expected,
+            "total": len(learners),
+            "marked": marked,
             "present": present,
-            "absent": absent,
             "late": late,
+            "absent": absent,
             "excused": excused,
             "unconfirmed": unconfirmed,
-            "present_pct": round((present / total_expected * 100), 1) if total_expected > 0 else 0
+            # Measured on learners actually marked, never on the whole roll.
+            "present_pct": analytics.rate(present, marked) or 0,
         }
-
-        ctx["filter_form"] = form
-        ctx["date"] = d
-        today = timezone.localdate()
-        now = timezone.localtime()
-        ctx["is_locked"] = is_register_locked(d)
-        ctx["is_future"] = d > today
-        ctx["is_super_admin"] = is_super_admin(self.request.user)
-        ctx["max_date"] = today
-        ctx["lock_hour"] = f"{lock_hour():02d}"
+        unmarked_classes = [c for c in class_status if c["unmarked"]]
+        ctx.update({
+            "filter_form": form,
+            "date": d,
+            "today": today,
+            "max_date": today,
+            "class_name": class_name,
+            "class_options": classes,
+            "rows": rows,
+            "class_status": class_status,
+            "unmarked_classes": unmarked_classes,
+            "unmarked_class_learners": sum(c["unmarked"] for c in unmarked_classes),
+            "non_school_reason": non_school_reason,
+            "statuses": AttendanceStatus.choices,
+            "current_term": current_term,
+            "auto_selected_subject": auto_selected_subject,
+            "is_locked": is_register_locked(d),
+            "is_future": False,
+            "is_super_admin": is_super_admin(user),
+            "lock_hour": f"{lock_hour():02d}",
+            "can_correct": can_change,
+            "can_mark": can_change,
+            "can_excuse": can_change,
+            "show_checkout_gaps": d < today or timezone.localtime().hour >= 16,
+            "flag": analytics.FLAG,
+            "attendance_tab": "today",
+        })
         if ctx["is_super_admin"]:
             from attendance.models import AttendanceCorrectionRequest
             ctx["pending_correction_count"] = AttendanceCorrectionRequest.objects.filter(status="pending").count()
-        ctx["class_name"] = class_name
-        ctx["rows"] = rows
-        ctx["statuses"] = AttendanceStatus.choices
-        ctx["status_chart"] = status_chart
-        ctx["status_totals"] = status_totals
-        ctx["current_term"] = current_term
-        ctx["auto_selected_subject"] = auto_selected_subject
-        can_change = self.request.user.has_perm("attendance.change_attendanceentry")
-        ctx["can_correct"] = can_change
-        ctx["can_mark"] = can_change
-        ctx["can_excuse"] = can_change
         return ctx
 
 
 class AttendanceMarkView(RoleRequiredMixin, TemplateView):
-    template_name = "attendance/_tr_content.html"
+    template_name = "attendance/_row.html"
     login_url = "/accounts/login/"
     allowed_roles = [UserRole.SUPER_ADMIN, UserRole.ADMIN_OFFICER]
     required_permission = "attendance.change_attendanceentry"
@@ -432,54 +281,13 @@ class AttendanceMarkView(RoleRequiredMixin, TemplateView):
             entry = mark_attendance(actor=request.user, student=student, date=d, status=status)
         except AttendanceWindowError as exc:
             return HttpResponse(exc.message, status=403)
-        if reason and entry:
-            entry.reason = reason
+        # The reason belongs to the excusal: it is replaced on a new excusal and
+        # cleared when the learner is marked anything else.
+        new_reason = reason if status == AttendanceStatus.EXCUSED else ""
+        if entry and entry.reason != new_reason:
+            entry.reason = new_reason
             entry.save(update_fields=["reason"])
-            entry.refresh_from_db()
-
-        rate = calculate_attendance_rate(student)
-        is_below = rate < 85.0 if rate is not None else False
-
-        week_start = d - timedelta(days=d.weekday())
-        week_days = [week_start + timedelta(days=i) for i in range(5)]
-        week_entries = AttendanceEntry.objects.filter(date__in=week_days, student=student)
-        attendance_week = []
-        entries_by_day = {e.date: e for e in week_entries}
-        for week_day in week_days:
-            day_entry = entries_by_day.get(week_day)
-            if day_entry:
-                if day_entry.status == AttendanceStatus.PRESENT:
-                    state = 'present'
-                elif day_entry.status == AttendanceStatus.LATE:
-                    state = 'late'
-                elif day_entry.status == AttendanceStatus.ABSENT:
-                    state = 'absent'
-                elif day_entry.status == AttendanceStatus.EXCUSED:
-                    state = 'excused'
-                else:
-                    state = 'other'
-            else:
-                state = 'missing'
-            attendance_week.append({
-                'date': week_day,
-                'state': state,
-            })
-
-        rendered = render(request, "attendance/_tr_content.html", {
-            "student": student,
-            "entry": entry,
-            "date": d,
-            "attendance_rate": rate,
-            "is_below_threshold": is_below,
-            "weekly_bars": attendance_week,
-            "statuses": AttendanceStatus.choices,
-            "can_correct": request.user.has_perm("attendance.change_attendanceentry"),
-            "can_mark": request.user.has_perm("attendance.change_attendanceentry"),
-            "is_locked": is_register_locked(d),
-            "is_super_admin": is_super_admin(request.user),
-        }).content.decode('utf-8')
-        wrapped = '<tr id="att-row-' + str(student.id) + '">' + rendered + '</tr>'
-        resp = HttpResponse(wrapped)
+        resp = HttpResponse(render_register_row(request, student, entry, d))
         resp["HX-Trigger"] = "attendance-updated"
         return resp
 

@@ -6,6 +6,33 @@
 
 {% block extra_head %}
 <style>
+  /* Academic & attendance card */
+  .sp-sub { font-size:12px; color:#64748B; margin-top:3px; }
+  .sp-actions { display:flex; gap:8px; flex-wrap:wrap; }
+  .sp-actions .hf-btn { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; }
+  .sp-terms { display:flex; gap:6px; flex-wrap:wrap; margin-top:12px; }
+  .sp-terms a { border:1px solid #E2E8F0; border-radius:99px; padding:4px 11px; font-size:12px; font-weight:600; color:#475569; text-decoration:none; }
+  .sp-terms a small { font-weight:400; color:#94A3B8; }
+  .sp-terms a.on { background:var(--hodari-blue); border-color:var(--hodari-blue); color:#fff; } .sp-terms a.on small { color:rgba(255,255,255,.75); }
+  .sp-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:18px; }
+  .sp-k { font-size:11px; font-weight:700; color:#94A3B8; text-transform:uppercase; letter-spacing:.04em; }
+  .sp-counts { display:flex; flex-wrap:wrap; gap:6px 14px; font-size:11.5px; color:#64748B; margin-bottom:12px; }
+  .sp-counts b { font-size:15px; margin-right:4px; font-family:var(--font-mono); }
+  .c-g { color:#16a34a; } .c-a { color:#d97706; } .c-r { color:#dc2626; } .c-p { color:#5B4FCF; } .c-n { color:#94A3B8; }
+  .sp-strip { display:flex; gap:3px; flex-wrap:wrap; }
+  .sp-strip i { width:12px; height:22px; border-radius:3px; background:#E2E8F0; }
+  .sp-strip .d-P { background:#16a34a; } .sp-strip .d-L { background:#d97706; } .sp-strip .d-A { background:#dc2626; } .sp-strip .d-E { background:#5B4FCF; }
+  .sp-note { font-size:11.5px; color:#94A3B8; margin-top:10px; line-height:1.5; }
+  .sp-empty { font-size:13px; color:#64748B; padding:14px; background:#F8FAFC; border:1px dashed #E2E8F0; border-radius:8px; margin-top:8px; }
+  .sp-subjects { width:100%; border-collapse:collapse; font-size:12.5px; }
+  .sp-subjects th { text-align:left; font-size:10px; color:#94A3B8; text-transform:uppercase; padding:4px 0; border-bottom:1px solid #F1F5F9; }
+  .sp-subjects td { padding:5px 0; border-bottom:1px solid #F8FAFC; }
+  .sp-subjects .r { text-align:right; } .sp-subjects .m { color:#94A3B8; font-family:var(--font-mono); }
+  .sp-subjects .g { display:inline-block; min-width:22px; text-align:center; font-size:10.5px; font-weight:700; color:#475569; background:#F1F5F9; border-radius:4px; padding:1px 4px; }
+  .b-critical { color:#dc2626; } .b-support { color:#d97706; } .b-pass { color:#2563eb; } .b-strong { color:#16a34a; }
+  .sp-grid.sp-one { grid-template-columns:1fr; }
+  @media (max-width:900px) { .sp-grid { grid-template-columns:1fr; } }
+
   /*  Profile Header  */
   .profile-header {
     display: flex; align-items: stretch; gap: 0;
@@ -75,7 +102,7 @@
     background: #fff;
   }
   .profile-actions-row {
-    display: flex; flex-direction: row; gap: 10px; align-items: center;
+    display: flex; flex-direction: row; flex-wrap: wrap; gap: 10px; align-items: center;
   }
   .profile-actions .hf-btn,
   .profile-actions form {
@@ -174,9 +201,20 @@
   @media (max-width: 1024px) {
     .profile-header { flex-direction: column; }
     .profile-avatar-section { min-width: unset; padding: 24px; }
-    .profile-actions { justify-content: center; }
+    .profile-actions { justify-content: center; margin-left: 0; align-self: stretch; }
+  }
+  /* Profile body: main column + sidebar. Hidden (empty) cards leave no
+     gaps: the remaining cards stack, and with no sidebar cards the main
+     column takes the full width. */
+  .pf-grid { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:24px; align-items:start; }
+  .pf-grid.no-side { grid-template-columns:minmax(0,1fr); }
+  .pf-main, .pf-side { display:flex; flex-direction:column; gap:20px; min-width:0; }
+  .pf-main:empty { display:none; }
+  @media (max-width: 1100px) {
+    .pf-grid { grid-template-columns:minmax(0,1fr); }
   }
   @media (max-width: 768px) {
+    .sp-actions .hf-btn { flex: 1 1 auto; justify-content: center; }
     .detail-grid { grid-template-columns: 1fr 1fr !important; }
   }
 </style>
@@ -271,6 +309,14 @@
   <!-- Profile Actions -->
   <div class="profile-actions">
     <div class="profile-actions-row">
+        {% has_perm user "students.change_student" as can_link_guardian_top %}
+        {% if can_link_guardian_top and not guardians %}
+        <a href="{% url 'students:guardian_link' student.pk %}" class="hf-btn hf-btn-secondary">+ Link guardian</a>
+        {% endif %}
+        {% has_perm user "welfare.add_welfareobservation" as can_add_welfare_top %}
+        {% if can_add_welfare_top and not welfare_stats.total %}
+        <a href="{% url 'welfare:submit' %}?student={{ student.pk }}" class="hf-btn hf-btn-secondary">+ Welfare note</a>
+        {% endif %}
         {% has_perm user "students.change_student" as can_edit %}
         {% if can_edit %}
         <a href="{% url 'students:edit' student.pk %}" class="hf-btn hf-btn-primary">
@@ -318,77 +364,98 @@
 <!-- 
      MAIN CONTENT: TWO-COLUMN LAYOUT
       -->
-<div style="display:grid; grid-template-columns: 1fr 340px; gap:24px; align-items:start">
+<div class="pf-grid{% if not sidebar_has_cards %} no-side{% endif %}">
 
   <!--  LEFT COLUMN  -->
-  <div style="display:flex; flex-direction:column; gap:24px">
+  <div class="pf-main">
 
-    <!-- 1. Academic & Attendance Performance -->
-    <div class="card" style="border-top: 4px solid var(--hodari-blue)">
-      <div class="card-title-row">
-        <h2 class="card-title" style="margin:0">Academic & Attendance Performance</h2>
-        {% if recent_report %}
-          <a href="{% url 'academics:report_preview' recent_report.pk %}" class="section-link">View Full Report →</a>
-        {% endif %}
+    <!-- 1. Academic & Attendance Performance (approved marks only; attendance on marked days only) -->
+    {% if perf_has_att or perf_has_acad %}
+    <div class="card sp-card" style="border-top: 4px solid var(--hodari-blue)" id="performance">
+      <div class="card-title-row" style="flex-wrap:wrap; gap:10px">
+        <div>
+          <h2 class="card-title" style="margin:0">Academic &amp; Attendance Performance</h2>
+          <div class="sp-sub">{% if record_term %}{{ record_term.name }}, {{ record_term.academic_year.name }} · {% endif %}attendance {{ attendance.period.label }}</div>
+        </div>
+        <div class="sp-actions">
+          {% if not academic_summary.is_ecd and perf_has_acad %}
+          <a class="hf-btn hf-btn-primary" target="_blank" rel="noopener" href="{% url 'academics:learner_report' student.pk %}?{% if record_term %}term={{ record_term.pk }}&{% endif %}autoprint=1">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z"/></svg>
+            Print progress report</a>
+          {% endif %}
+          {% if perf_has_att %}<a class="hf-btn hf-btn-secondary" target="_blank" rel="noopener" href="{% url 'attendance:print' %}?kind=student&student={{ student.pk }}&start={{ att_start|date:'Y-m-d' }}&end={{ att_end|date:'Y-m-d' }}&autoprint=1">Print attendance</a>{% endif %}
+        </div>
       </div>
+      {% if record_terms|length > 1 %}
+      <div class="sp-terms">{% for t in record_terms %}<a href="?term={{ t.pk }}#performance" class="{% if t == record_term %}on{% endif %}">{{ t.name }} <small>{{ t.academic_year.name }}</small></a>{% endfor %}</div>
+      {% endif %}
 
-      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-top:20px">
-        <!-- Attendance Chart -->
+      <div class="sp-grid{% if not perf_has_att or not perf_has_acad %} sp-one{% endif %}">
+        {% if perf_has_att %}
+        <!-- Attendance -->
         <div class="chart-container">
-          <div style="font-size:11px; font-weight:700; color:#94A3B8; text-transform:uppercase; margin-bottom:12px">Attendance Rate</div>
-          <div style="display:flex; align-items:baseline; gap:12px; margin-bottom:16px">
-            {% with rate=attendance_stats.attendance_rate|floatformat:0|add:0 %}
-            <div class="attendance-rate {% if rate >= 80 %}good{% elif rate >= 60 %}warning{% else %}poor{% endif %}">
-              {{ attendance_stats.attendance_rate|floatformat:1 }}%
+          <div class="sp-k">Attendance</div>
+          {% with r=attendance.row %}
+          {% if r and r.marked %}
+            <div style="display:flex; align-items:baseline; gap:12px; margin:6px 0 12px; flex-wrap:wrap">
+              <div class="attendance-rate {% if r.band == 'green' %}good{% elif r.band == 'amber' %}warning{% else %}poor{% endif %}">{{ r.rate }}%</div>
+              <div style="font-size:12px; font-weight:600; color:#64748B">in school {{ r.in_school }} of {{ r.marked }} marked days</div>
             </div>
-            {% endwith %}
-            <div style="font-size:12px; font-weight:600; color:#64748B">
-              {{ attendance_stats.present }} Present · {{ attendance_stats.absent }} Absent
-              <span style="font-weight:500; opacity:0.7; margin-left:4px">(Last 30)</span>
+            <div class="sp-counts">
+              <span><b class="c-g">{{ r.present }}</b>Present</span><span><b class="c-a">{{ r.late }}</b>Late</span>
+              <span><b class="c-r">{{ r.absent }}</b>Absent</span><span><b class="c-p">{{ r.excused }}</b>Excused</span>
+              <span><b class="c-n">{{ r.unmarked }}</b>Not marked</span>
             </div>
-          </div>
-          <div class="mini-chart" style="width:100%; gap:3px">
-            {% for a in attendance_data|slice:":30" %}
-              <div class="chart-bar {% if a.status == 'present' %}present{% elif a.status == 'late' %}late{% elif a.status == 'absent' %}absent{% endif %}" style="flex:1"></div>
-            {% endfor %}
-          </div>
-          <div style="display:flex; gap:12px; margin-top:8px; font-size:10px; color:#94A3B8; font-weight:600">
-            <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#16a34a;vertical-align:middle;margin-right:3px"></span>Present</span>
-            <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#d97706;vertical-align:middle;margin-right:3px"></span>Late</span>
-            <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#dc2626;vertical-align:middle;margin-right:3px"></span>Absent</span>
-          </div>
+            <div class="sp-strip" aria-label="Last school days, oldest first">
+              {% for d, c in attendance.strip %}<i class="d-{{ c }}" title="{{ d|date:'D j M' }}: {% if c == 'P' %}Present{% elif c == 'L' %}Late{% elif c == 'A' %}Absent{% elif c == 'E' %}Excused{% else %}Not marked{% endif %}"></i>{% endfor %}
+            </div>
+            <div class="sp-note">Last {{ attendance.strip|length }} school days, oldest first. Unmarked days are left out of the rate.{% if attendance.pattern.longest_absent_run > 1 %} Longest run absent: {{ attendance.pattern.longest_absent_run }} days.{% endif %}</div>
+          {% endif %}
+          {% endwith %}
+          <a class="section-link" style="display:inline-block;margin-top:10px" href="{% url 'attendance:reports' %}?student={{ student.pk }}&class_name={{ student.class_name|urlencode }}&start={{ att_start|date:'Y-m-d' }}&end={{ att_end|date:'Y-m-d' }}">Attendance report →</a>
         </div>
 
-        <!-- Academic / Behaviour -->
+        {% endif %}
+        {% if perf_has_acad %}
+        <!-- Academic -->
         <div class="chart-container">
           {% if academic_summary.is_ecd %}
-            <div style="font-size:11px; font-weight:700; color:#94A3B8; text-transform:uppercase; margin-bottom:12px">Domain Rating</div>
-            <div style="display:flex; align-items:center; gap:12px">
+            <div class="sp-k">Domain Rating</div>
+            <div style="display:flex; align-items:center; gap:12px; margin-top:6px">
               <span style="font-size:32px; font-weight:800; color:{% if academic_summary.rating_letter == 'E' %}#16a34a{% elif academic_summary.rating_letter == 'G' %}#2563eb{% elif academic_summary.rating_letter == 'S' %}#d97706{% else %}#94A3B8{% endif %}">{{ academic_summary.rating_letter|default:"N/A" }}</span>
               <div>
                 <div style="font-size:14px; font-weight:700; color:#1E293B">{{ academic_summary.grade }}</div>
                 <div style="font-size:12px; color:#64748B; margin-top:2px">Score: {{ academic_summary.average_rating|default:"0.0" }} / 4.0</div>
               </div>
             </div>
-          {% else %}
-            <div style="font-size:11px; font-weight:700; color:#94A3B8; text-transform:uppercase; margin-bottom:12px">Behaviour & Conduct</div>
-            <div style="display:flex; align-items:center; gap:10px; padding:14px; background:#F8FAFC; border-radius:8px; border:1px dashed #E2E8F0">
-              <div style="background:#fff; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#16a34a; box-shadow:0 1px 2px rgba(0,0,0,0.05)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-              </div>
-              <div>
-                <div style="font-size:13px; font-weight:700; color:#1E293B">Good Standing</div>
-                <div style="font-size:11px; color:#64748B">Awaiting term assessment</div>
-              </div>
+            <div class="sp-note">ECD is assessed by domain ratings on the term report card.{% if recent_report %} <a href="{% url 'academics:report_preview' recent_report.pk %}">Open report card →</a>{% endif %}</div>
+          {% elif record.average is not None %}
+            <div class="sp-k">Average mark</div>
+            <div style="display:flex; align-items:baseline; gap:12px; margin:6px 0 12px; flex-wrap:wrap">
+              <div class="attendance-rate {% if record.band == 'strong' %}good{% elif record.band == 'pass' %}good{% elif record.band == 'support' %}warning{% else %}poor{% endif %}">{{ record.average }}%</div>
+              <div style="font-size:12px; font-weight:600; color:#64748B">Grade {{ record.grade }} · position {{ record.position }} of {{ record.class_size }}{% if record.trend %} · {% if record.trend == 'improving' %}<span style="color:#16a34a">↑ {{ record.trend_diff }}</span>{% elif record.trend == 'declining' %}<span style="color:#dc2626">↓ {{ record.trend_diff }}</span>{% else %}→ steady{% endif %}{% endif %}</div>
             </div>
+            <table class="sp-subjects">
+              <thead><tr><th>Subject</th><th class="r">Mark</th><th class="r">Class</th></tr></thead>
+              <tbody>{% for s in record.subjects %}
+                <tr><td>{{ s.subject }}</td>
+                  <td class="r"><b class="b-{{ s.band }}">{{ s.mark }}</b> <span class="g">{{ s.grade }}</span></td>
+                  <td class="r m">{{ s.class_average }}</td></tr>
+              {% endfor %}</tbody>
+            </table>
+            <div class="sp-note">{% if record.below_pass %}Below the pass mark in {{ record.below_pass|length }} subject{{ record.below_pass|length|pluralize }}. {% endif %}Approved marks only; weighted over the assessments marked so far.</div>
+          {% else %}
+            <div class="sp-k">Average mark</div>
           {% endif %}
-          <div style="font-size:11px; color:#94A3B8; margin-top:12px">Based on: {{ academic_summary.term_name|default:"Current Term" }}</div>
         </div>
+        {% endif %}
       </div>
     </div>
 
+    {% endif %}
+
     <!-- 1b. Discipline Incidents — Primary & Secondary only (FRD: no discipline for ECD) -->
-    {% if student.class_name not in ecd_class_names %}
+    {% if student.class_name not in ecd_class_names and discipline_stats.total %}
     <div class="card">
       <div class="card-title-row">
         <h2 class="card-title" style="margin:0">Discipline Incidents</h2>
@@ -426,7 +493,7 @@
     {% endif %}
 
     <!-- 2. Welfare -->
-    {% if can_view_welfare %}
+    {% if can_view_welfare and welfare_stats.total %}
     <div class="card" style="padding:0">
       <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
         <div style="font-size:11px;font-weight:700;letter-spacing:.7px;color:var(--text-muted);text-transform:uppercase">Welfare</div>
@@ -547,6 +614,7 @@
     </script>
 
     <!-- 3. Guardians & Family -->
+    {% if guardians %}
     <div class="card">
       <div class="card-title-row">
         <h2 class="card-title" style="margin:0">Guardians & Family Contacts</h2>
@@ -572,11 +640,10 @@
             <a href="{% url 'students:guardian_detail' sg.guardian.pk %}" style="font-size:12px; color:var(--hodari-blue); font-weight:600; text-decoration:none">Manage Profile →</a>
           </div>
         </div>
-        {% empty %}
-        <div style="padding:24px; text-align:center; color:#94A3B8; font-size:13px; border:1px dashed #E2E8F0; border-radius:12px">No guardians linked.</div>
         {% endfor %}
       </div>
     </div>
+    {% endif %}
 
     <!-- Admissions Documents -->
     {% has_perm user "admissions.view_applicant" as can_view_admissions %}
@@ -623,39 +690,25 @@
         {% endif %}
       </div>
 
-      <!-- Personal Info -->
+      <!-- Personal Info (only fields that are recorded) -->
+      {% if student.date_of_birth or student.gender or student.nationality or student.religion or student.blood_type %}
       <div class="detail-section" style="margin-top:20px">
         <div class="detail-section-title">Personal Information</div>
         <div class="detail-grid">
-          <div class="detail-item">
-            <span class="detail-label">Date of Birth</span>
-            <span class="detail-value {% if not student.date_of_birth %}empty{% endif %}">{{ student.date_of_birth|date:"d F Y"|default:"Not recorded" }}</span>
-          </div>
-          <div class="detail-item">
-            <span class="detail-label">Age</span>
-            <span class="detail-value {% if student_age is None %}empty{% endif %}">{% if student_age is not None %}{{ student_age }} years{% else %}N/A{% endif %}</span>
-          </div>
-          <div class="detail-item">
-            <span class="detail-label">Gender</span>
-            <span class="detail-value {% if not student.gender %}empty{% endif %}" style="text-transform:capitalize">{{ student.gender|default:"Not recorded" }}</span>
-          </div>
-          <div class="detail-item">
-            <span class="detail-label">Nationality</span>
-            <span class="detail-value {% if not student.nationality %}empty{% endif %}">{{ student.nationality|default:"Not recorded" }}</span>
-          </div>
-          <div class="detail-item">
-            <span class="detail-label">Religion</span>
-            <span class="detail-value {% if not student.religion %}empty{% endif %}">{{ student.religion|default:"Not recorded" }}</span>
-          </div>
-          <div class="detail-item">
-            <span class="detail-label">Blood Type</span>
-            <span class="detail-value {% if not student.blood_type %}empty{% endif %}">{{ student.blood_type|upper|default:"Not recorded" }}</span>
-          </div>
+          {% if student.date_of_birth %}
+          <div class="detail-item"><span class="detail-label">Date of Birth</span><span class="detail-value">{{ student.date_of_birth|date:"d F Y" }}</span></div>
+          <div class="detail-item"><span class="detail-label">Age</span><span class="detail-value">{{ student_age }} years</span></div>
+          {% endif %}
+          {% if student.gender %}<div class="detail-item"><span class="detail-label">Gender</span><span class="detail-value" style="text-transform:capitalize">{{ student.gender }}</span></div>{% endif %}
+          {% if student.nationality %}<div class="detail-item"><span class="detail-label">Nationality</span><span class="detail-value">{{ student.nationality }}</span></div>{% endif %}
+          {% if student.religion %}<div class="detail-item"><span class="detail-label">Religion</span><span class="detail-value">{{ student.religion }}</span></div>{% endif %}
+          {% if student.blood_type %}<div class="detail-item"><span class="detail-label">Blood Type</span><span class="detail-value">{{ student.blood_type|upper }}</span></div>{% endif %}
         </div>
       </div>
+      {% endif %}
 
       <!-- Enrollment Info -->
-      <div class="detail-section">
+      <div class="detail-section"{% if not student.date_of_birth and not student.gender and not student.nationality and not student.religion and not student.blood_type %} style="margin-top:20px"{% endif %}>
         <div class="detail-section-title">Enrollment Information</div>
         <div class="detail-grid">
           <div class="detail-item">
@@ -672,10 +725,12 @@
             <span class="detail-value">{{ student.stream_name }}</span>
           </div>
           {% endif %}
+          {% if student.enrolment_date %}
           <div class="detail-item">
             <span class="detail-label">Enrolment Date</span>
-            <span class="detail-value {% if not student.enrolment_date %}empty{% endif %}">{{ student.enrolment_date|date:"d F Y"|default:"Not recorded" }}</span>
+            <span class="detail-value">{{ student.enrolment_date|date:"d F Y" }}</span>
           </div>
+          {% endif %}
           {% if years_enrolled is not None %}
           <div class="detail-item">
             <span class="detail-label">Years Enrolled</span>
@@ -704,10 +759,12 @@
     </div>
   </div>
 
-  <!--  RIGHT SIDEBAR  -->
-  <div style="display:flex; flex-direction:column; gap:20px">
+  <!--  RIGHT SIDEBAR (only when one of its cards has data) -->
+  {% if sidebar_has_cards %}
+  <div class="pf-side">
 
     <!-- Academic Record -->
+    {% if perf_has_acad or all_reports %}
     <div class="sidebar-card">
       <div class="sc-header" style="background:linear-gradient(135deg,#1e40af,#2563eb);color:#fff;display:flex;align-items:center;justify-content:space-between">
         <span>Academic Record</span>
@@ -736,8 +793,8 @@
         {% else %}
           <div style="text-align:center; padding:8px 0 12px">
             <div style="font-size:10px; font-weight:700; color:#94A3B8; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:6px">Overall Average</div>
-            <div style="font-size:36px; font-weight:800; line-height:1; margin-bottom:4px; color:{% if academic_summary.average >= 70 %}#16a34a{% elif academic_summary.average >= 50 %}#d97706{% else %}#dc2626{% endif %}">
-              {{ academic_summary.average|default:"0" }}%
+            <div style="font-size:36px; font-weight:800; line-height:1; margin-bottom:4px; color:{% if academic_summary.average is None %}#94A3B8{% elif academic_summary.average >= 70 %}#16a34a{% elif academic_summary.average >= 50 %}#d97706{% else %}#dc2626{% endif %}">
+              {% if academic_summary.average is not None %}{{ academic_summary.average }}%{% else %}—{% endif %}
             </div>
             <div style="font-size:13px; font-weight:700; color:#1E293B">Grade {{ academic_summary.grade|default:"N/A" }}</div>
             <div style="font-size:11px; color:#94A3B8; margin-top:4px">{{ academic_summary.term_name }}</div>
@@ -778,11 +835,7 @@
               </a>
             {% endfor %}
           </div>
-        {% else %}
-          <div style="border-top:1px solid #F1F5F9; padding-top:12px; margin-top:10px; text-align:center">
-            {% include '_partials/empty_state.html' with title='No reports yet' desc='View the Report Center for available reports.' icon='doc' icon_color='grey' action_url='/academics/reports/' action_text='View Report Center' %}
-          </div>
-        {% endif %}
+{% endif %}
         {% if all_reports %}
         <a href="{% url 'academics:student_academic_record' student.pk %}" style="display:block;text-align:center;margin-top:12px;padding:8px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;font-size:12px;font-weight:700;color:var(--hodari-blue);text-decoration:none;transition:all 0.15s" onmouseover="this.style.background='#DBEAFE'" onmouseout="this.style.background='#EFF6FF'">
           View Full Academic Record &rarr;
@@ -790,9 +843,10 @@
         {% endif %}
       </div>
     </div>
+    {% endif %}
 
     <!-- Financial Snapshot -->
-    {% if financial_info %}
+    {% if financial_info and financial_info.has_data %}
     <div class="sidebar-card">
       <div class="sc-header" style="display:flex;align-items:center;justify-content:space-between">
         <span>Financial Snapshot</span>
@@ -863,23 +917,23 @@
     {% endif %}
 
     <!-- Attendance Log -->
+    {% if perf_has_att %}
     <div class="sidebar-card">
       <div class="sc-header">Recent Attendance</div>
       <div class="sc-body">
-        {% for a in attendance_recent|slice:":7" %}
+        {% for d, c in attendance.recent|slice:":7" %}
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #F1F5F9">
-          <div>
-            <div style="font-size:12px; font-weight:700; color:#1E293B">{{ a.date|date:"d M Y" }}</div>
-            <div style="font-size:11px; color:#64748B">{{ a.get_status_display }}</div>
-          </div>
-          <span class="chip chip-{% if a.status == 'present' %}green{% elif a.status == 'late' %}amber{% else %}red{% endif %}" style="font-size:10px; padding:2px 8px">{{ a.status|title }}</span>
+          <div style="font-size:12px; font-weight:700; color:#1E293B">{{ d|date:"D d M Y" }}</div>
+          <span class="chip chip-{% if c == 'P' %}green{% elif c == 'L' %}amber{% elif c == 'A' %}red{% elif c == 'E' %}blue{% else %}grey{% endif %}" style="font-size:10px; padding:2px 8px">{% if c == 'P' %}Present{% elif c == 'L' %}Late{% elif c == 'A' %}Absent{% elif c == 'E' %}Excused{% else %}Not marked{% endif %}</span>
         </div>
         {% empty %}
-        <div style="text-align:center; padding:20px; font-size:12px; color:#94A3B8">No recent activity.</div>
+        <div style="text-align:center; padding:20px; font-size:12px; color:#94A3B8">No school days marked yet.</div>
         {% endfor %}
       </div>
     </div>
+    {% endif %}
 
   </div>
+  {% endif %}
 </div>
 {% endblock %}

@@ -1,0 +1,29 @@
+{# Learner day-by-day pattern: any element with data-learner="<id>" opens it for the range below. #}
+<div class="at-scrim" id="learnerScrim" role="dialog" aria-modal="true">
+  <div class="at-modal at" id="learnerModal"><div class="at-empty">Loading…</div></div>
+</div>
+<script>
+(function() {
+  var BASE = "{% url 'attendance:learner' 0 %}".replace(/0\/$/, "");
+  var RANGE = {start: "{{ learner_start|date:'Y-m-d' }}", end: "{{ learner_end|date:'Y-m-d' }}"};
+  var scrim = document.getElementById("learnerScrim"), box = document.getElementById("learnerModal");
+  function close(){ scrim.classList.remove("on"); }
+  window.openLearner = function(id) {
+    box.innerHTML = '<div class="at-empty">Loading…</div>';
+    scrim.classList.add("on");
+    var q = new URLSearchParams();
+    if (RANGE.start) q.set("start", RANGE.start);
+    if (RANGE.end) q.set("end", RANGE.end);
+    fetch(BASE + id + "/?" + q.toString(), {headers: {"X-Requested-With": "XMLHttpRequest"}})
+      .then(function(r){ if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(function(html){ box.innerHTML = html; var b = box.querySelector("[data-close]"); if (b) b.focus(); })
+      .catch(function(){ box.innerHTML = '<div class="at-empty">Could not load this learner. <button type="button" class="hf-btn hf-btn-secondary" data-close>Close</button></div>'; });
+  };
+  document.addEventListener("click", function(e) {
+    var t = e.target.closest("[data-learner]");
+    if (t) { e.preventDefault(); openLearner(t.getAttribute("data-learner")); return; }
+    if (e.target === scrim || e.target.closest("#learnerModal [data-close]")) close();
+  });
+  document.addEventListener("keydown", function(e){ if (e.key === "Escape") close(); });
+})();
+</script>
