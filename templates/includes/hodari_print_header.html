@@ -12,7 +12,9 @@
             </div>
         </div>
     </div>
-    {% if student and student.photo %}
+    {% if photo_src %}
+        <img src="{{ photo_src }}" alt="Student" class="student-photo">
+    {% elif student and student.photo %}
         <img src="{{ student.photo.url }}" alt="Student" class="student-photo">
     {% elif student and student.image %}
         <img src="{{ student.image.url }}" alt="Student" class="student-photo">

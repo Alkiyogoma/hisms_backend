@@ -480,7 +480,7 @@ class ArchiveRetentionPolicy(TimeStampedModel):
     """
     CATEGORY_CHOICES = [
         ("student", "Student Records"),
-        ("parent", "Parent / Guardian Records"),
+        ("parent", "Parent Records"),
         ("staff", "Staff Records"),
         ("attendance", "Attendance Records"),
         ("finance", "Financial Records"),

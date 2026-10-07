@@ -15,11 +15,11 @@
 {% block content %}
 {% include "admissions/_top_tabs.html" %}
 <div class="card" style="max-width:960px;margin:0 auto;padding:26px 28px">
-  <div class="card-title" style="margin:0 0 6px">Enrol a learner directly</div>
+  <div class="card-title" style="margin:0 0 6px">Enrol a student directly</div>
   <div class="de-banner">
-    For transfers, mid-year entry, staff children and returning learners. This skips the inquiry, assessment and
-    assessment fee, but creates the same student record, guardian and parent-portal account as a normal enrolment,
-    and notifies Finance to set up term fees. The reason, and who enrolled the learner and when, are recorded for review
+    For transfers, mid-year entry, staff children and returning students. This skips the inquiry, assessment and
+    assessment fee, but creates the same student record, parent and parent-portal account as a normal enrolment,
+    and notifies Finance to set up term fees. The reason, and who enrolled the student and when, are recorded for review
     under <a href="{% url 'admissions:direct_enrolments' %}">Direct enrolments</a>.
   </div>
 
@@ -36,13 +36,13 @@
       </div>
     {% endif %}
 
-    <div class="de-section">Why is this learner being enrolled directly?</div>
+    <div class="de-section">Why is this student being enrolled directly?</div>
     <div class="de-grid">
       {% include "admissions/_de_field.html" with field=form.reason %}
       <div style="grid-column:span 2">{% include "admissions/_de_field.html" with field=form.reason_note %}</div>
     </div>
 
-    <div class="de-section">Learner</div>
+    <div class="de-section">Student</div>
     <div class="de-grid">
       {% include "admissions/_de_field.html" with field=form.first_name %}
       {% include "admissions/_de_field.html" with field=form.last_name %}
@@ -62,7 +62,7 @@
       {% include "admissions/_de_field.html" with field=form.enrolment_date %}
     </div>
 
-    <div class="de-section">Parent / guardian</div>
+    <div class="de-section">Parent</div>
     <div class="de-grid">
       {% include "admissions/_de_field.html" with field=form.parent_full_name %}
       {% include "admissions/_de_field.html" with field=form.parent_relationship %}
@@ -83,7 +83,7 @@
 
     <div style="display:flex;justify-content:space-between;margin-top:28px">
       <a href="{% url 'admissions:pipeline' %}" class="hf-btn hf-btn-secondary" style="text-decoration:none">Cancel</a>
-      <button type="submit" class="hf-btn hf-btn-primary">Enrol learner</button>
+      <button type="submit" class="hf-btn hf-btn-primary">Enrol student</button>
     </div>
   </form>
 </div>

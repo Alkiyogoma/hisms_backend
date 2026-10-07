@@ -49,12 +49,12 @@
     <div class="at-fg sm"><label for="f-start">Start date</label><input id="f-start" type="date" name="start" value="{{ start|date:'Y-m-d' }}"></div>
     <div class="at-fg sm"><label for="f-end">End date</label><input id="f-end" type="date" name="end" value="{{ end|date:'Y-m-d' }}"></div>
     <div class="at-fg at-student"><label for="f-student">Student</label>
-      <input id="f-student" list="f-students" placeholder="All learners — type a name…" autocomplete="off" value="{% if student_row %}{{ student_row.name }} · {{ student_row.admission_no }}{% endif %}">
+      <input id="f-student" list="f-students" placeholder="All students — type a name…" autocomplete="off" value="{% if student_row %}{{ student_row.name }} · {{ student_row.admission_no }}{% endif %}">
       <input type="hidden" name="student" id="f-student-id" value="{% if student_row %}{{ student_row.id }}{% endif %}">
-      {% if student_row %}<button type="button" class="clear" id="f-student-clear" title="All learners">&times;</button>{% endif %}
+      {% if student_row %}<button type="button" class="clear" id="f-student-clear" title="All students">&times;</button>{% endif %}
       <datalist id="f-students">{% for r in roster %}<option value="{{ r.name }} · {{ r.admission_no }}" data-id="{{ r.id }}">{{ r.class_name }}</option>{% endfor %}</datalist>
     </div>
-    <div class="at-auto">Filters apply automatically. Click a figure to list those learners; click a learner for their pattern over the range.</div>
+    <div class="at-auto">Filters apply automatically. Click a figure to list those students; click a student for their pattern over the range.</div>
     <div class="at-quick">
       {% for q in quick %}<a href="{% querystring start=q.start|date:'Y-m-d' end=q.end|date:'Y-m-d' page=None %}" class="{% if q.on %}on{% endif %}">{{ q.label }}</a>{% endfor %}
     </div>
@@ -64,18 +64,18 @@
   {% if notes %}<p class="at-lead" style="margin-top:-4px">{{ period.days|length }} school day{{ period.days|length|pluralize }} in range. {% for n in notes %}{{ n }} {% endfor %}</p>{% endif %}
 
   <div class="at-stats">
-    <a href="{% querystring show='all' page=None %}" class="at-stat s-green{% if show == 'all' %} on{% endif %}"><div class="k">Average attendance</div><div class="v">{% if summary.average is not None %}{{ summary.average }}%{% else %}—{% endif %}</div><div class="n">Target {{ target }}% · {{ summary.marked }} learner-day{{ summary.marked|pluralize }} marked</div></a>
+    <a href="{% querystring show='all' page=None %}" class="at-stat s-green{% if show == 'all' %} on{% endif %}"><div class="k">Average attendance</div><div class="v">{% if summary.average is not None %}{{ summary.average }}%{% else %}—{% endif %}</div><div class="n">Target {{ target }}% · {{ summary.marked }} student-day{{ summary.marked|pluralize }} marked</div></a>
     <a href="{% querystring show='flag' page=None %}" class="at-stat s-amber{% if show == 'flag' %} on{% endif %}"><div class="k">Flagged · below {{ flag }}%</div><div class="v">{{ summary.flagged }}</div><div class="n">Requires support</div></a>
     <a href="{% querystring show='pers' page=None %}" class="at-stat s-red{% if show == 'pers' %} on{% endif %}"><div class="k">Persistent · below {{ persistent }}%</div><div class="v">{{ summary.persistent }}</div><div class="n">Immediate action</div></a>
     <a href="{% querystring show='late' page=None %}" class="at-stat s-purple{% if show == 'late' %} on{% endif %}"><div class="k">Habitually late</div><div class="v">{{ summary.habitually_late }}</div><div class="n">{{ habitual_late }}+ late arrivals · {{ summary.late }} in all</div></a>
-    <a href="{% querystring show='unm' page=None %}" class="at-stat s-grey{% if show == 'unm' %} on{% endif %}"><div class="k">Unmarked learner-days</div><div class="v">{{ summary.unmarked }}</div><div class="n">Excluded from the %</div></a>
+    <a href="{% querystring show='unm' page=None %}" class="at-stat s-grey{% if show == 'unm' %} on{% endif %}"><div class="k">Unmarked student-days</div><div class="v">{{ summary.unmarked }}</div><div class="n">Excluded from the %</div></a>
     <a href="{% querystring show='cls' page=None %}" class="at-stat s-blue{% if show == 'cls' %} on{% endif %}"><div class="k">By class</div><div class="v">{{ class_count }}</div><div class="n">Compare classes</div></a>
   </div>
-  <p class="at-openline">{{ summary.learners }} learner{{ summary.learners|pluralize }} on roll · <b>{{ summary.in_school }}</b> days in school (incl. <b>{{ summary.late }}</b> late) · <b>{{ summary.absent }}</b> absent · <b>{{ summary.excused }}</b> excused, out of {{ summary.marked }} marked. Unmarked days count as neither present nor absent.</p>
+  <p class="at-openline">{{ summary.learners }} student{{ summary.learners|pluralize }} on roll · <b>{{ summary.in_school }}</b> days in school (incl. <b>{{ summary.late }}</b> late) · <b>{{ summary.absent }}</b> absent · <b>{{ summary.excused }}</b> excused, out of {{ summary.marked }} marked. Unmarked days count as neither present nor absent.</p>
 
   <div class="at-card">
     <div class="at-card-h">
-      <div><h2>Status comparison</h2><p class="hint" style="margin-bottom:0">{{ period.label }}, {% if chart.unit == 'week' %}learners per school day, one point per week{% else %}learners, one point per school day{% endif %} — {% if student_row %}{{ student_row.name }}{% elif class_name %}{{ class_name }}{% else %}all classes{% endif %}. Click a {{ chart.unit }} to report on it alone.</p></div>
+      <div><h2>Status comparison</h2><p class="hint" style="margin-bottom:0">{{ period.label }}, {% if chart.unit == 'week' %}students per school day, one point per week{% else %}students, one point per school day{% endif %} — {% if student_row %}{{ student_row.name }}{% elif class_name %}{{ class_name }}{% else %}all classes{% endif %}. Click a {{ chart.unit }} to report on it alone.</p></div>
       <div class="at-legend">
         <span><i style="background:var(--at-green)"></i>Present</span><span><i style="background:var(--at-amber)"></i>Late</span>
         <span><i style="background:var(--at-purple)"></i>Excused</span><span><i style="background:var(--at-red)"></i>Absent</span>
@@ -121,16 +121,16 @@
           <div class="lb">{{ c.name }}</div>
           <div class="tr"><div class="fl f-{{ c.band }}" style="width:{% if c.average is not None %}{{ c.average|floatformat:0 }}{% else %}0{% endif %}%"></div><span class="tg" style="left:{{ target }}%"></span></div>
           <div class="vv c-{{ c.band }}">{% if c.average is not None %}{{ c.average }}%{% else %}—{% endif %}</div>
-          <div class="ex">{{ c.learners }} learners · {{ c.absent }} A · {{ c.excused }} E · {{ c.late }} L</div>
+          <div class="ex">{{ c.learners }} students · {{ c.absent }} A · {{ c.excused }} E · {{ c.late }} L</div>
         </a>
-      {% empty %}<div class="at-empty">No learners in this selection.</div>{% endfor %}
+      {% empty %}<div class="at-empty">No students in this selection.</div>{% endfor %}
       <div class="at-basis">One low class points to something local. Low across the board points to the calendar or the marking.</div>
 
     {% elif show == 'unm' %}
       <h2>Unconfirmed registers</h2>
-      <p class="hint">Days where a register was never or only partly confirmed, and registers confirmed after 09:00 — {{ issue_learner_days }} learner-day{{ issue_learner_days|pluralize }} unmarked.</p>
+      <p class="hint">Days where a register was never or only partly confirmed, and registers confirmed after 09:00 — {{ issue_learner_days }} student-day{{ issue_learner_days|pluralize }} unmarked.</p>
       <div class="at-scroll"><table class="at-table">
-        <thead><tr><th>Date</th><th>Class</th><th>Class teacher</th><th class="num">Learners unconfirmed</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Date</th><th>Class</th><th>Class teacher</th><th class="num">Students unconfirmed</th><th>Status</th><th></th></tr></thead>
         <tbody>
         {% for i in issues %}
           <tr><td style="white-space:nowrap">{{ i.date|date:"D j M Y" }}</td><td>{{ i.class_name }}</td><td>{{ i.teacher|default:"—" }}</td>
@@ -141,17 +141,17 @@
           <tr><td colspan="6"><div class="at-empty">Every register in this range was confirmed on time.</div></td></tr>
         {% endfor %}
         </tbody></table></div>
-      <div class="at-basis">Unconfirmed learners are not absent learners — they are excluded from every percentage. Past registers are corrected through a correction request.</div>
+      <div class="at-basis">Unconfirmed students are not absent students — they are excluded from every percentage. Past registers are corrected through a correction request.</div>
 
     {% else %}
       <div class="at-card-h">
         <div>
-          <h2>{% if show == 'flag' %}Flagged — below {{ flag }}%{% elif show == 'pers' %}Persistent absence — below {{ persistent }}%{% elif show == 'late' %}Habitually late{% else %}All learners{% endif %} <span class="at-muted" style="font-weight:600">· {{ page_obj.paginator.count }}</span></h2>
+          <h2>{% if show == 'flag' %}Flagged — below {{ flag }}%{% elif show == 'pers' %}Persistent absence — below {{ persistent }}%{% elif show == 'late' %}Habitually late{% else %}All students{% endif %} <span class="at-muted" style="font-weight:600">· {{ page_obj.paginator.count }}</span></h2>
           <p class="hint" style="margin-bottom:0">{% if show == 'flag' %}Attendance below the {{ flag }}% flag but at or above {{ persistent }}%.{% elif show == 'pers' %}Below {{ persistent }}% attendance. Immediate follow-up with parents.{% elif show == 'late' %}{{ habitual_late }} or more late arrivals. Reported separately so punctuality stays visible.{% else %}Lowest attendance first over the selected range. Absent and excused both count as not in school; excused is shown separately.{% endif %}</p>
         </div>
         <form method="get" class="at-fg" style="min-width:200px">
           {% for k, v in request.GET.items %}{% if k != 'q' and k != 'page' %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endif %}{% endfor %}
-          <input type="search" name="q" value="{{ query }}" placeholder="Search learners…" aria-label="Search learners">
+          <input type="search" name="q" value="{{ query }}" placeholder="Search students…" aria-label="Search students">
         </form>
       </div>
       <div class="at-scroll"><table class="at-table">
@@ -163,7 +163,7 @@
             <td class="at-mono">{{ r.admission_no }}</td><td class="num"><b>{{ r.late }}</b></td><td class="num">{{ r.late_share }}%</td>
             <td>{% include "attendance/_meter.html" with pct=r.rate band=r.band %}</td>
             <td>{% if r.late >= 8 %}<span class="at-tag t-red">Habitually late</span>{% else %}<span class="at-tag t-amber">Watch</span>{% endif %}</td></tr>
-        {% empty %}<tr><td colspan="6"><div class="at-empty">No learner was late {{ habitual_late }} or more times in this range.</div></td></tr>{% endfor %}
+        {% empty %}<tr><td colspan="6"><div class="at-empty">No student was late {{ habitual_late }} or more times in this range.</div></td></tr>{% endfor %}
         </tbody>
         {% else %}
         <thead><tr><th>Student information</th><th>Admission no.</th><th>Rate</th><th class="num">Days marked</th><th class="num">Absent</th><th class="num">Excused</th><th class="num">Late</th><th>Status</th></tr></thead>
@@ -177,7 +177,7 @@
             <td class="num"><span class="at-tag t-purple">{{ r.excused }}</span></td>
             <td class="num">{{ r.late }}</td>
             <td><span class="at-tag t-{{ r.tag.0 }}">{{ r.tag.1 }}</span></td></tr>
-        {% empty %}<tr><td colspan="8"><div class="at-empty">{% if query %}No learners match “{{ query }}”.{% elif show == 'all' %}No learners in this selection.{% else %}No learners fall in this band — good news.{% endif %}</div></td></tr>{% endfor %}
+        {% empty %}<tr><td colspan="8"><div class="at-empty">{% if query %}No students match “{{ query }}”.{% elif show == 'all' %}No students in this selection.{% else %}No students fall in this band — good news.{% endif %}</div></td></tr>{% endfor %}
         </tbody>
         {% endif %}
       </table></div>
@@ -192,7 +192,7 @@
         </span>
       </div>
       {% endif %}
-      <div class="at-basis">{% if show == 'late' %}A learner can hold a high attendance rate and still arrive late most days.{% elif show == 'pers' %}Missing a fifth of school. The excused column shows whether this is a truancy or a medical conversation.{% elif show == 'flag' %}Below {{ flag }}% is where most Cambridge-curriculum schools set a target for improvement.{% else %}Counted from each learner's admission date. Days never marked are excluded from the calculation entirely; “+n” shows a learner's unmarked days.{% endif %}</div>
+      <div class="at-basis">{% if show == 'late' %}A student can hold a high attendance rate and still arrive late most days.{% elif show == 'pers' %}Missing a fifth of school. The excused column shows whether this is a truancy or a medical conversation.{% elif show == 'flag' %}Below {{ flag }}% is where most Cambridge-curriculum schools set a target for improvement.{% else %}Counted from each student's admission date. Days never marked are excluded from the calculation entirely; “+n” shows a student's unmarked days.{% endif %}</div>
     {% endif %}
   </div>
   </div>

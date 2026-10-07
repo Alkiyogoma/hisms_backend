@@ -430,7 +430,7 @@ class DisciplineParentConfirmView(DepartmentScopedMixin, RoleRequiredMixin, View
             guardian_profile = getattr(request.user, 'guardian_profile', None)
             if not guardian_profile:
                 from django.core.exceptions import PermissionDenied
-                raise PermissionDenied("No guardian profile linked to your account.")
+                raise PermissionDenied("No parent profile linked to your account.")
             from students.models import StudentGuardian
             if not StudentGuardian.objects.filter(guardian=guardian_profile, student=incident.student).exists():
                 from django.core.exceptions import PermissionDenied

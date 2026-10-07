@@ -101,7 +101,7 @@ var ECD = ['Pre-KG','Kindergarten','Preschool','ABC'];
 var GRADES = ECD.concat(Array.from({length:9},function(_,i){return 'Grade '+(i+1)}));
 
 var STEPS = ['Child Information','Parent Information','Appointment'];
-var STEPS_LABELS = ["Child's information","Parent and guardian details","Preferred meeting date"];
+var STEPS_LABELS = ["Child's information","Parent details","Preferred meeting date"];
 
 var S = {
   step: 0,
@@ -142,7 +142,7 @@ function stepChild(){
 }
 
 function stepParent(){
-  return '<p class="eyebrow">Inquiry \u00b7 Step 2 of 3</p><h1 class="step-t">Parent / Guardian Information</h1>'+
+  return '<p class="eyebrow">Inquiry \u00b7 Step 2 of 3</p><h1 class="step-t">Parent Information</h1>'+
   '<p class="lede">The first contact listed receives all invoices, reports and school notices.</p>'+
   '<div class="grid">'+
     field('Full Name','parent.name',{span:true})+

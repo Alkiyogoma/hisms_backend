@@ -480,7 +480,7 @@ class InquiryCreateView(AdmissionsCountsMixin, PermissionCacheMixin, AdmissionsR
                             f"{child_name}. Your inquiry has reached us safely, and "
                             f"we're glad you got in touch.\n\n"
                             "Here's what we have on record:\n\n"
-                            f"Learner: {child_name}\n"
+                            f"Student: {child_name}\n"
                             f"Grade enquired for: {grade}\n"
                             f"Your reference number: {ref_number}\n\n"
                             "Our Head of School reviews each inquiry personally and "
@@ -562,9 +562,9 @@ class InquiryCreateView(AdmissionsCountsMixin, PermissionCacheMixin, AdmissionsR
                     e01_body = (
                         f"A new admission inquiry has been submitted.\n\n"
                         f"Reference: {ref_number}\n"
-                        f"Learner: {child_name}\n"
+                        f"Student: {child_name}\n"
                         f"Grade enquired for: {grade}\n"
-                        f"Parent or guardian: {parent_name}\n"
+                        f"Parent: {parent_name}\n"
                         f"Phone: {getattr(self.object, 'parent_phone', '')}\n"
                         f"Email: {getattr(self.object, 'parent_email', '')}\n\n"
                         f"Meeting date requested by the parent: "
@@ -1449,7 +1449,7 @@ class MeetingScheduleView(HtmxRequiredMixin, PermissionCacheMixin, AdmissionsRol
                 from communications.email_service import send_email_safe, dispatch_notification
                 from core.models import SchoolSettings
                 contact = SchoolSettings.get_settings().get_admissions_contact()
-                parent_name = applicant.parent_full_name or "Parent/Guardian"
+                parent_name = applicant.parent_full_name or "Parent"
                 ref = applicant.reference_number
                 day_str = meeting.meeting_date.strftime("%A, %d %B %Y")
                 time_str = meeting.meeting_time.strftime("%I:%M %p").lstrip("0")
@@ -1567,7 +1567,7 @@ class MeetingRescheduleView(HtmxRequiredMixin, PermissionCacheMixin, AdmissionsR
                 from communications.email_service import send_email_safe, dispatch_notification
                 from core.models import SchoolSettings
                 contact = SchoolSettings.get_settings().get_admissions_contact()
-                parent_name = applicant.parent_full_name or "Parent/Guardian"
+                parent_name = applicant.parent_full_name or "Parent"
                 ref = applicant.reference_number
                 prev_day_str = old_date.strftime("%A, %d %B %Y")
                 new_day_str = updated_meeting.meeting_date.strftime("%A, %d %B %Y")
@@ -2191,7 +2191,7 @@ class ToggleDocumentView(HtmxRequiredMixin, PermissionCacheMixin, AdmissionsRole
                 from core.email_templates import send_dynamic_email
                 from core.models import SchoolSettings
                 tpl_context = {
-                    "parent_name": applicant.parent_full_name or "Parent/Guardian",
+                    "parent_name": applicant.parent_full_name or "Parent",
                     "child_name": applicant.child_full_name,
                     "document_type": doc_label,
                     "ref": applicant.reference_number,
@@ -2883,7 +2883,7 @@ class ParentInquiryView(TemplateView):
                             f"{_child_name}. Your inquiry has reached us safely, and "
                             f"we're glad you got in touch.\n\n"
                             "Here's what we have on record:\n\n"
-                            f"Learner: {_child_name}\n"
+                            f"Student: {_child_name}\n"
                             f"Grade enquired for: {_grade}\n"
                             f"Your reference number: {_ref_number}\n\n"
                             "Our Head of School reviews each inquiry personally and "
@@ -2964,9 +2964,9 @@ class ParentInquiryView(TemplateView):
                     e01_body = (
                         f"A new admission inquiry has been submitted.\n\n"
                         f"Reference: {_ref_number}\n"
-                        f"Learner: {_child_name}\n"
+                        f"Student: {_child_name}\n"
                         f"Grade enquired for: {_grade}\n"
-                        f"Parent or guardian: {_parent_name}\n"
+                        f"Parent: {_parent_name}\n"
                         f"Phone: {_parent_phone_val}\n"
                         f"Email: {_parent_email}\n\n"
                         f"Meeting date requested by the parent: "

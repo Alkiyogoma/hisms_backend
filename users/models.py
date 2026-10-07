@@ -12,7 +12,7 @@ class UserRole(models.TextChoices):
     ADMIN_OFFICER = "admin_officer", "Admin Officer"
     FINANCE_OFFICER = "finance_officer", "Finance Officer"
     TEACHER = "teacher", "Teacher"
-    PARENT = "parent", "Parent / Guardian"
+    PARENT = "parent", "Parent"
 
 
 class User(AbstractUser):

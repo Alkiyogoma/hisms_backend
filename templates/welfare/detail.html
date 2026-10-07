@@ -96,7 +96,7 @@
 
     <!-- Student & Record Metadata -->
     <div class="data-grid">
-      <div class="data-item"><span class="data-label">Learner's Name</span><a href="{% url 'students:detail' obs.student.pk %}" class="data-value" style="text-decoration:none;color:var(--hodari-blue)">{{ obs.student.first_name }} {{ obs.student.last_name }}</a></div>
+      <div class="data-item"><span class="data-label">Student's Name</span><a href="{% url 'students:detail' obs.student.pk %}" class="data-value" style="text-decoration:none;color:var(--hodari-blue)">{{ obs.student.first_name }} {{ obs.student.last_name }}</a></div>
       <div class="data-item"><span class="data-label">Class/Grade</span><span class="data-value">{{ obs.student.class_name }}</span></div>
       <div class="data-item"><span class="data-label">Date of Observation</span><span class="data-value">{{ obs.observation_date|date:"F d, Y" }}</span></div>
       

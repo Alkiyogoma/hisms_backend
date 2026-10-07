@@ -56,7 +56,7 @@ class DirectEnrolmentReason(models.TextChoices):
     TRANSFER = "transfer", "Transfer from another school"
     MID_YEAR = "mid_year", "Mid-year entry"
     STAFF_CHILD = "staff_child", "Staff child"
-    RETURNING = "returning", "Returning learner"
+    RETURNING = "returning", "Returning student"
 
 
 # Common schools in Dar es Salaam area — used by get_previous_school_choices()
@@ -424,7 +424,7 @@ class ApplicantDocumentType(models.TextChoices):
     # Uploaded by parents on the online admission form. Useful records, but
     # not part of ENROLMENT_REQUIRED_DOCUMENTS.
     PREVIOUS_REPORT = "previous_report", "Previous school report"
-    STUDENT_PHOTO = "student_photo", "Passport photo of the learner"
+    STUDENT_PHOTO = "student_photo", "Passport photo of the student"
     PASSPORT_PERMIT = "passport_permit", "Passport or residence permit"
     PARENT_ID = "parent_id", "Parent national ID"
 

@@ -126,9 +126,9 @@
   {% include "attendance/_register_sheet.html" with letterhead=True %}
 
 {% elif kind == 'student' %}
-  <div class="doc-title"><h1>Learner Attendance Record</h1><span class="scope">{{ period.label }}</span></div>
+  <div class="doc-title"><h1>Student Attendance Record</h1><span class="scope">{{ period.label }}</span></div>
   <div class="meta">
-    <div><span>Learner</span><b>{{ student.first_name }} {{ student.last_name }}</b></div>
+    <div><span>Student</span><b>{{ student.first_name }} {{ student.last_name }}</b></div>
     <div><span>Admission no.</span><b>{{ student.admission_no }}</b></div>
     <div><span>Class</span><b>{{ row.class_name|default:student.class_name }}</b></div>
     <div><span>Admitted</span><b>{{ student.enrolment_date|date:"j M Y"|default:"—" }}</b></div>
@@ -152,7 +152,7 @@
     <div class="days">{% for c in m.cells %}<div><span class="c c-{{ c.code }}">{% if c.code == 'U' %}–{% elif c.code == 'F' or not c.code %}&nbsp;{% else %}{{ c.code }}{% endif %}</span>{{ c.date|date:"D j" }}</div>{% endfor %}</div>
   {% endfor %}
   {% if row.absent and pattern.worst_weekday %}<p style="font-size:9pt;margin:8px 0 0">Most absences fall on a <b>{{ pattern.worst_weekday.0 }}</b> ({{ pattern.worst_weekday.1 }} of {{ row.absent }}).</p>{% endif %}
-  {% else %}<div class="empty">No school days for this learner in the period.</div>{% endif %}
+  {% else %}<div class="empty">No school days for this student in the period.</div>{% endif %}
 
 {% elif kind == 'today' %}
   <div class="doc-title"><h1>Daily Attendance Roster</h1><span class="scope">{{ class_name|default:"Whole school" }}</span></div>
@@ -175,10 +175,10 @@
     <div class="kpi k-grey"><span>Not marked</span><b>{{ summary.unconfirmed }}</b><small>excluded from %</small></div>
   </div>
   {% if non_school_reason %}<div class="empty" style="margin-bottom:8px">{{ date|date:"l j F" }} is {{ non_school_reason }}.</div>{% endif %}
-  <h2>Roster <small>{{ rows|length }} learner{{ rows|length|pluralize }}</small></h2>
+  <h2>Roster <small>{{ rows|length }} student{{ rows|length|pluralize }}</small></h2>
   {% if rows %}
   <table class="t">
-    <thead><tr><th class="n">#</th><th>Learner</th><th>Adm. no</th>{% if not class_name %}<th>Class</th>{% endif %}<th>Status</th><th>Marked at</th><th>Checked out</th><th class="r">Term rate</th></tr></thead>
+    <thead><tr><th class="n">#</th><th>Student</th><th>Adm. no</th>{% if not class_name %}<th>Class</th>{% endif %}<th>Status</th><th>Marked at</th><th>Checked out</th><th class="r">Term rate</th></tr></thead>
     <tbody>
     {% for row in rows %}
       <tr><td class="n">{{ forloop.counter }}</td><td><b>{{ row.student.first_name }} {{ row.student.last_name }}</b></td><td class="mono">{{ row.student.admission_no }}</td>
@@ -190,7 +190,7 @@
     {% endfor %}
     </tbody>
   </table>
-  {% else %}<div class="empty">No learners on roll.</div>{% endif %}
+  {% else %}<div class="empty">No students on roll.</div>{% endif %}
   {% if class_status and not class_name %}
   <h2>Registers <small>{{ unmarked_classes|length }} class{{ unmarked_classes|length|pluralize:"es" }} not fully marked</small></h2>
   <table class="t">
@@ -205,8 +205,8 @@
     <div><span>Period</span><b>{{ period.label }}</b></div>
     <div><span>School days</span><b>{{ period.days|length }}</b></div>
     <div><span>Class</span><b>{{ class_name|default:"All classes" }}</b></div>
-    <div><span>Learners</span><b>{% if student_row %}{{ student_row.name }}{% else %}{{ summary.learners }} on roll{% endif %}</b></div>
-    <div><span>Learner-days marked</span><b>{{ summary.marked }}</b></div>
+    <div><span>Students</span><b>{% if student_row %}{{ student_row.name }}{% else %}{{ summary.learners }} on roll{% endif %}</b></div>
+    <div><span>Student-days marked</span><b>{{ summary.marked }}</b></div>
     <div><span>Not marked</span><b>{{ summary.unmarked }}</b></div>
     <div><span>Prepared by</span><b>{{ request.user.get_full_name|default:request.user.username }}</b></div>
     <div><span>Generated</span><b>{{ generated_at|date:"j M Y, H:i" }}</b></div>
@@ -220,7 +220,7 @@
     <div class="kpi k-blue"><span>Absent / excused</span><b>{{ summary.absent }}/{{ summary.excused }}</b><small>{{ summary.late }} late</small></div>
   </div>
 
-  <h2>1. {% if show == 'flag' %}Flagged learners — below {{ flag }}%{% elif show == 'pers' %}Persistent absence — below {{ persistent }}%{% elif show == 'late' %}Habitually late{% elif show == 'unm' %}Unconfirmed registers{% elif show == 'cls' %}Attendance by class{% else %}All learners{% endif %} <small>{% if show == 'late' %}most late first{% elif show == 'unm' or show == 'cls' %}{% else %}lowest attendance first{% endif %}{% if query %} · matching “{{ query }}”{% endif %}</small></h2>
+  <h2>1. {% if show == 'flag' %}Flagged students — below {{ flag }}%{% elif show == 'pers' %}Persistent absence — below {{ persistent }}%{% elif show == 'late' %}Habitually late{% elif show == 'unm' %}Unconfirmed registers{% elif show == 'cls' %}Attendance by class{% else %}All students{% endif %} <small>{% if show == 'late' %}most late first{% elif show == 'unm' or show == 'cls' %}{% else %}lowest attendance first{% endif %}{% if query %} · matching “{{ query }}”{% endif %}</small></h2>
   {% if show == 'unm' %}
     {% if issues %}
     <table class="t"><thead><tr><th>Date</th><th>Class</th><th>Class teacher</th><th class="r">Unconfirmed</th><th>Status</th></tr></thead>
@@ -229,7 +229,7 @@
   {% elif show != 'cls' %}
     {% if rows %}
     <table class="t">
-      <thead><tr><th class="n">#</th><th>Learner</th><th>Adm. no</th><th>Class</th><th class="r">Rate</th><th class="r">Marked</th><th class="r">Absent</th><th class="r">Excused</th><th class="r">Late</th><th>Status</th></tr></thead>
+      <thead><tr><th class="n">#</th><th>Student</th><th>Adm. no</th><th>Class</th><th class="r">Rate</th><th class="r">Marked</th><th class="r">Absent</th><th class="r">Excused</th><th class="r">Late</th><th>Status</th></tr></thead>
       <tbody>
       {% for r in rows %}
         <tr><td class="n">{{ forloop.counter }}</td><td style="white-space:nowrap"><b>{{ r.name }}</b></td><td class="mono">{{ r.admission_no }}</td><td style="white-space:nowrap">{{ r.class_name }}</td>
@@ -238,23 +238,23 @@
       {% endfor %}
       </tbody>
     </table>
-    {% else %}<div class="empty">No learners in this selection.</div>{% endif %}
+    {% else %}<div class="empty">No students in this selection.</div>{% endif %}
   {% endif %}
 
   <h2>{% if show == 'cls' %}1b{% else %}2{% endif %}. Attendance by class <small>marker at the {{ target }}% target</small></h2>
   {% if classes_summary %}
   <table class="t">
-    <thead><tr><th>Class</th><th style="width:34%">Attendance</th><th class="r">%</th><th class="r">Learners</th><th class="r">Absent</th><th class="r">Excused</th><th class="r">Late</th><th class="r">Not marked</th></tr></thead>
+    <thead><tr><th>Class</th><th style="width:34%">Attendance</th><th class="r">%</th><th class="r">Students</th><th class="r">Absent</th><th class="r">Excused</th><th class="r">Late</th><th class="r">Not marked</th></tr></thead>
     <tbody>{% for c in classes_summary %}
       <tr><td style="white-space:nowrap">{{ c.name }}</td>
         <td><div class="bar"><i class="f-{{ c.band }}" style="width:{% if c.average is not None %}{{ c.average|floatformat:0 }}{% else %}0{% endif %}%"></i><u style="left:{{ target }}%"></u></div></td>
         <td class="r mono b-{{ c.band }}">{% if c.average is not None %}{{ c.average }}{% else %}—{% endif %}</td><td class="r">{{ c.learners }}</td><td class="r">{{ c.absent }}</td><td class="r">{{ c.excused }}</td><td class="r">{{ c.late }}</td><td class="r">{{ c.unmarked }}</td></tr>
     {% endfor %}</tbody>
   </table>
-  {% else %}<div class="empty">No learners in this selection.</div>{% endif %}
+  {% else %}<div class="empty">No students in this selection.</div>{% endif %}
 
   {% if chart.points %}
-  <h2>3. Over time <small>learner-days per {{ chart.unit }}{% if chart.unit == 'week' %} (school days in brackets){% endif %}</small></h2>
+  <h2>3. Over time <small>student-days per {{ chart.unit }}{% if chart.unit == 'week' %} (school days in brackets){% endif %}</small></h2>
   <table class="t">
     <thead><tr><th>{% if chart.unit == 'day' %}Day{% else %}Week{% endif %}</th><th class="r">Present</th><th class="r">Late</th><th class="r">Excused</th><th class="r">Absent</th><th class="r">Not marked</th><th class="r">Attendance</th></tr></thead>
     <tbody>{% for p in chart.points %}
@@ -276,9 +276,9 @@
   <div class="notes">
     <b>How to read this {% if kind == 'today' %}roster{% else %}report{% endif %}</b>
     <ul>
-      <li>Attendance = days in school ÷ days marked. Learners not yet marked count as neither present nor absent and are left out of every percentage.</li>
-      <li>Late learners are in school and counted as present; lateness is also shown as its own figure. Excused is not in school and shown separately. Reasons for excusal are never printed.</li>
-      {% if kind != 'today' %}<li>Weekends, school holidays and days outside term dates are omitted. Learners admitted during the period are counted from their admission date.{% for n in notes %} {{ n }}{% endfor %}</li>{% endif %}
+      <li>Attendance = days in school ÷ days marked. Students not yet marked count as neither present nor absent and are left out of every percentage.</li>
+      <li>Late students are in school and counted as present; lateness is also shown as its own figure. Excused is not in school and shown separately. Reasons for excusal are never printed.</li>
+      {% if kind != 'today' %}<li>Weekends, school holidays and days outside term dates are omitted. Students admitted during the period are counted from their admission date.{% for n in notes %} {{ n }}{% endfor %}</li>{% endif %}
       {% if kind == 'report' %}<li>Target {{ target }}%. Flagged: {{ persistent }}–{{ flag|add:-1 }}%. Persistent absence: below {{ persistent }}%. Habitually late: {{ habitual_late }} or more late arrivals.</li>{% endif %}
     </ul>
   </div>

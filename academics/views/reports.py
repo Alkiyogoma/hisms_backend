@@ -287,6 +287,65 @@ def _remark_rows(student, term):
     return [(name, remarks.get(name, "")) for name in sorted(names)]
 
 
+def _photo_data_uri(student):
+    """The learner's photo inlined as a data: URI, so the PDF engine never
+    has to fetch it over HTTP (media may sit behind login). None if absent."""
+    import base64
+    import mimetypes
+    f = student.photo_file()
+    if not f:
+        return None
+    mime = mimetypes.guess_type(f.name)[0] or ""
+    if not mime.startswith("image/"):
+        return None
+    try:
+        f.open("rb")
+        try:
+            data = f.read()
+        finally:
+            f.close()
+    except (OSError, ValueError):
+        return None
+    if not data or len(data) > 5 * 1024 * 1024:
+        return None
+    return f"data:{mime};base64,{base64.b64encode(data).decode()}"
+
+
+TRAIT_GROUPS = [
+    ("Work Habits", [
+        ("Works well independently", "wh_works_independently"),
+        ("Completes work neatly", "wh_completes_neatly"),
+        ("Completes work required", "wh_completes_required"),
+        ("Does not disturb others", "wh_not_disturb"),
+        ("Follows directions", "wh_follows_directions"),
+    ]),
+    ("Personal Traits", [
+        ("Displays creativity", "pt_creativity"),
+        ("Is honest", "pt_honest"),
+        ("Successfully completes homework and assignments", "pt_homework"),
+        ("Attention span", "pt_attention"),
+        ("Displays flexibility", "pt_flexibility"),
+    ]),
+    ("Social Traits", [
+        ("Show respect for authority", "st_respects"),
+        ("Exhibits self-control", "st_self_control"),
+        ("Responds well to correction", "st_correction"),
+        ("Relates well with others", "st_relates_well"),
+        ("Is courteous", "st_courteous"),
+    ]),
+]
+
+
+def _trait_groups(traits):
+    """[(title, rows)] with two traits per row: [(label, grade), (label, grade) | None]."""
+    groups = []
+    for title, items in TRAIT_GROUPS:
+        cells = [(label, traits.get(key) or "-") for label, key in items]
+        rows = [(cells[i], cells[i + 1] if i + 1 < len(cells) else None) for i in range(0, len(cells), 2)]
+        groups.append((title, rows))
+    return groups
+
+
 def _build_report_card_context(report):
     """
     Build the shared context dict for report card rendering (both preview and PDF).
@@ -296,27 +355,28 @@ def _build_report_card_context(report):
     """
     ctx = {"report": report, "student": report.student}
 
-    from attendance.models import PRESENT_STATUSES, AttendanceEntry, AttendanceStatus
+    # Attendance over the term's school days so far: weekends, holidays and
+    # days before enrolment are left out, and unmarked days are never counted
+    # as absent. Present includes late; absent includes excused.
+    from attendance import analytics
     term = report.term
-    att_filter = {"student": report.student}
-    if term and term.start_date and term.end_date:
-        att_filter["date__range"] = (term.start_date, term.end_date)
-    entries = AttendanceEntry.objects.filter(**att_filter)
+    start, end = analytics.term_range(term)
+    row = analytics.learner_attendance(report.student, start, end)["row"] or {}
     ctx["attendance"] = {
-        # Present includes late; "late" is shown as "of which late".
-        "present": entries.filter(status__in=PRESENT_STATUSES).count(),
-        "absent": entries.filter(status=AttendanceStatus.ABSENT).count(),
-        "late": entries.filter(status=AttendanceStatus.LATE).count(),
+        "present": row.get("in_school", 0),
+        "late": row.get("late", 0),
+        "absent": row.get("absent", 0) + row.get("excused", 0),
+        "excused": row.get("excused", 0),
+        "marked": row.get("marked", 0),
+        "rate": row.get("rate"),
     }
+    ctx["photo_src"] = _photo_data_uri(report.student)
 
     if report.is_ecd_report:
         ctx["ecd"] = build_ecd_report_context(report)
         return ctx
 
-    # Primary report: attendance rate
-    a = ctx["attendance"]
-    total = a["present"] + a["absent"] + a["late"]
-    a["rate"] = int((a["present"] / total * 100)) if total > 0 else 100
+    ctx["trait_groups"] = _trait_groups(report.general_traits or {})
 
     # Subject scores with weighted averages and gap detection
     scores = ExamScore.objects.filter(
@@ -347,23 +407,11 @@ def _build_report_card_context(report):
     ctx["subjects"] = subjects
     ctx["remark_rows"] = _remark_rows(report.student, report.term)
 
-    # Compute overall_average if not set on the report
-    if report.overall_average is None and subjects:
-        total = Decimal(0)
-        count = 0
-        for subj, data in subjects.items():
-            if data.get("avg") is not None:
-                total += Decimal(str(data["avg"]))
-                count += 1
-        if count > 0:
-            ctx["computed_average"] = total / count
-
-    # How many subjects the (approved-only) average covers, for display.
-    from academics.score_progress import student_progress
-    progress = student_progress(report.student, report.term)
-    ctx["average_included_subjects"] = progress["included_subjects"]
-    ctx["average_total_subjects"] = progress["mark_subjects"]
-    ctx["report_is_complete"] = progress["is_complete"]
+    # ACADEMIC PROGRESS table: approved, mark-bearing subjects only. The exam
+    # average and grade appear only once the term is fully assessed — never
+    # the stored average, which may predate later scores.
+    from academics.score_progress import exam_summary
+    ctx["exam"] = exam_summary(report.student, report.term)
 
     # Cambridge Checkpoint (FR-ACAD-005) -- Grades 6, 7, 8, and 9
     if report.student.class_name in ["Grade 6", "Grade 7", "Grade 8", "Grade 9"]:

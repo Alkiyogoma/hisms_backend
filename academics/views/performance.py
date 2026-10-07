@@ -185,7 +185,7 @@ class PerformanceReportView(RoleRequiredMixin, TemplateView):
         response = HttpResponse(content_type="text/csv")
         response["Content-Disposition"] = 'attachment; filename="performance-report.csv"'
         writer = csv.writer(response)
-        writer.writerow(["Learner", "Admission no", "Class", "Subject", "Mark (%)", "Grade", "Status", "Assessments"])
+        writer.writerow(["Student", "Admission no", "Class", "Subject", "Mark (%)", "Grade", "Status", "Assessments"])
         for r in rows:
             writer.writerow([r["name"], r["admission_no"], r["class_name"], r["subject"],
                              r["mark"], r["grade"], r["status"], r["assessments"]])

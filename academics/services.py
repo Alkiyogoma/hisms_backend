@@ -55,31 +55,11 @@ def generate_class_reports(term_id, class_name, user):
                 # Skip this student — comment not yet entered
                 continue
 
-            # calculate overall average using dynamic exam weights with gap detection
-            scores = ExamScore.objects.filter(student=student, term=term, status=ScoreStatus.APPROVED).mark_bearing()
-            # Group by subject
-            subjects = {}
-            for s in scores:
-                if s.subject_name not in subjects:
-                    subjects[s.subject_name] = {}
-                subjects[s.subject_name][s.exam_type] = float(s.score)
-            
-            exam_weights = get_exam_weights()
-            total_weighted_sum = Decimal(0)
-            valid_subject_count = 0
-            
-            for subj, exams in subjects.items():
-                grade_result = compute_grade_with_gaps(
-                    scores=exams,
-                    weights=exam_weights,
-                )
-                if grade_result["average"] is not None:
-                    total_weighted_sum += Decimal(str(grade_result["average"]))
-                    valid_subject_count += 1
-            
-            if valid_subject_count > 0:
-                report.overall_average = total_weighted_sum / valid_subject_count
-        
+            # Exam average: approved, mark-bearing subjects only, and only once
+            # every one is fully assessed (None until then).
+            from academics.score_progress import exam_summary
+            report.overall_average = exam_summary(student, term)["average"]
+
         report.save()
 
         # FR-ATT-013: Populate attendance summary for this report card
@@ -107,33 +87,9 @@ def recalculate_report_card_average(report_card):
     if report_card.is_ecd_report:
         return
 
-    scores = ExamScore.objects.filter(
-        student=report_card.student,
-        term=report_card.term,
-        status=ScoreStatus.APPROVED,
-    ).mark_bearing()
-    subjects = {}
-    for s in scores:
-        if s.subject_name not in subjects:
-            subjects[s.subject_name] = {}
-        subjects[s.subject_name][s.exam_type] = float(s.score)
-
-    exam_weights = get_exam_weights()
-    total_weighted_sum = Decimal(0)
-    valid_subject_count = 0
-    for subj, exams in subjects.items():
-        grade_result = compute_grade_with_gaps(
-            scores=exams,
-            weights=exam_weights,
-        )
-        if grade_result["average"] is not None:
-            total_weighted_sum += Decimal(str(grade_result["average"]))
-            valid_subject_count += 1
-
-    if valid_subject_count > 0:
-        report_card.overall_average = total_weighted_sum / valid_subject_count
-    else:
-        report_card.overall_average = None
+    # Approved, mark-bearing subjects only; None until the term is fully assessed.
+    from academics.score_progress import exam_summary
+    report_card.overall_average = exam_summary(report_card.student, report_card.term)["average"]
     report_card.save(update_fields=["overall_average", "updated_at"])
 
 
@@ -208,27 +164,10 @@ def sign_off_report(report_card, user):
             
     report_card.populate_attendance_summary()
 
-    # Recompute overall_average if missing (was skipped at generation time when scores/comments were incomplete)
-    if report_card.overall_average is None and not report_card.is_ecd_report:
-        scores = ExamScore.objects.filter(student=report_card.student, term=report_card.term, status=ScoreStatus.APPROVED).mark_bearing()
-        subjects = {}
-        for s in scores:
-            if s.subject_name not in subjects:
-                subjects[s.subject_name] = {}
-            subjects[s.subject_name][s.exam_type] = float(s.score)
-        exam_weights = get_exam_weights()
-        total_weighted_sum = Decimal(0)
-        valid_subject_count = 0
-        for subj, exams in subjects.items():
-            grade_result = compute_grade_with_gaps(
-                scores=exams,
-                weights=exam_weights,
-            )
-            if grade_result["average"] is not None:
-                total_weighted_sum += Decimal(str(grade_result["average"]))
-                valid_subject_count += 1
-        if valid_subject_count > 0:
-            report_card.overall_average = total_weighted_sum / valid_subject_count
+    # Exam average from approved, mark-bearing subjects; None while incomplete.
+    if not report_card.is_ecd_report:
+        from academics.score_progress import exam_summary
+        report_card.overall_average = exam_summary(report_card.student, report_card.term)["average"]
 
     report_card.status = ReportCardStatus.PUBLISHED
     report_card.signed_off_by = user

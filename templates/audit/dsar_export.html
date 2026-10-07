@@ -14,7 +14,7 @@
       DSAR Export
     </h1>
     <p style="font-size:13px; color:#8492A6; margin:0;">
-      Search for a student or guardian to produce a complete personal data export. Only Super Admins may use this tool.
+      Search for a student or parent to produce a complete personal data export. Only Super Admins may use this tool.
     </p>
   </div>
 
@@ -34,7 +34,7 @@
         <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
         <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
       </svg>
-      Guardian / Parent
+      Parent
     </button>
   </div>
 
@@ -120,7 +120,7 @@
         <div style="font-size:13px; font-weight:600; color:#023AA5; margin-bottom:4px;">Compliance</div>
         <p style="font-size:12px; color:#474747; margin:0;">
           This tool produces a complete Data Subject Access Request (DSAR) export within the required 30-minute window.
-          The export includes identity, medical, guardian, sibling, attendance, financial, academic, discipline, welfare, admissions, notification, and audit trail records.
+          The export includes identity, medical, parent, sibling, attendance, financial, academic, discipline, welfare, admissions, notification, and audit trail records.
           All exports are logged in the audit trail.
         </p>
       </div>
@@ -254,7 +254,7 @@
 
   function selectItem(item) {
     selectedId = item.id;
-    document.getElementById('selectedTypeLabel').textContent = item.type === 'guardian' ? 'Guardian / Parent' : 'Student';
+    document.getElementById('selectedTypeLabel').textContent = item.type === 'guardian' ? 'Parent' : 'Student';
     document.getElementById('selectedName').textContent = item.label;
     document.getElementById('selectedDetail').textContent = item.detail;
     document.getElementById('selectedCard').style.display = 'block';

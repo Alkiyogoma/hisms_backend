@@ -171,3 +171,70 @@ def is_ready_for_sign_off(student, term):
         v["status"] in (ScoreStatus.SUBMITTED, ScoreStatus.APPROVED)
         for v in progress["subjects"].values()
     )
+
+
+# -- the report's ACADEMIC PROGRESS table ------------------------------------
+
+def report_grade(mark):
+    """(grade, label) on the printed report's scale (A* for 90+)."""
+    from academics.grading_utils import get_grade_from_score, get_grade_label
+    grade = get_grade_from_score(mark)
+    return ("A*" if grade == "A+" else grade), get_grade_label(grade)
+
+
+def exam_summary(student, term, expected_subjects=None):
+    """
+    The marks table of a learner's progress report, from approved scores of
+    mark-bearing subjects only. Remark-only subjects never count.
+
+    Each assessment column shows weighted points (score / max x weight), so a
+    subject's total is out of 100. A subject has a total and grade only once
+    every assessment is approved. The exam average, total and grade are given
+    only when every mark-bearing subject of the class is fully assessed;
+    otherwise they are None and the report shows "Awaiting end of term".
+    """
+    from academics.models import ExamTypeConfiguration
+    from academics.remarks import remark_subject_names
+
+    types = list(ExamTypeConfiguration.objects.filter(is_active=True).order_by("display_order", "name"))
+    if expected_subjects is None:
+        expected_subjects = expected_subjects_for_class(student.class_name)
+
+    points = {}
+    for subject, code, score, max_score in ExamScore.objects.filter(
+            student=student, term=term, status=ScoreStatus.APPROVED,
+    ).mark_bearing().values_list("subject_name", "exam_type", "score", "max_score"):
+        cfg = next((t for t in types if t.code == code), None)
+        if cfg is None:
+            continue
+        points.setdefault(subject, {})[code] = (
+            float(score) / (float(max_score or 100) or 100.0) * float(cfg.weight_percentage)
+        )
+
+    rows = []
+    for subject in sorted(points):
+        cells = [round(points[subject][t.code], 1) if t.code in points[subject] else None for t in types]
+        complete = bool(types) and all(c is not None for c in cells)
+        total = round(sum(points[subject][t.code] for t in types), 1) if complete else None
+        grade, label = report_grade(total) if complete else (None, None)
+        rows.append({"subject": subject, "cells": cells, "complete": complete,
+                     "total": total, "grade": grade, "label": label})
+
+    mark_subjects = (set(expected_subjects) | set(points)) - remark_subject_names()
+    assessed = sum(1 for r in rows if r["complete"])
+    summary = {
+        "types": types,
+        "rows": rows,
+        "assessed": assessed,
+        "total_subjects": len(mark_subjects),
+        "complete": bool(mark_subjects) and assessed == len(mark_subjects),
+        "column_averages": None, "average": None, "grade": None, "label": None,
+    }
+    if summary["complete"]:
+        done = [r for r in rows if r["complete"]]
+        summary["column_averages"] = [
+            round(sum(r["cells"][i] for r in done) / len(done), 1) for i in range(len(types))
+        ]
+        summary["average"] = round(sum(r["total"] for r in done) / len(done), 2)
+        summary["grade"], summary["label"] = report_grade(summary["average"])
+    return summary

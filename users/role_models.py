@@ -113,7 +113,7 @@ DEFAULT_ROLE_CONFIGS = {
         "icon_color": "#4F46E5",
     },
     UserRole.PARENT: {
-        "label": "Parent / Guardian",
+        "label": "Parent",
         "description": "Parent portal access. Views their children's academic and welfare information.",
         "departments": [],
         "icon_color": "#6B7280",

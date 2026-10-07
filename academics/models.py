@@ -963,7 +963,6 @@ class ReportCard(TimeStampedModel):
 
     def populate_attendance_summary(self, start_date=None, end_date=None):
         """FR-ATT-013: Populate attendance summary fields from AttendanceEntry records."""
-        from attendance.models import PRESENT_STATUSES, AttendanceEntry, AttendanceStatus
         from django.utils import timezone
 
         if start_date is None and self.term.start_date:
@@ -975,14 +974,16 @@ class ReportCard(TimeStampedModel):
         if end_date is None:
             end_date = timezone.now().date()
 
-        qs = AttendanceEntry.objects.filter(student=self.student, date__range=[start_date, end_date])
-        # Days present includes days late; days late is "of which late".
-        self.attendance_days_present = qs.filter(status__in=PRESENT_STATUSES).count()
-        self.attendance_days_late = qs.filter(status=AttendanceStatus.LATE).count()
-        self.attendance_days_absent = qs.filter(status=AttendanceStatus.ABSENT).count()
-        total = self.attendance_days_present + self.attendance_days_absent
-        if total > 0:
-            self.attendance_rate = round((self.attendance_days_present / total) * 100, 2)
+        # School days only (no weekends/holidays/days before enrolment);
+        # unmarked days are never counted as absent. Present includes late;
+        # absent includes excused.
+        from attendance import analytics
+        row = analytics.learner_attendance(self.student, start_date, end_date)["row"] or {}
+        self.attendance_days_present = row.get("in_school", 0)
+        self.attendance_days_late = row.get("late", 0)
+        self.attendance_days_absent = row.get("absent", 0) + row.get("excused", 0)
+        if row.get("rate") is not None:
+            self.attendance_rate = row["rate"]
         self.save(update_fields=[
             'attendance_days_present', 'attendance_days_absent',
             'attendance_days_late', 'attendance_rate', 'updated_at',

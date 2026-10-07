@@ -991,7 +991,7 @@ def _build_defaults():
                 + _p("The assessment for <strong>{{ learner_name }}</strong> has been marked complete. "
                      "Please complete the assessment report.")
                 + _details_card([
-                    ("Learner", "{{ learner_name }}"),
+                    ("Student", "{{ learner_name }}"),
                     ("Grade Assessed For", "{{ intended_grade }}"),
                     ("Assessment Date", "{{ assessment_date }}"),
                     ("Reference", "{{ reference_number }}"),
@@ -1004,7 +1004,7 @@ def _build_defaults():
                 "Dear {{ teacher_name }},\n\n"
                 "The assessment for {{ learner_name }} has been marked complete. Please complete the "
                 "assessment report.\n\n"
-                "Learner: {{ learner_name }}\n"
+                "Student: {{ learner_name }}\n"
                 "Grade assessed for: {{ intended_grade }}\n"
                 "Assessment date: {{ assessment_date }}\n"
                 "Reference: {{ reference_number }}\n\n"
@@ -1114,7 +1114,7 @@ def _build_defaults():
                 + _p("An assessment has been scheduled for <strong>{{ child_name }}</strong>. "
                      "Please arrange payment of the assessment fee before the assessment date.")
                 + _details_card([
-                    ("Learner", "{{ child_name }}"),
+                    ("Student", "{{ child_name }}"),
                     ("Grade enquired for", "{{ grade }}"),
                     ("Assessment date", "{{ assessment_date }}"),
                     ("Assessment time", "{{ assessment_time }}"),
@@ -1132,7 +1132,7 @@ def _build_defaults():
             "plain_body": (
                 "Dear {{ parent_name }},\n\n"
                 "An assessment has been scheduled for {{ child_name }}.\n\n"
-                "Learner: {{ child_name }}\n"
+                "Student: {{ child_name }}\n"
                 "Grade: {{ grade }}\n"
                 "Assessment date: {{ assessment_date }}\n"
                 "Assessment time: {{ assessment_time }}\n"
@@ -1157,7 +1157,7 @@ def _build_defaults():
                 _p("The assessment report for <strong>{{ child_name }}</strong> has been submitted by "
                    "<strong>{{ teacher_name }}</strong>.")
                 + _details_card([
-                    ("Learner", "{{ child_name }}"),
+                    ("Student", "{{ child_name }}"),
                     ("Grade assessed for", "{{ intended_grade|default:grade }}"),
                     ("Assessment date", "{{ assessment_date }}"),
                     ("Reference", "{{ reference_number }}"),
@@ -1168,7 +1168,7 @@ def _build_defaults():
             ),
             "plain_body": (
                 "The assessment report for {{ child_name }} has been submitted by {{ teacher_name }}.\n\n"
-                "Learner: {{ child_name }}\n"
+                "Student: {{ child_name }}\n"
                 "Grade assessed for: {{ intended_grade|default:grade }}\n"
                 "Assessment date: {{ assessment_date }}\n"
                 "Reference: {{ reference_number }}\n\n"
@@ -1294,7 +1294,7 @@ def _build_defaults():
                 + _p("An assessment report for <strong>{{ child_name }}</strong> has been "
                      "awaiting your review for <strong>72 hours</strong>.")
                 + _details_card([
-                    ("Learner", "{{ child_name }}"),
+                    ("Student", "{{ child_name }}"),
                     ("Grade", "{{ grade }}"),
                     ("Reference", "{{ reference_number }}"),
                 ])
@@ -1304,7 +1304,7 @@ def _build_defaults():
             "plain_body": (
                 "Dear {{ hos_name }},\n\n"
                 "An assessment report for {{ child_name }} has been awaiting your review for 72 hours.\n\n"
-                "Learner: {{ child_name }}\n"
+                "Student: {{ child_name }}\n"
                 "Grade: {{ grade }}\n"
                 "Reference: {{ reference_number }}\n\n"
                 "Review the report here: {{ review_link }}\n\n"
@@ -1379,9 +1379,9 @@ def _build_defaults():
                 _p("A new admission inquiry has been submitted.", mb="12px")
                 + _details_card([
                     ("Reference", "{{ reference_number }}"),
-                    ("Learner", "{{ child_name }}"),
+                    ("Student", "{{ child_name }}"),
                     ("Grade enquired for", "{{ grade }}"),
-                    ("Parent or guardian", "{{ parent_name }}"),
+                    ("Parent", "{{ parent_name }}"),
                     ("Phone", "{{ parent_phone }}"),
                     ("Email", "{{ parent_email|default:'Not provided' }}"),
                     ("Meeting date requested", "{{ proposed_meeting_date|default:'To be confirmed' }} at {{ proposed_meeting_time|default:'To be confirmed' }}"),
@@ -1392,9 +1392,9 @@ def _build_defaults():
             "plain_body": (
                 "A new admission inquiry has been submitted.\n\n"
                 "Reference: {{ reference_number }}\n"
-                "Learner: {{ child_name }}\n"
+                "Student: {{ child_name }}\n"
                 "Grade enquired for: {{ grade }}\n"
-                "Parent or guardian: {{ parent_name }}\n"
+                "Parent: {{ parent_name }}\n"
                 "Phone: {{ parent_phone }}\n"
                 "Email: {{ parent_email|default:'Not provided' }}\n\n"
                 "Meeting date requested: {{ proposed_meeting_date|default:'To be confirmed' }} at "
@@ -1413,7 +1413,7 @@ def _build_defaults():
                 _p("The admission form for <strong>{{ child_name }}</strong> has not been completed "
                    "within 14 days of the offer.", mb="12px")
                 + _details_card([
-                    ("Learner", "{{ child_name }}"),
+                    ("Student", "{{ child_name }}"),
                     ("Grade", "{{ grade }}"),
                     ("Parent", "{{ parent_name }}"),
                     ("Phone", "{{ parent_phone }}"),
@@ -1426,7 +1426,7 @@ def _build_defaults():
             ),
             "plain_body": (
                 "The admission form for {{ child_name }} has not been completed within 14 days.\n\n"
-                "Learner: {{ child_name }}\n"
+                "Student: {{ child_name }}\n"
                 "Grade: {{ grade }}\n"
                 "Parent: {{ parent_name }}\n"
                 "Phone: {{ parent_phone }}\n"
@@ -1446,7 +1446,7 @@ def _build_defaults():
                 _p("The admission invoice for <strong>{{ child_name }}</strong> has been outstanding "
                    "for 30 days.", mb="12px")
                 + _details_card([
-                    ("Learner", "{{ child_name }}"),
+                    ("Student", "{{ child_name }}"),
                     ("Grade", "{{ grade }}"),
                     ("Parent", "{{ parent_name }}"),
                     ("Phone", "{{ parent_phone }}"),
@@ -1460,7 +1460,7 @@ def _build_defaults():
             ),
             "plain_body": (
                 "The admission invoice for {{ child_name }} has been outstanding for 30 days.\n\n"
-                "Learner: {{ child_name }}\n"
+                "Student: {{ child_name }}\n"
                 "Grade: {{ grade }}\n"
                 "Parent: {{ parent_name }}\n"
                 "Phone: {{ parent_phone }}\n"

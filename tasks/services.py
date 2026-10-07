@@ -431,7 +431,7 @@ def generate_overdue_invoice_task(invoice):
         task = _create_task(
             task_type='overdue_collection',
             title=f"Follow up: {invoice.student.first_name} {invoice.student.last_name} — overdue fees",
-            description=f"Invoice {invoice.invoice_number} is overdue. Balance: TZS {invoice.total_due:,.0f}. Contact parent/guardian.",
+            description=f"Invoice {invoice.invoice_number} is overdue. Balance: TZS {invoice.total_due:,.0f}. Contact parent.",
             assigned_to=user,
             due_date=_due_tomorrow(),
             priority='high',

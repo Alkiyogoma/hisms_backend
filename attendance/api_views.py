@@ -313,7 +313,7 @@ def search_students(request):
                     'name': guardian_rel.full_name,
                     'email': guardian_rel.email or '',
                     'phone': guardian_rel.phone,
-                    'relation': 'Guardian'
+                    'relation': 'Parent'
                 })
             
             for parent_rel in student.laravel_parents.all():

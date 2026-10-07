@@ -5,7 +5,7 @@
   <a href="{% url 'students:list' %}" class="sub-tab {% if url_name == 'list' or url_name == 'detail' or url_name == 'create' or url_name == 'edit' or url_name == 'upload_photo' or url_name == 'print_id' or url_name == 'generate_id' %}active{% endif %}">Students</a>
   {% endif %}
   {% if perms.students.view_parentguardian %}
-  <a href="{% url 'students:guardian_list' %}" class="sub-tab {% if url_name == 'guardian_list' or url_name == 'guardian_detail' or url_name == 'guardian_create' or url_name == 'guardian_link' or url_name == 'guardian_consent_withdraw' %}active{% endif %}">Guardians</a>
+  <a href="{% url 'students:guardian_list' %}" class="sub-tab {% if url_name == 'guardian_list' or url_name == 'guardian_detail' or url_name == 'guardian_create' or url_name == 'guardian_link' or url_name == 'guardian_consent_withdraw' %}active{% endif %}">Parents</a>
   {% endif %}
   {% if url_name == 'list' %}
   <div style="margin-left:auto;display:flex;gap:4px;align-items:center">
@@ -24,7 +24,7 @@
     {% has_perm user "students.add_student" as can_add_student %}
     {% if can_add_student %}
     <div style="width:1px;height:20px;background:var(--border);margin:0 4px"></div>
-    <a href="{% url 'admissions:direct_enrol' %}" title="Enrol a transfer, mid-year, staff-child or returning learner without the assessment" style="padding:6px 12px;border-radius:6px;background:var(--hodari-blue);color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;text-decoration:none;transition:all 0.2s">
+    <a href="{% url 'admissions:direct_enrol' %}" title="Enrol a transfer, mid-year, staff-child or returning student without the assessment" style="padding:6px 12px;border-radius:6px;background:var(--hodari-blue);color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;text-decoration:none;transition:all 0.2s">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       Add student
     </a>
@@ -46,7 +46,7 @@
     <div style="width:1px;height:20px;background:var(--border);margin:0 4px"></div>
     <a href="{% url 'students:guardian_create' %}" style="padding:6px 12px;border-radius:6px;background:var(--hodari-blue);color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;text-decoration:none;transition:all 0.2s">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-      Add Guardian
+      Add Parent
     </a>
     {% endif %}
   </div>

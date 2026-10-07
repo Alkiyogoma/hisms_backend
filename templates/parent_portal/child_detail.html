@@ -61,7 +61,7 @@
         <a href="{% url 'parent_portal:child_detail' student.id %}" class="hf-btn hf-btn-primary" style="font-size:12px;padding:6px 14px">Full Profile</a>
         <a href="{% url 'parent_portal:attendance' %}?student={{ student.id }}" class="hf-btn hf-btn-secondary" style="font-size:12px;padding:6px 14px">Attendance</a>
         <a href="{% url 'parent_portal:grades' %}?student={{ student.id }}" class="hf-btn hf-btn-secondary" style="font-size:12px;padding:6px 14px">Grades</a>
-        <a href="{% url 'parent_portal:guardian_list' student.id %}" class="hf-btn hf-btn-secondary" style="font-size:12px;padding:6px 14px">Guardians</a>
+        <a href="{% url 'parent_portal:guardian_list' student.id %}" class="hf-btn hf-btn-secondary" style="font-size:12px;padding:6px 14px">Parents</a>
       </div>
     </div>
     <div class="ov-score-box">
@@ -233,10 +233,10 @@
     </div>
     {% endif %}
 
-    <!-- Learner Attributes -->
+    <!-- Student Attributes -->
     {% if learner_attributes %}
     <div class="card" style="padding:24px">
-      <h2 style="margin:0 0 16px;font-size:16px;font-weight:700">Learner Attributes</h2>
+      <h2 style="margin:0 0 16px;font-size:16px;font-weight:700">Student Attributes</h2>
       {% for attr in learner_attributes %}
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#F8FAFC;border-radius:8px;{% if not forloop.last %}margin-bottom:6px{% endif %}">
         <span style="font-size:13px;color:var(--text-secondary)">Attribute #{{ attr.attribute_number }}</span>

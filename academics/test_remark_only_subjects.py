@@ -179,7 +179,8 @@ class RemarkOnlySubjectTests(TestCase):
         ctx = _build_report_card_context(rc)
         self.assertEqual(list(ctx["subjects"]), ["Zoology"])
         self.assertEqual(ctx["remark_rows"], [("Choir", "Outstanding")])
-        self.assertEqual(ctx["computed_average"], Decimal("70"))
+        self.assertEqual([r["subject"] for r in ctx["exam"]["rows"]], ["Zoology"])
+        self.assertIsNone(ctx["exam"]["average"])  # only the quiz is in: awaiting end of term
 
         self.client.force_login(self.admin)
         page = self.client.get(

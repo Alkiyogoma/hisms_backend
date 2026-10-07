@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Guardians — {{ student.first_name }}{% endblock %}
+{% block title %}Parents — {{ student.first_name }}{% endblock %}
 {% block content %}
 <div class="page-hdr">
   <div>
-    <h1>Guardians for {{ student.first_name }} {{ student.last_name }}</h1>
+    <h1>Parents for {{ student.first_name }} {{ student.last_name }}</h1>
     <p>Manage who is linked to your child</p>
   </div>
   <a href="{% url 'parent_portal:child_detail' student.id %}" class="hf-btn hf-btn-secondary">Back to Child</a>
@@ -14,7 +14,7 @@
 {% else %}
 
 <div style="margin-bottom:16px">
-  <a href="{% url 'parent_portal:guardian_link' student.id %}" class="hf-btn hf-btn-primary">+ Link Additional Guardian</a>
+  <a href="{% url 'parent_portal:guardian_link' student.id %}" class="hf-btn hf-btn-primary">+ Link Additional Parent</a>
 </div>
 
 <div class="card" style="overflow-x:auto;padding:0">
@@ -54,7 +54,7 @@
         </td>
       </tr>
       {% empty %}
-      <tr><td colspan="6" style="text-align:center;padding:24px">{% include '_partials/empty_state.html' with title='No guardians linked yet' desc='Link a guardian to manage this child.' icon='users' icon_color='blue' %}</td></tr>
+      <tr><td colspan="6" style="text-align:center;padding:24px">{% include '_partials/empty_state.html' with title='No parents linked yet' desc='Link a parent to manage this child.' icon='users' icon_color='blue' %}</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -62,7 +62,7 @@
 
 <div class="card" style="padding:16px;margin-top:16px">
   <p style="font-size:13px;color:#64748B;margin:0">
-    <strong>Note:</strong> The primary guardian cannot be removed. To change the primary guardian, please contact the school office.
+    <strong>Note:</strong> The primary parent cannot be removed. To change the primary parent, please contact the school office.
   </p>
 </div>
 

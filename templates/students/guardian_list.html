@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load role_tags %}
-{% block title %}Guardians — {{ brand.school_name }}{% endblock %}
-{% block topbar_greeting %}Guardian Directory{% endblock %}
+{% block title %}Parents — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Parent Directory{% endblock %}
 
 {% block extra_head %}
 {% include "includes/hodari_print_styles.html" %}
@@ -84,8 +84,8 @@
   <div style="height:1px;background:var(--border);margin:16px 0"></div>
   <div style="display:flex;justify-content:space-between;align-items:center">
     <div>
-      <div style="font-family:var(--font-display);font-size:18pt;font-weight:bold;color:var(--hodari-blue);text-transform:uppercase">Guardian Directory</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">{{ guardians|length }} guardian{{ guardians|length|pluralize }}</div>
+      <div style="font-family:var(--font-display);font-size:18pt;font-weight:bold;color:var(--hodari-blue);text-transform:uppercase">Parent Directory</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">{{ guardians|length }} parent{{ guardians|length|pluralize }}</div>
     </div>
     <div style="text-align:right;font-size:12px;color:var(--text-muted)">
       <div style="font-weight:700;color:var(--hodari-blue)">Generated {% now "d M Y" %}</div>
@@ -172,11 +172,11 @@
     {% empty %}
     <div style="grid-column:1/-1">
       {% if request.GET.q %}
-        {% include '_partials/empty_state.html' with title='No guardians match search' desc='Try adjusting your search or clear the search.' icon='search' icon_color='grey' %}
+        {% include '_partials/empty_state.html' with title='No parents match search' desc='Try adjusting your search or clear the search.' icon='search' icon_color='grey' %}
       {% else %}
-        {% include '_partials/empty_state.html' with title='No guardians found' desc='Get started by adding a guardian to the system.' icon='users' icon_color='blue' %}
+        {% include '_partials/empty_state.html' with title='No parents found' desc='Get started by adding a parent to the system.' icon='users' icon_color='blue' %}
         {% if can_add_guardian %}
-        <div style="text-align:center;margin-top:12px"><a href="{% url 'students:guardian_create' %}" class="btn-primary" style="display:inline-flex;align-items:center;gap:6px">Add Guardian</a></div>
+        <div style="text-align:center;margin-top:12px"><a href="{% url 'students:guardian_create' %}" class="btn-primary" style="display:inline-flex;align-items:center;gap:6px">Add Parent</a></div>
         {% endif %}
       {% endif %}
     </div>
@@ -187,7 +187,7 @@
     <table class="guardian-table">
       <thead>
         <tr>
-          <th>Guardian Name</th>
+          <th>Parent Name</th>
           <th>Phone</th>
           <th>Email</th>
           <th>Address</th>
@@ -241,11 +241,11 @@
         <tr>
           <td colspan="7">
             {% if request.GET.q %}
-              {% include '_partials/empty_state.html' with title='No guardians match search' desc='Try adjusting your search or clear the search.' icon='search' icon_color='grey' %}
+              {% include '_partials/empty_state.html' with title='No parents match search' desc='Try adjusting your search or clear the search.' icon='search' icon_color='grey' %}
             {% else %}
-              {% include '_partials/empty_state.html' with title='No guardians found' desc='Get started by adding a guardian to the system.' icon='users' icon_color='blue' %}
+              {% include '_partials/empty_state.html' with title='No parents found' desc='Get started by adding a parent to the system.' icon='users' icon_color='blue' %}
               {% if can_add_guardian %}
-              <div style="text-align:center;margin-top:12px"><a href="{% url 'students:guardian_create' %}" class="btn-primary" style="display:inline-flex;align-items:center;gap:6px">Add Guardian</a></div>
+              <div style="text-align:center;margin-top:12px"><a href="{% url 'students:guardian_create' %}" class="btn-primary" style="display:inline-flex;align-items:center;gap:6px">Add Parent</a></div>
               {% endif %}
             {% endif %}
           </td>

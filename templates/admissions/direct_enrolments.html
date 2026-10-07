@@ -8,15 +8,15 @@
   <div class="card-title-row" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
     <div class="card-title" style="margin:0">Direct enrolments</div>
     {% if perms.students.add_student %}
-      <a href="{% url 'admissions:direct_enrol' %}" class="hf-btn hf-btn-primary" style="text-decoration:none">+ Enrol a learner directly</a>
+      <a href="{% url 'admissions:direct_enrol' %}" class="hf-btn hf-btn-primary" style="text-decoration:none">+ Enrol a student directly</a>
     {% endif %}
   </div>
-  <div class="muted" style="font-size:12.5px;margin:6px 0 16px">Learners enrolled without the assessment pipeline, with who enrolled them, when, and why.</div>
+  <div class="muted" style="font-size:12.5px;margin:6px 0 16px">Students enrolled without the assessment pipeline, with who enrolled them, when, and why.</div>
   <div style="overflow-x:auto">
     <table style="width:100%;border-collapse:collapse;font-size:13px">
       <thead>
         <tr style="text-align:left;border-bottom:2px solid var(--border)">
-          <th style="padding:10px 8px">Learner</th><th style="padding:10px 8px">Class</th>
+          <th style="padding:10px 8px">Student</th><th style="padding:10px 8px">Class</th>
           <th style="padding:10px 8px">Reason</th><th style="padding:10px 8px">Details</th>
           <th style="padding:10px 8px">Enrolled by</th><th style="padding:10px 8px">When</th>
         </tr>

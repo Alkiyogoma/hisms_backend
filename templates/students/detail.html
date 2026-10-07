@@ -311,7 +311,7 @@
     <div class="profile-actions-row">
         {% has_perm user "students.change_student" as can_link_guardian_top %}
         {% if can_link_guardian_top and not guardians %}
-        <a href="{% url 'students:guardian_link' student.pk %}" class="hf-btn hf-btn-secondary">+ Link guardian</a>
+        <a href="{% url 'students:guardian_link' student.pk %}" class="hf-btn hf-btn-secondary">+ Link parent</a>
         {% endif %}
         {% has_perm user "welfare.add_welfareobservation" as can_add_welfare_top %}
         {% if can_add_welfare_top and not welfare_stats.total %}
@@ -613,14 +613,14 @@
     }
     </script>
 
-    <!-- 3. Guardians & Family -->
+    <!-- 3. Parents & Family -->
     {% if guardians %}
     <div class="card">
       <div class="card-title-row">
-        <h2 class="card-title" style="margin:0">Guardians & Family Contacts</h2>
+        <h2 class="card-title" style="margin:0">Parents & Family Contacts</h2>
         {% has_perm user "students.change_student" as can_link_guardian %}
         {% if can_link_guardian %}
-        <a href="{% url 'students:guardian_link' student.pk %}" class="hf-btn hf-btn-secondary" style="padding:6px 12px; font-size:11px">+ Link Guardian</a>
+        <a href="{% url 'students:guardian_link' student.pk %}" class="hf-btn hf-btn-secondary" style="padding:6px 12px; font-size:11px">+ Link Parent</a>
         {% endif %}
       </div>
       <div style="margin-top:16px; display:grid; gap:12px">

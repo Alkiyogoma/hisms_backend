@@ -1,4 +1,4 @@
-{# Learner day-by-day pattern: any element with data-learner="<id>" opens it for the range below. #}
+{# Student day-by-day pattern: any element with data-learner="<id>" opens it for the range below. #}
 <div class="at-scrim" id="learnerScrim" role="dialog" aria-modal="true">
   <div class="at-modal at" id="learnerModal"><div class="at-empty">Loading…</div></div>
 </div>
@@ -17,7 +17,7 @@
     fetch(BASE + id + "/?" + q.toString(), {headers: {"X-Requested-With": "XMLHttpRequest"}})
       .then(function(r){ if (!r.ok) throw new Error(r.status); return r.text(); })
       .then(function(html){ box.innerHTML = html; var b = box.querySelector("[data-close]"); if (b) b.focus(); })
-      .catch(function(){ box.innerHTML = '<div class="at-empty">Could not load this learner. <button type="button" class="hf-btn hf-btn-secondary" data-close>Close</button></div>'; });
+      .catch(function(){ box.innerHTML = '<div class="at-empty">Could not load this student. <button type="button" class="hf-btn hf-btn-secondary" data-close>Close</button></div>'; });
   };
   document.addEventListener("click", function(e) {
     var t = e.target.closest("[data-learner]");

@@ -14,7 +14,7 @@
     --green:#1E8A4C; --green-bg:#EAF6EE; --red:#C0392B; --red-bg:#FDECEA; --amber:#C27803; --amber-bg:#FFF6E5; --purple:#5B4FCF; --purple-bg:#EFEDFB; --grey-bg:#F0F2F6;
     --font-ui:'Roboto', Arial, sans-serif; --font-display:'Merriweather', Georgia, serif; }
   @page { size:A4 portrait; margin:12mm 11mm 15mm;
-    @bottom-left { content:"Hodari Christian School \00B7  Learner Progress Report \00B7  Confidential"; font:8pt Roboto, Arial, sans-serif; color:#8492A6; }
+    @bottom-left { content:"Hodari Christian School \00B7  Student Progress Report \00B7  Confidential"; font:8pt Roboto, Arial, sans-serif; color:#8492A6; }
     @bottom-right { content:"Page " counter(page) " of " counter(pages); font:8pt Roboto, Arial, sans-serif; color:#8492A6; }
   }
   * { box-sizing:border-box; }
@@ -80,6 +80,9 @@
   .comment b { display:block; color:var(--ink); font-size:8.5pt; margin-bottom:2px; }
   .notes { margin-top:10px; font-size:7.6pt; color:#5B6578; border:1px solid var(--border); border-radius:6px; padding:8px 10px; break-inside:avoid; page-break-inside:avoid; }
   .notes ul { margin:4px 0 0 16px; padding:0; } .notes li { margin:1px 0; }
+  .st.await { background:#FFF4DA; color:#8A6400; }
+  .await-cell { background:#FFF4DA !important; color:#8A6400; text-align:center; }
+  .awaiting-note { background:#FFF4DA; border:1px solid #F0DFB4; color:#8A6400; border-radius:6px; padding:6px 10px; font-size:8.5pt; margin-bottom:8px; }
   .empty { padding:12px; border:1px dashed var(--border); border-radius:6px; color:var(--muted); font-size:9pt; text-align:center; }
   .signatures { display:grid; grid-template-columns:1fr 1fr 1fr; gap:28px; margin-top:8px; padding-top:4px; border-top:1px solid var(--border); break-inside:avoid; page-break-inside:avoid; align-items:start; }
   .sig-line { border-bottom:1.5px solid #474747; height:30px; }
@@ -121,9 +124,9 @@
 <main class="sheet">
   {% include "includes/hodari_print_header.html" %}
 
-  <div class="doc-title"><h1>Learner Progress Report</h1><span class="scope">{% if term %}{{ term.name }} · {{ term.academic_year.name }}{% else %}No term{% endif %}</span></div>
+  <div class="doc-title"><h1>Student Progress Report</h1><span class="scope">{% if term %}{{ term.name }} · {{ term.academic_year.name }}{% else %}No term{% endif %}</span></div>
   <div class="meta">
-    <div><span>Learner</span><b>{{ student.first_name }} {{ student.last_name }}</b></div>
+    <div><span>Student</span><b>{{ student.first_name }} {{ student.last_name }}</b></div>
     <div><span>Admission no.</span><b>{{ student.admission_no }}</b></div>
     <div><span>Class</span><b>{{ class_name }}</b></div>
     <div><span>Class teacher</span><b>{{ class_teacher|default:"—" }}</b></div>
@@ -134,13 +137,26 @@
   </div>
 
   {% with a=attendance.row %}
+  {% if not term_complete %}
+  <div class="awaiting-note">Awaiting end of term: {% if exam %}{{ exam.assessed }} of {{ exam.total_subjects }} mark-bearing subject{{ exam.total_subjects|pluralize }} fully assessed{% else %}no term selected{% endif %}. No overall average, grade or position is given until every subject's assessments are approved.</div>
+  {% endif %}
   <div class="kpis">
+    {% if term_complete %}
     <div class="kpi"><span>Average mark</span><b class="b-{{ record.band|default:'none' }}">{% if record.average is not None %}{{ record.average }}%{% else %}—{% endif %}</b><small>{% if record.grade %}grade {{ record.grade }} · {{ grade_label }}{% else %}no approved marks{% endif %}</small></div>
     <div class="kpi"><span>Position in class</span><b>{% if record.position %}{{ record.position }}<small>/{{ record.class_size }}</small>{% else %}—{% endif %}</b><small>by average mark</small></div>
     <div class="kpi"><span>Class average</span><b>{% if record.class_average is not None %}{{ record.class_average }}%{% else %}—{% endif %}</b><small>{{ class_name }}</small></div>
+    {% else %}
+    <div class="kpi"><span>Average mark</span><b class="b-none">—</b><small>awaiting end of term</small></div>
+    <div class="kpi"><span>Position in class</span><b class="b-none">—</b><small>awaiting end of term</small></div>
+    <div class="kpi"><span>Class average</span><b class="b-none">—</b><small>awaiting end of term</small></div>
+    {% endif %}
     <div class="kpi"><span>Below pass</span><b class="{% if record.below_pass %}b-critical{% endif %}">{{ record.below_pass|length }}</b><small>subject{{ record.below_pass|length|pluralize }} under {{ pass_mark }}%</small></div>
     <div class="kpi"><span>Attendance</span><b class="b-{{ a.band|default:'none' }}">{% if a.rate is not None %}{{ a.rate }}%{% else %}—{% endif %}</b><small>{% if a %}{{ a.in_school }} of {{ a.marked }} days{% else %}no days marked{% endif %}</small></div>
+    {% if term_complete %}
     <div class="kpi"><span>Trend</span><b class="{% if record.trend == 'improving' %}up{% elif record.trend == 'declining' %}down{% endif %}">{% if record.trend == 'improving' %}↑ {{ record.trend_diff }}{% elif record.trend == 'declining' %}↓ {{ record.trend_diff|cut:'-' }}{% elif record.trend == 'stable' %}→{% else %}—{% endif %}</b><small>{% if record.trend %}vs previous term{% else %}first term on record{% endif %}</small></div>
+    {% else %}
+    <div class="kpi"><span>Trend</span><b class="b-none">—</b><small>awaiting end of term</small></div>
+    {% endif %}
   </div>
 
   <h2>1. Subject results <small>mark-bearing subjects · approved marks only · % per assessment</small></h2>
@@ -156,15 +172,20 @@
       <tr>
         <td><b>{{ s.subject }}</b></td>
         {% for c in s.cells %}<td class="r mono">{% if c is not None %}{{ c|floatformat:0 }}{% else %}<span class="na">–</span>{% endif %}</td>{% endfor %}
+        {% if s.awaiting %}
+        <td class="r na">–</td><td class="ctr na">–</td><td class="r na">–</td><td class="r na">–</td>
+        <td><span class="st await">Awaiting end of term</span></td>
+        {% else %}
         <td class="r mono b-{{ s.band }}">{{ s.mark }}</td>
         <td class="ctr"><span class="g">{{ s.grade }}</span></td>
         <td class="r mono">{{ s.class_average|default:"–" }}</td>
         <td class="r mono {% if s.diff > 0 %}up{% elif s.diff < 0 %}down{% endif %}">{% if s.diff is not None %}{% if s.diff > 0 %}+{% endif %}{{ s.diff }}{% endif %}</td>
         <td><span class="st {{ s.band }}">{{ s.status }}</span></td>
+        {% endif %}
       </tr>
     {% endfor %}
     </tbody>
-    <tfoot><tr><td>Average</td>{% for t in record.types %}<td></td>{% endfor %}<td class="r mono">{{ record.average }}</td><td class="ctr">{{ record.grade }}</td><td class="r mono">{{ record.class_average }}</td><td class="r mono {% if record.class_diff > 0 %}up{% elif record.class_diff < 0 %}down{% endif %}">{% if record.class_diff is not None %}{% if record.class_diff > 0 %}+{% endif %}{{ record.class_diff }}{% endif %}</td><td></td></tr></tfoot>
+    <tfoot><tr><td>Average</td>{% for t in record.types %}<td></td>{% endfor %}{% if term_complete %}<td class="r mono">{{ record.average }}</td><td class="ctr">{{ record.grade }}</td><td class="r mono">{{ record.class_average }}</td><td class="r mono {% if record.class_diff > 0 %}up{% elif record.class_diff < 0 %}down{% endif %}">{% if record.class_diff is not None %}{% if record.class_diff > 0 %}+{% endif %}{{ record.class_diff }}{% endif %}</td><td></td>{% else %}<td colspan="5" class="await-cell">Awaiting end of term</td>{% endif %}</tr></tfoot>
   </table></div>
   {% else %}
     <div class="empty">No approved marks for {{ student.first_name }} {% if term %}in {{ term.name }}, {{ term.academic_year.name }}{% endif %} yet. Marks appear once they are entered and approved.</div>
@@ -199,7 +220,7 @@
         <thead><tr><th>Term</th><th class="r">Average</th><th class="ctr">Grade</th><th class="r">Subjects</th></tr></thead>
         <tbody>{% for h in record.history %}
           <tr{% if h.current %} style="font-weight:700"{% endif %}><td style="white-space:nowrap">{{ h.term.name }} <span style="color:var(--muted);font-weight:400">{{ h.term.academic_year.name }}</span></td>
-            <td class="r mono b-{{ h.band }}">{{ h.average }}</td><td class="ctr">{{ h.grade }}</td><td class="r">{{ h.subjects }}</td></tr>
+            {% if h.awaiting %}<td class="r na" colspan="2">Awaiting end of term</td>{% else %}<td class="r mono b-{{ h.band }}">{{ h.average }}</td><td class="ctr">{{ h.grade }}</td>{% endif %}<td class="r">{{ h.subjects }}</td></tr>
         {% endfor %}</tbody>
       </table>
       {% else %}<div class="empty">No earlier terms on record.</div>{% endif %}
@@ -214,7 +235,7 @@
     <b>How to read this report</b>
     <ul>
       <li>Remark-only subjects take a remark once per term and no marks, so they are not part of the average or position.</li>
-      <li>Only marks that have been entered <b>and approved</b> are included; assessments not yet marked are left out, never counted as zero. Each subject mark is the weighted average of the assessments marked so far, with the weights shown under each assessment rescaled over those marked.</li>
+      <li>Only marks that have been entered <b>and approved</b> are included, never counted as zero when missing. A subject's mark and grade are given once all its assessments are approved; the overall average, grade, position and trend once every mark-bearing subject is.</li>
       <li>Grades: {% for g, r, l in scale %}{{ g }} {{ r }} ({{ l }}){% if not forloop.last %} · {% endif %}{% endfor %}. Pass mark {{ pass_mark }}% (grade C).</li>
       <li>Attendance = days in school ÷ days marked. Late counts as in school; excused counts as absent but authorised; unmarked days are left out. Weekends and holidays are omitted.</li>
     </ul>

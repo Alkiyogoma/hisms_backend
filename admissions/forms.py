@@ -118,7 +118,7 @@ class ApplicantCreateForm(forms.ModelForm):
         self.fields["grade_applying_for"] = forms.ChoiceField(choices=grade_choices, label="Grade / class applying for*")
         if dept:
             self.fields["applying_department"].initial = dept
-        self.fields["parent_full_name"].label = "Parent / guardian name*"
+        self.fields["parent_full_name"].label = "Parent name*"
         self.fields["parent_phone"].label = "Phone number*"
         self.fields["parent_email"].label = "Email address"
         self.fields["parent_invoice_name"].label = "Preferred address on invoice"
@@ -149,7 +149,7 @@ class ApplicantCreateForm(forms.ModelForm):
         self.fields["sibling_details"].help_text = "System will check automatically once parent details are entered."
 
         # S5: Custom error messages for mandatory fields
-        self.fields["parent_full_name"].error_messages["required"] = "Parent / guardian name is required."
+        self.fields["parent_full_name"].error_messages["required"] = "Parent name is required."
         self.fields["parent_phone"].error_messages["required"] = "Phone number is required."
         self.fields["child_full_name"].error_messages["required"] = "Student name is required."
         self.fields["child_date_of_birth"].error_messages["required"] = "Date of birth is required."
@@ -164,7 +164,7 @@ class ApplicantCreateForm(forms.ModelForm):
         self.fields["previous_school_other"].widget.attrs["placeholder"] = "Enter school name"
         self.fields["previous_school_other"].help_text = "Only required if 'Other' selected above."
         _setup_inquiry_choice_fields(self)
-        self.fields["parent_relationship"].error_messages["required"] = "Please select the parent/guardian's relationship to the student."
+        self.fields["parent_relationship"].error_messages["required"] = "Please select the parent's relationship to the student."
         self.fields["sibling_details"].widget.attrs["placeholder"] = "Name and class of any siblings (if applicable)"
         self.fields["notes"].widget.attrs["placeholder"] = (
             "Any relevant context from this inquiry — special requirements, how they heard about us, urgency, etc."
@@ -204,7 +204,7 @@ class ApplicantCreateForm(forms.ModelForm):
 
         # FR-ADM-030: parent_relationship is required
         if not cleaned.get("parent_relationship"):
-            self.add_error("parent_relationship", "Please select the parent/guardian's relationship to the student.")
+            self.add_error("parent_relationship", "Please select the parent's relationship to the student.")
 
         return cleaned
 
@@ -270,7 +270,7 @@ class ApplicantEditForm(forms.ModelForm):
         self.fields["grade_applying_for"] = forms.ChoiceField(choices=grade_choices, label="Grade / class applying for*")
         if dept:
             self.fields["applying_department"].initial = dept
-        self.fields["parent_full_name"].label = "Parent / guardian name*"
+        self.fields["parent_full_name"].label = "Parent name*"
         self.fields["parent_phone"].label = "Phone number*"
         self.fields["parent_email"].label = "Email address"
         self.fields["parent_invoice_name"].label = "Preferred address on invoice"
@@ -322,7 +322,7 @@ class ApplicantEditForm(forms.ModelForm):
         if not channel or channel not in dict(InquiryChannel.choices):
             self.add_error("inquiry_channel", "Please select how this inquiry was received.")
         if not cleaned.get("parent_relationship"):
-            self.add_error("parent_relationship", "Please select the parent/guardian's relationship to the student.")
+            self.add_error("parent_relationship", "Please select the parent's relationship to the student.")
         return cleaned
 
     def clean_notes(self):
@@ -391,7 +391,7 @@ class DirectEnrolmentForm(forms.Form):
     enrolment_date = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))
 
     # Primary guardian
-    parent_full_name = forms.CharField(max_length=150, label="Parent / guardian full name")
+    parent_full_name = forms.CharField(max_length=150, label="Parent full name")
     parent_relationship = forms.ChoiceField(
         choices=[("father", "Father"), ("mother", "Mother"), ("guardian", "Guardian"), ("legal_guardian", "Legal guardian"), ("other", "Other")],
         label="Relationship",
@@ -401,10 +401,10 @@ class DirectEnrolmentForm(forms.Form):
     parent_invoice_name = forms.CharField(max_length=150, required=False, label="Name on invoices")
 
     pdpa_consent = forms.BooleanField(
-        label="The parent/guardian has given consent for the school to hold this data (PDPA).",
+        label="The parent has given consent for the school to hold this data (PDPA).",
     )
     override_duplicate = forms.BooleanField(required=False, widget=forms.HiddenInput)
-    confirm_sibling = forms.BooleanField(required=False, label="Link as sibling of existing learners with the same guardian")
+    confirm_sibling = forms.BooleanField(required=False, label="Link as sibling of existing students with the same parent")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -427,7 +427,7 @@ class DirectEnrolmentForm(forms.Form):
             if cleaned.get(name):
                 cleaned[name] = _strip_html(cleaned[name])
         if cleaned.get("reason") == "transfer" and not cleaned.get("previous_school"):
-            self.add_error("previous_school", "Enter the school the learner is transferring from.")
+            self.add_error("previous_school", "Enter the school the student is transferring from.")
         dob, start = cleaned.get("date_of_birth"), cleaned.get("enrolment_date")
         if dob and start and dob >= start:
             self.add_error("date_of_birth", "Date of birth must be before the enrolment date.")

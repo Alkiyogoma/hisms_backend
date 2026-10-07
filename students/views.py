@@ -671,7 +671,7 @@ class StudentCreateView(RoleRequiredMixin, TemplateView):
             )
         if not (guardian_name and guardian_phone):
             return self._blocked_response(
-                "<b>Blocked:</b> at least one guardian (name and phone) must be linked "
+                "<b>Blocked:</b> at least one parent (name and phone) must be linked "
                 "before a student can be created."
             )
         return redirect("admissions:new_inquiry")
@@ -851,7 +851,7 @@ class StudentEditView(RoleRequiredMixin, TemplateView):
                 # rather than as "errors below" that are not on the page.
                 detail = "; ".join(getattr(exc, "messages", None) or [str(exc)])
                 form.add_error(None, detail)
-                messages.error(request, f"The learner's record could not be saved: {detail}")
+                messages.error(request, f"The student's record could not be saved: {detail}")
                 return self.render_to_response(self.get_context_data(pk=pk, form=form))
 
             after = {}
@@ -892,8 +892,8 @@ def _form_error_summary(form):
     if general:
         parts.append(" ".join(general))
     if not parts:
-        return "The learner's record could not be saved. Please try again."
-    return "The learner's record was not saved: " + "; ".join(parts) + "."
+        return "The student's record could not be saved. Please try again."
+    return "The student's record was not saved: " + "; ".join(parts) + "."
 
 
 class StudentArchiveView(RoleRequiredMixin, View):
@@ -1154,18 +1154,18 @@ def _clean_guardian_post(post, exclude_pk=None):
             dupes = dupes.exclude(pk=exclude_pk)
         if dupes.exists():
             errors["phone"] = (
-                "Primary Phone: a guardian with this name and phone number already exists. "
-                "Link the existing guardian instead."
+                "Primary Phone: a parent with this name and phone number already exists. "
+                "Link the existing parent instead."
             )
     return values, errors
 
 
 def _guardian_error_message(errors, general=""):
     if general:
-        return f"The guardian record was not saved: {general}"
-    labels = {**GUARDIAN_FIELD_LABELS, "pdpa": "PDPA Consent", "guardian_id": "Guardian"}
+        return f"The parent record was not saved: {general}"
+    labels = {**GUARDIAN_FIELD_LABELS, "pdpa": "PDPA Consent", "guardian_id": "Parent"}
     names = ", ".join(labels.get(k, k.replace("_", " ").title()) for k in errors)
-    return f"The guardian record was not saved: please fix {names}."
+    return f"The parent record was not saved: please fix {names}."
 
 
 class GuardianCreateView(RoleRequiredMixin, TemplateView):
@@ -1216,7 +1216,7 @@ class GuardianCreateView(RoleRequiredMixin, TemplateView):
             try:
                 student = Student.objects.get(pk=student_id)
             except (Student.DoesNotExist, ValueError):
-                messages.warning(request, "Selected student not found — guardian created without link.")
+                messages.warning(request, "Selected student not found — parent created without link.")
 
 
         try:
@@ -1238,7 +1238,7 @@ class GuardianCreateView(RoleRequiredMixin, TemplateView):
                     guardian=guardian, action=PDPAConsentLog.Action.GIVEN,
                     method=pdpa_consent_method, version=pdpa_consent_version,
                     actor=request.user,
-                    notes="Consent recorded during guardian creation.",
+                    notes="Consent recorded during parent creation.",
                 )
                 # Link student only if one was selected
                 if student:
@@ -1260,13 +1260,13 @@ class GuardianCreateView(RoleRequiredMixin, TemplateView):
                     model_name="ParentGuardian",
                     object_id=guardian.pk,
                     description=(
-                        f"Guardian {guardian.full_name} (phone {guardian.phone}) created by "
+                        f"Parent {guardian.full_name} (phone {guardian.phone}) created by "
                         f"{request.user.get_full_name() or request.user.username}"
                     ),
                     request=request,
                 )
         except Exception as e:
-            logger.exception("Guardian create failed")
+            logger.exception("Parent create failed")
             return self._invalid(
                 request, values, {},
                 general=f"The system could not save it ({e}). Nothing was saved; please try again.",
@@ -1274,10 +1274,10 @@ class GuardianCreateView(RoleRequiredMixin, TemplateView):
         if portal_access:
             messages.success(
                 request,
-                f"Guardian {guardian.full_name} created — portal account created. Credentials sent via notification."
+                f"Parent {guardian.full_name} created — portal account created. Credentials sent via notification."
             )
         else:
-            messages.success(request, f"Guardian {guardian.full_name} created.")
+            messages.success(request, f"Parent {guardian.full_name} created.")
         return redirect("students:guardian_detail", pk=guardian.pk)
 
     def _create_parent_user(self, guardian, actor):
@@ -1515,7 +1515,7 @@ class StudentGuardianLinkView(RoleRequiredMixin, TemplateView):
 
     def _invalid(self, request, pk, values, errors, mode, general=""):
         messages.error(request, _guardian_error_message(errors, general).replace(
-            "guardian record was not saved", "guardian was not linked"))
+            "parent record was not saved", "parent was not linked"))
         ctx = self.get_context_data(
             pk=pk, values=values, errors=errors, general_error=general, mode=mode,
         )
@@ -1538,13 +1538,13 @@ class StudentGuardianLinkView(RoleRequiredMixin, TemplateView):
                 guardian = ParentGuardian.objects.filter(pk=guardian_id, is_archived=False).first()
             if guardian is None:
                 return self._invalid(request, pk, values, {
-                    "guardian_id": "Guardian: search for and select a guardian, "
-                                   "or switch to Create New Guardian.",
+                    "guardian_id": "Parent: search for and select a parent, "
+                                   "or switch to Create New Parent.",
                 }, mode)
             values["guardian"] = guardian
             if not guardian.has_given_consent():
                 return self._invalid(request, pk, values, {
-                    "guardian_id": f"Guardian: {guardian.full_name} has no recorded PDPA consent. "
+                    "guardian_id": f"Parent: {guardian.full_name} has no recorded PDPA consent. "
                                    "Consent must be recorded before this record can be saved.",
                 }, mode)
             try:
@@ -1554,7 +1554,7 @@ class StudentGuardianLinkView(RoleRequiredMixin, TemplateView):
                 detail = "; ".join(getattr(exc, "messages", None) or [str(exc)])
                 return self._invalid(request, pk, values, {}, mode, general=detail)
             if created:
-                messages.success(request, f"Linked existing guardian: {guardian.full_name}")
+                messages.success(request, f"Linked existing parent: {guardian.full_name}")
             else:
                 messages.success(
                     request,
@@ -1605,14 +1605,14 @@ class StudentGuardianLinkView(RoleRequiredMixin, TemplateView):
                     guardian=guardian, action=PDPAConsentLog.Action.GIVEN,
                     method=pdpa_consent_method, version=pdpa_consent_version,
                     actor=request.user,
-                    notes="Consent recorded during guardian link flow.",
+                    notes="Consent recorded during parent link flow.",
                 )
                 _set_guardian_link(student, guardian, relationship, is_primary)
                 # Portal access: create linked User account if requested
                 if portal_access:
                     self._create_parent_user(guardian, request.user)
         except Exception as e:
-            logger.exception("Guardian create-and-link failed")
+            logger.exception("Parent create-and-link failed")
             return self._invalid(
                 request, pk, values, {}, mode,
                 general=f"The system could not save it ({e}). Nothing was saved; please try again.",
@@ -1621,10 +1621,10 @@ class StudentGuardianLinkView(RoleRequiredMixin, TemplateView):
         if portal_access:
             messages.success(
                 request,
-                f"Created and linked new guardian: {guardian.full_name} — portal account created. Credentials sent via notification."
+                f"Created and linked new parent: {guardian.full_name} — portal account created. Credentials sent via notification."
             )
         else:
-            messages.success(request, f"Created and linked new guardian: {guardian.full_name}")
+            messages.success(request, f"Created and linked new parent: {guardian.full_name}")
 
         # FR-STU-005: Notify Finance Officer if sibling relationship confirmed
         if request.POST.get("confirm_sibling") == "1":
@@ -1826,7 +1826,7 @@ class GuardianEditView(RoleRequiredMixin, TemplateView):
             if linked_student_ids and not linked_student_ids.intersection(accessible_student_ids):
                 messages.error(
                     request,
-                    "You do not have access to edit this guardian's record."
+                    "You do not have access to edit this parent's record."
                 )
                 return redirect("students:guardian_detail", pk=pk)
 
@@ -1863,12 +1863,12 @@ class GuardianEditView(RoleRequiredMixin, TemplateView):
             action_type="GUARDIAN_UPDATED",
             model_name="ParentGuardian",
             object_id=guardian.pk,
-            description=f"Guardian {guardian.full_name} updated by {request.user.username}",
+            description=f"Parent {guardian.full_name} updated by {request.user.username}",
             before={"full_name": before_name, "phone": before_phone},
             after={"full_name": guardian.full_name, "phone": guardian.phone},
             request=request,
         )
-        messages.success(request, f"Guardian {guardian.full_name} updated.")
+        messages.success(request, f"Parent {guardian.full_name} updated.")
         return redirect("students:guardian_detail", pk=pk)
 
 
@@ -1893,7 +1893,7 @@ class GuardianDeleteView(RoleRequiredMixin, View):
             messages.error(
                 request,
                 f"Cannot delete {guardian.full_name}: financial records exist. "
-                "Archive the guardian instead."
+                "Archive the parent instead."
             )
             return redirect("students:guardian_detail", pk=pk)
 
@@ -1909,10 +1909,10 @@ class GuardianDeleteView(RoleRequiredMixin, View):
             action_type="GUARDIAN_DELETED",
             model_name="ParentGuardian",
             object_id=guardian.pk,
-            description=f"Guardian {name} archived by {request.user.username}",
+            description=f"Parent {name} archived by {request.user.username}",
             request=request,
         )
-        messages.success(request, f"Guardian {name} has been removed.")
+        messages.success(request, f"Parent {name} has been removed.")
         return redirect("students:guardian_list")
 
 

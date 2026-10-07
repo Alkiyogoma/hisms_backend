@@ -70,7 +70,7 @@ class ParentOnlyMixin(RoleRequiredMixin):
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated and request.user.role not in (UserRole.PARENT, UserRole.SUPER_ADMIN):
             from django.core.exceptions import PermissionDenied
-            raise PermissionDenied("Parent portal access is restricted to the Parent/Guardian role.")
+            raise PermissionDenied("Parent portal access is restricted to the Parent role.")
         return super().dispatch(request, *args, **kwargs)
 
 
@@ -827,7 +827,7 @@ class ParentGuardianLinkView(ParentOnlyMixin, TemplateView):
             notes = request.POST.get("notes", "").strip()
 
             if not guardian_name or not guardian_phone:
-                messages.error(request, "Guardian name and phone are required.")
+                messages.error(request, "Parent name and phone are required.")
                 return redirect("parent_portal:guardian_link", student_id=student_id)
 
             from users.models import User, UserRole
@@ -837,17 +837,17 @@ class ParentGuardianLinkView(ParentOnlyMixin, TemplateView):
             parent_name = request.user.get_full_name() or request.user.username
             rel_display = dict(GuardianRelationship.choices).get(relationship, relationship)
 
-            notif_title = "Guardian Link Request"
+            notif_title = "Parent Link Request"
             notif_body = (
-                f"{parent_name} has requested a new guardian be created and linked to "
+                f"{parent_name} has requested a new parent be created and linked to "
                 f"{student.first_name} {student.last_name}.\n\n"
-                f"Guardian Name: {guardian_name}\n"
+                f"Parent Name: {guardian_name}\n"
                 f"Phone: {guardian_phone}\n"
                 f"Relationship: {rel_display}\n"
             )
             if notes:
                 notif_body += f"Notes: {notes}\n"
-            notif_body += f"\nPlease create the guardian record and link them to the student."
+            notif_body += f"\nPlease create the parent record and link them to the student."
 
             for admin in admin_users:
                 Notification.objects.create(
@@ -865,7 +865,7 @@ class ParentGuardianLinkView(ParentOnlyMixin, TemplateView):
         relationship = _valid_relationship(request.POST.get("relationship", "other"))
 
         if not guardian_id:
-            messages.error(request, "Please select a guardian to link.")
+            messages.error(request, "Please select a parent to link.")
             return redirect("parent_portal:guardian_link", student_id=student_id)
 
         # IDOR guard: only allow linking guardians already associated with the
@@ -879,7 +879,7 @@ class ParentGuardianLinkView(ParentOnlyMixin, TemplateView):
             scoped_pks.add(parent_guardian.pk)
         guardian = ParentGuardian.objects.filter(pk=guardian_id, pk__in=scoped_pks).first()
         if not guardian:
-            messages.error(request, "Guardian not found or not linked to your family.")
+            messages.error(request, "Parent not found or not linked to your family.")
             return redirect("parent_portal:guardian_link", student_id=student_id)
 
         if StudentGuardian.objects.filter(student=student, guardian=guardian).exists():
@@ -912,7 +912,7 @@ class ParentGuardianUnlinkView(ParentOnlyMixin, View):
         sg = get_object_or_404(StudentGuardian, pk=sg_pk, student=student)
 
         if sg.is_primary:
-            messages.error(request, "Cannot remove the primary guardian.")
+            messages.error(request, "Cannot remove the primary parent.")
             return redirect("parent_portal:guardian_list", student_id=student_id)
 
         guardian_name = sg.guardian.full_name
@@ -1353,7 +1353,7 @@ class ParentGenerateInvoiceView(ParentOnlyMixin, View):
                     subject=f"Invoice raised: {applicant.child_full_name} — {applicant.reference_number}",
                     body=(
                         f"An admission invoice has been generated and payment is expected.\n\n"
-                        f"Learner: {applicant.child_full_name}\n"
+                        f"Student: {applicant.child_full_name}\n"
                         f"Grade: {applicant.grade_applying_for}\n"
                         f"Parent: {applicant.parent_full_name}\n"
                         f"Invoice number: {inv_no}\n"

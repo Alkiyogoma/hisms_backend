@@ -101,7 +101,7 @@ class DSARRequest(TimeStampedModel):
     )
     target_type = models.CharField(
         max_length=16,
-        choices=[("student", "Student"), ("guardian", "Guardian")],
+        choices=[("student", "Student"), ("guardian", "Parent")],
     )
     target_id = models.PositiveIntegerField()
     target_label = models.CharField(

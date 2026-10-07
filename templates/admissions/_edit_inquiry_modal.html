@@ -27,7 +27,7 @@
     {% include "_partials/form_error_summary.html" with form=form %}
 
     <div style="font-size:13px;font-weight:700;color:var(--text-primary);padding-bottom:8px;border-bottom:1px solid var(--border)">
-      Parent / Guardian Details
+      Parent Details
     </div>
     <div class="hf2-grid-2">
       {% field form.parent_full_name %}
@@ -37,16 +37,16 @@
       {% field form.parent_invoice_name %}
     </div>
 
-    {# Additional parents / guardians (optional, unlimited) #}
+    {# Additional parents (optional, unlimited) #}
     <div id="edit-extra-parents">
       {% for p in additional_parents %}
       <div class="extra-parent-block" style="margin-top:8px;padding-top:12px;border-top:1px dashed var(--border)">
         <div class="section-hdr" style="margin-bottom:8px">
-          <span class="section-title" style="font-size:12.5px">Parent / Guardian <span class="ep-index">{{ forloop.counter|add:1 }}</span></span>
+          <span class="section-title" style="font-size:12.5px">Parent <span class="ep-index">{{ forloop.counter|add:1 }}</span></span>
           <button type="button" class="btn btn-danger btn-sm ep-remove">Remove</button>
         </div>
         <div class="hf2-grid-2">
-          <div class="hf2-group hf2-span-full"><label class="hf2-label">Parent / guardian name</label><input type="text" name="extra_parent_full_name[]" class="hf2-input" value="{{ p.full_name }}"></div>
+          <div class="hf2-group hf2-span-full"><label class="hf2-label">Parent name</label><input type="text" name="extra_parent_full_name[]" class="hf2-input" value="{{ p.full_name }}"></div>
           <div class="hf2-group"><label class="hf2-label">Relationship to student</label>
             <select name="extra_parent_relationship[]" class="hf2-select">
               <option value="">Select relationship…</option>
@@ -60,16 +60,16 @@
       {% endfor %}
     </div>
     <div>
-      <button type="button" id="edit-add-parent-btn" class="btn btn-secondary btn-sm">+ Add another parent / guardian</button>
+      <button type="button" id="edit-add-parent-btn" class="btn btn-secondary btn-sm">+ Add another parent</button>
     </div>
     <template id="edit-extra-parent-template">
       <div class="extra-parent-block" style="margin-top:8px;padding-top:12px;border-top:1px dashed var(--border)">
         <div class="section-hdr" style="margin-bottom:8px">
-          <span class="section-title" style="font-size:12.5px">Parent / Guardian <span class="ep-index">2</span></span>
+          <span class="section-title" style="font-size:12.5px">Parent <span class="ep-index">2</span></span>
           <button type="button" class="btn btn-danger btn-sm ep-remove">Remove</button>
         </div>
         <div class="hf2-grid-2">
-          <div class="hf2-group hf2-span-full"><label class="hf2-label">Parent / guardian name</label><input type="text" name="extra_parent_full_name[]" class="hf2-input" placeholder="e.g. Mrs. Jane Kamau"></div>
+          <div class="hf2-group hf2-span-full"><label class="hf2-label">Parent name</label><input type="text" name="extra_parent_full_name[]" class="hf2-input" placeholder="e.g. Mrs. Jane Kamau"></div>
           <div class="hf2-group"><label class="hf2-label">Relationship to student</label>
             <select name="extra_parent_relationship[]" class="hf2-select">
               <option value="">Select relationship…</option>

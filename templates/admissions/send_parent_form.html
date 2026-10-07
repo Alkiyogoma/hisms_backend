@@ -7,7 +7,7 @@
 <div class="card" style="max-width:640px;margin:0 auto;padding:26px 28px">
   <div class="card-title" style="margin:0 0 6px">Send the admission form to a parent</div>
   <p class="muted" style="font-size:13px;margin:0 0 18px">
-    Enter the parent's details and we'll email them a secure link. They fill in the learner and family details,
+    Enter the parent's details and we'll email them a secure link. They fill in the student and family details,
     upload the documents and submit; the admission invoice is generated automatically. The application appears in the
     pipeline at the admission-form stage, showing whether the form is sent, being filled in, or submitted.
   </p>
@@ -19,7 +19,7 @@
   <form method="post">
     {% csrf_token %}
     <div class="hf2-group">
-      <label class="hf2-label" for="pname">Parent / guardian name <span style="color:var(--red)">*</span></label>
+      <label class="hf2-label" for="pname">Parent name <span style="color:var(--red)">*</span></label>
       <input id="pname" name="parent_full_name" class="hf2-input" value="{{ values.parent_full_name }}" required>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-top:14px">
