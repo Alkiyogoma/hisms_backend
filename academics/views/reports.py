@@ -287,6 +287,34 @@ def _remark_rows(student, term):
     return [(name, remarks.get(name, "")) for name in sorted(names)]
 
 
+def _reopens_on(term):
+    """Start date of the term after ``term`` (None when not yet set up)."""
+    from academics.models import Term
+    if not term or not (term.end_date or term.start_date):
+        return None
+    after = term.end_date or term.start_date
+    nxt = Term.objects.filter(start_date__gt=after).order_by("start_date").first()
+    return nxt.start_date if nxt else None
+
+
+def _class_teacher_name(report):
+    """The class teacher assigned to the learner's class for the report's term,
+    else the latest class teacher of that class, else whoever generated it."""
+    from hr.models import TeacherClassAssignment
+    class_name = report.student.class_name
+    a = (TeacherClassAssignment.objects.filter(
+            is_class_teacher=True, grade_class__name=class_name, term=report.term)
+         .select_related("teacher").first())
+    if a:
+        return a.teacher.full_name or str(a.teacher)
+    from attendance.analytics import class_teachers
+    name = class_teachers().get(class_name)
+    if name:
+        return name
+    by = report.generated_by
+    return (by.get_full_name() or by.username) if by else ""
+
+
 def _photo_data_uri(student):
     """The learner's photo inlined as a data: URI, so the PDF engine never
     has to fetch it over HTTP (media may sit behind login). None if absent."""
@@ -371,6 +399,8 @@ def _build_report_card_context(report):
         "rate": row.get("rate"),
     }
     ctx["photo_src"] = _photo_data_uri(report.student)
+    ctx["reopens_on"] = _reopens_on(term)
+    ctx["class_teacher"] = _class_teacher_name(report)
 
     if report.is_ecd_report:
         ctx["ecd"] = build_ecd_report_context(report)

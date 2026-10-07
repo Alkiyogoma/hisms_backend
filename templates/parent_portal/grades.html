@@ -21,11 +21,16 @@
 {% if selected_student %}
 
 <!-- Overall Average -->
-{% if overall_average > 0 %}
+{% if exam_scores %}
 <div class="card" style="padding:16px;margin-bottom:16px">
   <div style="display:flex;flex-direction:column;align-items:center;gap:16px">
     <div style="text-align:center;min-width:80px">
-      <div style="font-size:28px;font-weight:800;color:{% if overall_average >= 80 %}#16A34A{% elif overall_average >= 50 %}#CA8A04{% else %}#DC2626{% endif %}">{{ overall_average }}%</div>
+      {% if overall_average is not None %}
+      <div style="font-size:28px;font-weight:800;color:{% if overall_average >= 80 %}#16A34A{% elif overall_average >= 50 %}#CA8A04{% else %}#DC2626{% endif %}">{{ overall_average|floatformat:1 }}%</div>
+      {% else %}
+      <div style="font-size:16px;font-weight:700;color:#8A6400">Awaiting end of term</div>
+      {% if exam_summary %}<div style="font-size:11px;color:var(--text-muted)">{{ exam_summary.assessed }} of {{ exam_summary.total_subjects }} subjects fully assessed</div>{% endif %}
+      {% endif %}
       <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600">Overall Average</div>
     </div>
     <div style="width:100%;display:grid;grid-template-columns:repeat(2,1fr);gap:12px">
@@ -51,15 +56,19 @@
   <div style="padding:12px 16px{% if not forloop.last %};border-bottom:1px solid var(--border){% endif %}">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <h3 style="margin:0;font-weight:600;font-size:13px">{{ subject_data.subject_name }}</h3>
-      <span style="font-weight:700;font-size:12px;color:{% if subject_data.average >= 80 %}#16A34A{% elif subject_data.average >= 50 %}#CA8A04{% else %}#DC2626{% endif %}">Avg: {{ subject_data.average }}%</span>
+      {% if subject_data.average is not None %}
+      <span style="font-weight:700;font-size:12px;color:{% if subject_data.average >= 80 %}#16A34A{% elif subject_data.average >= 50 %}#CA8A04{% else %}#DC2626{% endif %}">{{ subject_data.average|floatformat:1 }}% &middot; {{ subject_data.grade }}</span>
+      {% else %}<span style="font-size:11px;font-weight:600;color:#8A6400">Awaiting end of term</span>{% endif %}
     </div>
+    {% if subject_data.average is not None %}
     <div style="height:5px;background:#E2E8F0;border-radius:99px;overflow:hidden;margin-bottom:10px">
       <div style="height:100%;width:{{ subject_data.average }}%;background:{% if subject_data.average >= 80 %}#16A34A{% elif subject_data.average >= 50 %}#CA8A04{% else %}#DC2626{% endif %};border-radius:99px"></div>
     </div>
+    {% endif %}
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px">
       {% for score in subject_data.scores %}
       <div style="padding:6px 10px;background:#F8FAFC;border-radius:6px">
-        <div style="font-size:10px;color:var(--text-muted)">{{ score.exam_type.name|default:"Exam" }}</div>
+        <div style="font-size:10px;color:var(--text-muted)">{{ score.type_name }}</div>
         <div style="font-size:12px;font-weight:600">{{ score.score }}{% if score.max_score %}/{{ score.max_score }}{% endif %}</div>
       </div>
       {% endfor %}

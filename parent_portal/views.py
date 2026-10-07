@@ -24,6 +24,43 @@ from students.models import Student, StudentStatus, StudentGuardian, ParentGuard
 from users.models import User, UserRole
 
 
+_COLUMN = {"quiz": "quiz", "mid_term": "mid", "end_of_term": "end"}
+
+
+def _approved_term_results(student, term):
+    """What parents see for a term: HOD-approved marks of mark-bearing subjects
+    only (never drafts, submissions or remark-only subjects). A subject's
+    average (its weighted total out of 100) appears only once all its
+    assessments are approved, and the overall average only once the whole
+    term is, exactly as on the printed report card.
+
+    Returns ({subject: data}, summary) where summary is exam_summary() or None.
+    """
+    from academics.models import ScoreStatus
+    from academics.score_progress import exam_summary
+    if not student or not term:
+        return {}, None
+    summary = exam_summary(student, term)
+    rows = {r["subject"]: r for r in summary["rows"]}
+    grouped = {}
+    for sc in (ExamScore.objects.filter(student=student, term=term, status=ScoreStatus.APPROVED)
+               .mark_bearing().select_related("exam_type_config")
+               .order_by("subject_name", "exam_type_config__display_order", "exam_type")):
+        d = grouped.setdefault(sc.subject_name, {
+            "subject_name": sc.subject_name, "subject": sc.subject_name, "scores": [],
+            "quiz": None, "mid": None, "end": None, "average": None, "grade": None,
+        })
+        sc.type_name = sc.exam_type_config.name if sc.exam_type_config else sc.exam_type.replace("_", " ").title()
+        d["scores"].append(sc)
+        if sc.exam_type in _COLUMN:
+            d[_COLUMN[sc.exam_type]] = float(sc.score)
+    for subject, d in grouped.items():
+        row = rows.get(subject)
+        if row and row["complete"]:
+            d["average"], d["grade"] = row["total"], row["grade"]
+    return grouped, summary
+
+
 def _get_parent_guardian(user):
     """Return the ParentGuardian instance linked to this user, or None."""
     return ParentGuardian.objects.filter(user=user).first()
@@ -156,9 +193,10 @@ class ParentDashboardView(RoleRequiredMixin, TemplateView):
                     total_outstanding += bal
             fee_summary[child.id] = total_outstanding
         for child in children:
+            # Parents only ever see HOD-approved marks of mark-bearing subjects.
             scores = ExamScore.objects.filter(
-                student=child
-            ).select_related("term").order_by("-term__start_date", "subject_name")
+                student=child, status="approved",
+            ).mark_bearing().select_related("term").order_by("-term__start_date", "subject_name")
             # Deduplicate by subject — keep latest score per subject
             seen_subjects = set()
             deduped = []
@@ -176,8 +214,6 @@ class ParentDashboardView(RoleRequiredMixin, TemplateView):
 
         # Performance trend data (overall averages per term per child)
         import json
-        from academics.grading_utils import compute_grade_with_gaps
-        from academics.models import get_exam_weights
 
         performance_trend = {}
         for child in children:
@@ -188,28 +224,10 @@ class ParentDashboardView(RoleRequiredMixin, TemplateView):
             trend = []
             for r in reports:
                 avg = r.overall_average
-                # Compute from scores if not stored
+                # Not stored: only a fully assessed term has an average.
                 if avg is None:
-                    scores = ExamScore.objects.filter(student=child, term=r.term, status="approved")
-                    subj_scores = {}
-                    for s in scores:
-                        if s.subject_name not in subj_scores:
-                            subj_scores[s.subject_name] = {}
-                        subj_scores[s.subject_name][s.exam_type] = float(s.score)
-                    if subj_scores:
-                        exam_weights = get_exam_weights()
-                        total = Decimal(0)
-                        count = 0
-                        for subj, exams in subj_scores.items():
-                            gr = compute_grade_with_gaps(
-                                scores=exams,
-                                weights=exam_weights,
-                            )
-                            if gr["average"] is not None:
-                                total += Decimal(str(gr["average"]))
-                                count += 1
-                        if count > 0:
-                            avg = float(total / count)
+                    from academics.score_progress import exam_summary
+                    avg = exam_summary(child, r.term)["average"]
 
                 if avg is not None:
                     trend.append({
@@ -406,31 +424,10 @@ class ParentGradesView(RoleRequiredMixin, TemplateView):
         from academics.utils import get_current_term
         active_term = get_current_term()
 
-        # Exam scores grouped by subject
-        exam_scores = []
-        subject_averages = {}
-        if selected_student and active_term:
-            scores = ExamScore.objects.filter(
-                student=selected_student,
-                term=active_term,
-            ).select_related("exam_type_config").order_by("subject_name", "exam_type")
-
-            # Group by subject
-            grouped = {}
-            for score in scores:
-                subj_name = score.subject_name or "Unknown"
-                if subj_name not in grouped:
-                    grouped[subj_name] = {"subject_name": subj_name, "scores": [], "average": 0}
-                grouped[subj_name]["scores"].append(score)
-
-            # Calculate averages
-            for subj_name, data in grouped.items():
-                if data["scores"]:
-                    total = sum(s.score for s in data["scores"])
-                    data["average"] = round(total / len(data["scores"]), 1)
-                subject_averages[subj_name] = data["average"]
-
-            exam_scores = list(grouped.values())
+        # Approved marks only; averages only once assessments are complete.
+        grouped, summary = _approved_term_results(selected_student, active_term)
+        exam_scores = list(grouped.values())
+        subject_averages = {k: d["average"] for k, d in grouped.items() if d["average"] is not None}
 
         # Report cards
         report_cards = []
@@ -459,10 +456,7 @@ class ParentGradesView(RoleRequiredMixin, TemplateView):
                     cp_grouped[subj]["scores"].append(cs)
                 checkpoint_scores = list(cp_grouped.values())
 
-        # Overall average
-        overall_average = 0
-        if subject_averages:
-            overall_average = round(sum(subject_averages.values()) / len(subject_averages), 1)
+        overall_average = summary["average"] if summary else None
 
         ctx.update({
             "children": children,
@@ -471,6 +465,7 @@ class ParentGradesView(RoleRequiredMixin, TemplateView):
             "exam_scores": exam_scores,
             "subject_averages": subject_averages,
             "overall_average": overall_average,
+            "exam_summary": summary,
             "report_cards": report_cards,
             "checkpoint_scores": checkpoint_scores,
         })
@@ -535,22 +530,9 @@ class ParentChildDetailView(RoleRequiredMixin, TemplateView):
             rate = round(present / max(total, 1) * 100, 1)
             monthly_attendance.append({"month": calendar.month_abbr[m], "year": y, "rate": rate, "total": total})
 
-        # Exam scores for active term (all terms if no active)
-        score_qs = ExamScore.objects.filter(student=student).select_related("exam_type_config", "term")
-        if active_term:
-            score_qs = score_qs.filter(term=active_term)
-        score_qs = score_qs.order_by("subject_name", "exam_type")
-
-        grouped_scores = {}
-        for score in score_qs:
-            subj = score.subject_name or "Unknown"
-            if subj not in grouped_scores:
-                grouped_scores[subj] = {"subject_name": score.subject_name, "scores": [], "average": 0}
-            grouped_scores[subj]["scores"].append(score)
-        for data in grouped_scores.values():
-            if data["scores"]:
-                data["average"] = round(sum(s.score for s in data["scores"]) / len(data["scores"]), 1)
-        overall = round(sum(d["average"] for d in grouped_scores.values()) / max(len(grouped_scores), 1), 1)
+        # Approved marks only; averages only once assessments are complete.
+        grouped_scores, summary = _approved_term_results(student, active_term)
+        overall = summary["average"] if summary else None
 
         # Report cards
         report_cards = ReportCard.objects.filter(student=student, status=ReportCardStatus.PUBLISHED).select_related("term").order_by("-term__start_date")
@@ -567,6 +549,7 @@ class ParentChildDetailView(RoleRequiredMixin, TemplateView):
             "monthly_attendance": monthly_attendance,
             "grouped_scores": grouped_scores,
             "overall_average": overall,
+            "exam_summary": summary,
             "report_cards": report_cards,
             "today": today,
         })
@@ -977,31 +960,9 @@ class ParentStudentDetailView(ParentOnlyMixin, TemplateView):
             elif "excus" in s: att_stats["excused"] += 1
         att_stats["rate"] = round((att_stats["present"] + att_stats["late"]) / max(att_stats["total"], 1) * 100, 1)
 
-        # Exam scores for active term
-        score_qs = ExamScore.objects.filter(student=student).select_related("exam_type_config", "term")
-        if active_term:
-            score_qs = score_qs.filter(term=active_term)
-
-        grouped_scores = {}
-        for sc in score_qs:
-            subj = sc.subject_name or "General"
-            if subj not in grouped_scores:
-                grouped_scores[subj] = {"subject": subj, "quiz": None, "mid": None, "end": None, "average": 0, "count": 0}
-            exam_label = (sc.exam_type_config.label or "").lower() if sc.exam_type_config else ""
-            if "quiz" in exam_label:
-                grouped_scores[subj]["quiz"] = float(sc.score) if sc.score is not None else None
-            elif "mid" in exam_label:
-                grouped_scores[subj]["mid"] = float(sc.score) if sc.score is not None else None
-            else:
-                grouped_scores[subj]["end"] = float(sc.score) if sc.score is not None else None
-            if sc.score is not None:
-                grouped_scores[subj]["average"] += float(sc.score)
-                grouped_scores[subj]["count"] += 1
-        for d in grouped_scores.values():
-            if d["count"]:
-                d["average"] = round(d["average"] / d["count"], 1)
-
-        overall = round(sum(d["average"] for d in grouped_scores.values()) / max(len(grouped_scores), 1), 1)
+        # Approved marks only; averages only once assessments are complete.
+        grouped_scores, summary = _approved_term_results(student, active_term)
+        overall = summary["average"] if summary else None
 
         # Report cards
         report_cards = ReportCard.objects.filter(student=student, status=ReportCardStatus.PUBLISHED).select_related("term").order_by("-term__start_date")
@@ -1019,6 +980,7 @@ class ParentStudentDetailView(ParentOnlyMixin, TemplateView):
             "att_stats": att_stats,
             "grouped_scores": grouped_scores,
             "overall_average": overall,
+            "exam_summary": summary,
             "report_cards": report_cards,
             "guardian_links": guardian_links,
             "today": today,

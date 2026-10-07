@@ -192,6 +192,14 @@ class ReportLayoutTests(TestCase):
         self.assertIn('<th colspan="4">Work Habits</th>', page)
         self.assertIn("traits-full", page)
         self.assertIn("Works well independently</td><td class=\"g\">E", page)
+        # No hardcoded reopen date or teacher name.
+        self.assertIn("School Reopens on: To be announced", page)
+        self.assertNotIn("RANGE MARWA", page)
+        Term.objects.create(academic_year=self.year, name="Term 2",
+                            start_date=self.term.end_date + timedelta(days=30),
+                            end_date=self.term.end_date + timedelta(days=120))
+        self.assertIn("School Reopens on: " + (self.term.end_date + timedelta(days=30)).strftime("%-d"),
+                      self._preview())
 
     def test_photo_from_admission_document_is_embedded(self):
         from django.core.files.base import ContentFile

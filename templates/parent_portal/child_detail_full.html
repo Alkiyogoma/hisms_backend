@@ -117,10 +117,10 @@
           {% for d in grouped_scores.values %}
           <tr>
             <td style="font-weight:600">{{ d.subject }}</td>
-            <td style="text-align:center">{% if d.quiz %}{{ d.quiz }}{% else %}—{% endif %}</td>
-            <td style="text-align:center">{% if d.mid %}{{ d.mid }}{% else %}—{% endif %}</td>
-            <td style="text-align:center">{% if d.end %}{{ d.end }}{% else %}—{% endif %}</td>
-            <td style="text-align:center;font-weight:700">{{ d.average }}</td>
+            <td style="text-align:center">{% if d.quiz is not None %}{{ d.quiz|floatformat:"-1" }}{% else %}—{% endif %}</td>
+            <td style="text-align:center">{% if d.mid is not None %}{{ d.mid|floatformat:"-1" }}{% else %}—{% endif %}</td>
+            <td style="text-align:center">{% if d.end is not None %}{{ d.end|floatformat:"-1" }}{% else %}—{% endif %}</td>
+            <td style="text-align:center;font-weight:700">{% if d.average is not None %}{{ d.average|floatformat:1 }} &middot; {{ d.grade }}{% else %}<span style="font-size:11px;font-weight:600;color:#8A6400">Awaiting end of term</span>{% endif %}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -183,7 +183,12 @@
     <!-- Overall Average -->
     <div class="card" style="padding:24px;text-align:center">
       <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:8px">Overall Average</div>
-      <div style="font-size:36px;font-weight:800;color:var(--hodari-blue)">{{ overall_average }}%</div>
+      {% if overall_average is not None %}
+      <div style="font-size:36px;font-weight:800;color:var(--hodari-blue)">{{ overall_average|floatformat:1 }}%</div>
+      {% else %}
+      <div style="font-size:16px;font-weight:700;color:#8A6400">Awaiting end of term</div>
+      {% if exam_summary %}<div style="font-size:12px;color:var(--text-muted)">{{ exam_summary.assessed }} of {{ exam_summary.total_subjects }} subjects fully assessed</div>{% endif %}
+      {% endif %}
       {% if active_term %}<div style="font-size:12px;color:var(--text-muted);margin-top:4px">{{ active_term.name }}</div>{% endif %}
       {% if grouped_scores %}<div style="font-size:12px;color:var(--text-muted)">{{ grouped_scores|length }} subject{{ grouped_scores|length|pluralize }}</div>{% endif %}
     </div>

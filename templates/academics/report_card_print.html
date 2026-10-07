@@ -517,7 +517,7 @@
                 <td>Days Absent : {{ attendance.absent }}
                     <div style="font-size:8pt;font-weight:normal;color:#555">{% if attendance.excused %}incl. {{ attendance.excused }} excused &middot; {% endif %}of {{ attendance.marked }} school day{{ attendance.marked|pluralize }} marked &middot; unmarked days not counted</div>
                 </td>
-                <td>School Reopens on: {{ report.term.next_term_start|default:"7th September 2026" }}</td>
+                <td>School Reopens on: {% if reopens_on %}{{ reopens_on|date:"jS F Y" }}{% else %}To be announced{% endif %}</td>
             </tr>
         </table>
 
@@ -540,7 +540,7 @@
                 </td>
                 <td class="signatures-right">
                     <div style="font-weight: bold;">
-                        Class Teacher: {{ report.generated_by.get_full_name|upper|default:"RANGE MARWA BORNFACE R.M" }}
+                        Class Teacher: {{ class_teacher|upper|default:"—" }}
                     </div>
                     
                     {% if report.status == 'published' and report.signed_off_at %}
