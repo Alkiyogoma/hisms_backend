@@ -1,0 +1,5 @@
+<nav class="at-tabs" aria-label="Attendance">
+  <a href="{% url 'attendance:today' %}{% if class_name %}?class_name={{ class_name|urlencode }}{% endif %}" class="{% if attendance_tab == 'today' %}on{% endif %}">Today</a>
+  <a href="{% url 'attendance:reports' %}{% if class_name %}?class_name={{ class_name|urlencode }}{% endif %}" class="{% if attendance_tab == 'reports' %}on{% endif %}">Attendance Reports</a>
+  <a href="{% url 'attendance:register' %}{% if class_name %}?class_name={{ class_name|urlencode }}{% endif %}" class="{% if attendance_tab == 'register' %}on{% endif %}">Printable Register</a>
+</nav>

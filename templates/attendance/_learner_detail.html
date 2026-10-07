@@ -1,0 +1,51 @@
+<div class="at-mhead">
+  <div>
+    <h3>{{ student.first_name }} {{ student.last_name }}</h3>
+    <div class="ms">{{ row.class_name|default:student.class_name }} · {{ student.admission_no }} · {{ period.label }} · {{ period.days|length }} school day{{ period.days|length|pluralize }}</div>
+  </div>
+  <div style="display:flex; gap:6px; flex-shrink:0">
+    <a class="hf-btn hf-btn-secondary" style="font-size:12px" target="_blank" rel="noopener"
+       href="{% url 'attendance:print' %}?kind=student&student={{ student.pk }}&start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}&autoprint=1">Print</a>
+    <button type="button" class="hf-btn hf-btn-secondary" style="font-size:12px" data-close>Close</button>
+  </div>
+</div>
+{% if not row %}
+  <div class="at-empty">No school days for this learner in the range.</div>
+{% else %}
+<div class="at-mini">
+  <div><div class="k">Rate</div><div class="v c-{{ row.band }}">{% if row.rate is not None %}{{ row.rate }}%{% else %}—{% endif %}</div></div>
+  <div><div class="k">In school</div><div class="v c-green">{{ row.in_school }}</div></div>
+  <div><div class="k">Absent</div><div class="v c-red">{{ row.absent }}</div></div>
+  <div><div class="k">Excused</div><div class="v" style="color:var(--at-purple)">{{ row.excused }}</div></div>
+  <div><div class="k">Late</div><div class="v c-amber">{{ row.late }}</div></div>
+  <div><div class="k">Longest run absent</div><div class="v">{{ pattern.longest_absent_run }}</div></div>
+  <div><div class="k">Not marked</div><div class="v c-none">{{ row.unmarked }}</div></div>
+</div>
+<div style="font-size:12.5px;color:var(--at-muted);margin-bottom:8px">Every school day in the range, in order{% if row.admitted_in_period %} — admitted {{ row.enrolment_date|date:"j M Y" }}, counted from that date{% endif %}.</div>
+{% for m in pattern.months %}
+  <div class="at-month"><div class="ml">{{ m.label }}</div>
+    <div class="at-daygrid">
+      {% for c in m.cells %}<div class="dcw" title="{{ c.date|date:'D j M' }}: {% if c.code == 'P' %}Present{% elif c.code == 'L' %}Late{% elif c.code == 'A' %}Absent{% elif c.code == 'E' %}Excused{% elif c.code == 'U' %}Not marked{% elif c.code == 'F' %}Still ahead{% else %}Not yet on roll{% endif %}"><span class="dc dc-{{ c.code }}">{% if c.code == 'U' %}–{% elif c.code == 'F' or not c.code %}&nbsp;{% else %}{{ c.code }}{% endif %}</span><small>{{ c.date|date:'j' }}</small></div>{% endfor %}
+    </div>
+  </div>
+{% endfor %}
+<div class="at-legend" style="font-size:11.5px; margin-top:6px">
+  <span><span class="dc dc-P" style="width:16px;height:16px;line-height:16px;font-size:9px">P</span> Present</span>
+  <span><span class="dc dc-L" style="width:16px;height:16px;line-height:16px;font-size:9px">L</span> Late</span>
+  <span><span class="dc dc-A" style="width:16px;height:16px;line-height:16px;font-size:9px">A</span> Absent</span>
+  <span><span class="dc dc-E" style="width:16px;height:16px;line-height:16px;font-size:9px">E</span> Excused</span>
+  <span><span class="dc dc-U" style="width:16px;height:16px;line-height:16px;font-size:9px">–</span> Not marked</span>
+</div>
+{% if reasons %}
+  <div class="at-reasons"><b>Excusal reasons</b> <span class="at-sub" style="display:inline">· authorised staff only, never printed</span>
+    <ul style="margin:6px 0 0 16px; padding:0">{% for d, text in reasons %}<li>{{ d|date:"D j M" }} — {{ text }}</li>{% endfor %}</ul>
+  </div>
+{% elif reasons_hidden %}
+  <div class="at-basis">Excusal reasons are held against the record and visible to authorised staff only.</div>
+{% endif %}
+<div class="at-basis">
+  {% if row.absent and pattern.worst_weekday %}Most absences fall on a <b>{{ pattern.worst_weekday.0 }}</b> ({{ pattern.worst_weekday.1 }} of {{ row.absent }}). Patterns like this are what a parent conversation needs — a figure alone does not show them.
+  {% elif row.marked %}No unexcused absences in this range.{% else %}No days marked in this range yet.{% endif %}
+  Rate = in school ÷ days marked; unmarked days are left out.
+</div>
+{% endif %}

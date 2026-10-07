@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Progress Report — {{ student.first_name }} {{ student.last_name }}{% if term %} — {{ term.name }} {{ term.academic_year.name }}{% endif %}</title>
+{% if not is_pdf %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@500;700&family=Merriweather:wght@700&display=swap" rel="stylesheet">
+{% endif %}
+<style>
+  :root { --blue:#023AA5; --ink:#1A1A2E; --muted:#6B778C; --border:#DDE3EE;
+    --crit:#B42318; --crit-bg:#FDECEA; --supp:#A15C07; --supp-bg:#FFF3E0; --pass:#1B4FD8; --pass-bg:#E9EFFD; --strong:#17803F; --strong-bg:#E5F5EB;
+    --green:#1E8A4C; --green-bg:#EAF6EE; --red:#C0392B; --red-bg:#FDECEA; --amber:#C27803; --amber-bg:#FFF6E5; --purple:#5B4FCF; --purple-bg:#EFEDFB; --grey-bg:#F0F2F6;
+    --font-ui:'Roboto', Arial, sans-serif; --font-display:'Merriweather', Georgia, serif; }
+  @page { size:A4 portrait; margin:12mm 11mm 15mm;
+    @bottom-left { content:"Hodari Christian School \00B7  Learner Progress Report \00B7  Confidential"; font:8pt Roboto, Arial, sans-serif; color:#8492A6; }
+    @bottom-right { content:"Page " counter(page) " of " counter(pages); font:8pt Roboto, Arial, sans-serif; color:#8492A6; }
+  }
+  * { box-sizing:border-box; }
+  body { font-family:var(--font-ui); color:var(--ink); background:#EEF1F6; margin:0; padding:24px 16px; font-size:10pt; line-height:1.4; }
+  .toolbar { max-width:210mm; margin:0 auto 14px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; font-size:13px; color:#5B6578; }
+  .toolbar .btns { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .toolbar select { padding:7px 10px; border-radius:7px; border:1.5px solid var(--border); font:inherit; }
+  .btn { padding:8px 16px; border-radius:7px; font-size:13px; font-weight:600; cursor:pointer; text-decoration:none; border:none; font-family:inherit; display:inline-block; }
+  .btn-primary { background:var(--blue); color:#fff; } .btn-outline { background:#fff; color:var(--blue); border:1.5px solid var(--blue); }
+  .sheet { max-width:210mm; margin:0 auto; background:#fff; padding:12mm 11mm; box-shadow:0 6px 30px rgba(15,35,95,.12); border-radius:6px; }
+
+  .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; }
+  .header-left { display:flex; gap:14px; align-items:center; }
+  .school-logo { width:64px; } .school-info { line-height:1.15; }
+  .school-name { font-family:var(--font-display); font-weight:bold; text-transform:uppercase; margin-bottom:4px; font-size:13.5pt; }
+  .school-details { font-size:8.5pt; }
+  .student-photo { width:70px; height:84px; object-fit:cover; border-radius:4px; font-size:8pt; }
+  .student-photo-placeholder { display:none; }
+  .header-separator { border-bottom:1.5px solid #000; margin-bottom:10px; }
+
+  .doc-title { display:flex; justify-content:space-between; align-items:flex-end; gap:12px; margin:2px 0 10px; }
+  .doc-title h1 { font-family:var(--font-display); font-size:16pt; color:var(--blue); margin:0; }
+  .doc-title .scope { font-size:8.5pt; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--blue); background:#EAF1FD; padding:4px 10px; border-radius:20px; white-space:nowrap; }
+  .meta { display:grid; grid-template-columns:repeat(4,1fr); border:1px solid var(--border); border-radius:6px; margin-bottom:8px; }
+  .meta div { padding:6px 10px; border-right:1px solid var(--border); border-bottom:1px solid var(--border); }
+  .meta div:nth-child(4n) { border-right:none; } .meta div:nth-last-child(-n+4) { border-bottom:none; }
+  .meta span { display:block; font-size:7pt; letter-spacing:.8px; text-transform:uppercase; color:var(--muted); font-weight:700; }
+  .meta b { font-size:9.5pt; font-weight:600; }
+  .kpis { display:grid; grid-template-columns:repeat(6,1fr); gap:7px; margin-bottom:8px; }
+  .kpi { border:1px solid var(--border); border-radius:6px; padding:6px 9px; }
+  .kpi span { display:block; font-size:6.8pt; letter-spacing:.7px; text-transform:uppercase; color:var(--muted); font-weight:700; }
+  .kpi b { display:block; font-size:15pt; line-height:1.15; margin-top:3px; font-family:'Roboto Mono', Consolas, monospace; }
+  .kpi small { font-size:7.5pt; color:var(--muted); }
+
+  h2 { font-size:11pt; color:var(--blue); margin:8px 0 4px; padding-bottom:4px; border-bottom:2px solid var(--blue); break-after:avoid; page-break-after:avoid; }
+  h2 small { font-weight:400; color:var(--muted); font-size:8.5pt; margin-left:6px; }
+  table.t { width:100%; border-collapse:collapse; font-size:8.8pt; }
+  table.t th { background:var(--blue); color:#fff; text-align:left; font-size:7.3pt; letter-spacing:.5px; text-transform:uppercase; padding:5px 6px; border:1px solid var(--blue); }
+  table.t td { padding:3px 6px; border:1px solid #DDE3EE; vertical-align:middle; }
+  table.t tbody tr:nth-child(even) td { background:#F7F9FC; }
+  table.t thead { display:table-header-group; }
+  table.t tr { break-inside:avoid; page-break-inside:avoid; }
+  table.t tfoot td { font-weight:700; background:#F0F3F8; border-top:2px solid #3C4559; }
+  .r { text-align:right; } .ctr { text-align:center; } .mono { font-family:'Roboto Mono', Consolas, monospace; white-space:nowrap; }
+  .na { color:#B4BBC9; }
+  .b-critical { color:var(--crit); font-weight:700; } .b-support { color:var(--supp); font-weight:700; }
+  .b-pass { color:var(--pass); font-weight:700; } .b-strong { color:var(--strong); font-weight:700; }
+  .b-green { color:var(--green); font-weight:700; } .b-amber { color:var(--amber); font-weight:700; } .b-red { color:var(--red); font-weight:700; } .b-none { color:#9AA0AE; }
+  .st { display:inline-block; padding:1px 7px; border-radius:10px; font-size:7.6pt; font-weight:700; white-space:nowrap; }
+  .st.critical { background:var(--crit-bg); color:var(--crit); } .st.support { background:var(--supp-bg); color:var(--supp); }
+  .st.pass, .st.strong { background:var(--strong-bg); color:var(--strong); }
+  .g { display:inline-block; min-width:22px; text-align:center; font-weight:700; }
+  .up { color:var(--strong); } .down { color:var(--crit); }
+  .two { display:grid; grid-template-columns:1.1fr .9fr; gap:14px; align-items:start; }
+  .days { display:flex; flex-wrap:wrap; gap:3px; margin-top:6px; }
+  .days i { display:block; width:11px; height:16px; border-radius:2px; background:#E2E8F0; }
+  .days .d-P { background:#2FA866; } .days .d-L { background:#E39A3B; } .days .d-A { background:#C8302A; } .days .d-E { background:#7E73E0; }
+  .student-photo { width:62px; height:74px; }
+  .legend { display:flex; gap:10px; flex-wrap:wrap; font-size:7.5pt; color:var(--muted); margin-top:5px; }
+  .legend i { display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:3px; vertical-align:-1px; }
+  .comments { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .comment { border:1px solid var(--border); border-radius:6px; min-height:40px; padding:6px 10px; font-size:8.5pt; color:var(--muted); break-inside:avoid; }
+  .comment b { display:block; color:var(--ink); font-size:8.5pt; margin-bottom:2px; }
+  .notes { margin-top:10px; font-size:7.6pt; color:#5B6578; border:1px solid var(--border); border-radius:6px; padding:8px 10px; break-inside:avoid; page-break-inside:avoid; }
+  .notes ul { margin:4px 0 0 16px; padding:0; } .notes li { margin:1px 0; }
+  .empty { padding:12px; border:1px dashed var(--border); border-radius:6px; color:var(--muted); font-size:9pt; text-align:center; }
+  .signatures { display:grid; grid-template-columns:1fr 1fr 1fr; gap:28px; margin-top:8px; padding-top:4px; border-top:1px solid var(--border); break-inside:avoid; page-break-inside:avoid; align-items:start; }
+  .sig-line { border-bottom:1.5px solid #474747; height:30px; }
+  .sig-label { font-size:9pt; font-weight:700; color:#474747; margin-top:6px; line-height:1.3; }
+  .sig-label span { font-weight:400; }
+
+  @media print {
+    body { background:#fff; padding:0; }
+    .toolbar { display:none !important; }
+    .sheet { box-shadow:none; border-radius:0; padding:0; max-width:none; }
+    * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  }
+  @media screen and (max-width:700px) {
+    .comments { grid-template-columns:1fr; }
+    .sheet { padding:16px; } .meta { grid-template-columns:repeat(2,1fr); } .kpis { grid-template-columns:repeat(3,1fr); }
+    .meta div:nth-child(4n) { border-right:1px solid var(--border); } .meta div:nth-child(2n) { border-right:none; }
+    .two, .signatures { grid-template-columns:1fr; }
+    .scroll { overflow-x:auto; }
+  }
+</style>
+</head>
+<body>
+{% if not is_pdf %}
+<div class="toolbar">
+  <span>A4 document. In the print dialog choose <b>Save as PDF</b>, or download it directly.</span>
+  <div class="btns">
+    {% if record.history|length > 1 %}
+    <select aria-label="Term" onchange="var q=new URLSearchParams(location.search);q.set('term',this.value);q.delete('autoprint');location.search=q.toString()">
+      {% for h in record.history %}<option value="{{ h.term.pk }}"{% if h.term == term %} selected{% endif %}>{{ h.term.name }} · {{ h.term.academic_year.name }}</option>{% endfor %}
+    </select>
+    {% endif %}
+    <a class="btn btn-outline" href="{% url 'students:detail' student.pk %}{% if term %}?term={{ term.pk }}{% endif %}#performance">&larr; Back to profile</a>
+    <a class="btn btn-outline" href="?{% if term %}term={{ term.pk }}&{% endif %}format=pdf">Download PDF</a>
+    <button class="btn btn-primary" type="button" onclick="window.print()">Print</button>
+  </div>
+</div>
+{% endif %}
+
+<main class="sheet">
+  {% include "includes/hodari_print_header.html" %}
+
+  <div class="doc-title"><h1>Learner Progress Report</h1><span class="scope">{% if term %}{{ term.name }} · {{ term.academic_year.name }}{% else %}No term{% endif %}</span></div>
+  <div class="meta">
+    <div><span>Learner</span><b>{{ student.first_name }} {{ student.last_name }}</b></div>
+    <div><span>Admission no.</span><b>{{ student.admission_no }}</b></div>
+    <div><span>Class</span><b>{{ class_name }}</b></div>
+    <div><span>Class teacher</span><b>{{ class_teacher|default:"—" }}</b></div>
+    <div><span>Term</span><b>{% if term %}{{ term.name }}, {{ term.academic_year.name }}{% else %}—{% endif %}</b></div>
+    <div><span>Term dates</span><b>{% if term.start_date %}{{ term.start_date|date:"j M" }} – {{ term.end_date|date:"j M Y" }}{% else %}—{% endif %}</b></div>
+    <div><span>Prepared by</span><b>{{ request.user.get_full_name|default:request.user.username }}</b></div>
+    <div><span>Generated</span><b>{{ generated_at|date:"j M Y, H:i" }}</b></div>
+  </div>
+
+  {% with a=attendance.row %}
+  <div class="kpis">
+    <div class="kpi"><span>Average mark</span><b class="b-{{ record.band|default:'none' }}">{% if record.average is not None %}{{ record.average }}%{% else %}—{% endif %}</b><small>{% if record.grade %}grade {{ record.grade }} · {{ grade_label }}{% else %}no approved marks{% endif %}</small></div>
+    <div class="kpi"><span>Position in class</span><b>{% if record.position %}{{ record.position }}<small>/{{ record.class_size }}</small>{% else %}—{% endif %}</b><small>by average mark</small></div>
+    <div class="kpi"><span>Class average</span><b>{% if record.class_average is not None %}{{ record.class_average }}%{% else %}—{% endif %}</b><small>{{ class_name }}</small></div>
+    <div class="kpi"><span>Below pass</span><b class="{% if record.below_pass %}b-critical{% endif %}">{{ record.below_pass|length }}</b><small>subject{{ record.below_pass|length|pluralize }} under {{ pass_mark }}%</small></div>
+    <div class="kpi"><span>Attendance</span><b class="b-{{ a.band|default:'none' }}">{% if a.rate is not None %}{{ a.rate }}%{% else %}—{% endif %}</b><small>{% if a %}{{ a.in_school }} of {{ a.marked }} days{% else %}no days marked{% endif %}</small></div>
+    <div class="kpi"><span>Trend</span><b class="{% if record.trend == 'improving' %}up{% elif record.trend == 'declining' %}down{% endif %}">{% if record.trend == 'improving' %}↑ {{ record.trend_diff }}{% elif record.trend == 'declining' %}↓ {{ record.trend_diff|cut:'-' }}{% elif record.trend == 'stable' %}→{% else %}—{% endif %}</b><small>{% if record.trend %}vs previous term{% else %}first term on record{% endif %}</small></div>
+  </div>
+
+  <h2>1. Subject results <small>approved marks only · % per assessment</small></h2>
+  {% if record.subjects %}
+  <div class="scroll"><table class="t">
+    <thead><tr>
+      <th>Subject</th>
+      {% for t in record.types %}<th class="r">{{ t.name }}<br><span style="font-weight:400;text-transform:none">{{ t.weight_percentage|floatformat:0 }}%</span></th>{% endfor %}
+      <th class="r">Mark</th><th class="ctr">Grade</th><th class="r">Class avg</th><th class="r">+/−</th><th>Status</th>
+    </tr></thead>
+    <tbody>
+    {% for s in record.subjects %}
+      <tr>
+        <td><b>{{ s.subject }}</b></td>
+        {% for c in s.cells %}<td class="r mono">{% if c is not None %}{{ c|floatformat:0 }}{% else %}<span class="na">–</span>{% endif %}</td>{% endfor %}
+        <td class="r mono b-{{ s.band }}">{{ s.mark }}</td>
+        <td class="ctr"><span class="g">{{ s.grade }}</span></td>
+        <td class="r mono">{{ s.class_average|default:"–" }}</td>
+        <td class="r mono {% if s.diff > 0 %}up{% elif s.diff < 0 %}down{% endif %}">{% if s.diff is not None %}{% if s.diff > 0 %}+{% endif %}{{ s.diff }}{% endif %}</td>
+        <td><span class="st {{ s.band }}">{{ s.status }}</span></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr><td>Average</td>{% for t in record.types %}<td></td>{% endfor %}<td class="r mono">{{ record.average }}</td><td class="ctr">{{ record.grade }}</td><td class="r mono">{{ record.class_average }}</td><td class="r mono {% if record.class_diff > 0 %}up{% elif record.class_diff < 0 %}down{% endif %}">{% if record.class_diff is not None %}{% if record.class_diff > 0 %}+{% endif %}{{ record.class_diff }}{% endif %}</td><td></td></tr></tfoot>
+  </table></div>
+  {% else %}
+    <div class="empty">No approved marks for {{ student.first_name }} {% if term %}in {{ term.name }}, {{ term.academic_year.name }}{% endif %} yet. Marks appear once they are entered and approved.</div>
+  {% endif %}
+
+  <div class="two">
+    <div>
+      <h2>2. Attendance <small>{{ attendance.period.label }}</small></h2>
+      {% if a and a.marked %}
+      <table class="t">
+        <thead><tr><th>In school</th><th>Late</th><th>Absent</th><th>Excused</th><th>Not marked</th><th class="r">Rate</th></tr></thead>
+        <tbody><tr><td class="mono">{{ a.in_school }}</td><td class="mono">{{ a.late }}</td><td class="mono">{{ a.absent }}</td><td class="mono">{{ a.excused }}</td><td class="mono">{{ a.unmarked }}</td><td class="r mono b-{{ a.band }}">{{ a.rate }}%</td></tr></tbody>
+      </table>
+      <div class="days">{% for d, c in attendance.strip %}<i class="d-{{ c }}"></i>{% endfor %}</div>
+      <div class="legend"><span><i style="background:#2FA866"></i>Present</span><span><i style="background:#E39A3B"></i>Late</span><span><i style="background:#C8302A"></i>Absent</span><span><i style="background:#7E73E0"></i>Excused</span><span><i style="background:#E2E8F0"></i>Not marked</span><span>· last {{ attendance.strip|length }} school days</span></div>
+      {% else %}<div class="empty">No attendance marked in this term yet.</div>{% endif %}
+    </div>
+    <div>
+      <h2>3. Progress across terms</h2>
+      {% if record.history %}
+      <table class="t">
+        <thead><tr><th>Term</th><th class="r">Average</th><th class="ctr">Grade</th><th class="r">Subjects</th></tr></thead>
+        <tbody>{% for h in record.history %}
+          <tr{% if h.current %} style="font-weight:700"{% endif %}><td style="white-space:nowrap">{{ h.term.name }} <span style="color:var(--muted);font-weight:400">{{ h.term.academic_year.name }}</span></td>
+            <td class="r mono b-{{ h.band }}">{{ h.average }}</td><td class="ctr">{{ h.grade }}</td><td class="r">{{ h.subjects }}</td></tr>
+        {% endfor %}</tbody>
+      </table>
+      {% else %}<div class="empty">No earlier terms on record.</div>{% endif %}
+    </div>
+  </div>
+  {% endwith %}
+
+  <h2>4. Comments</h2>
+  <div class="comments"><div class="comment"><b>Class teacher</b>&nbsp;</div><div class="comment"><b>Head of School</b>&nbsp;</div></div>
+
+  <div class="notes">
+    <b>How to read this report</b>
+    <ul>
+      <li>Only marks that have been entered <b>and approved</b> are included; assessments not yet marked are left out, never counted as zero. Each subject mark is the weighted average of the assessments marked so far, with the weights shown under each assessment rescaled over those marked.</li>
+      <li>Grades: {% for g, r, l in scale %}{{ g }} {{ r }} ({{ l }}){% if not forloop.last %} · {% endif %}{% endfor %}. Pass mark {{ pass_mark }}% (grade C).</li>
+      <li>Attendance = days in school ÷ days marked. Late counts as in school; excused counts as absent but authorised; unmarked days are left out. Weekends and holidays are omitted.</li>
+    </ul>
+  </div>
+
+  <div class="signatures">
+    <div><div class="sig-line"></div><div class="sig-label">Class teacher<br><span>{{ class_teacher|default:"Signature and date" }}</span></div></div>
+    <div><div class="sig-line"></div><div class="sig-label">Head of School<br><span>Signature and date</span></div></div>
+    <div><div class="sig-line"></div><div class="sig-label">Parent / guardian<br><span>Signature and date</span></div></div>
+  </div>
+</main>
+
+{% if not is_pdf %}
+<script>
+  if ({% if print_now %}true || {% endif %}new URLSearchParams(location.search).get('autoprint') === '1') {
+    window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 350); });
+  }
+</script>
+{% endif %}
+</body>
+</html>

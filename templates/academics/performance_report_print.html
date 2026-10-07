@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Performance Report &mdash; {{ scope.label }} &mdash; {{ terms_label }} {{ selected_year.name }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@500;700&family=Merriweather:wght@700&display=swap" rel="stylesheet">
+<style>
+  /* Letterhead + signature styles (from includes/hodari_print_styles.html,
+     without its global margin/padding reset). */
+  :root { --hodari-blue:#023AA5; --hodari-charcoal:#474747; --text-primary:#1A1A2E; --text-muted:#6B778C; --border:#DDE3EE;
+    --font-ui:'Roboto', Arial, sans-serif; --font-display:'Merriweather', Georgia, serif; }
+  .header { display:flex; justify-content:space-between; align-items:flex-start; }
+  .header-left { display:flex; gap:14px; align-items:center; }
+  .school-info { line-height:1.15; }
+  .school-name { font-family:var(--font-display); font-weight:bold; text-transform:uppercase; margin-bottom:4px; }
+  .header-separator { border-bottom:1.5px solid #000; margin-bottom:12px; }
+  .signatures { display:grid; align-items:start; padding-top:14px; border-top:1px solid var(--border); break-inside:avoid; }
+  .sig-line { border-bottom:1.5px solid var(--hodari-charcoal); height:38px; }
+  .sig-label { font-size:9pt; font-weight:700; color:var(--hodari-charcoal); margin-top:6px; line-height:1.3; }
+  .btn { padding:8px 16px; border-radius:7px; font-size:13px; font-weight:600; cursor:pointer; text-decoration:none; border:none; font-family:inherit; }
+  .btn-primary { background:var(--hodari-blue); color:#fff; }
+  .btn-outline { background:#fff; color:var(--hodari-blue); border:1.5px solid var(--hodari-blue); }
+  @page { size:A4 portrait; margin:14mm 12mm 16mm;
+    @bottom-left { content:"Hodari Christian School \00B7  Performance Report \00B7  Confidential"; font:8pt Roboto, Arial, sans-serif; color:#8492A6; }
+    @bottom-right { content:"Page " counter(page) " of " counter(pages); font:8pt Roboto, Arial, sans-serif; color:#8492A6; }
+  }
+  @page wide { size:A4 landscape; }
+  :root { --crit:#B42318; --crit-bg:#FDECEA; --supp:#A15C07; --supp-bg:#FFF3E0; --pass:#1B4FD8; --pass-bg:#E9EFFD; --strong:#17803F; --strong-bg:#E5F5EB; }
+  body { font-family:var(--font-ui); color:var(--text-primary); background:#EEF1F6; margin:0; padding:24px 16px; font-size:10pt; line-height:1.4; }
+  * { box-sizing:border-box; }
+  .toolbar { max-width:210mm; margin:0 auto 14px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; font-size:13px; color:#5B6578; }
+  .toolbar .btns { display:flex; gap:8px; }
+  .sheet { max-width:210mm; margin:0 auto; background:#fff; padding:14mm 12mm; box-shadow:0 6px 30px rgba(15,35,95,.12); border-radius:6px; }
+  .student-photo-placeholder { display:none; }
+  .header { margin-bottom:6px; } .school-logo { width:70px; } .school-name { font-size:14pt; } .school-details { font-size:9pt; }
+
+  .doc-title { display:flex; justify-content:space-between; align-items:flex-end; gap:12px; margin:4px 0 10px; }
+  .doc-title h1 { font-family:var(--font-display); font-size:17pt; color:var(--hodari-blue); margin:0; }
+  .doc-title .scope { font-size:9pt; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--hodari-blue); background:var(--pass-bg); padding:4px 10px; border-radius:20px; white-space:nowrap; }
+  .meta { display:grid; grid-template-columns:repeat(4,1fr); border:1px solid var(--border); border-radius:6px; margin-bottom:12px; }
+  .meta div { padding:6px 10px; border-right:1px solid var(--border); border-bottom:1px solid var(--border); }
+  .meta div:nth-child(4n) { border-right:none; } .meta div:nth-last-child(-n+4) { border-bottom:none; }
+  .meta span { display:block; font-size:7pt; letter-spacing:.8px; text-transform:uppercase; color:var(--text-muted); font-weight:700; }
+  .meta b { font-size:9.5pt; font-weight:600; }
+
+  .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:14px; }
+  .kpi { border:1px solid var(--border); border-radius:6px; padding:8px 10px; }
+  .kpi span { display:block; font-size:7pt; letter-spacing:.8px; text-transform:uppercase; color:var(--text-muted); font-weight:700; }
+  .kpi b { display:block; font-size:17pt; line-height:1.15; margin-top:3px; }
+  .kpi small { font-size:8pt; color:var(--text-muted); }
+  .kpi.avg b { color:var(--hodari-blue); } .kpi.pass b { color:var(--strong); }
+  .kpi.supp { background:var(--supp-bg); border-color:#F1D9B5; } .kpi.supp b { color:var(--supp); }
+  .kpi.crit { background:var(--crit-bg); border-color:#F3C9C4; } .kpi.crit b { color:var(--crit); }
+
+  h1, h2, p { margin-top:0; }
+  h2 { font-size:11.5pt; color:var(--hodari-blue); margin:16px 0 4px; padding-bottom:4px; border-bottom:2px solid var(--hodari-blue); break-after:avoid; }
+  h2 small { font-weight:400; color:var(--text-muted); font-size:8.5pt; margin-left:6px; }
+  .lead { font-size:8.5pt; color:var(--text-muted); margin:0 0 6px; }
+  table.t { width:100%; border-collapse:collapse; font-size:8.8pt; }
+  table.t th { background:var(--hodari-blue); color:#fff; text-align:left; font-size:7.5pt; letter-spacing:.5px; text-transform:uppercase; padding:5px 6px; border:1px solid var(--hodari-blue); }
+  table.t td { padding:4px 6px; border:1px solid #DDE3EE; vertical-align:top; }
+  table.t tbody tr:nth-child(even) td { background:#F7F9FC; }
+  table.t thead { display:table-header-group; }
+  table.t tr { break-inside:avoid; }
+  .r { text-align:right; } .c { text-align:center; } .mono { font-family:'Roboto Mono', Consolas, monospace; white-space:nowrap; }
+  .n { color:#8492A6; width:24px; }
+  .b-critical { color:var(--crit); font-weight:700; } .b-support { color:var(--supp); font-weight:700; }
+  .b-pass { color:var(--pass); font-weight:700; } .b-strong { color:var(--strong); font-weight:700; }
+  .st { display:inline-block; padding:1px 7px; border-radius:10px; font-size:7.8pt; font-weight:700; white-space:nowrap; }
+  .st.critical { background:var(--crit-bg); color:var(--crit); } .st.support { background:var(--supp-bg); color:var(--supp); }
+  .st.pass, .st.strong { background:var(--strong-bg); color:var(--strong); }
+  .weak { display:inline-block; white-space:nowrap; margin-right:6px; }
+
+  table.heat { width:100%; border-collapse:collapse; font-size:8.2pt; table-layout:fixed; }
+  table.heat th.rowh { width:78px; }
+  table.heat th, table.heat td { border:1px solid #fff; padding:4px 3px; text-align:center; }
+  table.heat thead th { background:#F0F3F8; color:#3C4559; font-size:7.2pt; font-weight:700; vertical-align:bottom; line-height:1.15; word-break:break-word; }
+  table.heat th.rowh { text-align:left; background:#F0F3F8; font-weight:700; white-space:nowrap; padding-left:6px; }
+  table.heat td { font-family:'Roboto Mono', Consolas, monospace; font-weight:700; }
+  .h-critical { background:var(--crit-bg); color:var(--crit); } .h-support { background:var(--supp-bg); color:var(--supp); }
+  .h-pass { background:var(--pass-bg); color:var(--pass); } .h-strong { background:var(--strong-bg); color:var(--strong); }
+  .h-none { background:#FAFBFC; color:#B4BBC9; font-weight:400; }
+  tr.tot td, tr.tot th { border-top:2px solid #3C4559; }
+  tr.sel th.rowh { color:var(--hodari-blue); }
+
+  .bars td { vertical-align:middle; }
+  .bar { height:7px; background:#E8ECF3; border-radius:4px; position:relative; min-width:120px; }
+  .bar i { display:block; height:100%; border-radius:4px; }
+  .bar u { position:absolute; top:-3px; bottom:-3px; width:1.5px; background:#5B6578; }
+  .f-critical { background:#C8302A; } .f-support { background:#E39A3B; } .f-pass { background:#5B84EA; } .f-strong { background:#2FA866; }
+  .legend { display:flex; gap:12px; flex-wrap:wrap; font-size:7.8pt; color:var(--text-muted); margin-top:5px; }
+  .legend i { display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:4px; vertical-align:-1px; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .notes { margin-top:14px; font-size:8pt; color:#5B6578; border:1px solid var(--border); border-radius:6px; padding:8px 10px; break-inside:avoid; }
+  .notes ul { margin:4px 0 0 16px; padding:0; } .notes li { margin:1px 0; }
+  .empty { padding:10px; border:1px dashed var(--border); border-radius:6px; color:var(--text-muted); font-size:9pt; text-align:center; }
+  .signatures { margin-top:22px; grid-template-columns:1fr 1fr 1fr; gap:28px; }
+  .wide { page:wide; }
+
+  @media print {
+    body { background:#fff; padding:0; }
+    .toolbar { display:none !important; }
+    .sheet { box-shadow:none; border-radius:0; padding:0; max-width:none; }
+    * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    table.t, table.heat { font-size:8.4pt; }
+  }
+  @media screen and (max-width:700px) {
+    .sheet { padding:16px; } .meta, .kpis { grid-template-columns:repeat(2,1fr); }
+    .meta div:nth-child(4n) { border-right:1px solid var(--border); } .meta div:nth-child(2n) { border-right:none; }
+    .two { grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <span>A4 document. In the print dialog choose <b>Save as PDF</b> to export.</span>
+  <div class="btns">
+    <a class="btn btn-outline" href="{% querystring format=None autoprint=None %}">&larr; Back to report</a>
+    <button class="btn btn-primary" type="button" onclick="window.print()">Print / Save as PDF</button>
+  </div>
+</div>
+
+<main class="sheet">
+  {% include "includes/hodari_print_header.html" %}
+
+  <div class="doc-title">
+    <h1>Academic Performance Report</h1>
+    <span class="scope">{{ scope.label }}</span>
+  </div>
+
+  <div class="meta">
+    <div><span>Academic year</span><b>{{ selected_year.name|default:"—" }}</b></div>
+    <div><span>Term</span><b>{{ terms_label }}</b></div>
+    <div><span>Assessment</span><b>{{ selected_type_label }}</b></div>
+    <div><span>Class</span><b>{{ selected_class|default:"All classes" }}</b></div>
+    <div><span>Subject</span><b>{{ selected_subject|default:"All subjects" }}</b></div>
+    <div><span>Learners</span><b>{{ summary.learners }}</b></div>
+    <div><span>Prepared by</span><b>{{ request.user.get_full_name|default:request.user.username }}</b></div>
+    <div><span>Generated</span><b>{{ generated_at|date:"j M Y, H:i" }}</b></div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi avg"><span>Average</span><b>{% if summary.average is not None %}{{ summary.average }}%{% else %}—{% endif %}</b><small>{{ summary.count }} result{{ summary.count|pluralize }}{% if summary.average_grade %} &middot; grade {{ summary.average_grade }}{% endif %}</small></div>
+    <div class="kpi pass"><span>Pass rate</span><b>{% if summary.pass_rate is not None %}{{ summary.pass_rate }}%{% else %}—{% endif %}</b><small>at {{ pass_mark }}% or above</small></div>
+    <div class="kpi supp"><span>Requires support (D)</span><b>{{ summary.flagged }}</b><small>results {{ critical_mark }}&ndash;{{ pass_mark|add:-1 }}%</small></div>
+    <div class="kpi crit"><span>Critical (E)</span><b>{{ summary.critical }}</b><small>results below {{ critical_mark }}%</small></div>
+  </div>
+
+  {% if not scope.pairs and scope.kind == 'teacher' %}
+    <div class="empty">You are not assigned to any class or subject for this term, so there is nothing to report.</div>
+  {% else %}
+
+  <!-- 1. Who needs help -->
+  <h2>1. Who needs help <small>{{ show_label }}{% if group == 'learner' %} &middot; by learner{% endif %}{% if query %} &middot; matching “{{ query }}”{% endif %} &middot; lowest first</small></h2>
+  {% if help_rows %}
+  <table class="t">
+    <thead><tr>
+      <th class="n">#</th><th>Learner</th><th>Adm. no</th><th>Class</th>
+      {% if group == 'result' %}<th>Subject</th>{% endif %}
+      <th class="r">{% if group == 'learner' %}Average{% elif selected_type %}Mark{% else %}Wtd avg{% endif %}</th>
+      <th class="c">Grade</th><th>Status</th>
+      {% if group == 'learner' %}<th>Below pass in</th>{% endif %}
+    </tr></thead>
+    <tbody>
+    {% for r in help_rows %}
+      <tr>
+        <td class="n">{{ forloop.counter }}</td>
+        <td style="white-space:nowrap"><b>{{ r.name }}</b></td>
+        <td class="mono">{{ r.admission_no }}</td>
+        <td style="white-space:nowrap">{{ r.class_name }}</td>
+        {% if group == 'result' %}<td>{{ r.subject }}</td>{% endif %}
+        <td class="r mono b-{{ r.band }}">{{ r.mark }}%</td>
+        <td class="c"><b>{{ r.grade }}</b></td>
+        <td><span class="st {{ r.band }}">{{ r.status }}</span></td>
+        {% if group == 'learner' %}<td>{% for w in r.weak %}<span class="weak b-{{ w.band }}">{{ w.subject }} {{ w.mark|floatformat:0 }}%</span>{% if not forloop.last %} {% endif %}{% empty %}—{% endfor %}</td>{% endif %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <div class="empty">{% if summary.count %}No {% if group == 'learner' %}learner{% else %}result{% endif %} in this selection is {{ show_label|lower }}.{% else %}No approved marks for this selection yet.{% endif %}</div>
+  {% endif %}
+
+  <!-- 2. Subject performance across classes -->
+  {% if ranking %}
+  <div{% if matrix and matrix.subjects|length > 8 %} class="wide"{% endif %}>
+    <h2>2. Subject performance across classes <small>average mark, approved results only</small></h2>
+    {% if matrix %}
+    <p class="lead">Read across a row for a class, down a column for a subject.</p>
+    <table class="heat">
+      <thead><tr><th class="rowh">Class</th>{% for s in matrix.subjects %}<th>{{ s }}</th>{% endfor %}<th>All</th></tr></thead>
+      <tbody>
+      {% for row in matrix.rows %}
+        <tr{% if row.name == selected_class %} class="sel"{% endif %}>
+          <th class="rowh">{{ row.name }}</th>
+          {% for c in row.cells %}{% if c %}<td class="h-{{ c.band }}">{{ c.average|floatformat:1 }}</td>{% else %}<td class="h-none">–</td>{% endif %}{% endfor %}
+          <td class="h-{{ row.overall.band }}">{{ row.overall.average|floatformat:1 }}</td>
+        </tr>
+      {% endfor %}
+        <tr class="tot">
+          <th class="rowh">All classes</th>
+          {% for c in matrix.totals %}<td class="h-{{ c.band }}">{{ c.average|floatformat:1 }}</td>{% endfor %}
+          <td class="h-{{ matrix.overall.band }}">{{ matrix.overall.average|floatformat:1 }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="legend">
+      <span><i class="f-critical"></i>Below {{ critical_mark }}% (E)</span>
+      <span><i class="f-support"></i>{{ critical_mark }}&ndash;{{ pass_mark|add:-1 }}% (D)</span>
+      <span><i class="f-pass"></i>{{ pass_mark }}&ndash;{{ strong_mark|add:-1 }}% (C)</span>
+      <span><i class="f-strong"></i>{{ strong_mark }}%+ (B and above)</span>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="two" style="margin-top:6px">
+    <div>
+      <h2>3. Subjects ranked <small>{{ selected_class|default:"all classes" }}</small></h2>
+      <table class="t bars">
+        <thead><tr><th>Subject</th><th>Average</th><th class="r">%</th><th class="r">Below pass</th></tr></thead>
+        <tbody>
+        {% for s in ranking %}
+          <tr><td>{{ s.name }}</td><td><div class="bar"><i class="f-{{ s.band }}" style="width:{{ s.average|floatformat:0 }}%"></i><u style="left:{{ pass_mark }}%"></u></div></td>
+            <td class="r mono b-{{ s.band }}">{{ s.average }}</td><td class="r">{{ s.below_pass }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <h2>4. {{ focus_subject }} by class</h2>
+      {% if by_class %}
+      <table class="t bars">
+        <thead><tr><th>Class</th><th>Average</th><th class="r">%</th><th class="r">Learners</th></tr></thead>
+        <tbody>
+        {% for c in by_class %}
+          <tr><td style="white-space:nowrap">{{ c.name }}</td><td><div class="bar"><i class="f-{{ c.band }}" style="width:{{ c.average|floatformat:0 }}%"></i><u style="left:{{ pass_mark }}%"></u></div></td>
+            <td class="r mono b-{{ c.band }}">{{ c.average }}</td><td class="r">{{ c.learners }}{% if c.below_pass %} <span class="b-support">({{ c.below_pass }}&darr;)</span>{% endif %}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<div class="empty">No approved {{ focus_subject }} marks.</div>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+  {% endif %}
+
+  <div class="notes">
+    <b>How to read this report</b>
+    <ul>
+      <li>Only marks that have been entered <b>and approved</b> are included. Assessments not yet marked are left out, never counted as zero.</li>
+      {% if not selected_type %}<li>Weighted averages use the configured assessment weights, rescaled over the assessments marked so far.</li>{% endif %}
+      {% if not selected_term %}<li>With all terms selected, each mark is the average of the learner's term results.</li>{% endif %}
+      <li>Pass mark {{ pass_mark }}% (grade C). Requires support: {{ critical_mark }}&ndash;{{ pass_mark|add:-1 }}% (D). Critical: below {{ critical_mark }}% (E). The marker on each bar is the pass mark.</li>
+      <li>Scope: {{ scope.label }} &mdash; limited to what the preparer's role allows.</li>
+    </ul>
+  </div>
+
+  <div class="signatures">
+    <div><div class="sig-line"></div><div class="sig-label">Prepared by<br><span style="font-weight:400">{{ request.user.get_full_name|default:request.user.username }}</span></div></div>
+    <div><div class="sig-line"></div><div class="sig-label">Head of Department</div></div>
+    <div><div class="sig-line"></div><div class="sig-label">Head of School</div></div>
+  </div>
+</main>
+
+<script>
+  if (new URLSearchParams(location.search).get('autoprint') === '1') {
+    window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 350); });
+  }
+</script>
+</body>
+</html>

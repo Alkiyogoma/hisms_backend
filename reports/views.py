@@ -21,6 +21,12 @@ class ReportsDashboardView(RoleRequiredMixin, TemplateView):
                 "url": "academics:analytics",
             },
             {
+                "title": "Performance Report",
+                "icon": "trending-up",
+                "description": "Who needs help, and how subjects perform across classes.",
+                "url": "academics:performance_report",
+            },
+            {
                 "title": "Admissions Reports",
                 "icon": "users",
                 "description": "Enrolment trends, inquiry conversion, and demographic data.",
@@ -33,10 +39,10 @@ class ReportsDashboardView(RoleRequiredMixin, TemplateView):
                 "url": "finance:dashboard",
             },
             {
-                "title": "Attendance Analytics",
+                "title": "Attendance Reports",
                 "icon": "check-circle",
-                "description": "Student and staff attendance trends.",
-                "url": "attendance:today",
+                "description": "Attendance by class, learner or whole school over any date range, and the printable register.",
+                "url": "attendance:reports",
             },
         ]
         return context

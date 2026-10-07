@@ -1,0 +1,481 @@
+{% extends "base.html" %}
+
+{% block title %}Performance Report &mdash; {{ brand.school_name }}{% endblock %}
+
+{% block topbar_greeting %}Performance Report{% endblock %}
+{% block topbar_date %}{{ terms_label }}{% if selected_year %} &middot; {{ selected_year.name }}{% endif %}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .pr {
+    --pr-ink:#1F2430; --pr-muted:#7C8599; --pr-line:#E6EAF2; --pr-soft:#F6F8FC;
+    --pr-crit:#C8302A; --pr-crit-bg:#FDEDEC; --pr-crit-bd:#F5CFCC;
+    --pr-supp:#B86E12; --pr-supp-bg:#FFF4E4; --pr-supp-bd:#F3DDBA;
+    --pr-pass:#1B4FD8; --pr-pass-bg:#EAF0FD; --pr-pass-bd:#CFDCFA;
+    --pr-strong:#18864C; --pr-strong-bg:#E7F6EE; --pr-strong-bd:#C6E9D5;
+    color:var(--pr-ink);
+  }
+  .pr-stat, .pr-learner, .pr-chip, .pr-bar .nm { color:inherit; }
+  .pr-top { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:18px; }
+  .pr-title { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .pr-title h1 { margin:0; font-family:var(--font-display); font-size:24px; font-weight:700; letter-spacing:-.3px; }
+  .pr-scope { display:inline-flex; align-items:center; gap:6px; padding:4px 11px; border-radius:20px; background:var(--pr-pass-bg); color:var(--hodari-blue); font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; }
+  .pr-scope svg { width:13px; height:13px; }
+  .pr-sub { font-size:13px; color:var(--pr-muted); margin-top:6px; }
+  .pr-actions { display:flex; gap:8px; flex-wrap:wrap; }
+  .pr-actions .hf-btn { display:inline-flex; align-items:center; gap:7px; }
+  .pr-actions svg { width:15px; height:15px; }
+
+  /* filters */
+  .pr-filterbar { background:#fff; border:1px solid var(--pr-line); border-radius:14px; padding:14px 16px 12px; margin-bottom:18px; transition:opacity .15s; }
+  .pr-filters { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:12px; }
+  .pr-fg { display:flex; flex-direction:column; gap:5px; min-width:0; }
+  .pr-fg label { font-size:10.5px; letter-spacing:.9px; color:var(--pr-muted); text-transform:uppercase; font-weight:700; }
+  .pr-fg select { height:40px; padding:0 34px 0 12px; border:1px solid #DCE2EC; border-radius:9px; font-size:13.5px; background:#fff; font-family:inherit; color:inherit; width:100%; appearance:none; cursor:pointer;
+    background-image:linear-gradient(45deg,transparent 50%,#8A91A3 50%),linear-gradient(135deg,#8A91A3 50%,transparent 50%);
+    background-position:calc(100% - 17px) 50%,calc(100% - 12px) 50%; background-size:5px 5px; background-repeat:no-repeat; }
+  .pr-fg select:hover { border-color:#B9C4D6; }
+  .pr-fg select:focus { outline:none; border-color:var(--hodari-blue); box-shadow:0 0 0 3px rgba(2,58,165,.12); }
+  .pr-fg select:disabled { background-color:var(--pr-soft); color:#8A91A3; cursor:not-allowed; }
+  .pr-filterfoot { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px; font-size:12px; color:var(--pr-muted); }
+  .pr-filterfoot svg { width:13px; height:13px; vertical-align:-2px; margin-right:4px; }
+  .pr-reset { color:var(--hodari-blue) !important; font-weight:600; text-decoration:none; }
+  .pr-reset:hover { text-decoration:underline; }
+  .is-loading .pr-body { opacity:.45; pointer-events:none; }
+
+  /* summary tiles */
+  .pr-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-bottom:18px; }
+  .pr-stat { display:block; border:1px solid var(--pr-line); border-radius:14px; padding:16px 18px; background:#fff; text-decoration:none; position:relative; transition:border-color .15s, box-shadow .15s, transform .15s; }
+  a.pr-stat:hover { box-shadow:0 6px 18px -8px rgba(15,35,95,.25); transform:translateY(-1px); }
+  a.pr-stat.on { box-shadow:0 0 0 2px currentColor inset; }
+  .pr-stat .lab { font-size:10.5px; letter-spacing:1px; color:var(--pr-muted); text-transform:uppercase; font-weight:700; }
+  .pr-stat .row { display:flex; align-items:baseline; gap:10px; margin-top:8px; }
+  .pr-stat .num { font-family:var(--font-mono); font-size:30px; font-weight:700; line-height:1; }
+  .pr-stat .num em { font-style:normal; font-size:14px; color:var(--pr-muted); margin-left:2px; }
+  .pr-stat .sub { font-size:12px; margin-top:8px; color:var(--pr-muted); }
+  .pr-stat .go { font-weight:700; white-space:nowrap; }
+  .pr-meter { height:6px; border-radius:6px; background:#E3E8F1; margin-top:10px; overflow:hidden; }
+  .pr-meter span { display:block; height:100%; background:var(--pr-strong); border-radius:6px; }
+  .s-avg .num { color:var(--hodari-blue); }
+  .s-pass .num { color:var(--pr-strong); }
+  .s-flag { background:var(--pr-supp-bg); border-color:var(--pr-supp-bd); color:var(--pr-supp); } .s-flag .num { color:var(--pr-supp); }
+  .s-crit { background:var(--pr-crit-bg); border-color:var(--pr-crit-bd); color:var(--pr-crit); } .s-crit .num { color:var(--pr-crit); }
+  .s-flag .sub, .s-crit .sub { color:inherit; opacity:.85; }
+
+  /* view tabs */
+  .pr-tabs { display:flex; gap:4px; padding:4px; background:#EEF1F7; border-radius:12px; width:max-content; max-width:100%; overflow-x:auto; margin-bottom:16px; }
+  .pr-tab { padding:9px 16px; border-radius:9px; font-size:13.5px; font-weight:600; color:var(--pr-muted) !important; text-decoration:none; white-space:nowrap; }
+  .pr-tab:hover { color:var(--pr-ink) !important; }
+  .pr-tab.on { background:#fff; color:var(--hodari-blue) !important; box-shadow:0 1px 3px rgba(15,35,95,.12); }
+
+  .pr-card { background:#fff; border:1px solid var(--pr-line); border-radius:14px; padding:18px 20px; margin-bottom:18px; min-width:0; }
+  .pr-card-h { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+  .pr-card-t { font-size:12px; letter-spacing:1px; color:var(--pr-muted); text-transform:uppercase; font-weight:700; }
+  .pr-card-s { font-size:12.5px; color:var(--pr-muted); margin-top:3px; }
+
+  /* toolbar */
+  .pr-toolbar { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+  .pr-chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .pr-chip { display:inline-flex; align-items:center; gap:6px; border:1px solid #DCE2EC; background:#fff; border-radius:30px; padding:6px 12px; font-size:12.5px; font-weight:600; text-decoration:none; white-space:nowrap; }
+  .pr-chip:hover { border-color:var(--hodari-blue); }
+  .pr-chip .ct { font-family:var(--font-mono); font-size:11.5px; font-weight:700; padding:1px 7px; border-radius:20px; background:#EEF1F7; color:var(--pr-muted); }
+  .pr-chip.on { background:var(--hodari-blue); border-color:var(--hodari-blue); color:#fff !important; }
+  .pr-chip.on .ct { background:rgba(255,255,255,.22); color:#fff; }
+  .pr-seg { display:inline-flex; border:1px solid #DCE2EC; border-radius:9px; overflow:hidden; }
+  .pr-seg a { padding:6px 12px; font-size:12.5px; font-weight:600; text-decoration:none; color:var(--pr-muted) !important; }
+  .pr-seg a + a { border-left:1px solid #DCE2EC; }
+  .pr-seg a.on { background:var(--pr-pass-bg); color:var(--hodari-blue) !important; }
+  .pr-search { position:relative; }
+  .pr-search input { height:34px; width:220px; max-width:100%; border:1px solid #DCE2EC; border-radius:9px; padding:0 12px 0 32px; font-size:13px; font-family:inherit; }
+  .pr-search input:focus { outline:none; border-color:var(--hodari-blue); box-shadow:0 0 0 3px rgba(2,58,165,.12); }
+  .pr-search svg { position:absolute; left:10px; top:10px; width:14px; height:14px; color:var(--pr-muted); }
+  .pr-tools-r { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+
+  /* table */
+  .pr-table { width:100%; border-collapse:collapse; }
+  .pr-table th { text-align:left; font-size:10.5px; letter-spacing:.9px; color:var(--pr-muted); text-transform:uppercase; font-weight:700; padding:10px 12px; background:var(--pr-soft); border-bottom:1px solid var(--pr-line); white-space:nowrap; }
+  .pr-table th:first-child { border-radius:9px 0 0 9px; } .pr-table th:last-child { border-radius:0 9px 9px 0; }
+  .pr-table td { padding:11px 12px; border-bottom:1px solid #F0F3F8; font-size:13.5px; vertical-align:middle; }
+  .pr-table tbody tr:hover td { background:#FAFBFE; }
+  .pr-table tbody tr:last-child td { border-bottom:none; }
+  .pr-table .num { text-align:right; white-space:nowrap; }
+  .pr-table .rank { color:#A3ABBD; font-family:var(--font-mono); font-size:12px; width:34px; }
+  .pr-learner { display:flex; align-items:center; gap:10px; min-width:150px; text-decoration:none; }
+  .pr-learner b { display:block; font-weight:600; line-height:1.25; }
+  .pr-learner:hover b { color:var(--hodari-blue); text-decoration:underline; }
+  .pr-learner small { display:block; color:var(--pr-muted); font-family:var(--font-mono); font-size:11.5px; margin-top:1px; }
+  .pr-ini { width:32px; height:32px; border-radius:50%; background:var(--pr-pass-bg); color:var(--hodari-blue); font-size:11.5px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .pr-nowrap { white-space:nowrap; }
+  .pr-mark { font-weight:700; font-family:var(--font-mono); display:inline-block; min-width:52px; }
+  .t-critical { color:var(--pr-crit); } .t-support { color:var(--pr-supp); } .t-pass { color:var(--pr-pass); } .t-strong { color:var(--pr-strong); }
+  .pr-g { display:inline-flex; min-width:32px; justify-content:center; padding:4px 7px; border-radius:7px; font-size:12px; font-weight:700; font-family:var(--font-mono); }
+  .pr-g.g-E { background:#7F1D1D; color:#fff; }
+  .pr-g.g-D { background:#FBE3D0; color:var(--pr-supp); }
+  .pr-g.g-C { background:#FDF3D7; color:#8A6B06; }
+  .pr-g.g-B { background:var(--pr-pass-bg); color:var(--pr-pass); }
+  .pr-g.g-A, .pr-g.g-Ap { background:#DCF5E6; color:var(--pr-strong); }
+  .pr-tag { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:20px; font-size:12px; font-weight:600; white-space:nowrap; border:1px solid transparent; }
+  .pr-tag::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; }
+  .pr-tag.critical { background:var(--pr-crit-bg); color:var(--pr-crit); border-color:var(--pr-crit-bd); }
+  .pr-tag.support { background:var(--pr-supp-bg); color:var(--pr-supp); border-color:var(--pr-supp-bd); }
+  .pr-tag.pass, .pr-tag.strong { background:var(--pr-strong-bg); color:var(--pr-strong); border-color:var(--pr-strong-bd); }
+  .pr-mini { display:inline-flex; gap:5px; align-items:baseline; padding:3px 8px; border-radius:6px; font-size:11.5px; margin:2px 4px 2px 0; white-space:nowrap; }
+  .pr-weak { min-width:220px; }
+  .pr-more { font-size:11.5px; color:var(--pr-muted); font-weight:600; cursor:help; white-space:nowrap; }
+  .pr-mini b { font-family:var(--font-mono); }
+  .pr-mini.critical { background:var(--pr-crit-bg); color:var(--pr-crit); }
+  .pr-mini.support { background:var(--pr-supp-bg); color:var(--pr-supp); }
+
+  /* bars */
+  .pr-grid2 { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr); gap:18px; align-items:start; }
+  .pr-grid2 .pr-card { margin-bottom:0; }
+  .pr-bar { display:grid; grid-template-columns:minmax(80px,130px) 1fr 58px 150px; align-items:center; gap:12px; padding:8px 0; }
+  .pr-bar.compact { grid-template-columns:minmax(80px,150px) 1fr 58px; }
+  .pr-bar .nm { font-size:13.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-decoration:none; }
+  a.nm:hover { color:var(--hodari-blue); text-decoration:underline; }
+  .pr-bar.sel .nm { color:var(--hodari-blue); }
+  .pr-bar .track { height:10px; background:#EDF0F6; border-radius:20px; position:relative; }
+  .pr-bar .fill { height:100%; border-radius:20px; }
+  .pr-bar .pass { position:absolute; top:-4px; bottom:-4px; width:2px; border-radius:2px; background:#5B6578; opacity:.55; }
+  .f-critical { background:var(--pr-crit); } .f-support { background:#E39A3B; } .f-pass { background:#5B84EA; } .f-strong { background:#2FA866; }
+  .pr-bar .v { text-align:right; font-size:13.5px; font-weight:700; font-family:var(--font-mono); }
+  .pr-bar .n { text-align:right; font-size:11.5px; color:var(--pr-muted); white-space:nowrap; }
+  .pr-legend { display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px; color:var(--pr-muted); margin-top:12px; }
+  .pr-legend i { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px; }
+  .pr-foot { font-size:12px; color:var(--pr-muted); margin-top:14px; padding-top:12px; border-top:1px solid #EEF1F6; line-height:1.55; }
+
+  /* heatmap */
+  .pr-heat { border-collapse:separate; border-spacing:3px; width:100%; min-width:max-content; }
+  .pr-heat th { font-size:11px; font-weight:700; color:var(--pr-muted); padding:6px 8px; text-align:center; white-space:nowrap; }
+  .pr-heat th.rowh { text-align:left; color:var(--pr-ink); font-size:12.5px; position:sticky; left:0; background:#fff; z-index:1; }
+  .pr-heat td { text-align:center; font-family:var(--font-mono); font-size:12.5px; font-weight:700; padding:9px 8px; border-radius:7px; min-width:62px; }
+  .pr-heat td.critical { background:var(--pr-crit-bg); color:var(--pr-crit); }
+  .pr-heat td.support { background:var(--pr-supp-bg); color:var(--pr-supp); }
+  .pr-heat td.pass { background:var(--pr-pass-bg); color:var(--pr-pass); }
+  .pr-heat td.strong { background:var(--pr-strong-bg); color:var(--pr-strong); }
+  .pr-heat td.none { background:var(--pr-soft); color:#B4BBC9; font-weight:400; }
+  .pr-heat .tot td, .pr-heat td.tot { box-shadow:inset 0 0 0 1.5px rgba(31,36,48,.12); }
+  .pr-heat tr.sel th.rowh { color:var(--hodari-blue); }
+  .pr-heat tr.sel td { outline:2px solid var(--hodari-blue); outline-offset:-2px; }
+  .pr-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+
+  @media (max-width:1180px) {
+    .pr-hide-md { display:none; }
+    .pr-filters { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .pr-grid2 { grid-template-columns:1fr; }
+    .pr-grid2 .pr-card { margin-bottom:18px; }
+  }
+  @media (max-width:900px) { .pr-stats { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  @media (max-width:640px) {
+    .pr-filters { grid-template-columns:1fr 1fr; }
+    .pr-stats { gap:10px; }
+    .pr-stat { padding:13px 14px; } .pr-stat .num { font-size:24px; }
+    .pr-bar { grid-template-columns:80px 1fr 52px; } .pr-bar .n { display:none; }
+    .pr-bar.compact { grid-template-columns:90px 1fr 52px; }
+    .pr-search input { width:100%; } .pr-search, .pr-tools-r { width:100%; }
+    .pr-hide-sm { display:none; }
+    .pr-card { padding:14px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "academics/_top_tabs_reports.html" %}
+<div class="pr" id="pr">
+
+<div class="pr-top">
+  <div>
+    <div class="pr-title">
+      <h1>Performance Report</h1>
+      <span class="pr-scope" title="What your role lets you see">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        {{ scope.label }}
+      </span>
+    </div>
+    <div class="pr-sub">
+      {{ selected_year.name|default:"No academic year" }} &middot; {{ terms_label }} &middot; {{ selected_type_label }}{% if selected_class %} &middot; {{ selected_class }}{% endif %}{% if selected_subject %} &middot; {{ selected_subject }}{% endif %}
+    </div>
+  </div>
+  <div class="pr-actions">
+    <a class="hf-btn hf-btn-secondary" href="{% querystring export='csv' page=None %}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>Export CSV
+    </a>
+    <a class="hf-btn hf-btn-primary" href="{% querystring format='print' autoprint='1' page=None page_size=None %}" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v7H6z"/></svg>Export PDF
+    </a>
+  </div>
+</div>
+
+<!-- filters -->
+<form method="get" class="pr-filterbar" id="prFilters">
+  <input type="hidden" name="view" value="{{ view }}">
+  {% if view == 'help' %}<input type="hidden" name="show" value="{{ show }}"><input type="hidden" name="group" value="{{ group }}">{% endif %}
+  <div class="pr-filters">
+    <div class="pr-fg">
+      <label for="fYear">Academic year</label>
+      <select id="fYear" name="year" data-reset-term>
+        {% for y in years %}
+          <option value="{{ y.pk }}"{% if selected_year and y.pk == selected_year.pk %} selected{% endif %}>{{ y.name }}{% if y.is_current %} (current){% endif %}</option>
+        {% empty %}
+          <option value="">No academic years</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="pr-fg">
+      <label for="fTerm">Term</label>
+      <select id="fTerm" name="term">
+        <option value="all"{% if not selected_term %} selected{% endif %}>All terms</option>
+        {% for t in year_terms %}
+          <option value="{{ t.pk }}"{% if selected_term and t.pk == selected_term.pk %} selected{% endif %}>{{ t.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="pr-fg">
+      <label for="fClass">Class</label>
+      <select id="fClass" name="class"{% if class_locked %} disabled{% endif %}>
+        {% if not class_locked %}<option value="">All classes</option>{% endif %}
+        {% for c in class_options %}
+          <option value="{{ c }}"{% if c == selected_class %} selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="pr-fg">
+      <label for="fSubject">Subject</label>
+      <select id="fSubject" name="subject"{% if subject_locked %} disabled{% endif %}>
+        {% if not subject_locked %}<option value="">All subjects</option>{% endif %}
+        {% for s in subject_options %}
+          <option value="{{ s }}"{% if s == selected_subject %} selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="pr-fg">
+      <label for="fType">Assessment type</label>
+      <select id="fType" name="type">
+        <option value="">All assessed so far</option>
+        {% for e in exam_types %}
+          <option value="{{ e.code }}"{% if e.code == selected_type %} selected{% endif %}>{{ e.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <div class="pr-filterfoot">
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>Approved marks only &mdash; unmarked assessments are excluded, never counted as zero.</span>
+    <span>
+      <noscript><button type="submit" class="hf-btn hf-btn-primary">Apply</button></noscript>
+      {% if filters_active %}<a class="pr-reset" href="?view={{ view }}{% if selected_year %}&amp;year={{ selected_year.pk }}{% endif %}&amp;term={% if selected_term %}{{ selected_term.pk }}{% else %}all{% endif %}">Clear class, subject &amp; type</a>{% endif %}
+    </span>
+  </div>
+</form>
+
+<div class="pr-body">
+{% if not scope.pairs and scope.kind == 'teacher' %}
+  <div class="pr-card"><c-empty-state title="No classes assigned" desc="You are not assigned to any class or subject for this term, so there is nothing to report yet. Ask the academic office to check your class assignments." icon="users" /></div>
+{% else %}
+
+<!-- summary -->
+<div class="pr-stats">
+  <div class="pr-stat s-avg">
+    <div class="lab">Average</div>
+    <div class="row">
+      <div class="num">{% if summary.average is not None %}{{ summary.average }}<em>%</em>{% else %}&mdash;{% endif %}</div>
+      {% if summary.average_grade %}<span class="pr-g g-{% if summary.average_grade == 'A+' %}Ap{% else %}{{ summary.average_grade }}{% endif %}">{{ summary.average_grade }}</span>{% endif %}
+    </div>
+    <div class="sub">{{ summary.count }} result{{ summary.count|pluralize }} &middot; {{ summary.learners }} learner{{ summary.learners|pluralize }}</div>
+  </div>
+  <div class="pr-stat s-pass">
+    <div class="lab">Pass rate</div>
+    <div class="row"><div class="num">{% if summary.pass_rate is not None %}{{ summary.pass_rate }}<em>%</em>{% else %}&mdash;{% endif %}</div></div>
+    <div class="pr-meter"><span style="width:{{ summary.pass_rate|default:0|floatformat:0 }}%"></span></div>
+    <div class="sub">Results at {{ pass_mark }}% (grade C) or above</div>
+  </div>
+  <a class="pr-stat s-flag{% if view == 'help' and show == 'support' %} on{% endif %}" href="{% querystring view='help' show='support' page=None %}">
+    <div class="lab">Requires support &middot; D</div>
+    <div class="row"><div class="num">{{ summary.flagged }}</div></div>
+    <div class="sub">Results {{ critical_mark }}&ndash;{{ pass_mark|add:-1 }}% &middot; <span class="go">View &rarr;</span></div>
+  </a>
+  <a class="pr-stat s-crit{% if view == 'help' and show == 'critical' %} on{% endif %}" href="{% querystring view='help' show='critical' page=None %}">
+    <div class="lab">Critical &middot; E</div>
+    <div class="row"><div class="num">{{ summary.critical }}</div></div>
+    <div class="sub">Below {{ critical_mark }}%, act now &middot; <span class="go">View &rarr;</span></div>
+  </a>
+</div>
+
+<!-- view tabs -->
+<nav class="pr-tabs" aria-label="Report view">
+  <a class="pr-tab{% if view == 'help' %} on{% endif %}" href="{% querystring view='help' page=None %}">Who needs help</a>
+  <a class="pr-tab{% if view == 'subjects' %} on{% endif %}" href="{% querystring view='subjects' page=None %}">Subject performance across classes</a>
+</nav>
+
+{% if view == 'help' %}
+<!-- VIEW 1: who needs help -->
+<section class="pr-card">
+  <div class="pr-card-h">
+    <div>
+      <div class="pr-card-t">Who needs help</div>
+      <div class="pr-card-s">{% if group == 'learner' %}One row per learner, by average across {% if selected_subject %}{{ selected_subject }}{% else %}the subjects in view{% endif %}{% else %}One row per learner per subject{% endif %} &mdash; lowest first.</div>
+    </div>
+    <div class="pr-seg" role="group" aria-label="Group rows">
+      <a class="{% if group == 'result' %}on{% endif %}" href="{% querystring group='result' page=None %}">By subject result</a>
+      <a class="{% if group == 'learner' %}on{% endif %}" href="{% querystring group='learner' page=None %}">By learner</a>
+    </div>
+  </div>
+  <div class="pr-toolbar">
+    <div class="pr-chips">
+      {% for key, label, count in show_options %}
+        <a class="pr-chip{% if show == key %} on{% endif %}" href="{% querystring show=key page=None %}">{{ label }}<span class="ct">{{ count }}</span></a>
+      {% endfor %}
+    </div>
+    <form method="get" class="pr-search" role="search">
+      {% for k, vals in request.GET.lists %}{% if k != 'q' and k != 'page' %}{% for v in vals %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}{% endif %}{% endfor %}
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" value="{{ query }}" placeholder="Search learner or adm. no" aria-label="Search learner">
+    </form>
+  </div>
+
+  {% if page_obj.object_list %}
+  <div class="pr-scroll">
+    <table class="pr-table">
+      <thead><tr>
+        <th class="pr-hide-md">#</th>
+        <th>Learner</th><th>Class</th>
+        {% if group == 'result' %}<th>Subject</th>{% endif %}
+        <th>{% if group == 'learner' %}Average{% elif selected_type %}Mark{% else %}Weighted avg{% endif %} &middot; Grade</th>
+        <th>Status</th>
+        {% if group == 'learner' %}<th>Below pass in</th>{% endif %}
+      </tr></thead>
+      <tbody>
+      {% for r in page_obj.object_list %}
+        <tr>
+          <td class="rank pr-hide-md">{{ page_obj.start_index|add:forloop.counter0 }}</td>
+          <td><a class="pr-learner" href="{% url 'students:detail' r.student_id %}"><span class="pr-ini">{{ r.initials }}</span><span><b>{{ r.name }}</b><small>{{ r.admission_no }}</small></span></a></td>
+          <td class="pr-nowrap">{{ r.class_name }}</td>
+          {% if group == 'result' %}<td>{{ r.subject }}</td>{% endif %}
+          <td class="pr-nowrap"{% if r.assessments %} title="{{ r.assessments }} approved assessment{{ r.assessments|pluralize }}"{% endif %}><span class="pr-mark t-{{ r.band }}">{{ r.mark }}%</span> <span class="pr-g g-{% if r.grade == 'A+' %}Ap{% else %}{{ r.grade }}{% endif %}">{{ r.grade }}</span></td>
+          <td><span class="pr-tag {{ r.band }}">{{ r.status }}</span></td>
+          {% if group == 'learner' %}
+          <td class="pr-weak">{% for w in r.weak|slice:":3" %}<span class="pr-mini {{ w.band }}">{{ w.subject }} <b>{{ w.mark|floatformat:0 }}</b></span>{% empty %}<span style="color:var(--pr-muted)">&mdash;</span>{% endfor %}{% if r.weak|length > 3 %}<span class="pr-more" title="{% for w in r.weak|slice:'3:' %}{{ w.subject }} {{ w.mark|floatformat:0 }}%{% if not forloop.last %}, {% endif %}{% endfor %}">+{{ r.weak|length|add:-3 }} more</span>{% endif %}</td>
+          {% endif %}
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <c-pagination :page_obj="page_obj" label="{% if group == 'learner' %}learners{% else %}results{% endif %}" :rows="page_sizes" />
+  {% elif query %}
+    <c-empty-state title="No match for “{{ query }}”" desc="Check the spelling, or clear the search to see everyone." icon="search" icon_color="grey" />
+  {% elif show != 'all' and summary.count %}
+    <c-empty-state title="Nobody in this group" desc="No {% if group == 'learner' %}learner{% else %}result{% endif %} in this selection is {{ show_label|lower }}." icon="check" icon_color="green" />
+  {% else %}
+    <c-empty-state title="No approved marks yet" desc="No marks have been entered and approved for this selection. Try another term, assessment type or class." icon="search" icon_color="grey" />
+  {% endif %}
+  <div class="pr-foot">
+    {% if help_total %}{{ help_total }} {% if group == 'learner' %}learner{{ help_total|pluralize }}{% else %}result{{ help_total|pluralize }}{% endif %} shown, lowest first. {% endif %}
+    {% if group == 'learner' %}A learner needs help when their average, or any single subject, is below {{ pass_mark }}%. {% endif %}
+    {% if not selected_type %}Weighted averages use the configured assessment weights, rescaled over the assessments marked so far. {% endif %}
+    {% if not selected_term %}With all terms selected, each mark is the average of the learner's term results.{% endif %}
+  </div>
+</section>
+
+{% else %}
+<!-- VIEW 2: subject performance across classes -->
+{% if not ranking %}
+  <div class="pr-card"><c-empty-state title="No approved marks yet" desc="No marks have been entered and approved for this selection." icon="search" icon_color="grey" /></div>
+{% else %}
+<div class="pr-grid2">
+  <section class="pr-card">
+    <div class="pr-card-h">
+      <div>
+        <div class="pr-card-t">{{ focus_subject }} by class</div>
+        <div class="pr-card-s">Every class in your scope, whatever the class filter.</div>
+      </div>
+    </div>
+    {% if not selected_subject and focus_choices|length > 1 %}
+    <div class="pr-chips" style="margin-bottom:8px">
+      {% for s in focus_choices %}
+        <a class="pr-chip{% if s == focus_subject %} on{% endif %}" href="{% querystring focus=s %}">{{ s }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% for c in by_class %}
+      <div class="pr-bar{% if selected_class == c.name %} sel{% endif %}">
+        <div class="nm" title="{{ c.name }}">{{ c.name }}</div>
+        <div class="track"><div class="fill f-{{ c.band }}" style="width:{{ c.average|floatformat:0 }}%"></div><span class="pass" style="left:{{ pass_mark }}%" title="Pass mark {{ pass_mark }}%"></span></div>
+        <div class="v t-{{ c.band }}">{{ c.average }}%</div>
+        <div class="n">{{ c.learners }} learner{{ c.learners|pluralize }}{% if c.below_pass %} &middot; <span class="t-support">{{ c.below_pass }} below pass</span>{% endif %}</div>
+      </div>
+    {% empty %}
+      <c-empty-state title="No approved {{ focus_subject }} marks" desc="No class in your scope has approved marks for this subject yet." icon="search" icon_color="grey" />
+    {% endfor %}
+    <div class="pr-foot">Low in one class points to that class or its teaching; low across every class points to the subject or the assessment.</div>
+  </section>
+  <section class="pr-card">
+    <div class="pr-card-h">
+      <div>
+        <div class="pr-card-t">Subjects ranked</div>
+        <div class="pr-card-s">{% if selected_class %}{{ selected_class }}{% else %}All classes in your scope{% endif %}, highest first. Click to compare across classes.</div>
+      </div>
+    </div>
+    {% for s in ranking %}
+      <div class="pr-bar compact{% if s.name == focus_subject %} sel{% endif %}">
+        {% if selected_subject %}<div class="nm" title="{{ s.name }}">{{ s.name }}</div>{% else %}<a class="nm" href="{% querystring focus=s.name %}" title="Compare {{ s.name }} across classes">{{ s.name }}</a>{% endif %}
+        <div class="track"><div class="fill f-{{ s.band }}" style="width:{{ s.average|floatformat:0 }}%"></div><span class="pass" style="left:{{ pass_mark }}%"></span></div>
+        <div class="v t-{{ s.band }}">{{ s.average }}%</div>
+      </div>
+    {% endfor %}
+  </section>
+</div>
+
+{% if matrix %}
+<section class="pr-card" style="margin-top:18px">
+  <div class="pr-card-h">
+    <div>
+      <div class="pr-card-t">Class &times; subject averages</div>
+      <div class="pr-card-s">Read across a row to see a class; down a column to see a subject.{% if selected_class %} {{ selected_class }} is outlined.{% endif %}</div>
+    </div>
+  </div>
+  <div class="pr-scroll">
+    <table class="pr-heat">
+      <thead><tr><th></th>{% for s in matrix.subjects %}<th>{{ s }}</th>{% endfor %}<th>All subjects</th></tr></thead>
+      <tbody>
+        {% for row in matrix.rows %}
+        <tr{% if row.name == selected_class %} class="sel"{% endif %}>
+          <th class="rowh">{{ row.name }}</th>
+          {% for c in row.cells %}{% if c %}<td class="{{ c.band }}" title="{{ c.n }} learner{{ c.n|pluralize }}">{{ c.average|floatformat:1 }}</td>{% else %}<td class="none">&ndash;</td>{% endif %}{% endfor %}
+          <td class="tot {{ row.overall.band }}">{{ row.overall.average|floatformat:1 }}</td>
+        </tr>
+        {% endfor %}
+        <tr class="tot">
+          <th class="rowh">All classes</th>
+          {% for c in matrix.totals %}<td class="{{ c.band }}">{{ c.average|floatformat:1 }}</td>{% endfor %}
+          <td class="{{ matrix.overall.band }}">{{ matrix.overall.average|floatformat:1 }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="pr-legend">
+    <span><i class="f-critical"></i>Below {{ critical_mark }}% (E)</span>
+    <span><i class="f-support"></i>{{ critical_mark }}&ndash;{{ pass_mark|add:-1 }}% (D)</span>
+    <span><i class="f-pass"></i>{{ pass_mark }}&ndash;{{ strong_mark|add:-1 }}% (C)</span>
+    <span><i class="f-strong"></i>{{ strong_mark }}% and above (B+)</span>
+    <span><i style="background:#5B6578;opacity:.55;width:2px"></i>Pass mark on bars</span>
+  </div>
+</section>
+{% endif %}
+{% endif %}
+{% endif %}
+{% endif %}
+</div>
+</div>
+
+<script>
+(function () {
+  var form = document.getElementById('prFilters'), root = document.getElementById('pr');
+  if (!form) return;
+  form.addEventListener('change', function (e) {
+    if (e.target.hasAttribute('data-reset-term')) form.term.value = '';
+    root.classList.add('is-loading');
+    form.submit();
+  });
+})();
+</script>
+{% endblock %}

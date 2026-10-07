@@ -45,6 +45,9 @@ from academics.views.reports import (
     ReportPDFDownloadView,
 )
 
+from academics.views.performance import PerformanceReportView
+from academics.views.learner_report import LearnerReportView
+
 from academics.views.ecd import (
     ECDEvaluationEntryView,
     _export_students_for_user,

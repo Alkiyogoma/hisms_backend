@@ -56,3 +56,24 @@ def check_can_modify(actor, date, now=None) -> bool:
             "locked",
         )
     return False
+
+
+# Excusal reasons are often medical, so only these roles (and whoever recorded
+# the excusal) may read them. Everything else in the module is open to all
+# staff. Reasons are never printed.
+EXCUSE_REASON_ROLES = {
+    UserRole.SUPER_ADMIN,
+    UserRole.HEAD_OF_SCHOOL,
+    UserRole.PRIMARY_HOD,
+    UserRole.ECD_HOD,
+    UserRole.LOWER_SECONDARY_HOD,
+    UserRole.ADMIN_OFFICER,
+}
+
+
+def can_view_excuse_reasons(user) -> bool:
+    return bool(user and getattr(user, "is_authenticated", False) and user.role in EXCUSE_REASON_ROLES)
+
+
+def can_view_excuse_reason(user, entry) -> bool:
+    return can_view_excuse_reasons(user) or bool(entry and entry.marked_by_id == getattr(user, "pk", None))

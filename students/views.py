@@ -409,6 +409,31 @@ class StudentDetailView(RoleRequiredMixin, DetailView):
                 academic_summary['grade'] = '--'
                 academic_summary['trend'] = '--'
 
+        # Approved marks only, for the selected term (default: the current term,
+        # else the latest term with marks) — the same figures as the
+        # Performance Report. ECD is rating-based and keeps its own summary.
+        from academics import performance
+        from attendance import analytics
+        record_terms = performance.learner_terms(student)
+        term_param = self.request.GET.get("term", "")
+        record_term = next((t for t in record_terms if str(t.pk) == term_param), None) \
+            or performance.default_learner_term(student, record_terms)
+        record = None if is_ecd else performance.learner_record(student, record_term)
+        if record and record["average"] is not None:
+            academic_summary.update({
+                "average": record["average"], "grade": record["grade"], "term_name": record_term.name,
+                "subjects_count": len(record["subjects"]), "trend": record["trend"] or "new",
+                "has_report": True,
+            })
+        elif not is_ecd:
+            academic_summary.update({"average": None, "grade": "--", "trend": "--", "subjects_count": 0,
+                                     "term_name": record_term.name if record_term else "Current term"})
+        att_start, att_end = analytics.term_range(record_term)
+        attendance = analytics.learner_attendance(student, att_start, att_end)
+        # Cards are shown only when they have something to show.
+        perf_has_att = bool(attendance["row"] and attendance["row"]["marked"])
+        perf_has_acad = bool(record and record["average"] is not None) or bool(is_ecd and academic_summary.get("eval_count"))
+
         # Financial information — visible to roles with finance view permission
         financial_info = {}
         if self.request.user.has_perm("finance.view_invoice"):
@@ -468,6 +493,7 @@ class StudentDetailView(RoleRequiredMixin, DetailView):
                 'invoices': invoices_list,
                 'student_pk': student.pk,
             }
+            financial_info['has_data'] = bool(total_billed or admission_billed or invoices_list or last_pay)
         
         # Evaluate stats BEFORE slicing the queryset — single aggregated query
         welfare_stats = welfare_incidents.aggregate(
@@ -536,6 +562,17 @@ class StudentDetailView(RoleRequiredMixin, DetailView):
                 critical=Count('id', filter=Q(severity='critical')),
             ),
             "academic_summary": academic_summary,
+            "record": record,
+            "record_term": record_term,
+            "record_terms": record_terms + ([record_term] if record_term and record_term not in record_terms else []),
+            "attendance": attendance,
+            "perf_has_att": perf_has_att,
+            "perf_has_acad": perf_has_acad,
+            "siblings": siblings,
+            "sidebar_has_cards": bool(perf_has_acad or all_reports or perf_has_att or siblings.exists()
+                                      or financial_info.get("has_data")),
+            "att_start": att_start,
+            "att_end": att_end,
             "recent_report": recent_report,
             "all_reports": all_reports,
             "financial_info": financial_info,
