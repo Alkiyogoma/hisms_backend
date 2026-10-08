@@ -2587,7 +2587,7 @@ class BulkImportTemplateView(RoleRequiredMixin, View):
         if import_type == "students":
             headers = [
                 "admission_no", "first_name", "last_name", "date_of_birth",
-                "gender", "class_name", "stream_name", "phone",
+                "gender", "class_name", "stream_name",
                 "nationality", "religion", "blood_type", "allergies_medical",
                 "enrolment_date",
             ]
@@ -2847,7 +2847,6 @@ class BulkImportConfirmView(RoleRequiredMixin, View):
             gender=row.get("gender", "").strip().lower(),
             class_name=row.get("class_name", "").strip(),
             stream_name=row.get("stream_name", "").strip(),
-            phone=row.get("phone", "").strip(),
             nationality=row.get("nationality", "").strip(),
             religion=row.get("religion", "").strip(),
             blood_type=row.get("blood_type", "").strip().lower(),
@@ -2868,8 +2867,6 @@ class BulkImportConfirmView(RoleRequiredMixin, View):
             student.class_name = row["class_name"].strip()
         if row.get("gender"):
             student.gender = row["gender"].strip().lower()
-        if row.get("phone"):
-            student.phone = row["phone"].strip()
         student.save()
 
     def _create_staff(self, row, request=None):

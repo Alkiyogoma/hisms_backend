@@ -16,10 +16,11 @@
     </div>
 </div>
 {% endif %}
+{% if current_term %}{% include "academics/_pending_signoffs.html" %}{% endif %}
 <div class="section-hdr">
   <span class="section-title">Pending Reports &middot; {{ current_term.name }}</span>
   <div style="display:flex; gap:10px">
-    <a href="{% url 'academics:analytics' %}" class="hf-btn hf-btn-secondary" style="font-size:12px; padding:6px 12px">Academic Analytics</a>
+    <a href="{% url 'academics:performance_report' %}" class="hf-btn hf-btn-secondary" style="font-size:12px; padding:6px 12px">Performance Report</a>
     <span class="chip chip-blue">HOS Action Required</span>
   </div>
 </div>
@@ -29,7 +30,7 @@
     <thead>
       <tr style="background: #F8FAFC">
         <th style="padding-left:24px">Class Type / Grade</th>
-        <th style="text-align:center">Students</th>
+        <th style="text-align:center">Reports</th>
         <th style="text-align:center">Published</th>
         <th style="text-align:center">Pending Sign-off</th>
         <th style="text-align:center">Blocked (Incomplete)</th>

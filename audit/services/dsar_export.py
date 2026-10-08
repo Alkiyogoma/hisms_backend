@@ -84,7 +84,6 @@ def export_student_data(student) -> dict[str, Any]:
         "class_name": student.class_name,
         "stream_name": student.stream_name,
         "enrolment_date": _serialize_date(student.enrolment_date),
-        "phone": student.phone,
         "photo_url": student.photo.url if student.photo else None,
         "is_archived": student.is_archived,
         "created_at": _serialize_date(student.created_at),
@@ -267,8 +266,7 @@ def export_student_data(student) -> dict[str, Any]:
 
         data["notifications"] = _safe_qs_to_list(
             Notification.objects.filter(
-                Q(recipient=student.phone)
-                | Q(message__icontains=student.first_name)
+                Q(message__icontains=student.first_name)
                 | Q(message__icontains=student.last_name)
             ).order_by("-created_at")[:200],
             ["id", "title", "message", "is_read", "created_at"],

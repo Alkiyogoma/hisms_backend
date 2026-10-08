@@ -1,0 +1,19 @@
+{% comment %}
+Reports not yet published this term, per class. Counts reports (one per
+learner), not results. Used by the Review Queue and HOS Sign-Off tabs.
+{% endcomment %}
+<div class="card" style="margin-bottom:20px">
+  <div class="card-title-row" style="margin-bottom:10px">
+    <h2 class="card-title" style="margin:0;font-size:14px">Pending sign-offs</h2>
+    <span style="font-size:12px;color:var(--text-muted)">{{ pending_signoff_total }} report{{ pending_signoff_total|pluralize }} not yet published &middot; one report per student</span>
+  </div>
+  {% if pending_signoffs %}
+  <div style="display:flex;flex-wrap:wrap;gap:8px">
+    {% for p in pending_signoffs %}
+      <span class="chip chip-amber" style="font-size:12px">{{ p.class_name }} &middot; <b>{{ p.count }}</b> report{{ p.count|pluralize }}</span>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="font-size:13px;color:var(--text-muted)">Every report this term is signed off and published.</div>
+  {% endif %}
+</div>

@@ -479,7 +479,6 @@ class LaravelFieldMapper:
     STUDENT_FIELD_MAP = {
         'student_id': 'laravel_student_id',
         'name': 'full_name',
-        'phone': 'phone',
         'class_id': 'class_name',  # Will need class name lookup
         'image': 'image',
         'status': 'status'

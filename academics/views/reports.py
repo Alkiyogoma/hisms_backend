@@ -8,6 +8,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render, reverse
 from django.utils import timezone
+from django.utils.http import urlencode
 from django.views.generic import CreateView, UpdateView, TemplateView, View
 import json
 
@@ -104,8 +105,11 @@ class ReportRouterView(RoleRequiredMixin, View):
         if role == UserRole.PARENT:
             return redirect("academics:parent_reports")
         elif request.user.has_role(UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN, UserRole.PRIMARY_HOD,
-                                   UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD):
-            return redirect("academics:analytics")
+                                   UserRole.LOWER_SECONDARY_HOD):
+            return redirect("academics:performance_report")
+        elif request.user.has_role(UserRole.ECD_HOD):
+            # ECD is rated, not marked, so it has no performance figures.
+            return redirect("academics:report_review_queue")
         elif role == UserRole.TEACHER:
             return redirect("academics:exam_scores_entry")
         else:
@@ -168,6 +172,8 @@ class HOSSignOffListView(AllowedRolesEnforcedMixin, RoleRequiredMixin, TemplateV
                         "can_sign_off_all": pending > 0 and blocked == 0,
                     })
             ctx["class_stats"] = class_stats
+            ctx["pending_signoffs"] = pending_signoffs_by_class(term, classes)
+            ctx["pending_signoff_total"] = sum(p["count"] for p in ctx["pending_signoffs"])
             
             # Action: generate missing reports
             if "generate" in self.request.GET:
@@ -607,7 +613,7 @@ class HOSSignOffActionView(AllowedRolesEnforcedMixin, RoleRequiredMixin, View):
         else:
             messages.error(request, "Nothing was changed: no report or class was selected.")
 
-        return _back_to(request, "academics:analytics")
+        return _back_to(request, "academics:hos_signoff_list")
 
 
 class ReportReviewQueueView(AllowedRolesEnforcedMixin, RoleRequiredMixin, TemplateView):
@@ -801,6 +807,8 @@ class ReportReviewQueueView(AllowedRolesEnforcedMixin, RoleRequiredMixin, Templa
             status=ReportCardStatus.PUBLISHED,
         ).count()
         ctx["total_published"] = published_count
+        ctx["pending_signoffs"] = pending_signoffs_by_class(term, dept_class_names)
+        ctx["pending_signoff_total"] = sum(p["count"] for p in ctx["pending_signoffs"])
         ctx["academics_tab"] = "review_queue"
         return ctx
 
@@ -870,448 +878,32 @@ class ReportReviewQueueView(AllowedRolesEnforcedMixin, RoleRequiredMixin, Templa
         return _back_to(request, "academics:report_review_queue")
 
 
-class AcademicAnalyticsView(RoleRequiredMixin, TemplateView):
-    template_name = "academics/analytics.html"
+class AcademicAnalyticsView(RoleRequiredMixin, View):
+    """Retired: the Analytics tab duplicated the Performance Report with
+    different counting rules, so the two disagreed. Old links and bookmarks
+    land on the Performance Report for the same term."""
     allowed_roles = [UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD]
     required_permission = "academics.view_examscore"
 
-    def _compute_term_analytics(self, term, role, dept_filter, selected_class, weights):
-        """Compute all analytics metrics for a given term. Returns dict of computed values."""
-        from django.db.models import Avg, Count, Q, Sum, F, Case, When, Value, FloatField, ExpressionWrapper
-        from academics.models import Department, GradeClass, ExamType, ReportCard, ReportCardStatus
+    def get(self, request, *args, **kwargs):
+        url = reverse("academics:performance_report")
+        term = Term.objects.filter(pk=request.GET.get("term_id")).first() if request.GET.get("term_id", "").isdigit() else None
+        if term:
+            url += "?" + urlencode({"year": term.academic_year_id, "term": term.pk})
+        return redirect(url)
 
-        result = {}
-        if not term:
-            return result
 
-        # -- ECD Analytics Path (uses ECDEvaluation ratings, not ExamScore) --
-        if role == UserRole.ECD_HOD:
-            ecd_classes = GradeClass.objects.filter(department=Department.ECD).values_list('name', flat=True)
-            rating_map = {"E": 4, "G": 3, "S": 2, "N": 1}
-
-            rc_filter = Q(student__class_name__in=ecd_classes, is_ecd_report=True, term=term)
-            report_cards = ReportCard.objects.filter(rc_filter).exclude(
-                status=ReportCardStatus.DRAFT
-            ).prefetch_related("ecd_evaluations", "student")
-
-            # Per-student averages
-            student_avgs = []
-            student_avg_map = {}
-            for rc in report_cards:
-                evals = rc.ecd_evaluations.all()
-                if not evals:
-                    continue
-                total_val = 0
-                count = 0
-                for ev in evals:
-                    val = rating_map.get(ev.rating, 0)
-                    if val > 0:
-                        total_val += val
-                        count += 1
-                if count == 0:
-                    continue
-                avg_rating = total_val / count  # 1.0 - 4.0
-                avg_pct = avg_rating / 4.0 * 100.0  # Scale to 0-100%
-                student_avgs.append({"student": rc.student_id, "avg": avg_pct})
-                student_avg_map[rc.student_id] = avg_pct
-
-            valid_avgs = [s["avg"] for s in student_avgs]
-            result["overall_avg"] = round(sum(valid_avgs) / len(valid_avgs), 1) if valid_avgs else 0
-            total_students = len(valid_avgs)
-            passed_students = sum(1 for a in valid_avgs if a >= 60)
-            result["pass_rate_pct"] = round((passed_students / total_students * 100), 1) if total_students > 0 else 0
-            result["passed_count"] = passed_students
-            result["total_students_count"] = total_students
-            result["student_avg_map"] = student_avg_map
-
-            result["grade_dist"] = {
-                "ap": sum(1 for a in valid_avgs if a >= 90),
-                "a":  sum(1 for a in valid_avgs if a >= 80 and a < 90),
-                "b":  sum(1 for a in valid_avgs if a >= 70 and a < 80),
-                "c":  sum(1 for a in valid_avgs if a >= 60 and a < 70),
-                "d":  sum(1 for a in valid_avgs if a >= 50 and a < 60),
-                "e":  sum(1 for a in valid_avgs if a < 50),
-            }
-
-            # Per-class at-risk counts
-            class_at_risk_counts = {}
-            if student_avg_map:
-                class_student_qs = Student.objects.filter(
-                    id__in=list(student_avg_map.keys())
-                ).values('id', 'class_name')
-                for entry in class_student_qs:
-                    sid = entry['id']
-                    cn = entry['class_name']
-                    avg = student_avg_map.get(sid)
-                    if avg is not None and avg < 60:
-                        class_at_risk_counts[cn] = class_at_risk_counts.get(cn, 0) + 1
-            result["class_at_risk_counts"] = class_at_risk_counts
-
-            # Completion stats
-            completion_stats = []
-            for cls in GradeClass.objects.filter(department=Department.ECD):
-                cls_total = Student.objects.filter(class_name=cls.name, is_archived=False).count()
-                if cls_total == 0:
-                    continue
-                reports = ReportCard.objects.filter(term=term, student__class_name=cls.name, is_ecd_report=True)
-                assessed = reports.exclude(status=ReportCardStatus.DRAFT).count()
-                pending = reports.filter(status=ReportCardStatus.PENDING_SIGN_OFF).count()
-                cls_at_risk = class_at_risk_counts.get(cls.name, 0)
-                completion_stats.append({
-                    "class_name": cls.name, "total": cls_total,
-                    "assessed": assessed, "pending": pending,
-                    "remaining": cls_total - assessed,
-                    "progress_pct": round((assessed / cls_total * 100), 1) if cls_total > 0 else 0,
-                    "can_sign_off": pending > 0,
-                    "student_count": cls_total, "at_risk_count": cls_at_risk,
-                })
-            result["completion_stats"] = sorted(completion_stats, key=lambda x: x["class_name"])
-
-            # At-risk students
-            at_risk_ids = [s["student"] for s in student_avgs if s["avg"] < 60]
-            at_risk_students = Student.objects.filter(id__in=at_risk_ids).only(
-                "first_name", "last_name", "class_name", "admission_no"
-            )
-            at_risk_map = {s["student"]: s["avg"] for s in student_avgs if s["avg"] < 60}
-            for s in at_risk_students:
-                s.avg = round(at_risk_map[s.id], 1)
-                s.grade = get_grade_from_score(s.avg)
-            result["at_risk_students"] = at_risk_students[:10]
-            result["at_risk_count"] = len(at_risk_ids)
-
-            # Class performance -- single batch query
-            student_ids = [s["student"] for s in student_avgs]
-            students_map = {s_obj.id: s_obj for s_obj in Student.objects.filter(id__in=student_ids).only("id", "class_name")}
-            class_perf_data = {}
-            for s in student_avgs:
-                student_obj = students_map.get(s["student"])
-                if student_obj:
-                    class_perf_data.setdefault(student_obj.class_name, []).append(s["avg"])
-            class_stats = []
-            for cn, avgs in class_perf_data.items():
-                class_stats.append({"student__class_name": cn, "avg": round(sum(avgs) / len(avgs), 1)})
-            class_stats.sort(key=lambda x: x["avg"], reverse=True)
-            for c in class_stats:
-                c["is_flagged"] = is_at_risk(c["avg"])
-            result["class_stats"] = class_stats
-
-            # Domain performance (instead of subject performance)
-            all_evals = ECDEvaluation.objects.filter(report_card__in=report_cards)
-            domain_data = {}
-            for ev in all_evals:
-                val = rating_map.get(ev.rating, 0)
-                if val > 0:
-                    domain_data.setdefault(ev.domain, []).append(val)
-            subject_stats = []
-            for domain, vals in domain_data.items():
-                avg = (sum(vals) / len(vals)) / 4.0 * 100.0
-                subject_stats.append({"subject_name": domain, "avg": round(avg, 1)})
-            subject_stats.sort(key=lambda x: x["avg"], reverse=True)
-            result["subject_stats"] = subject_stats
-
-            # Pending sign-offs
-            reports_pending = ReportCard.objects.filter(
-                term=term, student__class_name__in=ecd_classes, is_ecd_report=True
-            ).exclude(status=ReportCardStatus.PUBLISHED)
-            result["pending_signoffs"] = reports_pending.values(
-                "student__class_name"
-            ).annotate(count=Count("id")).order_by("student__class_name")
-
-            # Per-class student data
-            if selected_class:
-                class_students = Student.objects.filter(
-                    class_name=selected_class, is_archived=False
-                ).order_by("last_name", "first_name")
-                class_student_data = []
-                for s_obj in class_students:
-                    avg_val = student_avg_map.get(s_obj.id)
-                    data = {
-                        "student": s_obj,
-                        "avg": round(avg_val, 1) if avg_val else None,
-                        "grade": get_grade_from_score(avg_val) if avg_val else "N/A",
-                        "is_at_risk": is_at_risk(avg_val) if avg_val else False,
-                        "is_critical": is_critical(avg_val) if avg_val else False,
-                    }
-                    class_student_data.append(data)
-                result["class_student_data"] = sorted(
-                    class_student_data,
-                    key=lambda x: (0 if x["avg"] is not None else 1, x["avg"] if x["avg"] is not None else 0),
-                )
-                result["class_selected_name"] = selected_class
-                result["class_student_total"] = len(class_students)
-                result["class_with_scores"] = sum(1 for d in class_student_data if d["avg"] is not None)
-                result["class_at_risk_count"] = sum(1 for d in class_student_data if d["is_at_risk"])
-
-            return result
-
-        # -- ExamScore Analytics Path (Primary / Secondary) --
-        scores = ExamScore.objects.filter(term=term).filter(dept_filter)
-
-        # Apply weights to scores
-        w_scores = scores.annotate(
-            weight_val=Case(
-                *[When(exam_type=code, then=Value(w/100.0)) for code, w in weights.items()],
-                default=Value(0.0),
-                output_field=FloatField()
-            )
-        ).annotate(
-            weighted_val=ExpressionWrapper(F('score') * F('weight_val'), output_field=FloatField())
-        )
-
-        # 1. Overall stats (Weighted)
-        student_totals = w_scores.values("student").annotate(
-            total_w=Sum('weighted_val'),
-            sum_w=Sum('weight_val')
-        )
-        student_avgs = [
-            {"student": s["student"], "avg": float(s["total_w"] / s["sum_w"])}
-            for s in student_totals if s["sum_w"] > 0
-        ]
-        student_avg_map = {s["student"]: s["avg"] for s in student_avgs}
-        valid_avgs = [s["avg"] for s in student_avgs]
-        
-        result["overall_avg"] = round(sum(valid_avgs) / len(valid_avgs), 1) if valid_avgs else 0
-        
-        total_students = len(valid_avgs)
-        passed_students = sum(1 for a in valid_avgs if a >= 60)
-        result["pass_rate_pct"] = round((passed_students / total_students * 100), 1) if total_students > 0 else 0
-        result["passed_count"] = passed_students
-        result["total_students_count"] = total_students
-        result["student_avg_map"] = student_avg_map
-        
-        # Grade distribution
-        result["grade_dist"] = {
-            "ap": sum(1 for a in valid_avgs if a >= 90),
-            "a":  sum(1 for a in valid_avgs if a >= 80 and a < 90),
-            "b":  sum(1 for a in valid_avgs if a >= 70 and a < 80),
-            "c":  sum(1 for a in valid_avgs if a >= 60 and a < 70),
-            "d":  sum(1 for a in valid_avgs if a >= 50 and a < 60),
-            "e":  sum(1 for a in valid_avgs if a < 50),
-        }
-
-        # Per-class at-risk counts
-        class_at_risk_counts = {}
-        if student_avg_map:
-            class_student_qs = Student.objects.filter(
-                id__in=list(student_avg_map.keys())
-            ).values('id', 'class_name')
-            for entry in class_student_qs:
-                sid = entry['id']
-                cn = entry['class_name']
-                avg = student_avg_map.get(sid)
-                if avg is not None and avg < 60:
-                    class_at_risk_counts[cn] = class_at_risk_counts.get(cn, 0) + 1
-        result["class_at_risk_counts"] = class_at_risk_counts
-
-        # Completion stats
-        completion_stats = []
-        tracking_classes = GradeClass.objects.all()
-        scope_depts = getattr(self, "_scope_depts", None)
-        if scope_depts:
-            tracking_classes = GradeClass.objects.filter(department__in=scope_depts)
-            
-        for cls in tracking_classes:
-            cls_total = Student.objects.filter(class_name=cls.name, is_archived=False).count()
-            if cls_total == 0: continue
-            
-            if cls.department == Department.ECD:
-                reports = ReportCard.objects.filter(term=term, student__class_name=cls.name, is_ecd_report=True)
-                assessed = reports.exclude(status=ReportCardStatus.DRAFT).count()
-                pending = reports.filter(status=ReportCardStatus.PENDING_SIGN_OFF).count()
-            else:
-                assessed = Student.objects.filter(
-                    class_name=cls.name, is_archived=False, exam_scores__term=term
-                ).distinct().count()
-                pending = ReportCard.objects.filter(
-                    term=term, student__class_name=cls.name, status=ReportCardStatus.PENDING_SIGN_OFF
-                ).count()
-            
-            cls_at_risk = class_at_risk_counts.get(cls.name, 0)
-            completion_stats.append({
-                "class_name": cls.name,
-                "total": cls_total,
-                "assessed": assessed,
-                "pending": pending,
-                "remaining": cls_total - assessed,
-                "progress_pct": round((assessed / cls_total * 100), 1) if cls_total > 0 else 0,
-                "can_sign_off": pending > 0,
-                "student_count": cls_total,
-                "at_risk_count": cls_at_risk,
-            })
-        result["completion_stats"] = sorted(completion_stats, key=lambda x: x["class_name"])
-
-        # At-risk students
-        at_risk_ids = [s["student"] for s in student_avgs if s["avg"] < 60]
-        at_risk_students = Student.objects.filter(id__in=at_risk_ids).only("first_name", "last_name", "class_name", "admission_no")
-        at_risk_map = {s["student"]: s["avg"] for s in student_avgs if s["avg"] < 60}
-        for s in at_risk_students:
-            s.avg = round(at_risk_map[s.id], 1)
-            s.grade = get_grade_from_score(s.avg)
-        result["at_risk_students"] = at_risk_students[:10]
-        result["at_risk_count"] = len(at_risk_ids)
-
-        # Class performance
-        class_perf = scores.values("student__class_name").annotate(avg=Avg("score")).order_by("-avg")
-        for c in class_perf:
-            c["avg"] = round(c["avg"], 1)
-            c["is_flagged"] = is_at_risk(c["avg"])
-        result["class_stats"] = class_perf
-
-        # Subject performance
-        subject_stats = scores.values("subject_name").annotate(
-            avg=Avg("score"),
-            total_count=Count("id")
-        ).order_by("-avg")
-        for s in subject_stats:
-            s["avg"] = round(s["avg"], 1)
-        result["subject_stats"] = subject_stats
-
-        # Pending sign-offs
-        reports_pending = ReportCard.objects.filter(term=term).filter(dept_filter).exclude(status=ReportCardStatus.PUBLISHED)
-        result["pending_signoffs"] = reports_pending.values("student__class_name").annotate(count=Count("id")).order_by("student__class_name")
-
-        # Per-class student data
-        if selected_class:
-            class_students = Student.objects.filter(class_name=selected_class, is_archived=False).order_by("last_name", "first_name")
-            class_student_data = []
-            for s in class_students:
-                avg_val = student_avg_map.get(s.id)
-                data = {
-                    "student": s,
-                    "avg": round(avg_val, 1) if avg_val else None,
-                    "grade": get_grade_from_score(avg_val) if avg_val else "N/A",
-                    "is_at_risk": is_at_risk(avg_val) if avg_val else False,
-                    "is_critical": is_critical(avg_val) if avg_val else False,
-                }
-                class_student_data.append(data)
-            
-            result["class_student_data"] = sorted(
-                class_student_data,
-                key=lambda x: (0 if x["avg"] is not None else 1, x["avg"] if x["avg"] is not None else 0)
-            )
-            result["class_selected_name"] = selected_class
-            result["class_student_total"] = len(class_students)
-            result["class_with_scores"] = sum(1 for d in class_student_data if d["avg"] is not None)
-            result["class_at_risk_count"] = sum(1 for d in class_student_data if d["is_at_risk"])
-
-        return result
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        from django.db.models import Avg, Count, Q, Sum, F, Case, When, Value, FloatField, ExpressionWrapper
-        from academics.models import Department, GradeClass, ExamType, ReportCard, ReportCardStatus, get_exam_weights
-
-        # Current (default) term — resolved from system date (FR-CAL-003)
-        from academics.utils import get_current_term
-        current_term = get_current_term() or Term.objects.order_by("-start_date").first()
-        ctx["current_term"] = current_term
-
-        # Available terms for the selector
-        available_terms = Term.objects.all().order_by("-start_date")
-        ctx["available_terms"] = available_terms
-
-        # Selected term from query param (default to most recent term with data)
-        selected_term_id = self.request.GET.get("term_id")
-        if selected_term_id:
-            selected_term = Term.objects.filter(id=selected_term_id).first()
-        else:
-            # Find the most recent term that has ExamScore data
-            terms_with_scores = (
-                ExamScore.objects.values("term")
-                .annotate(score_count=Count("id"))
-                .filter(score_count__gt=0)
-                .order_by("-term")
-                .values_list("term", flat=True)
-            )
-            data_term = Term.objects.filter(id__in=terms_with_scores).order_by("-start_date").first()
-            selected_term = current_term or data_term
-        ctx["selected_term"] = selected_term
-        ctx["selected_term_id"] = selected_term.id if selected_term else None
-
-        # Defaults for template variables (used when no term/data exists)
-        ctx.setdefault("overall_avg", 0)
-        ctx.setdefault("pass_rate_pct", 0)
-        ctx.setdefault("passed_count", 0)
-        ctx.setdefault("total_students_count", 0)
-        ctx.setdefault("grade_dist", {"ap": 0, "a": 0, "b": 0, "c": 0, "d": 0, "e": 0})
-        ctx.setdefault("subject_stats", [])
-        ctx.setdefault("class_stats", [])
-        ctx.setdefault("pending_signoffs", [])
-        ctx.setdefault("at_risk_students", [])
-        ctx.setdefault("at_risk_count", 0)
-        ctx.setdefault("completion_stats", [])
-        ctx.setdefault("class_student_data", [])
-        ctx.setdefault("class_student_total", 0)
-        ctx.setdefault("class_with_scores", 0)
-        ctx.setdefault("class_at_risk_count", 0)
-        ctx.setdefault("total_enrolled_count", 0)
-        ctx.setdefault("student_avg_map", {})
-        ctx.setdefault("class_at_risk_counts", {})
-        ctx.setdefault("is_ecd_analytics", False)
-
-        # Comparison mode
-        compare_mode = self.request.GET.get("compare", "") == "1"
-        ctx["compare_mode"] = compare_mode
-        
-        # 0. Department Scoping for HODs (union across every section role held)
-        role, scope_depts = _analytics_scope(self.request.user)
-        self._scope_depts = scope_depts
-        dept_filter = Q()
-        scope_classes = None
-        if scope_depts:
-            scope_classes = list(GradeClass.objects.filter(department__in=scope_depts).values_list('name', flat=True))
-            dept_filter = Q(student__class_name__in=scope_classes)
-            labels = dict(Department.choices)
-            ctx["dept_name"] = " & ".join(labels.get(d, d) for d in scope_depts)
-            if role == UserRole.ECD_HOD:
-                ctx["is_ecd_analytics"] = True
-        else:
-            ctx["dept_name"] = "Whole School"
-
-        # Determine available classes for tabs
-        if scope_depts:
-            available_classes = GradeClass.objects.filter(department__in=scope_depts).values_list('name', flat=True).order_by('name')
-        else:
-            available_classes = GradeClass.objects.all().values_list('name', flat=True).order_by('name')
-        all_available = list(available_classes)
-        
-        # Department filter for class tabs
-        selected_dept = self.request.GET.get("dept", "")
-        ctx["selected_dept"] = selected_dept
-        ctx["dept_choices"] = Department.choices
-        
-        if selected_dept:
-            dept_class_names = GradeClass.objects.filter(department=selected_dept).values_list('name', flat=True)
-            available_classes = [c for c in all_available if c in dept_class_names]
-        else:
-            available_classes = all_available
-        
-        ctx["available_classes"] = list(available_classes)
-        selected_class = self.request.GET.get("class_name", "")
-        ctx["selected_class"] = selected_class
-
-        weights = get_exam_weights()
-
-        # Compute analytics for the selected term
-        if selected_term:
-            term_data = self._compute_term_analytics(selected_term, role, dept_filter, selected_class, weights)
-            ctx.update(term_data)
-            
-            # Total enrolled students across scoped classes
-            enrolled_qs = Student.objects.filter(is_archived=False)
-            if scope_classes is not None:
-                enrolled_qs = enrolled_qs.filter(class_name__in=scope_classes)
-            ctx["total_enrolled_count"] = enrolled_qs.count()
-
-            # Comparison: compute analytics for the current term too
-            if compare_mode and current_term and selected_term.id != current_term.id:
-                compare_data = self._compute_term_analytics(current_term, role, dept_filter, selected_class, weights)
-                ctx["compare_data"] = compare_data
-                ctx["compare_term"] = current_term
-        
-        ctx["academics_tab"] = "analytics"
-        
-        return ctx
+def pending_signoffs_by_class(term, class_names=None):
+    """Reports not yet published this term, counted per class (reports, not
+    learners). ``class_names`` limits it to a section; None means every class."""
+    from django.db.models import Count
+    qs = ReportCard.objects.filter(term=term).exclude(status=ReportCardStatus.PUBLISHED)
+    if class_names is not None:
+        qs = qs.filter(student__class_name__in=list(class_names))
+    return [
+        {"class_name": r["student__class_name"], "count": r["count"]}
+        for r in qs.values("student__class_name").annotate(count=Count("id")).order_by("student__class_name")
+    ]
 
 
 class AtRiskStudentsListView(RoleRequiredMixin, TemplateView):

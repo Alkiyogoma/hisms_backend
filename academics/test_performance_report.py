@@ -252,3 +252,57 @@ class LearnerProfileAndProgressReportTests(PerformanceReportTests):
             resp = self.client.get(reverse("academics:learner_report", args=[self.amani.pk]), {"format": "pdf"})
         self.assertEqual(resp["Content-Type"].split(";")[0], "text/html")
         self.assertTrue(resp.context["print_now"])
+
+
+class SingleSourceOfPerformanceTests(PerformanceReportTests):
+    """Regression for: Analytics and the Performance Report showed different
+    averages, pass rates and grade counts for the same term without saying
+    what they counted. Analytics is retired; the Performance Report states
+    whether each figure counts results or learners."""
+
+    def test_summary_counts_results_and_names_the_learners_behind_them(self):
+        s = self._get(self.hos, term=self.term1.pk).context["summary"]
+        # Term 1 results: Amani 58 (D) & 45 (E), Baraka 90 & 80, Caren 30 (E).
+        self.assertEqual((s["count"], s["learners"], s["passed"]), (5, 3, 2))
+        self.assertEqual((s["flagged"], s["flagged_learners"]), (1, 1))
+        self.assertEqual((s["critical"], s["critical_learners"]), (2, 2))
+
+    def test_grade_distribution_counts_results_or_learners(self):
+        def counts(resp):
+            return {g["grade"]: g["count"] for g in resp.context["grade_dist"]["grades"]}
+        by_result = self._get(self.hos, term=self.term1.pk)
+        self.assertEqual(counts(by_result), {"A+": 1, "A": 1, "B": 0, "C": 0, "D": 1, "E": 2})
+        self.assertContains(by_result, "Counts 5 subject results")
+        by_learner = self._get(self.hos, term=self.term1.pk, dist="learner")
+        # Averages: Amani 51.5 (D), Baraka 85 (A), Caren 30 (E).
+        self.assertEqual(counts(by_learner), {"A+": 0, "A": 1, "B": 0, "C": 0, "D": 1, "E": 1})
+        self.assertContains(by_learner, "Counts 3 students")
+
+    def test_analytics_link_redirects_to_the_performance_report(self):
+        self.client.force_login(self.hos)
+        resp = self.client.get(reverse("academics:analytics"), {"term_id": self.term1.pk})
+        self.assertRedirects(resp, f"{URL}?year={self.year.pk}&term={self.term1.pk}", fetch_redirect_response=False)
+        self.assertRedirects(self.client.get(reverse("academics:analytics")), URL, fetch_redirect_response=False)
+
+    def test_reports_landing_and_tabs_point_to_the_performance_report(self):
+        self.client.force_login(self.hos)
+        self.assertRedirects(self.client.get(reverse("academics:reports_router")), URL, fetch_redirect_response=False)
+        page = self._get(self.hos, term=self.term1.pk).content.decode()
+        self.assertNotIn(">Analytics<", page)
+
+    def test_pending_signoffs_shown_on_review_queue_and_hos_signoff(self):
+        from academics.models import ReportCard, ReportCardStatus
+        ReportCard.objects.create(student=self.amani, term=self.term1, generated_by=self.hos, status=ReportCardStatus.DRAFT)
+        ReportCard.objects.create(student=self.baraka, term=self.term1, generated_by=self.hos, status=ReportCardStatus.PUBLISHED)
+        ReportCard.objects.create(student=self.caren, term=self.term1, generated_by=self.hos, status=ReportCardStatus.PENDING_SIGN_OFF)
+        self.client.force_login(self.hos)
+        for name in ("academics:report_review_queue", "academics:hos_signoff_list"):
+            resp = self.client.get(reverse(name))
+            self.assertEqual(resp.status_code, 200, name)
+            self.assertEqual(resp.context["pending_signoffs"],
+                             [{"class_name": "Grade 4", "count": 1}, {"class_name": "Grade 8", "count": 1}], name)
+            self.assertContains(resp, "Pending sign-offs")
+        # A Head of Primary only sees their own section's classes.
+        self.client.force_login(self.hod)
+        resp = self.client.get(reverse("academics:report_review_queue"))
+        self.assertEqual(resp.context["pending_signoffs"], [{"class_name": "Grade 4", "count": 1}])

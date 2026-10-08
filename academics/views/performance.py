@@ -121,6 +121,11 @@ class PerformanceReportView(RoleRequiredMixin, TemplateView):
             page_size = PAGE_SIZES[0]
         page_obj = Paginator(rows, page_size).get_page(params.get("page"))
 
+        # Grade distribution, counting results (one per learner per subject)
+        # or learners (each learner's average across the subjects in view).
+        dist_by = params.get("dist") if params.get("dist") in GROUPS else "result"
+        dist_rows = performance.learner_summary(filtered) if dist_by == "learner" else filtered
+
         # View 2 — one subject across classes (ignores the class filter, since
         # the point is to compare classes), every subject ranked within the
         # class filter, and the class x subject heatmap.
@@ -159,6 +164,8 @@ class PerformanceReportView(RoleRequiredMixin, TemplateView):
             "group": group,
             "query": query,
             "summary": performance.summarise(filtered),
+            "dist_by": dist_by,
+            "grade_dist": performance.grade_distribution(dist_rows),
             "page_obj": page_obj,
             "help_rows": rows,
             "help_total": len(rows),

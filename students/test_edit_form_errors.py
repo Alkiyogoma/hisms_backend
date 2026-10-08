@@ -32,7 +32,7 @@ class StudentEditFormErrorTests(TestCase):
         """Exactly the fields the edit page submits."""
         data = {
             "first_name": "Jasiel", "last_name": "Kajeguka", "preferred_name": "",
-            "date_of_birth": "2017-03-01", "gender": "male", "phone": "",
+            "date_of_birth": "2017-03-01", "gender": "male",
             "nationality": "", "religion": "", "blood_type": "",
             "allergies_medical": "", "status": self.student.status,
         }
@@ -110,6 +110,14 @@ class StudentEditFormErrorTests(TestCase):
         self.assertEqual(resp.status_code, 302)
         self.student.refresh_from_db()
         self.assertEqual(self.student.class_name, "Grade 4")
+
+    def test_learners_have_no_phone_number(self):
+        """Family contact numbers live on the parent/guardian record only."""
+        self.assertNotIn("phone", [f.name for f in Student._meta.get_fields()])
+        edit_page = self.client.get(self.url).content.decode()
+        self.assertNotIn('name="phone"', edit_page)
+        profile = self.client.get(reverse("students:detail", args=[self.student.pk])).content.decode()
+        self.assertNotIn("Student Phone", profile)
 
     def test_audit_records_the_old_value(self):
         from audit.models import AuditLog

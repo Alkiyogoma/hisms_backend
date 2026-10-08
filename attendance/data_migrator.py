@@ -257,7 +257,6 @@ class DataMigrator:
                                 'admission_no': mapped_data.get('admission_no', f"L{laravel_id}"),
                                 'first_name': mapped_data.get('first_name', ''),
                                 'last_name': mapped_data.get('last_name', ''),
-                                'phone': mapped_data.get('phone') or '',  # Ensure phone is never None
                                 'laravel_student_id': laravel_id,
                                 'qr_code': laravel_student.get('student_id'),  # Use student_id as QR code
                                 'status': 'active' if laravel_student.get('status') == 'active' else 'withdrawn',
