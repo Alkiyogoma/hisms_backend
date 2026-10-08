@@ -399,23 +399,61 @@ class PerSubjectApprovalTests(TestCase):
         })
         self.assertEqual(self._score("English").status, ScoreStatus.APPROVED)
 
-    def test_hod_cannot_approve_a_class_they_teach(self):
-        self._save("English", 67)
-        self._submit("English")
+    def test_hod_can_approve_a_class_they_teach_and_their_own_entries(self):
+        # The HOD teaches Grade 4 and entered the English marks themselves.
         staff = StaffProfile.objects.create(
             user=self.hod, employment_start_date=date(2024, 1, 1),
             full_name="HOD", department="PRIMARY", job_title="HOD",
         )
         TeacherClassAssignment.objects.create(
-            teacher=staff, term=self.term, grade_class=self.gc, subjects_taught=["Bible Studies"],
+            teacher=staff, term=self.term, grade_class=self.gc, subjects_taught=["English"],
         )
+        ExamScore.objects.create(
+            student=self.student, term=self.term, subject_name="English", exam_type="quiz",
+            score=Decimal("67"), entered_by=self.hod, status=ScoreStatus.SUBMITTED, is_locked=True,
+        )
+        self._save("Bible Studies", 80)
+        self._submit("Bible Studies")
+
         self.client.force_login(self.hod)
         resp = self.client.get(reverse("academics:exam_score_approval_queue"))
-        self.assertIn("You teach Grade 4", resp.context["queue_details"][0]["block_reason"])
-        self.assertNotContains(resp, 'type="checkbox" name="score_ids"')
+        self.assertTrue(all(not g["block_reason"] for g in resp.context["queue_details"]))
+        self.assertContains(resp, 'type="checkbox" name="score_ids"')
 
         self._approve("English")
-        self.assertEqual(self._score("English").status, ScoreStatus.SUBMITTED)
+        self._approve("Bible Studies")
+        own, other = self._score("English"), self._score("Bible Studies")
+        self.assertEqual((own.status, other.status), (ScoreStatus.APPROVED, ScoreStatus.APPROVED))
+        self.assertEqual(own.approved_by, self.hod)
+        self.assertIsNotNone(own.approved_at)
+        self.assertTrue(own.approver_entered)
+        self.assertFalse(other.approver_entered)
+        self.assertIn("approver also entered these marks", own.approval_note)
+        self.assertNotIn("approver also entered", other.approval_note)
+
+        from audit.models import AuditLog
+        self.assertTrue(AuditLog.objects.filter(
+            action_type="EXAM_SCORE_APPROVED", object_id=str(own.pk),
+            description__contains="approver also entered these marks",
+        ).exists())
+
+        # The note travels to the assessment page's Approved badge.
+        data = self.client.get(reverse("academics:api_primary_scores", args=[self.student.id]),
+                               {"term": self.term.id}).json()
+        self.assertIn("approver also entered", data["scores"]["English"]["quiz"]["approval_note"])
+
+    def test_head_of_school_can_approve_own_entries(self):
+        ExamScore.objects.create(
+            student=self.student, term=self.term, subject_name="English", exam_type="quiz",
+            score=Decimal("67"), entered_by=self.hos, status=ScoreStatus.SUBMITTED, is_locked=True,
+        )
+        self.client.force_login(self.hos)
+        self.client.post(reverse("academics:exam_score_approval_queue"), {
+            "action": "approve", "score_ids": [self._score("English").pk],
+        })
+        score = self._score("English")
+        self.assertEqual(score.status, ScoreStatus.APPROVED)
+        self.assertTrue(score.approver_entered)
 
     def test_hod_cannot_approve_other_department(self):
         self._save("English", 67)

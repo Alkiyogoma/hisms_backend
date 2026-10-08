@@ -3,8 +3,10 @@ Who may approve grades.
 
 Approving (and returning) submitted scores and signing off reports is limited
 to Heads of Department, the Head of School and Super Admin. Teachers can see
-the status of their own scores but never approve them, and nobody may approve
-scores for a class they teach or scores they entered themselves.
+the status of their own scores but never approve them, including for classes
+they teach. Approvers may approve everything in their scope, including scores
+they entered or classes they teach; the score then records that the approver
+also entered the marks (ExamScore.approver_entered).
 
 Role checks here are deliberate: RoleRequiredMixin grants access by
 permission alone, and teachers hold the view/change permissions they need for
@@ -47,25 +49,11 @@ def approver_class_names(user):
     return set(GradeClass.objects.filter(department__in=depts).values_list("name", flat=True))
 
 
-def taught_class_names(user, term) -> set:
-    """Classes ``user`` teaches (any subject, or as class teacher) in ``term``."""
-    from hr.models import TeacherClassAssignment
-    qs = TeacherClassAssignment.objects.filter(teacher__user=user)
-    if term is not None:
-        qs = qs.filter(term=term)
-    return set(qs.values_list("grade_class__name", flat=True))
-
-
-def approval_block_reason(user, score, taught=None) -> str:
-    """Why ``user`` may not approve ``score`` ("" when they may)."""
+def approval_block_reason(user, score) -> str:
+    """Why ``user`` may not approve ``score`` ("" when they may). Department
+    scope is applied separately (approver_class_names)."""
     if not can_approve_grades(user):
         return "Only a Head of Department or the Head of School can approve grades."
-    if score.entered_by_id == user.pk:
-        return "You entered this score, so someone else must approve it."
-    if taught is None:
-        taught = taught_class_names(user, score.term)
-    if score.student.class_name in taught:
-        return f"You teach {score.student.class_name}, so another approver must approve its grades."
     return ""
 
 

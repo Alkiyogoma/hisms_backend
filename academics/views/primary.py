@@ -625,9 +625,9 @@ class PrimaryScoreAPIView(RoleRequiredMixin, View):
         if not self._student_in_teacher_classes(request, student):
             return JsonResponse({"error": "Access denied"}, status=403)
         
-        scores = ExamScore.objects.filter(student_id=student_id, term_id=term_id).prefetch_related(
-            "amendments__changed_by"
-        )
+        scores = ExamScore.objects.filter(student_id=student_id, term_id=term_id).select_related(
+            "approved_by"
+        ).prefetch_related("amendments__changed_by")
         rc = ReportCard.objects.filter(student_id=student_id, term_id=term_id).first()
         rc_status = rc.status if rc else ReportCardStatus.DRAFT
         
@@ -643,6 +643,7 @@ class PrimaryScoreAPIView(RoleRequiredMixin, View):
                 "correction_reason": s.correction_reason or "",
                 "hod_feedback": s.hod_feedback or "",
                 "id": s.pk,
+                "approval_note": s.approval_note,
                 "amendments": [amendment_payload(a) for a in s.amendments.all()],
             }
 
@@ -1218,9 +1219,9 @@ class LowerSecondaryScoreAPIView(RoleRequiredMixin, View):
         if not self._student_in_teacher_classes(request, student):
             return JsonResponse({"error": "Access denied"}, status=403)
 
-        scores = ExamScore.objects.filter(student_id=student_id, term_id=term_id).prefetch_related(
-            "amendments__changed_by"
-        )
+        scores = ExamScore.objects.filter(student_id=student_id, term_id=term_id).select_related(
+            "approved_by"
+        ).prefetch_related("amendments__changed_by")
         rc = ReportCard.objects.filter(student_id=student_id, term_id=term_id).first()
         rc_status = rc.status if rc else ReportCardStatus.DRAFT
 
@@ -1235,6 +1236,7 @@ class LowerSecondaryScoreAPIView(RoleRequiredMixin, View):
                 "correction_reason": s.correction_reason or "",
                 "hod_feedback": s.hod_feedback or "",
                 "id": s.pk,
+                "approval_note": s.approval_note,
                 "amendments": [amendment_payload(a) for a in s.amendments.all()],
             }
 

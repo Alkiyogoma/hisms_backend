@@ -174,6 +174,7 @@
             <td>
               {% if score.status == 'approved' %}
                 <span class="chip chip-green">Approved</span>
+                {% if score.approval_note %}<div style="font-size:11px;color:var(--text-muted);margin-top:3px">{{ score.approval_note }}</div>{% endif %}
               {% elif score.status == 'returned' %}
                 <span class="chip chip-amber">Returned</span>
               {% else %}

@@ -517,7 +517,7 @@ class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
         ctx = super().get_context_data(**kwargs)
         from academics.models import ScoreStatus
         from academics.approval_policy import (
-            approval_block_reason, approver_class_names, can_approve_grades, taught_class_names,
+            approval_block_reason, approver_class_names, can_approve_grades,
         )
 
         term = get_current_term()
@@ -545,7 +545,7 @@ class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
             # Teachers: read-only sign-off status of their own subjects' scores.
             qs = ExamScore.objects.filter(
                 status__in=[ScoreStatus.SUBMITTED, ScoreStatus.APPROVED, ScoreStatus.RETURNED]
-            ).select_related("student", "entered_by")
+            ).select_related("student", "entered_by", "approved_by")
             from django.db.models import Q
             own = Q(entered_by=user)
             for class_name, info in get_teacher_assigned_classes_from_tca(user).items():
@@ -570,7 +570,6 @@ class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
         )
 
         # Build detailed entries per group
-        taught = taught_class_names(user, term) if can_approve else set()
         queue_details = []
         for item in queue_items:
             scores = list(qs.filter(
@@ -581,7 +580,7 @@ class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
             block_reason = ""
             if can_approve:
                 for sc in scores:
-                    sc.block_reason = approval_block_reason(user, sc, taught)
+                    sc.block_reason = approval_block_reason(user, sc)
                 reasons = {sc.block_reason for sc in scores}
                 if all(reasons):
                     block_reason = scores[0].block_reason if len(reasons) == 1 else "You cannot approve these scores."
@@ -631,7 +630,7 @@ class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
     def post(self, request, *args, **kwargs):
         from academics.models import ScoreStatus
         from academics.approval_policy import (
-            approval_block_reason, approver_class_names, can_approve_grades, taught_class_names,
+            approval_block_reason, approver_class_names, can_approve_grades,
         )
         from communications.email_service import dispatch_notification
         from audit.models import log_event
@@ -655,13 +654,10 @@ class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
             scores = scores.filter(student__class_name__in=scope)
         updated = 0
         blocked = {}
-        taught_by_term = {}
 
         for score in scores:
-            if score.term_id not in taught_by_term:
-                taught_by_term[score.term_id] = taught_class_names(request.user, score.term)
-            # Nobody approves or returns grades for a class they teach or scores they entered.
-            reason_blocked = approval_block_reason(request.user, score, taught_by_term[score.term_id])
+            # Approvers may approve within their scope, including their own entries.
+            reason_blocked = approval_block_reason(request.user, score)
             if reason_blocked:
                 blocked[reason_blocked] = blocked.get(reason_blocked, 0) + 1
                 continue
@@ -669,7 +665,8 @@ class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
                 score.status = ScoreStatus.APPROVED
                 score.approved_by = request.user
                 score.approved_at = timezone.now()
-                score.save(update_fields=["status", "approved_by_id", "approved_at", "updated_at"])
+                score.approver_entered = score.entered_by_id == request.user.pk
+                score.save(update_fields=["status", "approved_by_id", "approved_at", "approver_entered", "updated_at"])
 
                 # Notify the teacher who entered the score
                 if score.entered_by:
@@ -689,7 +686,10 @@ class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
                     action_type="EXAM_SCORE_APPROVED",
                     model_name="ExamScore",
                     object_id=score.pk,
-                    description=f"Score {score.score} approved for {score.student.admission_no} in {score.subject_name}",
+                    description=(
+                        f"Score {score.score} approved for {score.student.admission_no} in {score.subject_name}"
+                        + (" (approver also entered these marks)" if score.approver_entered else "")
+                    ),
                     request=request,
                 )
                 updated += 1

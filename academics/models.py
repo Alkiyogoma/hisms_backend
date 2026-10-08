@@ -753,6 +753,9 @@ class ExamScore(TimeStampedModel):
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="scores_approved"
     )
     approved_at = models.DateTimeField(null=True, blank=True)
+    approver_entered = models.BooleanField(
+        default=False, help_text="The approver also entered these marks (recorded at approval).",
+    )
     hod_feedback = models.TextField(blank=True)
 
     objects = ExamScoreQuerySet.as_manager()
@@ -799,6 +802,20 @@ class ExamScore(TimeStampedModel):
 
         if self.is_locked and not self.pk:
             raise ValidationError("Cannot create a score in locked state.")
+
+    @property
+    def approval_note(self) -> str:
+        """Sign-off record: who approved and when, and whether they also entered the marks."""
+        if self.status != ScoreStatus.APPROVED or not self.approved_by_id:
+            return ""
+        from django.utils import timezone as _tz
+        by = self.approved_by
+        note = f"Approved by {by.get_full_name() or by.username}"
+        if self.approved_at:
+            note += f", {_tz.localtime(self.approved_at):%d %b %Y %H:%M}"
+        if self.approver_entered:
+            note += " · approver also entered these marks"
+        return note
 
     def __str__(self) -> str:
         return f"{self.student_id} | {self.subject_name} | {self.exam_type} | {self.score}"
