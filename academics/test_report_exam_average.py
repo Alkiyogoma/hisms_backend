@@ -138,6 +138,18 @@ class ReportExamAverageTests(TestCase):
         rc.refresh_from_db()
         self.assertIsNone(rc.overall_average)
 
+    def test_command_leaves_published_reports_unless_asked(self):
+        from academics.models import ReportCardStatus
+        self._approve("Alg", "quiz", 83)
+        rc = ReportCard.objects.create(student=self.student, term=self.term, generated_by=self.hos,
+                                       overall_average=Decimal("51.00"), status=ReportCardStatus.PUBLISHED)
+        call_command("recalculate_report_averages", stdout=StringIO())
+        rc.refresh_from_db()
+        self.assertEqual(rc.overall_average, Decimal("51.00"))
+        call_command("recalculate_report_averages", "--include-published", stdout=StringIO())
+        rc.refresh_from_db()
+        self.assertIsNone(rc.overall_average)
+
 
 class ReportLayoutTests(TestCase):
     """Header once, admission number, photo, traits two per row, days absent,

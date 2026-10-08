@@ -44,6 +44,7 @@ from academics.models import (
     Subject,
 )
 from academics.services import generate_class_reports, sign_off_report, calculate_progression_cases
+from academics.approval_policy import ScoreEntryAccessMixin
 from academics.views.exams import amendment_payload
 from audit.models import log_event
 from students.models import Student, StudentStatus, EnrollmentHistory
@@ -397,7 +398,7 @@ class ScoreCorrectionHistoryView(RoleRequiredMixin, TemplateView):
         return ctx
 
 
-class PrimaryScoreEntryView(RoleRequiredMixin, TemplateView):
+class PrimaryScoreEntryView(ScoreEntryAccessMixin, RoleRequiredMixin, TemplateView):
     """New focused score entry view for Primary students matching ECD UI."""
     template_name = "academics/primary_score_entry.html"
     allowed_roles = [UserRole.TEACHER, UserRole.PRIMARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
@@ -515,7 +516,7 @@ class PrimaryScoreEntryView(RoleRequiredMixin, TemplateView):
             # submission or approval must not mark this teacher's work as done.
             own_scores = ExamScore.objects.filter(
                 student__class_name=selected_class, term=ctx["current_term"],
-            )
+            ).mark_bearing()
             if role == UserRole.TEACHER:
                 own_scores = own_scores.filter(subject_name__in=ctx.get("editable_subjects") or [])
             returned_student_ids = list(
@@ -598,7 +599,7 @@ class PrimaryStudentsAPIView(RoleRequiredMixin, View):
         ]
         return JsonResponse({"students": data})
 
-class PrimaryScoreAPIView(RoleRequiredMixin, View):
+class PrimaryScoreAPIView(ScoreEntryAccessMixin, RoleRequiredMixin, View):
     """API for getting/saving all primary scores for a student in a term."""
     allowed_roles = [UserRole.TEACHER, UserRole.PRIMARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
     # Viewing needs either permission (Head of School holds view only, and
@@ -1001,7 +1002,7 @@ class PrimaryBulkSubmissionAPIView(RoleRequiredMixin, View):
 # LOWER SECONDARY ASSESSMENT (Grade 7–9)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class LowerSecondaryScoreEntryView(RoleRequiredMixin, TemplateView):
+class LowerSecondaryScoreEntryView(ScoreEntryAccessMixin, RoleRequiredMixin, TemplateView):
     """Score entry view for Lower Secondary students (Grade 7–9)."""
     template_name = "academics/lower_secondary_score_entry.html"
     allowed_roles = [UserRole.TEACHER, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
@@ -1111,7 +1112,7 @@ class LowerSecondaryScoreEntryView(RoleRequiredMixin, TemplateView):
             # submission or approval must not mark this teacher's work as done.
             own_scores = ExamScore.objects.filter(
                 student__class_name=selected_class, term=ctx["current_term"],
-            )
+            ).mark_bearing()
             if role == UserRole.TEACHER:
                 own_scores = own_scores.filter(subject_name__in=ctx.get("editable_subjects") or [])
             returned_student_ids = list(
@@ -1192,7 +1193,7 @@ class LowerSecondaryStudentsAPIView(RoleRequiredMixin, View):
         return JsonResponse({"students": data})
 
 
-class LowerSecondaryScoreAPIView(RoleRequiredMixin, View):
+class LowerSecondaryScoreAPIView(ScoreEntryAccessMixin, RoleRequiredMixin, View):
     """API for getting/saving all Lower Secondary scores for a student in a term."""
     allowed_roles = [UserRole.TEACHER, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
     # Viewing needs either permission (Head of School holds view only, and

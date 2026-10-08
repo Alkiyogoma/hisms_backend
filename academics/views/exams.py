@@ -536,7 +536,7 @@ class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
             # Base queryset: submitted scores for review
             qs = ExamScore.objects.filter(
                 status=ScoreStatus.SUBMITTED
-            ).select_related("student", "entered_by")
+            ).mark_bearing().select_related("student", "entered_by")
             # FR-ACAD-011: HOD Scoping
             scope = approver_class_names(user)
             if scope is not None:
@@ -545,7 +545,7 @@ class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
             # Teachers: read-only sign-off status of their own subjects' scores.
             qs = ExamScore.objects.filter(
                 status__in=[ScoreStatus.SUBMITTED, ScoreStatus.APPROVED, ScoreStatus.RETURNED]
-            ).select_related("student", "entered_by", "approved_by")
+            ).mark_bearing().select_related("student", "entered_by", "approved_by")
             from django.db.models import Q
             own = Q(entered_by=user)
             for class_name, info in get_teacher_assigned_classes_from_tca(user).items():

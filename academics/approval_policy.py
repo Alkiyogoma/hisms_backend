@@ -66,3 +66,22 @@ class AllowedRolesEnforcedMixin:
         if user.is_authenticated and not (user.is_superuser or user.has_role(*self.allowed_roles)):
             raise PermissionDenied("Only a Head of Department or the Head of School can review and approve grades.")
         return super().dispatch(request, *args, **kwargs)
+
+
+class ScoreEntryAccessMixin:
+    """Put before RoleRequiredMixin on the score-entry pages and their APIs.
+
+    Access is what it always was (academics.change_examscore), plus the Head
+    of School, who holds view only and changes approved grades from these
+    pages. Other view-only holders (admin officers, parents) stay out.
+    """
+
+    def dispatch(self, request, *args, **kwargs):
+        user = request.user
+        if user.is_authenticated and not (
+            user.is_superuser
+            or user.has_role(UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL)
+            or user.has_perm("academics.change_examscore")
+        ):
+            raise PermissionDenied("You do not have the required permission (academics.change_examscore) for this page.")
+        return super().dispatch(request, *args, **kwargs)
