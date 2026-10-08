@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Amend {{ incident.reference }} — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Amend {{ incident.reference }}{% endblock %}
+{% block topbar_date %}{{ incident.student.first_name }} {{ incident.student.last_name }}{% endblock %}
+
+{% block content %}
+{% include "discipline/_top_tabs.html" %}
+<style>
+  .am-wrap { max-width: 900px; margin: 0 auto; }
+  .am-err { color: #DC2626; font-size: 12px; margin-top: 4px; display: block; }
+  .am-levels { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .am-level { border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+  .am-level-h { color: #fff; padding: 7px 12px; font-size: 12px; font-weight: 700; }
+  .am-level-b { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+  .am-level-b label, .am-actions label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  .am-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; font-size: 12px; }
+  .am-note { font-size: 12px; color: #475569; margin-top: 4px; padding: 6px 10px; background: #F8FAFC; border: 1px dashed #CBD5E1; border-radius: 6px; }
+  .am-reason { background: #FFF9EC; border: 1px solid #F0DFB4; border-radius: 12px; padding: 16px; margin-top: 20px; }
+  @media (max-width: 720px) {
+    .am-levels, .am-actions { grid-template-columns: 1fr; }
+  }
+</style>
+
+<div class="am-wrap">
+  <div class="card" style="padding:20px 24px">
+    <div class="card-title-row">
+      <div class="card-title">Amend {{ incident.reference }}</div>
+      <a href="{% url 'discipline:detail' incident.pk %}" class="btn-secondary btn-sm">← Back to record</a>
+    </div>
+    <p style="font-size:13px;color:#475569;margin:6px 0 16px;line-height:1.55">
+      Correct anything recorded wrongly. The previous value, the new value, your name, the time and your reason are kept and shown on the record.
+      If a copy has already gone home, print the record again after saving: the amended copy replaces it.
+      Parent contact and follow-up are kept up to date in the review section of the record.
+    </p>
+
+    {% if shared_account %}
+    <div style="background:#FFF7ED;border:1px solid #FED7AA;color:#9A3412;border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:13px">
+      You are signed in with a shared system account. An amendment must be made by a named member of staff. Sign in with your own account.
+    </div>
+    {% endif %}
+    {% if form.non_field_errors %}
+    <div style="background:#FEF2F2;border:1px solid #FECACA;color:#B91C1C;border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:13px">
+      {% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+      <div class="hf2-section">
+        <div class="hf2-section-title">Incident context</div>
+        <div class="hf2-grid-2">
+          <div class="hf2-group">
+            <label class="hf2-label" for="id_student">Student *</label>
+            <select name="student" id="id_student" class="hf2-select" required>
+              {% for value, label in form.fields.student.choices %}
+              {% if value %}<option value="{{ value }}" {% if form.student.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>{{ label }} ({{ value.instance.class_name }})</option>{% endif %}
+              {% endfor %}
+            </select>
+            {% for e in form.student.errors %}<span class="am-err">{{ e }}</span>{% endfor %}
+          </div>
+          <div class="hf2-group">
+            <label class="hf2-label" for="id_incident_date">Date of incident *</label>
+            <input type="date" name="incident_date" id="id_incident_date" class="hf2-input hf2-date" required value="{{ form.incident_date.value|date:'Y-m-d'|default:form.incident_date.value|default:'' }}">
+            {% for e in form.incident_date.errors %}<span class="am-err">{{ e }}</span>{% endfor %}
+          </div>
+          <div class="hf2-group">
+            <label class="hf2-label" for="id_time_of_incident">Time of incident</label>
+            <input type="time" name="time_of_incident" id="id_time_of_incident" class="hf2-input hf2-time" value="{{ form.time_of_incident.value|time:'H:i'|default:form.time_of_incident.value|default:'' }}">
+            {% for e in form.time_of_incident.errors %}<span class="am-err">{{ e }}</span>{% endfor %}
+          </div>
+          <div class="hf2-group">
+            <label class="hf2-label" for="id_location">Location</label>
+            <input type="text" name="location" id="id_location" class="hf2-input" maxlength="100" list="am-locations" value="{{ form.location.value|default:'' }}">
+            <datalist id="am-locations">{% for loc in locations %}<option value="{{ loc }}">{% endfor %}</datalist>
+            {% for e in form.location.errors %}<span class="am-err">{{ e }}</span>{% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <div class="hf2-section" style="margin-top:20px">
+        <div class="hf2-section-title">Type of incident</div>
+        <div class="am-levels">
+          {% with f=form.incident_level_1 %}<div class="am-level"><div class="am-level-h" style="background:#16a34a">LEVEL 1 — MINOR</div><div class="am-level-b">{% for cb in f %}<label>{{ cb.tag }} {{ cb.choice_label }}</label>{% endfor %}</div></div>{% endwith %}
+          {% with f=form.incident_level_2 %}<div class="am-level"><div class="am-level-h" style="background:#2563eb">LEVEL 2 — MODERATE</div><div class="am-level-b">{% for cb in f %}<label>{{ cb.tag }} {{ cb.choice_label }}</label>{% endfor %}</div></div>{% endwith %}
+          {% with f=form.incident_level_3 %}<div class="am-level"><div class="am-level-h" style="background:#d97706">LEVEL 3 — SERIOUS</div><div class="am-level-b">{% for cb in f %}<label>{{ cb.tag }} {{ cb.choice_label }}</label>{% endfor %}</div></div>{% endwith %}
+          {% with f=form.incident_level_4 %}<div class="am-level"><div class="am-level-h" style="background:#dc2626">LEVEL 4 — SEVERE</div><div class="am-level-b">{% for cb in f %}<label>{{ cb.tag }} {{ cb.choice_label }}</label>{% endfor %}</div></div>{% endwith %}
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:6px">The overall level is the highest level ticked.</div>
+      </div>
+
+      <div class="hf2-section" style="margin-top:20px">
+        <div class="hf2-section-title">Description and action</div>
+        <div class="hf2-group">
+          <label class="hf2-label" for="id_summary">Incident summary *</label>
+          <textarea name="summary" id="id_summary" class="hf2-textarea" rows="5" required>{{ form.summary.value|default:'' }}</textarea>
+          <div class="am-note">Do not name other learners. Describe them by class, for example &lsquo;a Grade 2 learner&rsquo;.</div>
+          {% for e in form.summary.errors %}<span class="am-err">{{ e }}</span>{% endfor %}
+        </div>
+        <div class="hf2-group" style="margin-top:14px">
+          <label class="hf2-label">Action taken by the school</label>
+          <div class="am-actions">{% for cb in form.actions_taken_detailed %}<label>{{ cb.tag }} {{ cb.choice_label }}</label>{% endfor %}</div>
+        </div>
+        <div class="hf2-group" style="margin-top:14px">
+          <label class="hf2-label" for="id_action_taken">Action details</label>
+          <textarea name="action_taken" id="id_action_taken" class="hf2-textarea" rows="3">{{ form.action_taken.value|default:'' }}</textarea>
+          {% for e in form.action_taken.errors %}<span class="am-err">{{ e }}</span>{% endfor %}
+        </div>
+      </div>
+
+      <div class="am-reason">
+        <label class="hf2-label" for="id_reason">Reason for the change *</label>
+        <textarea name="reason" id="id_reason" class="hf2-textarea" rows="3" required placeholder="e.g. Wrong date selected when the form was submitted; the incident happened the previous day.">{{ form.reason.value|default:'' }}</textarea>
+        <div style="font-size:11.5px;color:#7A808D;margin-top:4px">Required. It is shown on the record, including the copy sent home.</div>
+        {% for e in form.reason.errors %}<span class="am-err">{{ e }}</span>{% endfor %}
+      </div>
+
+      <div class="hf2-actions" style="margin-top:20px">
+        <a href="{% url 'discipline:detail' incident.pk %}" class="hf-btn hf-btn-secondary" style="margin-right:auto;text-decoration:none">Cancel</a>
+        <button type="submit" class="hf-btn hf-btn-primary" {% if shared_account %}disabled{% endif %}>Save amendment</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

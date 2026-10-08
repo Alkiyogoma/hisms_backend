@@ -46,6 +46,16 @@
 
         <form method="post" id="discipline-form" style="margin-top:16px">
           {% csrf_token %}
+          {% if shared_account %}
+          <div style="background:#FFF7ED;border:1px solid #FED7AA;color:#9A3412;border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:13px">
+            You are signed in with a shared system account. An incident must be reported by a named member of staff, so this account cannot submit it. Sign in with your own account.
+          </div>
+          {% endif %}
+          {% if form.non_field_errors %}
+          <div class="field-error" style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px 16px;margin-bottom:12px">
+            {% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}
+          </div>
+          {% endif %}
 
           <!-- Stepper -->
           <div style="display:flex;gap:10px;align-items:center;margin:10px 0 18px;flex-wrap:wrap">
@@ -72,7 +82,8 @@
               </div>
               <div class="hf2-group">
                 <label class="hf2-label">Date of Incident</label>
-                <input type="date" name="incident_date" class="hf2-input hf2-date" value="{{ today_date_iso }}" required>
+                <input type="date" name="incident_date" class="hf2-input hf2-date" value="{{ posted.incident_date|default:today_date_iso }}" max="{{ today_date_iso }}" required>
+                {% if form.incident_date.errors %}<span class="field-error">{{ form.incident_date.errors.0 }}</span>{% endif %}
               </div>
             </div>
             <div class="hf2-grid-2" style="margin-top:16px">
@@ -81,7 +92,7 @@
                 <select name="student" class="hf2-select" id="student-select" required>
                   <option value="">Select student...</option>
                   {% for s in students %}
-                    <option value="{{ s.id }}" data-class="{{ s.class_name }}">{{ s.first_name }} {{ s.last_name }} ({{ s.class_name }})</option>
+                    <option value="{{ s.id }}" data-class="{{ s.class_name }}" data-previous="{{ previous_dates|get_item:s.id|default:'' }}" {% if posted.student == s.id|stringformat:"s" %}selected{% endif %}>{{ s.first_name }} {{ s.last_name }} ({{ s.class_name }})</option>
                   {% endfor %}
                 </select>
                 {% if form.student.errors %}<span class="field-error">{{ form.student.errors.0 }}</span>{% endif %}
@@ -89,7 +100,7 @@
               </div>
               <div class="hf2-group">
                 <label class="hf2-label">Time of Incident</label>
-                <input type="time" name="time_of_incident" class="hf2-input hf2-time">
+                <input type="time" name="time_of_incident" class="hf2-input hf2-time" value="{{ posted.time_of_incident|default:'' }}">
               </div>
             </div>
             <div class="hf2-grid-2" style="margin-top:16px">
@@ -97,24 +108,15 @@
                 <label class="hf2-label">Location of Incident</label>
                 <select name="location" class="hf2-select" id="location-select" onchange="toggleOtherLocation(this)">
                   <option value="">Select location...</option>
-                  <option value="Classroom">Classroom</option>
-                  <option value="Playground">Playground</option>
-                  <option value="Hallway">Hallway</option>
-                  <option value="Cafeteria">Cafeteria</option>
-                  <option value="Library">Library</option>
-                  <option value="Sports Field">Sports Field</option>
-                  <option value="Assembly Hall">Assembly Hall</option>
-                  <option value="Bus Area">Bus Area</option>
-                  <option value="Off-campus">Off-campus</option>
-                  <option value="__other__">Other (please specify)</option>
+                  {% for loc in locations %}<option value="{{ loc }}" {% if posted.location == loc %}selected{% endif %}>{{ loc }}</option>{% endfor %}
+                  <option value="__other__" {% if posted.location == "__other__" %}selected{% endif %}>Other (please specify)</option>
                 </select>
-                <input type="text" name="location_other" class="hf2-input" id="location-other" placeholder="Enter location..." style="display:none;margin-top:6px">
+                <input type="text" name="location_other" class="hf2-input" id="location-other" placeholder="Enter location..." value="{{ posted.location_other|default:'' }}" style="display:none;margin-top:6px">
               </div>
-              <div class="hf2-group" style="display:flex;align-items:flex-end">
-                <label class="hf2-check-label" style="margin-bottom:12px">
-                  <input type="checkbox" name="previous_incidents" class="hf2-checkbox">
-                  <span>Previous incidents on record?</span>
-                </label>
+              <div class="hf2-group">
+                <label class="hf2-label">Previous incidents on record</label>
+                <div id="previous-incidents" class="hf2-input" style="background:#f8fafc;font-weight:600">Select a student</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Taken from the learner&rsquo;s own history. It cannot be changed here.</div>
               </div>
             </div>
           </div>
@@ -127,9 +129,9 @@
               <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
                 <div style="background:#16a34a;color:white;padding:8px 12px;font-size:12px;font-weight:700">LEVEL 1 - MINOR (Teacher)</div>
                 <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
-                  {% for item in "Talking out of turn,Homework not done,Lateness to class,Uniform untidy,Minor disruption,Mild disrespect,Left class no perm"|split:"," %}
+                  {% for item in behaviours.1 %}
                     <label class="hf2-check-label" style="font-size:12px">
-                      <input type="checkbox" name="level_1" value="{{ item }}" class="hf2-checkbox severity-trigger" data-severity="low">
+                      <input type="checkbox" name="level_1" value="{{ item }}" {% if item in posted_lists.level_1 %}checked{% endif %} class="hf2-checkbox severity-trigger" data-severity="low">
                       <span>{{ item }}</span>
                     </label>
                   {% endfor %}
@@ -139,9 +141,9 @@
               <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
                 <div style="background:#2563eb;color:white;padding:8px 12px;font-size:12px;font-weight:700">LEVEL 2 - MODERATE (Tchr + HOD)</div>
                 <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
-                  {% for item in "Repeated Level 1,Rudeness to staff,Verbal bullying,Cheating/Dishonesty,Minor property damage,Lying to staff,Unkind rumours"|split:"," %}
+                  {% for item in behaviours.2 %}
                     <label class="hf2-check-label" style="font-size:12px">
-                      <input type="checkbox" name="level_2" value="{{ item }}" class="hf2-checkbox severity-trigger" data-severity="medium">
+                      <input type="checkbox" name="level_2" value="{{ item }}" {% if item in posted_lists.level_2 %}checked{% endif %} class="hf2-checkbox severity-trigger" data-severity="medium">
                       <span>{{ item }}</span>
                     </label>
                   {% endfor %}
@@ -151,9 +153,9 @@
               <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
                 <div style="background:#d97706;color:white;padding:8px 12px;font-size:12px;font-weight:700">LEVEL 3 - SERIOUS (HOD + HOS)</div>
                 <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
-                  {% for item in "Persistent bullying,Physical aggression,Theft,Deliberate vandalism,Prohibited items,Sustained defiance,Inappropriate lang"|split:"," %}
+                  {% for item in behaviours.3 %}
                     <label class="hf2-check-label" style="font-size:12px">
-                      <input type="checkbox" name="level_3" value="{{ item }}" class="hf2-checkbox severity-trigger" data-severity="high">
+                      <input type="checkbox" name="level_3" value="{{ item }}" {% if item in posted_lists.level_3 %}checked{% endif %} class="hf2-checkbox severity-trigger" data-severity="high">
                       <span>{{ item }}</span>
                     </label>
                   {% endfor %}
@@ -163,24 +165,23 @@
               <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
                 <div style="background:#dc2626;color:white;padding:8px 12px;font-size:12px;font-weight:700">LEVEL 4 - SEVERE (HOS ONLY)</div>
                 <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
-                  {% for item in "Assault w/ injury,Sexual harassment,Possess weapons,Possess substances,Threatening staff,Serious theft/fraud,Repeat Level 3"|split:"," %}
+                  {% if user.role == "teacher" %}
+                  <div style="font-size:12px;color:#475569">Level 4 incidents are recorded by the Head of School. Report them to the Head of School directly.</div>
+                  {% else %}
+                  {% for item in behaviours.4 %}
                     <label class="hf2-check-label" style="font-size:12px">
-                      <input type="checkbox" name="level_4" value="{{ item }}" class="hf2-checkbox severity-trigger" data-severity="critical">
+                      <input type="checkbox" name="level_4" value="{{ item }}" {% if item in posted_lists.level_4 %}checked{% endif %} class="hf2-checkbox severity-trigger" data-severity="critical">
                       <span>{{ item }}</span>
                     </label>
                   {% endfor %}
+                  {% endif %}
                 </div>
               </div>
             </div>
             <div class="hf2-group" style="margin-top:16px">
-               <label class="hf2-label">Selected Severity (Auto-calculated)</label>
-               <select name="severity" id="severity-select" class="hf2-select" readonly style="background:#f8fafc">
-                  {% for val, lbl in severity_choices %}
-                    <option value="{{ val }}" {% if val == 'low' %}selected{% endif %}>{{ lbl }}</option>
-                  {% endfor %}
-               </select>
-               {% if form.severity.errors %}<span class="field-error">{{ form.severity.errors.0 }}</span>{% endif %}
-               <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Severity is auto-calculated based on the highest level selected above.</div>
+               <label class="hf2-label">Overall level</label>
+               <div id="severity-display" class="hf2-input" style="background:#f8fafc;font-weight:700" data-labels='{% for val, lbl in severity_choices %}{{ lbl }}{% if not forloop.last %}|{% endif %}{% endfor %}'>Level 1 — Minor</div>
+               <div style="font-size:11px;color:var(--text-muted);margin-top:3px">The overall level is the highest level ticked above. It is the only scale on the record.</div>
             </div>
           </div>
 
@@ -189,15 +190,16 @@
             <div class="hf2-section-title">Incident Description & Action Taken</div>
             <div class="hf2-group">
               <label class="hf2-label">Brief Factual Description *</label>
-              <textarea name="summary" class="hf2-textarea" rows="4" placeholder="Describe what happened clearly and factually..." required></textarea>
+              <textarea name="summary" class="hf2-textarea" rows="4" placeholder="Describe what happened clearly and factually..." required>{{ posted.summary|default:'' }}</textarea>
+              <div style="font-size:12px;color:#475569;margin-top:4px;padding:6px 10px;background:#F8FAFC;border:1px dashed #CBD5E1;border-radius:6px">Do not name other learners. Describe them by class, for example &lsquo;a Grade 2 learner&rsquo;.</div>
               {% if form.summary.errors %}<span class="field-error">{{ form.summary.errors.0 }}</span>{% endif %}
             </div>
             <div style="margin-top:20px">
               <label class="hf2-label" style="margin-bottom:12px">Immediate Action Taken (Tick all that apply)</label>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-                {% for item in "Verbal redirect,Reflection task,Merit deduction,Privilege withdrawal,Apology letter,Community service,Restorative circle,Purposeful detention,Formal written warning,Referred to HOD,Referred to HOS,In-School Suspension,Out-of-School Suspension,Parent Shadow Day"|split:"," %}
+                {% for item in school_actions %}
                   <label class="hf2-check-label" style="font-size:12px">
-                    <input type="checkbox" name="actions_detailed" value="{{ item }}" class="hf2-checkbox">
+                    <input type="checkbox" name="actions_detailed" value="{{ item }}" {% if item in posted_lists.actions_detailed %}checked{% endif %} class="hf2-checkbox">
                     <span>{{ item }}</span>
                   </label>
                 {% endfor %}
@@ -205,7 +207,7 @@
             </div>
             <div class="hf2-group" style="margin-top:16px">
               <label class="hf2-label">Additional Action Details</label>
-              <textarea name="action_taken" class="hf2-textarea" rows="2" placeholder="Any other notes on actions taken..."></textarea>
+              <textarea name="action_taken" class="hf2-textarea" rows="2" placeholder="Any other notes on actions taken...">{{ posted.action_taken|default:'' }}</textarea>
               {% if form.action_taken.errors %}<span class="field-error">{{ form.action_taken.errors.0 }}</span>{% endif %}
             </div>
           </div>
@@ -213,37 +215,55 @@
           <!-- STEP 4: PARENT CONTACT -->
           <div class="hf2-section" data-step="4" style="display:none">
             <div class="hf2-section-title">Parent Contact & Follow-up</div>
-            <div class="hf2-grid-1">
-              <div class="hf2-group hf2-check-group">
-                <label class="hf2-check-label">
-                  <input type="checkbox" name="parent_contacted" class="hf2-checkbox" id="parent_contacted">
-                  <span>Parent Contacted?</span>
-                </label>
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">Record what has actually happened. If your notes describe contact with the parent or an arranged meeting, the record will not save until these agree.</div>
+            <div class="hf2-group">
+              <label class="hf2-label">Parent contacted? *</label>
+              <div style="display:flex;gap:20px;font-size:13px">
+                <label class="hf2-check-label"><input type="radio" name="parent_contacted" value="yes" id="parent_contacted_yes" {% if posted.parent_contacted == "yes" %}checked{% endif %} required> <span>Yes</span></label>
+                <label class="hf2-check-label"><input type="radio" name="parent_contacted" value="no" {% if posted.parent_contacted == "no" %}checked{% endif %} required> <span>No, not yet</span></label>
               </div>
-              <div id="parent_contact_details" style="display:none;margin-top:16px">
-                <div class="hf2-grid-2">
-                  <div class="hf2-group">
-                    <label class="hf2-label">Contact Date</label>
-                    <input type="date" name="parent_contact_date" class="hf2-input hf2-date">
-                  </div>
-                  <div class="hf2-group">
-                    <label class="hf2-label">Contact Time</label>
-                    <input type="time" name="parent_contact_time" class="hf2-input hf2-time">
-                  </div>
-                </div>
+              {% if form.parent_contacted.errors %}<span class="field-error">{{ form.parent_contacted.errors.0 }}</span>{% endif %}
+            </div>
+            <div id="parent_contact_details" class="hf2-grid-2" style="display:none;margin-top:12px">
+              <div class="hf2-group">
+                <label class="hf2-label">Contact date *</label>
+                <input type="date" name="parent_contact_date" class="hf2-input hf2-date" value="{{ posted.parent_contact_date|default:'' }}" max="{{ today_date_iso }}">
+                {% if form.parent_contact_date.errors %}<span class="field-error">{{ form.parent_contact_date.errors.0 }}</span>{% endif %}
+              </div>
+              <div class="hf2-group">
+                <label class="hf2-label">How *</label>
+                <select name="parent_contact_method" class="hf2-select">
+                  {% for value, label in form.fields.parent_contact_method.choices %}<option value="{{ value }}" {% if posted.parent_contact_method == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                </select>
+                {% if form.parent_contact_method.errors %}<span class="field-error">{{ form.parent_contact_method.errors.0 }}</span>{% endif %}
+              </div>
+              <div class="hf2-group" style="grid-column:1 / -1">
+                <label class="hf2-label">Which parent or guardian *</label>
+                <input type="text" name="parent_contact_person" class="hf2-input" maxlength="120" placeholder="e.g. Mother, Mrs Rwamugila" value="{{ posted.parent_contact_person|default:'' }}">
+                {% if form.parent_contact_person.errors %}<span class="field-error">{{ form.parent_contact_person.errors.0 }}</span>{% endif %}
               </div>
             </div>
-            <div class="hf2-grid-1" style="margin-top:24px;padding-top:20px;border-top:1px dashed #e2e8f0">
-              <div class="hf2-group hf2-check-group">
-                <label class="hf2-check-label">
-                  <input type="checkbox" name="follow_up_required" class="hf2-checkbox" id="follow_up_required">
-                  <span>Follow-up Required?</span>
-                </label>
+            <div style="margin-top:24px;padding-top:20px;border-top:1px dashed #e2e8f0">
+              <div class="hf2-group">
+                <label class="hf2-label">Follow-up *</label>
+                <select name="follow_up" id="follow_up" class="hf2-select" required>
+                  {% for value, label in form.fields.follow_up.choices %}<option value="{{ value }}" {% if posted.follow_up == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                </select>
               </div>
-              <div id="follow_up_details" style="display:none;margin-top:16px">
+              <div id="follow_up_details" class="hf2-grid-2" style="display:none;margin-top:12px">
+                <div class="hf2-group" style="grid-column:1 / -1">
+                  <label class="hf2-label" id="follow_up_details_label">What the follow-up is</label>
+                  <input type="text" name="follow_up_details" class="hf2-input" maxlength="255" placeholder="e.g. Meeting with the mother and class teacher about this and earlier concerns" value="{{ posted.follow_up_details|default:'' }}">
+                  {% if form.follow_up_details.errors %}<span class="field-error">{{ form.follow_up_details.errors.0 }}</span>{% endif %}
+                </div>
                 <div class="hf2-group">
-                  <label class="hf2-label">Follow-up Date</label>
-                  <input type="date" name="follow_up_date" class="hf2-input hf2-date">
+                  <label class="hf2-label">Date (if known)</label>
+                  <input type="date" name="follow_up_date" class="hf2-input hf2-date" value="{{ posted.follow_up_date|default:'' }}">
+                  {% if form.follow_up_date.errors %}<span class="field-error">{{ form.follow_up_date.errors.0 }}</span>{% endif %}
+                </div>
+                <div class="hf2-group">
+                  <label class="hf2-label">Time (optional)</label>
+                  <input type="time" name="follow_up_time" class="hf2-input hf2-time" value="{{ posted.follow_up_time|default:'' }}">
                 </div>
               </div>
             </div>
@@ -281,7 +301,8 @@
         <div style="font-size:12px;color:#475569;line-height:1.6">
           <p style="margin:0 0 8px"><strong>Be factual</strong> &middot; Describe what was observed or reported, not assumptions.</p>
           <p style="margin:0 0 8px"><strong>Be specific</strong> &middot; Include times, locations, and any witnesses.</p>
-          <p style="margin:0 0 8px"><strong>Severity</strong> is auto-calculated from the incident levels selected.</p>
+          <p style="margin:0 0 8px"><strong>Do not name other learners</strong> &middot; The record is sent home. Describe them by class, for example &lsquo;a Grade 2 learner&rsquo;.</p>
+          <p style="margin:0 0 8px"><strong>Level</strong> is the highest incident level ticked.</p>
           <p style="margin:0"><strong>Critical incidents</strong> should be reported directly to the Head of School.</p>
         </div>
       </div>
@@ -303,10 +324,26 @@ function toggleOtherLocation(sel) {
 document.addEventListener('DOMContentLoaded', function() {
   const classFilterSelect = document.getElementById('class-filter-select');
   const studentSelect = document.getElementById('student-select');
-  const parentContacted = document.getElementById('parent_contacted');
   const parentContactDetails = document.getElementById('parent_contact_details');
-  const followUpRequired = document.getElementById('follow_up_required');
+  const followUpSelect = document.getElementById('follow_up');
   const followUpDetails = document.getElementById('follow_up_details');
+
+  // Contact date/method and follow-up date are only asked for, and required, when they apply.
+  function syncContactFields() {
+    const yes = document.getElementById('parent_contacted_yes').checked;
+    parentContactDetails.style.display = yes ? '' : 'none';
+    parentContactDetails.querySelectorAll('input[type="date"], select').forEach(el => { el.required = yes; });
+    parentContactDetails.querySelector('input[name="parent_contact_person"]').required = yes;
+    const arranged = followUpSelect.value !== 'none';
+    followUpDetails.style.display = arranged ? '' : 'none';
+    // "Follow-up arranged" says nothing on its own, so it needs the detail.
+    const needsDetail = followUpSelect.value === 'other';
+    followUpDetails.querySelector('input[name="follow_up_details"]').required = needsDetail;
+    document.getElementById('follow_up_details_label').textContent = 'What the follow-up is' + (needsDetail ? ' *' : ' (optional)');
+  }
+  document.querySelectorAll('input[name="parent_contacted"]').forEach(el => el.addEventListener('change', syncContactFields));
+  followUpSelect.addEventListener('change', syncContactFields);
+  syncContactFields();
 
   const form = document.getElementById('discipline-form');
   const steps = Array.from(document.querySelectorAll('[data-step]'));
@@ -317,7 +354,8 @@ document.addEventListener('DOMContentLoaded', function() {
   const reviewSummary = document.getElementById('review-summary');
   let currentStep = 1;
 
-  const severitySelect = document.getElementById('severity-select');
+  const severityDisplay = document.getElementById('severity-display');
+  const severityLabels = severityDisplay.dataset.labels.split('|');
   const severityTriggers = document.querySelectorAll('.severity-trigger');
 
   // Class filter: narrow student dropdown by selected class
@@ -332,6 +370,27 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
+  // Previous incidents: the learner's records on or before the incident date.
+  const previousBox = document.getElementById('previous-incidents');
+  const incidentDateInput = document.querySelector('#discipline-form [name="incident_date"]');
+  function formatDay(iso) {
+    const d = new Date(iso + 'T00:00:00');
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  function previousText() {
+    const opt = studentSelect.selectedIndex > 0 ? studentSelect.options[studentSelect.selectedIndex] : null;
+    if (!opt || !opt.value) return 'Select a student';
+    const upTo = incidentDateInput.value || '9999-12-31';
+    const dates = (opt.dataset.previous || '').split(',').filter(d => d && d <= upTo).sort();
+    if (!dates.length) return 'None on record';
+    return dates.length + ' previous \u2014 most recent ' + formatDay(dates[dates.length - 1]);
+  }
+  function updatePrevious() { previousBox.textContent = previousText(); }
+  studentSelect.addEventListener('change', updatePrevious);
+  incidentDateInput.addEventListener('change', updatePrevious);
+  updatePrevious();
+  toggleOtherLocation(document.getElementById('location-select'));
+
   // Auto-calculate severity based on highest level checked
   function updateSeverity() {
     const severityMap = { 'low': 1, 'medium': 2, 'high': 3, 'critical': 4 };
@@ -343,8 +402,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (level > highestLevel) highestLevel = level;
       }
     });
-    severitySelect.value = reverseMap[highestLevel];
+    severityDisplay.textContent = severityLabels[highestLevel - 1];
+    severityDisplay.dataset.value = reverseMap[highestLevel];
   }
+  updateSeverity();
   severityTriggers.forEach(trigger => {
     trigger.addEventListener('change', updateSeverity);
   });
@@ -359,6 +420,27 @@ document.addEventListener('DOMContentLoaded', function() {
   function escapeHtml(text) {
     if (text === null || text === undefined) return '-';
     return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function contactText() {
+    const f = document.getElementById('discipline-form');
+    const yes = document.getElementById('parent_contacted_yes').checked;
+    let text = 'Parent contacted: ';
+    if (yes) {
+      const how = f.querySelector('[name="parent_contact_method"]');
+      const parts = [how.selectedIndex > 0 ? how.options[how.selectedIndex].text.toLowerCase() : '',
+                     f.querySelector('[name="parent_contact_person"]').value.trim(),
+                     f.querySelector('[name="parent_contact_date"]').value];
+      text += 'Yes \u2014 ' + parts.filter(Boolean).join(', ');
+    } else {
+      text += 'No';
+    }
+    text += '. Follow-up: ';
+    if (followUpSelect.value === 'none') return text + 'Not required.';
+    const parts = [followUpSelect.options[followUpSelect.selectedIndex].text,
+                   f.querySelector('[name="follow_up_details"]').value.trim(),
+                   f.querySelector('[name="follow_up_date"]').value];
+    return text + parts.filter(Boolean).join(', ') + '.';
   }
 
   function showStep(n) {
@@ -390,9 +472,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         var severityText = '-';
         var severityVal = 'low';
-        if (severitySelect && severitySelect.selectedIndex >= 0) {
-          severityText = severitySelect.options[severitySelect.selectedIndex].text;
-          severityVal = severitySelect.value || 'low';
+        if (severityDisplay) {
+          severityText = severityDisplay.textContent;
+          severityVal = severityDisplay.dataset.value || 'low';
         }
         var details = (summaryEl && summaryEl.value) ? summaryEl.value : '';
 
@@ -413,8 +495,12 @@ document.addEventListener('DOMContentLoaded', function() {
         html += '<div style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px">';
         html += '<div><div style="font-size:11px;color:#8492A6;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Location</div>';
         html += '<div>' + escapeHtml(locVal) + '</div></div>';
-        html += '<div><div style="font-size:11px;color:#8492A6;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Severity</div>';
-        html += '<span class="chip ' + sevClass + '">' + escapeHtml(severityText) + '</span></div></div>';
+        html += '<div><div style="font-size:11px;color:#8492A6;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Level</div>';
+        html += '<span class="chip ' + sevClass + '">' + escapeHtml(severityText) + '</span></div>';
+        html += '<div><div style="font-size:11px;color:#8492A6;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Previous incidents</div>';
+        html += '<div>' + escapeHtml(previousText()) + '</div></div>';
+        html += '<div><div style="font-size:11px;color:#8492A6;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Parent contact &amp; follow-up</div>';
+        html += '<div>' + escapeHtml(contactText()) + '</div></div></div>';
 
         html += '<div style="border-top: 1px solid #DDE3EE; padding-top: 16px; margin-top: 16px">';
         html += '<div style="font-weight:700; margin-bottom:8px; font-size:14px">Incident Types</div>';
@@ -457,6 +543,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const required = Array.from(scope.querySelectorAll('[required]'));
     for (const el of required) {
       if (el.disabled) continue;
+      if (el.type === 'radio') {
+        if (!scope.querySelector(`input[name="${el.name}"]:checked`)) return false;
+        continue;
+      }
       if (el.tagName === 'SELECT' && !el.value) return false;
       if ((el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') && !String(el.value || '').trim()) return false;
     }

@@ -3,10 +3,10 @@ from datetime import date
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
-from django.db.models import Count, Q
+from django.db.models import Case, Count, F, Q, Value, When
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
-from django.views.generic import CreateView, DetailView, ListView, TemplateView, View
+from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView, View
 
 from academics.models import Department, GradeClass
 from audit.models import log_event
@@ -16,9 +16,61 @@ from core.teacher_context import get_teacher_assigned_classes
 from users.models import UserRole
 
 from students.models import Student
-from .forms import DisciplineIncidentForm, DisciplineReviewForm
-from .models import DisciplineIncident, IncidentSeverity, IncidentStatus
+from .consistency import notes_conflicts
+from .forms import (
+    CONTACT_FIELDS,
+    DisciplineAmendForm,
+    DisciplineIncidentForm,
+    DisciplineReviewForm,
+    apply_parent_contact,
+    parent_contact_initial,
+)
+from .models import (
+    INCIDENT_BEHAVIOURS,
+    LEVEL_SEVERITY,
+    LOCATIONS,
+    SCHOOL_ACTIONS,
+    DisciplineIncident,
+    IncidentAmendment,
+    IncidentSeverity,
+    IncidentStatus,
+    severity_for_levels,
+)
 
+STAFF_TITLES = {
+    UserRole.SUPER_ADMIN: "Super Admin",
+    UserRole.HEAD_OF_SCHOOL: "Head of School",
+    UserRole.PRIMARY_HOD: "Head of Primary",
+    UserRole.LOWER_SECONDARY_HOD: "Head of Lower Secondary",
+    UserRole.ECD_HOD: "Head of ECD",
+}
+
+
+def staff_name(user):
+    profile = getattr(user, "staff_profile", None)
+    return (profile.full_name if profile else "") or user.get_full_name() or user.username
+
+
+def staff_title(user):
+    """The role printed beside a member of staff's name, from their user record."""
+    return STAFF_TITLES.get(user.role) or user.get_role_display()
+
+
+def is_shared_account(user):
+    """System accounts (Django superusers) are not a named member of staff, so they
+    cannot be recorded as the person who reported or amended an incident."""
+    return user.is_superuser
+
+
+SHARED_ACCOUNT_MESSAGE = (
+    "This is a shared system account, not a named member of staff. "
+    "Sign in with your own account to record this."
+)
+
+
+def can_amend(user):
+    """The super admin and the Head of School may correct a submitted incident."""
+    return user.has_role(UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL)
 
 
 
@@ -39,6 +91,34 @@ def _heads_student_section(user, student):
     classes = hod_class_names(user)
     return classes is None or student.class_name in classes
 
+def visible_incidents(user):
+    """Incidents ``user`` may see: teachers their own reports, a head of section
+    the learners in the sections they head, school-wide staff everything."""
+    from core.scoping import hod_class_names
+    qs = DisciplineIncident.objects.select_related("student", "reported_by", "reviewed_by")
+    if user.role == UserRole.TEACHER:
+        return qs.filter(reported_by=user)
+    classes = hod_class_names(user)
+    if classes is not None:
+        qs = qs.filter(Q(student__class_name__in=classes) | Q(reported_by=user))
+    return qs
+
+
+def search_incidents(qs, text):
+    """Match a learner's name or admission number, or a reference such as DISC-12."""
+    words = text.split()
+    if not words:
+        return qs
+    names = Q()
+    for word in words:
+        names &= Q(student__first_name__icontains=word) | Q(student__last_name__icontains=word)
+    match = names | Q(student__admission_no__icontains=text.strip())
+    ref = text.strip().upper().removeprefix("DISC-").removeprefix("#")
+    if ref.isdigit():
+        match |= Q(pk=int(ref))
+    return qs.filter(match)
+
+
 class DisciplineSubmitView(DepartmentScopedMixin, RoleRequiredMixin, CreateView):
     """Teacher-facing form to submit a new discipline incident."""
     model = DisciplineIncident
@@ -58,35 +138,23 @@ class DisciplineSubmitView(DepartmentScopedMixin, RoleRequiredMixin, CreateView)
         return kwargs
 
     def form_valid(self, form):
+        if is_shared_account(self.request.user):
+            form.add_error(None, SHARED_ACCOUNT_MESSAGE)
+            return self.form_invalid(form)
         incident = form.save(commit=False)
         incident.reported_by = self.request.user
 
         # Process detailed fields from POST
-        incident.incident_date = self.request.POST.get("incident_date") or None
-        incident.time_of_incident = self.request.POST.get("time_of_incident") or None
         raw_location = self.request.POST.get("location", "").strip()
         if raw_location == "__other__":
             raw_location = self.request.POST.get("location_other", "").strip()
         incident.location = raw_location
-        incident.previous_incidents = self.request.POST.get("previous_incidents") == "on"
         incident.incident_level_1 = self.request.POST.getlist("level_1")
         incident.incident_level_2 = self.request.POST.getlist("level_2")
         incident.incident_level_3 = self.request.POST.getlist("level_3")
         incident.incident_level_4 = self.request.POST.getlist("level_4")
         incident.actions_taken_detailed = self.request.POST.getlist("actions_detailed")
-
-        # Parent contact & follow-up
-        incident.parent_contacted = self.request.POST.get("parent_contacted") == "on"
-        contact_date = self.request.POST.get("parent_contact_date")
-        contact_time = self.request.POST.get("parent_contact_time")
-        if incident.parent_contacted and contact_date and contact_time:
-            try:
-                from datetime import datetime as dt
-                incident.parent_contact_datetime = dt.strptime(f"{contact_date} {contact_time}", "%Y-%m-%d %H:%M")
-            except (ValueError, TypeError):
-                pass  # Invalid date/time format — leave field as None
-        incident.follow_up_required = self.request.POST.get("follow_up_required") == "on"
-        incident.follow_up_date = self.request.POST.get("follow_up_date") or None
+        apply_parent_contact(incident, form.cleaned_data)
 
         # Auto-escalate High severity
         if incident.severity == IncidentSeverity.HIGH:
@@ -155,6 +223,17 @@ class DisciplineSubmitView(DepartmentScopedMixin, RoleRequiredMixin, CreateView)
         ctx["severity_choices"] = IncidentSeverity.choices
         ctx["today_date"] = date.today().strftime("%d %B %Y")
         ctx["today_date_iso"] = date.today().strftime("%Y-%m-%d")
+        # Re-fill the form after a failed submit, so nothing typed is lost.
+        posted = self.request.POST if self.request.method == "POST" else None
+        ctx["posted"] = posted
+        ctx["posted_lists"] = {
+            name: posted.getlist(name) if posted else []
+            for name in ("level_1", "level_2", "level_3", "level_4", "actions_detailed")
+        }
+        ctx["behaviours"] = INCIDENT_BEHAVIOURS
+        ctx["school_actions"] = SCHOOL_ACTIONS
+        ctx["locations"] = LOCATIONS
+        ctx["shared_account"] = is_shared_account(self.request.user)
 
         # FRD: Behaviour is PRIMARY + SECONDARY only — exclude ECD department
         non_ecd_classes = self._get_non_ecd_classes()
@@ -176,6 +255,17 @@ class DisciplineSubmitView(DepartmentScopedMixin, RoleRequiredMixin, CreateView)
                 class_name__in=non_ecd_classes, is_archived=False
             ).order_by("class_name", "last_name")
 
+        # Previous incidents come from the learner's record, never from the reporter.
+        # The form counts those on or before the chosen incident date.
+        dates = {}
+        records = (
+            DisciplineIncident.objects.filter(student__in=ctx["students"])
+            .exclude(status=IncidentStatus.DISMISSED)
+            .only("student_id", "incident_date", "created_at")
+        )
+        for record in records:
+            dates.setdefault(record.student_id, []).append(record.occurred_on.isoformat())
+        ctx["previous_dates"] = {pk: ",".join(sorted(d)) for pk, d in dates.items()}
         return ctx
 
 
@@ -193,52 +283,49 @@ class DisciplineListView(DepartmentScopedMixin, RoleRequiredMixin, ListView):
     ]
     required_permission = "discipline.view_disciplineincident"
 
+    FILTERS = ("q", "status", "severity", "class_name", "student")
+
+    def scoped(self):
+        return visible_incidents(self.request.user)
+
     def get_queryset(self):
-        qs = DisciplineIncident.objects.select_related(
-            "student", "reported_by"
-        ).order_by("-created_at")
-
-        role = self.request.user.role
-
-        # Teachers see only their own reports
-        if role == UserRole.TEACHER:
-            qs = qs.filter(reported_by=self.request.user)
-
-        # Apply filters
-        status = self.request.GET.get("status")
-        if status:
-            qs = qs.filter(status=status)
-
-        severity = self.request.GET.get("severity")
-        if severity:
-            qs = qs.filter(severity=severity)
-
-        student = self.request.GET.get("student")
-        if student:
-            qs = qs.filter(student__id=student)
-
-        class_name = self.request.GET.get("class_name")
-        if class_name:
-            qs = qs.filter(student__class_name=class_name)
-
-        return qs
+        qs = self.scoped()
+        get = self.request.GET
+        if get.get("q", "").strip():
+            qs = search_incidents(qs, get["q"])
+        if get.get("status"):
+            qs = qs.filter(status=get["status"])
+        if get.get("severity"):
+            qs = qs.filter(severity=get["severity"])
+        if get.get("student", "").isdigit():
+            qs = qs.filter(student_id=get["student"])
+        if get.get("class_name"):
+            qs = qs.filter(student__class_name=get["class_name"])
+        # Newest incident first, by the date it happened.
+        return qs.annotate(amendment_count=Count("amendments")).order_by(
+            F("incident_date").desc(nulls_last=True), "-created_at"
+        )
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["discipline_tab"] = "list"
+        ctx["today_date"] = timezone.localdate().strftime("%d %B %Y")
         ctx["status_choices"] = IncidentStatus.choices
         ctx["severity_choices"] = IncidentSeverity.choices
-        ctx["current_filters"] = {
-            k: v for k, v in self.request.GET.items() if v
-        }
+        ctx["current_filters"] = {k: self.request.GET[k] for k in self.FILTERS if self.request.GET.get(k)}
+        # Keeps the filters when moving between pages.
+        query = self.request.GET.copy()
+        query.pop("page", None)
+        ctx["filter_query"] = query.urlencode()
 
-        # Stats summary
-        qs = self.get_queryset()
-        ctx["stats"] = {
-            "total": qs.count(),
-            "pending": qs.filter(status=IncidentStatus.PENDING_REVIEW).count(),
-            "resolved": qs.filter(status=IncidentStatus.RESOLVED).count(),
-        }
+        # The cards count everything this user can see, whatever is filtered below.
+        counts = self.scoped().aggregate(
+            total=Count("pk"),
+            pending=Count("pk", filter=Q(status=IncidentStatus.PENDING_REVIEW)),
+            investigating=Count("pk", filter=Q(status=IncidentStatus.UNDER_INVESTIGATION)),
+            resolved=Count("pk", filter=Q(status=IncidentStatus.RESOLVED)),
+        )
+        ctx["stats"] = counts
 
         # FRD: Behaviour list filter — Primary + Secondary only (no ECD)
         if _primary_only_head(self.request.user):
@@ -263,30 +350,55 @@ class DisciplineDetailView(RoleRequiredMixin, DetailView):
     required_permission = "discipline.view_disciplineincident"
 
     def get_queryset(self):
-        qs = super().get_queryset().select_related(
-            "student", "reported_by", "reviewed_by"
-        )
-        # Teachers can only see their own incidents
-        if self.request.user.role == UserRole.TEACHER:
-            qs = qs.filter(reported_by=self.request.user)
-        return qs
+        # Teachers see their own reports; heads of section their own sections.
+        return visible_incidents(self.request.user)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["discipline_tab"] = "detail"
-        ctx["review_form"] = DisciplineReviewForm(
-            initial={"status": self.object.status, "hod_notes": self.object.hod_notes}
-        )
+        incident = self.object
+        locked = incident.status in {IncidentStatus.RESOLVED, IncidentStatus.DISMISSED}
+        ctx["is_incident_locked"] = locked
         ctx["can_review"] = self.request.user.has_perm("discipline.can_review_incident")
-        ctx["is_incident_locked"] = self.object.status in {
-            IncidentStatus.RESOLVED,
-            IncidentStatus.DISMISSED,
-        }
+        ctx["review_form"] = kwargs.get("review_form") or DisciplineReviewForm(
+            incident=incident,
+            locked=locked,
+            initial={"status": incident.status, "hod_notes": incident.hod_notes,
+                     **parent_contact_initial(incident)},
+        )
+        ctx["reviewer_title"] = staff_title(self.request.user)
+        ctx["can_amend"] = can_amend(self.request.user)
+        ctx["amendments"] = list(incident.amendments.select_related("changed_by"))
+        for amendment in ctx["amendments"]:
+            amendment.by_name = staff_name(amendment.changed_by)
+            amendment.by_title = staff_title(amendment.changed_by)
+        ctx["last_amended"] = ctx["amendments"][-1].changed_at if ctx["amendments"] else None
+
+        earlier = incident.earlier_incidents()
+        ctx["previous_count"] = len(earlier)
+        ctx["previous_latest"] = max((i.occurred_on for i in earlier), default=None)
+
+        ctx["record_conflicts"] = notes_conflicts(
+            [incident.summary, incident.action_taken, incident.hod_notes],
+            incident.parent_contacted,
+            incident.follow_up_required,
+        )
+
+        reporter, reviewer = incident.reported_by, incident.reviewed_by
+        ctx["reporter_name"], ctx["reporter_title"] = staff_name(reporter), staff_title(reporter)
+        if reviewer:
+            ctx["reviewer_name"], ctx["reviewed_by_title"] = staff_name(reviewer), staff_title(reviewer)
+            ctx["same_reviewer"] = reviewer.pk == reporter.pk
+
+        photo = incident.student.photo_file()
+        ctx["photo_src"] = photo.url if photo else None
+        ctx["photo_checked"] = True
+        ctx["issued_on"] = timezone.localdate()
         return ctx
 
 
 class DisciplineReviewView(DepartmentScopedMixin, RoleRequiredMixin, View):
-    """HOD review action — update status and add notes."""
+    """Review action — update status and add notes."""
     allowed_roles = [
         UserRole.PRIMARY_HOD,
         UserRole.ECD_HOD,
@@ -306,63 +418,154 @@ class DisciplineReviewView(DepartmentScopedMixin, RoleRequiredMixin, View):
                 from django.core.exceptions import PermissionDenied
                 raise PermissionDenied("You can only review incidents from your own department.")
         is_locked = incident.status in {IncidentStatus.RESOLVED, IncidentStatus.DISMISSED}
+        form = DisciplineReviewForm(request.POST, incident=incident, locked=is_locked)
+        if not form.is_valid():
+            # Show the page again with the reviewer's entries and what to fix.
+            view = DisciplineDetailView()
+            view.setup(request, pk=pk)
+            view.object = view.get_object()
+            messages.error(request, "Not saved. Fix the points below and save again.")
+            return view.render_to_response(view.get_context_data(review_form=form))
+
+        contact_fields = CONTACT_FIELDS
+        before = {f: str(getattr(incident, f)) for f in ["status", "hod_notes"] + contact_fields}
+        apply_parent_contact(incident, form.cleaned_data)
 
         if is_locked:
-            comment = request.POST.get("comment", "").strip()
-            if not comment:
-                messages.error(request, "Please enter a comment.")
-                return redirect("discipline:detail", pk=pk)
-
-            before_notes = incident.hod_notes
-            incident.hod_notes = append_review_comment(incident.hod_notes, request.user, comment)
-            incident.save(update_fields=["hod_notes", "updated_at"])
-
-            log_event(
-                actor=request.user,
-                action_type="discipline_incident_comment_added",
-                model_name="DisciplineIncident",
-                object_id=incident.pk,
-                description=f"Comment added on closed discipline incident for {incident.student}",
-                before={"hod_notes": before_notes},
-                after={"hod_notes": incident.hod_notes},
-                request=request,
+            incident.hod_notes = append_review_comment(
+                incident.hod_notes, request.user, form.cleaned_data["comment"]
             )
-            messages.success(request, "Comment added.")
-            return redirect("discipline:detail", pk=pk)
-
-        form = DisciplineReviewForm(request.POST)
-
-        if form.is_valid():
-            before_status = incident.status
+            incident.save(update_fields=["hod_notes", *contact_fields, "updated_at"])
+            action, description, done = (
+                "discipline_incident_comment_added",
+                f"Comment added on closed discipline incident for {incident.student}",
+                "Comment added.",
+            )
+        else:
             incident.status = form.cleaned_data["status"]
             incident.hod_notes = form.cleaned_data.get("hod_notes", "")
             incident.reviewed_by = request.user
             incident.reviewed_at = timezone.now()
             incident.save(update_fields=[
-                "status", "hod_notes", "reviewed_by", "reviewed_at", "updated_at"
+                "status", "hod_notes", "reviewed_by", "reviewed_at", *contact_fields, "updated_at"
             ])
-
-            # Log to audit trail
-            log_event(
-                actor=request.user,
-                action_type="discipline_incident_reviewed",
-                model_name="DisciplineIncident",
-                object_id=incident.pk,
-                description=f"HOD review for {incident.student}: {incident.get_status_display()}",
-                before={"status": before_status},
-                after={"status": incident.status, "hod_notes": incident.hod_notes[:200]},
-                request=request,
+            action, description, done = (
+                "discipline_incident_reviewed",
+                f"Review for {incident.student}: {incident.get_status_display()}",
+                f"{incident.reference} marked as {incident.get_status_display()}.",
             )
 
-            messages.success(request, f"Incident #{incident.pk} marked as {incident.get_status_display()}.")
-        else:
-            messages.error(request, "Invalid review submission.")
-
+        log_event(
+            actor=request.user,
+            action_type=action,
+            model_name="DisciplineIncident",
+            object_id=incident.pk,
+            description=description,
+            before=before,
+            after={f: str(getattr(incident, f)) for f in before},
+            request=request,
+        )
+        messages.success(request, done)
         return redirect("discipline:detail", pk=pk)
 
 
+def _amend_values(incident):
+    """Each amendable field as people read it: (label, value, is_free_text)."""
+    def joined(items):
+        return ", ".join(items) if items else "None"
+
+    values = [
+        ("Student", f"{incident.student.first_name} {incident.student.last_name} ({incident.student.class_name})", False),
+        ("Date of incident", f"{incident.incident_date.day} {incident.incident_date:%B %Y}" if incident.incident_date else "Not recorded", False),
+        ("Time of incident", f"{incident.time_of_incident:%H:%M}" if incident.time_of_incident else "Not recorded", False),
+        ("Location", incident.location or "Not recorded", False),
+        ("Level", incident.get_severity_display(), False),
+    ]
+    for n in range(1, 5):
+        values.append((f"Level {n} behaviours", joined(getattr(incident, f"incident_level_{n}")), False))
+    values += [
+        ("Actions taken", joined(incident.actions_taken_detailed), False),
+        ("Incident summary", incident.summary, True),
+        ("Action details", incident.action_taken or "None", True),
+    ]
+    return values
+
+
+class DisciplineAmendView(RoleRequiredMixin, UpdateView):
+    """Correct a submitted incident. The reason, the previous and new values, who
+    changed it and when are kept and shown on the record."""
+    model = DisciplineIncident
+    form_class = DisciplineAmendForm
+    template_name = "discipline/amend.html"
+    context_object_name = "incident"
+    allowed_roles = [UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
+    required_permission = "discipline.view_disciplineincident"
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and not can_amend(request.user):
+            raise PermissionDenied("Only the super admin and the Head of School can amend an incident.")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return super().get_queryset().select_related("student")
+
+    def get_form(self, form_class=None):
+        # Snapshot the record before the form writes the new values onto it.
+        self.before = _amend_values(self.get_object())
+        return super().get_form(form_class)
+
+    def form_valid(self, form):
+        if is_shared_account(self.request.user):
+            form.add_error(None, SHARED_ACCOUNT_MESSAGE)
+            return self.form_invalid(form)
+        incident = form.save(commit=False)
+        incident.severity = severity_for_levels(form.ticked_levels())
+        if incident.severity in (IncidentSeverity.HIGH, IncidentSeverity.CRITICAL):
+            incident.escalated = True
+        changes = [
+            {"field": label, "before": old, "after": new, "text": text}
+            for (label, old, text), (_, new, _) in zip(self.before, _amend_values(incident))
+            if old != new
+        ]
+        if not changes:
+            form.add_error(None, "Nothing has been changed, so there is nothing to save.")
+            return self.form_invalid(form)
+        incident.save()
+        reason = form.cleaned_data["reason"]
+        IncidentAmendment.objects.create(
+            incident=incident, changed_by=self.request.user, reason=reason, changes=changes,
+        )
+        log_event(
+            actor=self.request.user,
+            action_type="discipline_incident_amended",
+            model_name="DisciplineIncident",
+            object_id=incident.pk,
+            description=f"{incident.reference} amended: {reason[:200]}",
+            before={c["field"]: c["before"] for c in changes},
+            after={c["field"]: c["after"] for c in changes},
+            request=self.request,
+        )
+        messages.success(
+            self.request,
+            f"{incident.reference} amended. If a copy has already gone home, print this record "
+            "and send it again: it replaces the earlier copy.",
+        )
+        return redirect("discipline:detail", pk=incident.pk)
+
+    def form_invalid(self, form):
+        messages.error(self.request, "Not saved. Fix the points below and save again.")
+        return super().form_invalid(form)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["discipline_tab"] = "detail"
+        ctx["locations"] = LOCATIONS
+        ctx["shared_account"] = is_shared_account(self.request.user)
+        return ctx
+
+
 class DisciplineHODQueueView(DepartmentScopedMixin, RoleRequiredMixin, TemplateView):
-    """Dedicated HOD approval queue showing pending incidents for their department."""
+    """Incidents awaiting review by whoever is responsible for the learner's section."""
     template_name = "discipline/hod_queue.html"
     allowed_roles = [
         UserRole.PRIMARY_HOD,
@@ -374,6 +577,7 @@ class DisciplineHODQueueView(DepartmentScopedMixin, RoleRequiredMixin, TemplateV
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["discipline_tab"] = "queue"
+        ctx["today_date"] = timezone.localdate().strftime("%d %B %Y")
 
         # FRD: Behaviour is Primary + Secondary only — exclude ECD
         if _primary_only_head(self.request.user):
@@ -381,18 +585,22 @@ class DisciplineHODQueueView(DepartmentScopedMixin, RoleRequiredMixin, TemplateV
         else:
             classes = self._get_non_ecd_classes()
 
-        # Pending incidents
-        pending = DisciplineIncident.objects.filter(
+        # Pending incidents, most serious first (severity is text, so rank it).
+        rank = Case(
+            *[When(severity=sev, then=Value(level)) for level, sev in LEVEL_SEVERITY.items()],
+            default=Value(0),
+        )
+        pending = visible_incidents(self.request.user).filter(
             student__class_name__in=list(classes),
             status=IncidentStatus.PENDING_REVIEW,
-        ).select_related("student", "reported_by").order_by("-severity", "-created_at")
+        ).order_by(rank.desc(), F("incident_date").desc(nulls_last=True), "-created_at")
 
         ctx["pending_incidents"] = pending
         ctx["pending_count"] = pending.count()
 
         # Stats
         ctx["stats"] = {
-            "total": DisciplineIncident.objects.filter(
+            "total": visible_incidents(self.request.user).filter(
                 student__class_name__in=list(classes)
             ).count(),
             "pending": pending.count(),
