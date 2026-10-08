@@ -232,7 +232,7 @@ class TaskDashboardView(RoleRequiredMixin, TemplateView):
                 ('communications', 'Communications'),
                 ('hr', 'HR'),
             ]
-        elif role in (UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.TEACHER):
+        elif user.has_role(UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD) or role == UserRole.TEACHER:
             allowed_categories = [
                 ('academics', 'Academics'),
                 ('welfare', 'Welfare'),

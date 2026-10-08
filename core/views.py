@@ -2553,7 +2553,7 @@ class BulkImportView(RoleRequiredMixin, TemplateView):
         role = getattr(self.request.user, 'role', None)
         ctx["is_admin_officer"] = role == UserRole.ADMIN_OFFICER
         ctx["is_head_of_school"] = role == UserRole.HEAD_OF_SCHOOL
-        ctx["is_hod"] = role in {UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD}
+        ctx["is_hod"] = self.request.user.has_role(UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD)
         if self.request.user.has_perm("academics.view_gradeclass"):
             from academics.models import GradeClass as _GC
             ctx["classes_count"] = _GC.objects.count()

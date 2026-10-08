@@ -235,8 +235,10 @@ class GradeClassListView(RoleRequiredMixin, View):
             UserRole.ECD_HOD: Department.ECD,
             UserRole.LOWER_SECONDARY_HOD: Department.LOWER_SECONDARY,
         }
-        if request.user.role in HOD_DEPT_MAP:
-            classes = classes.filter(department=HOD_DEPT_MAP[request.user.role])
+        # Every section a user heads (e.g. Head of Primary and of Lower Secondary).
+        if not request.user.is_school_wide and request.user.has_role(*HOD_DEPT_MAP):
+            classes = classes.filter(department__in=request.user.section_departments
+                                     or [HOD_DEPT_MAP[r] for r in HOD_DEPT_MAP if request.user.has_role(r)])
         return render(request, self.template_name, {"classes": classes, "edit_class": None, "departments": Department.choices})
 
     def post(self, request, *args, **kwargs):

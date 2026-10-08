@@ -474,23 +474,24 @@ def _export_students_for_user(user):
     from students.models import Student
 
     qs = Student.objects.filter(is_archived=False).order_by("class_name", "last_name")
-    role = getattr(user, "role", None)
-    if role in (UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL):
+    if user.is_school_wide:
         return qs
-    if role == UserRole.PRIMARY_HOD:
-        names = grade_class_names_for_department(Department.PRIMARY)
-        return qs.filter(class_name__in=names)
-    if role == UserRole.ECD_HOD:
-        names = grade_class_names_for_department(Department.ECD)
-        return qs.filter(class_name__in=names)
-    return Student.objects.none()
+    # Union of every section role held (e.g. Primary and ECD head).
+    names = set()
+    if user.has_role(UserRole.PRIMARY_HOD):
+        names |= set(grade_class_names_for_department(Department.PRIMARY))
+    if user.has_role(UserRole.ECD_HOD):
+        names |= set(grade_class_names_for_department(Department.ECD))
+    return qs.filter(class_name__in=names) if names else Student.objects.none()
 
 
 def _ecd_api_class_allowed(request, class_name: str) -> bool:
     if not (class_name or "").strip():
         return False
     role = request.user.role
-    if role in (UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN):
+    if request.user.is_school_wide:
+        return True
+    if request.user.has_role(UserRole.ECD_HOD) and class_name in grade_class_names_for_department(Department.ECD):
         return True
     if role == UserRole.TEACHER:
         from timetable.models import TimetableSlot
