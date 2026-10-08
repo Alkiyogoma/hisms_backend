@@ -399,6 +399,7 @@ def _build_report_card_context(report):
         "rate": row.get("rate"),
     }
     ctx["photo_src"] = _photo_data_uri(report.student)
+    ctx["photo_checked"] = True
     ctx["reopens_on"] = _reopens_on(term)
     ctx["class_teacher"] = _class_teacher_name(report)
 

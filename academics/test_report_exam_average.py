@@ -213,6 +213,37 @@ class ReportLayoutTests(TestCase):
         page = self._preview()
         self.assertIn('src="data:image/png;base64,', page)
 
+    def test_profile_photo_on_report_and_progress_report(self):
+        from django.core.files.base import ContentFile
+        self.student.photo.save("joan.jpg", ContentFile(b"\xff\xd8\xff\xe0fakejpeg"), save=True)
+        self.assertIn('src="data:image/jpeg;base64,', self._preview())
+        page = self.client.get(reverse("academics:learner_report", args=[self.student.pk]),
+                               {"term": self.term.pk}).content.decode()
+        self.assertIn('src="data:image/jpeg;base64,', page)
+
+    def test_missing_photo_file_falls_back_never_broken_image(self):
+        from django.core.files.base import ContentFile
+        from admissions.models import Applicant, ApplicantDocumentReceipt, ApplicantDocumentType
+        self.student.photo.name = "students/photos/gone.jpg"  # record exists, file does not
+        self.student.save(update_fields=["photo"])
+        page = self._preview()
+        self.assertIn("No Photo", page)
+        self.assertNotIn("gone.jpg", page)
+        applicant = Applicant.objects.create(
+            child_full_name="Joan Namunga", parent_full_name="Parent", parent_phone="0700000000",
+            grade_applying_for="Grade 5", enrolled_student=self.student,
+        )
+        doc = ApplicantDocumentReceipt(applicant=applicant, document_type=ApplicantDocumentType.STUDENT_PHOTO)
+        doc.file.save("joan.png", ContentFile(b"\x89PNG\r\n\x1a\nfake"), save=True)
+        self.assertIn('src="data:image/png;base64,', self._preview())
+
+    def test_ecd_report_shows_admission_number(self):
+        self.rc.is_ecd_report = True
+        self.rc.ecd_template_type = "kindergarten"
+        self.rc.save(update_fields=["is_ecd_report", "ecd_template_type"])
+        page = self._preview()
+        self.assertIn("ADM-2026-065", page)
+
     def test_days_absent_counts_school_days_only(self):
         from attendance.models import AttendanceEntry, AttendanceStatus
         today = timezone.localdate()

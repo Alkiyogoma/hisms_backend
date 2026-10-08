@@ -188,12 +188,16 @@
         <value>{{ student.get_full_name }}</value>
       </div>
       <div class="field">
+        <label>Admission No</label>
+        <value>{{ student.admission_no|default:"—" }}</value>
+      </div>
+      <div class="field">
         <label>Class</label>
         <value>{{ student.class_name }}</value>
       </div>
       <div class="field">
         <label>Class Teacher</label>
-        <value>{{ report.generated_by.get_full_name|default:report.generated_by.username }}</value>
+        <value>{{ class_teacher|default:"—" }}</value>
       </div>
     </div>
 

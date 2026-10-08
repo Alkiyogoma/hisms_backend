@@ -14,6 +14,8 @@
     </div>
     {% if photo_src %}
         <img src="{{ photo_src }}" alt="Student" class="student-photo">
+    {% elif photo_checked %}
+        <div class="student-photo" style="display: flex; align-items: center; justify-content: center; border: 1px solid #ccc; color: #aaa; font-family: Arial;">No Photo</div>
     {% elif student and student.photo %}
         <img src="{{ student.photo.url }}" alt="Student" class="student-photo">
     {% elif student and student.image %}
