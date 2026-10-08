@@ -467,6 +467,7 @@ async function loadStudent(id) {
                    renderAmend(subject, type, d.scores[subject][type], d.can_amend);
                    if (badge) {
                        badge.className = 'score-status-badge';
+                       badge.title = d.scores[subject][type].approval_note || '';
                        if (sc === 'approved') { badge.classList.add('badge-approved'); badge.textContent = 'Approved'; }
                        else if (sc === 'returned') { badge.classList.add('badge-returned'); badge.textContent = 'Returned'; }
                    }
@@ -603,6 +604,7 @@ async function reloadScores() {
                   renderAmend(subject, type, d.scores[subject][type], d.can_amend);
                   if (badge) {
                       badge.className = 'score-status-badge';
+                      badge.title = d.scores[subject][type].approval_note || '';
                       if (sc === 'approved') { badge.classList.add('badge-approved'); badge.textContent = 'Approved'; }
                       else if (sc === 'returned') { badge.classList.add('badge-returned'); badge.textContent = 'Returned'; }
                   }

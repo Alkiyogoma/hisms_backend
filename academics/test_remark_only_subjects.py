@@ -188,3 +188,49 @@ class RemarkOnlySubjectTests(TestCase):
         ).content.decode()
         self.assertIn("Subjects assessed by remark", page)
         self.assertIn("Outstanding", page)
+
+    # ── found in review: access and leftover-mark edge cases ─────────
+
+    def test_view_only_roles_do_not_reach_score_pages(self):
+        for role in (UserRole.PARENT, UserRole.ADMIN_OFFICER):
+            user = User.objects.create_user(username=f"u_{role}", email=f"{role}@example.test",
+                                            password="x", role=role)
+            assign_role_group(user)
+            self.assertTrue(user.has_perm("academics.view_examscore"), role)
+            self.client.force_login(user)
+            for url in (reverse("academics:primary_assessment"), reverse("academics:lower_secondary_assessment"),
+                        reverse("academics:api_primary_scores", args=[self.student.id])):
+                self.assertNotEqual(self.client.get(url, {"term": self.term.id}).status_code, 200, (role, url))
+        hos = User.objects.create_user(username="hos2", email="hos2@example.test", password="x",
+                                       role=UserRole.HEAD_OF_SCHOOL)
+        assign_role_group(hos)
+        self.client.force_login(hos)
+        self.assertEqual(self.client.get(reverse("academics:primary_assessment")).status_code, 200)
+        self.client.force_login(self.teacher)
+        self.assertEqual(self.client.get(reverse("academics:primary_assessment")).status_code, 200)
+
+    def test_leftover_marks_on_remark_subject_never_block(self):
+        from academics.services import sign_off_report
+        ExamScore.objects.create(
+            student=self.student, term=self.term, subject_name="Zoology", exam_type="quiz",
+            score=Decimal("70"), entered_by=self.teacher, status=ScoreStatus.APPROVED, is_locked=True,
+        )
+        # Entered before the subject became remark-only, then returned.
+        ExamScore.objects.create(
+            student=self.student, term=self.term, subject_name="Choir", exam_type="quiz",
+            score=Decimal("10"), entered_by=self.teacher, status=ScoreStatus.RETURNED,
+        )
+        self.client.force_login(self.admin)
+        queue = self.client.get(reverse("academics:exam_score_approval_queue"))
+        self.assertNotIn("Choir", {g["subject_name"] for g in queue.context["queue_details"]})
+
+        rc = ReportCard.objects.create(student=self.student, term=self.term, generated_by=self.admin,
+                                       teacher_comments="x" * 60, status=ReportCardStatus.PENDING_SIGN_OFF)
+        from django.core.exceptions import ValidationError
+        with self.assertRaisesMessage(ValidationError, "no term remark yet for: Choir"):
+            sign_off_report(rc, self.admin)
+        SubjectTermRemark.objects.create(student=self.student, term=self.term, subject_name="Choir",
+                                         remark="Good", entered_by=self.teacher)
+        sign_off_report(rc, self.admin)
+        rc.refresh_from_db()
+        self.assertEqual(rc.status, ReportCardStatus.PUBLISHED)

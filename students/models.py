@@ -95,18 +95,23 @@ class Student(TimeStampedModel):
 
     def photo_file(self):
         """The learner's photograph: the one uploaded on the profile, else the
-        passport photo from their admission application. None when there is none."""
-        if self.photo:
-            return self.photo
-        if self.image:
-            return self.image
+        passport photo from their admission application. Files whose record
+        exists but which are missing from storage are skipped. None if none."""
+        def usable(f):
+            if not f:
+                return False
+            try:
+                return f.storage.exists(f.name)
+            except Exception:
+                return False
+
+        candidates = [self.photo, self.image]
         applicant = getattr(self, "from_applicant", None) if self.pk else None
-        if applicant is None:
-            return None
-        if applicant.photo:
-            return applicant.photo
-        doc = applicant.documents.filter(document_type="student_photo").exclude(file="").first()
-        return doc.file if doc and doc.file else None
+        if applicant is not None:
+            candidates.append(applicant.photo)
+            candidates += [d.file for d in applicant.documents.filter(document_type="student_photo")
+                           .exclude(file="")]
+        return next((f for f in candidates if usable(f)), None)
 
     def get_full_name(self) -> str:
         return f"{self.first_name} {self.last_name}"

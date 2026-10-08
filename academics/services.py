@@ -42,10 +42,11 @@ def generate_class_reports(term_id, class_name, user):
         else:
             # FR-ACAD-014: Check that all submitted exam scores are approved before generating
             from academics.models import ScoreStatus
+            # Remark-only subjects take no marks; leftover marks on them never block.
             pending_scores = ExamScore.objects.filter(
                 student=student, term=term,
                 status__in=[ScoreStatus.SUBMITTED, ScoreStatus.RETURNED]
-            )
+            ).mark_bearing()
             if pending_scores.exists():
                 # Skip this student — scores not yet approved by HOD
                 continue
@@ -130,7 +131,7 @@ def sign_off_report(report_card, user):
             student=report_card.student,
             term=report_card.term,
             status__in=[ScoreStatus.SUBMITTED, ScoreStatus.RETURNED],
-        )
+        ).mark_bearing()  # leftover marks on remark-only subjects never block
         if pending_review.exists():
             pending_subjects = pending_review.values_list("subject_name", flat=True).distinct()
             raise ValidationError(
@@ -142,14 +143,24 @@ def sign_off_report(report_card, user):
         # A report is complete only when every subject has approved scores.
         from academics.score_progress import student_progress
         progress = student_progress(report_card.student, report_card.term)
+        missing_remarks = sorted(
+            name for name, info in progress["subjects"].items()
+            if info.get("remark_only") and info["status"] != ScoreStatus.APPROVED
+        )
         missing = sorted(
             name for name, info in progress["subjects"].items()
-            if info["status"] != ScoreStatus.APPROVED and info["approved_average"] is None
+            if not info.get("remark_only")
+            and info["status"] != ScoreStatus.APPROVED and info["approved_average"] is None
         )
+        gaps = []
         if missing:
+            gaps.append(f"no approved scores yet for: {', '.join(missing)}")
+        if missing_remarks:
+            gaps.append(f"no term remark yet for: {', '.join(missing_remarks)}")
+        if gaps:
             raise ValidationError(
                 f"Cannot sign off: {report_card.student.first_name}'s report is incomplete — "
-                f"no approved scores yet for: {', '.join(missing)}."
+                + "; ".join(gaps) + "."
             )
 
     # Validation gate: ECD mandatory comments

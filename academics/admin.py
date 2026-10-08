@@ -125,10 +125,11 @@ class ExamScoreAmendmentInline(admin.TabularInline):
 @admin.register(ExamScore)
 class ExamScoreAdmin(admin.ModelAdmin):
     inlines = [ExamScoreAmendmentInline]
-    list_display = ("student", "term", "subject_name", "exam_type", "score", "status", "entered_by")
+    list_display = ("student", "term", "subject_name", "exam_type", "score", "status", "entered_by",
+                    "approved_by", "approved_at", "approver_entered")
     list_filter = ("status", "exam_type", "term", "subject_name")
     search_fields = ("student__admission_no", "student__first_name", "student__last_name", "subject_name")
-    readonly_fields = ("entered_by", "created_at", "updated_at")
+    readonly_fields = ("entered_by", "approved_by", "approved_at", "approver_entered", "created_at", "updated_at")
     
     def get_queryset(self, request):
         qs = super().get_queryset(request)

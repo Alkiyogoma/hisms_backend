@@ -4,15 +4,18 @@ Recalculate the stored exam average on report cards.
 Usage:
   python manage.py recalculate_report_averages --dry-run
   python manage.py recalculate_report_averages [--term=<term_id>]
+  python manage.py recalculate_report_averages --include-published
 
 The average counts approved, mark-bearing subjects only and is cleared
 (None) while a term's assessments are incomplete. Run once after deploying
 that rule so reports saved under the old calculation (which averaged partial
 marks and remark-only subjects) are corrected. ECD reports are skipped.
+Published reports have been issued to parents, so they are left alone
+unless --include-published is given.
 """
 from django.core.management.base import BaseCommand
 
-from academics.models import ReportCard
+from academics.models import ReportCard, ReportCardStatus
 from academics.score_progress import exam_summary
 
 
@@ -22,11 +25,15 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--term", type=int, help="Only reports for this term id.")
         parser.add_argument("--dry-run", action="store_true", help="Show changes without saving.")
+        parser.add_argument("--include-published", action="store_true",
+                            help="Also correct reports already published to parents.")
 
     def handle(self, *args, **options):
         reports = ReportCard.objects.filter(is_ecd_report=False).select_related("student", "term")
         if options["term"]:
             reports = reports.filter(term_id=options["term"])
+        if not options["include_published"]:
+            reports = reports.exclude(status=ReportCardStatus.PUBLISHED)
         changed = 0
         for rc in reports:
             new = exam_summary(rc.student, rc.term)["average"]
