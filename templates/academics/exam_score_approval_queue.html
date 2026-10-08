@@ -45,7 +45,7 @@
 {% endif %}
 {% if not queue_details %}
   {% if can_approve %}
-  {% include '_partials/empty_state.html' with icon='check' title='All Clear' desc='No scores pending HOD review for this term.' cta_url='academics:analytics' cta_label='View Analytics Dashboard' %}
+  {% include '_partials/empty_state.html' with icon='check' title='All Clear' desc='No scores pending HOD review for this term.' cta_url='academics:performance_report' cta_label='View Performance Report' %}
   {% else %}
   {% include '_partials/empty_state.html' with icon='check' title='Nothing submitted yet' desc='Scores you submit to the HOD will appear here with their sign-off status.' %}
   {% endif %}

@@ -142,11 +142,20 @@
   </div>
 
   <div class="kpis">
-    <div class="kpi avg"><span>Average</span><b>{% if summary.average is not None %}{{ summary.average }}%{% else %}—{% endif %}</b><small>{{ summary.count }} result{{ summary.count|pluralize }}{% if summary.average_grade %} &middot; grade {{ summary.average_grade }}{% endif %}</small></div>
-    <div class="kpi pass"><span>Pass rate</span><b>{% if summary.pass_rate is not None %}{{ summary.pass_rate }}%{% else %}—{% endif %}</b><small>at {{ pass_mark }}% or above</small></div>
-    <div class="kpi supp"><span>Requires support (D)</span><b>{{ summary.flagged }}</b><small>results {{ critical_mark }}&ndash;{{ pass_mark|add:-1 }}%</small></div>
-    <div class="kpi crit"><span>Critical (E)</span><b>{{ summary.critical }}</b><small>results below {{ critical_mark }}%</small></div>
+    <div class="kpi avg"><span>Average result</span><b>{% if summary.average is not None %}{{ summary.average }}%{% else %}—{% endif %}</b><small>mean of {{ summary.count }} result{{ summary.count|pluralize }} from {{ summary.learners }} student{{ summary.learners|pluralize }}{% if summary.average_grade %} &middot; grade {{ summary.average_grade }}{% endif %}</small></div>
+    <div class="kpi pass"><span>Pass rate &middot; results</span><b>{% if summary.pass_rate is not None %}{{ summary.pass_rate }}%{% else %}—{% endif %}</b><small>{{ summary.passed }} of {{ summary.count }} results at {{ pass_mark }}%+</small></div>
+    <div class="kpi supp"><span>Results at D</span><b>{{ summary.flagged }}</b><small>{{ critical_mark }}&ndash;{{ pass_mark|add:-1 }}%, from {{ summary.flagged_learners }} student{{ summary.flagged_learners|pluralize }}</small></div>
+    <div class="kpi crit"><span>Results at E</span><b>{{ summary.critical }}</b><small>below {{ critical_mark }}%, from {{ summary.critical_learners }} student{{ summary.critical_learners|pluralize }}</small></div>
   </div>
+  <p class="lead">A result is one student&rsquo;s mark in one subject.</p>
+
+  {% if grade_dist.total %}
+  <h2>Grade distribution <small>{% if dist_by == 'learner' %}{{ grade_dist.total }} students, by average across subjects{% else %}{{ grade_dist.total }} subject results{% endif %}</small></h2>
+  <table class="t">
+    <thead><tr>{% for g in grade_dist.grades %}<th class="r">{{ g.grade }}</th>{% endfor %}</tr></thead>
+    <tbody><tr>{% for g in grade_dist.grades %}<td class="r mono">{{ g.count }} <small>({{ g.pct }}%)</small></td>{% endfor %}</tr></tbody>
+  </table>
+  {% endif %}
 
   {% if not scope.pairs and scope.kind == 'teacher' %}
     <div class="empty">You are not assigned to any class or subject for this term, so there is nothing to report.</div>
@@ -219,7 +228,7 @@
     <div>
       <h2>3. Subjects ranked <small>{{ selected_class|default:"all classes" }}</small></h2>
       <table class="t bars">
-        <thead><tr><th>Subject</th><th>Average</th><th class="r">%</th><th class="r">Below pass</th></tr></thead>
+        <thead><tr><th>Subject</th><th>Average</th><th class="r">%</th><th class="r">Results below pass</th></tr></thead>
         <tbody>
         {% for s in ranking %}
           <tr><td>{{ s.name }}</td><td><div class="bar"><i class="f-{{ s.band }}" style="width:{{ s.average|floatformat:0 }}%"></i><u style="left:{{ pass_mark }}%"></u></div></td>

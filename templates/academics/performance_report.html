@@ -131,6 +131,8 @@
   .pr-grid2 .pr-card { margin-bottom:0; }
   .pr-bar { display:grid; grid-template-columns:minmax(80px,130px) 1fr 58px 150px; align-items:center; gap:12px; padding:8px 0; }
   .pr-bar.compact { grid-template-columns:minmax(80px,150px) 1fr 58px; }
+  .pr-bar.pr-dist { grid-template-columns:56px 1fr 52px 120px; }
+  .pr-countnote { font-size:12px; color:var(--pr-muted); margin:-6px 0 18px; }
   .pr-bar .nm { font-size:13.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-decoration:none; }
   a.nm:hover { color:var(--hodari-blue); text-decoration:underline; }
   .pr-bar.sel .nm { color:var(--hodari-blue); }
@@ -172,6 +174,7 @@
     .pr-stat { padding:13px 14px; } .pr-stat .num { font-size:24px; }
     .pr-bar { grid-template-columns:80px 1fr 52px; } .pr-bar .n { display:none; }
     .pr-bar.compact { grid-template-columns:90px 1fr 52px; }
+    .pr-bar.pr-dist { grid-template-columns:48px 1fr 44px; }
     .pr-search input { width:100%; } .pr-search, .pr-tools-r { width:100%; }
     .pr-hide-sm { display:none; }
     .pr-card { padding:14px; }
@@ -275,30 +278,55 @@
 <!-- summary -->
 <div class="pr-stats">
   <div class="pr-stat s-avg">
-    <div class="lab">Average</div>
+    <div class="lab">Average result</div>
     <div class="row">
       <div class="num">{% if summary.average is not None %}{{ summary.average }}<em>%</em>{% else %}&mdash;{% endif %}</div>
       {% if summary.average_grade %}<span class="pr-g g-{% if summary.average_grade == 'A+' %}Ap{% else %}{{ summary.average_grade }}{% endif %}">{{ summary.average_grade }}</span>{% endif %}
     </div>
-    <div class="sub">{{ summary.count }} result{{ summary.count|pluralize }} &middot; {{ summary.learners }} student{{ summary.learners|pluralize }}</div>
+    <div class="sub">Mean of {{ summary.count }} subject result{{ summary.count|pluralize }} from {{ summary.learners }} student{{ summary.learners|pluralize }}</div>
   </div>
   <div class="pr-stat s-pass">
-    <div class="lab">Pass rate</div>
+    <div class="lab">Pass rate &middot; results</div>
     <div class="row"><div class="num">{% if summary.pass_rate is not None %}{{ summary.pass_rate }}<em>%</em>{% else %}&mdash;{% endif %}</div></div>
     <div class="pr-meter"><span style="width:{{ summary.pass_rate|default:0|floatformat:0 }}%"></span></div>
-    <div class="sub">Results at {{ pass_mark }}% (grade C) or above</div>
+    <div class="sub">{{ summary.passed }} of {{ summary.count }} result{{ summary.count|pluralize }} at {{ pass_mark }}% (grade C) or above</div>
   </div>
   <a class="pr-stat s-flag{% if view == 'help' and show == 'support' %} on{% endif %}" href="{% querystring view='help' show='support' page=None %}">
-    <div class="lab">Requires support &middot; D</div>
+    <div class="lab">Results at D &middot; requires support</div>
     <div class="row"><div class="num">{{ summary.flagged }}</div></div>
-    <div class="sub">Results {{ critical_mark }}&ndash;{{ pass_mark|add:-1 }}% &middot; <span class="go">View &rarr;</span></div>
+    <div class="sub">{{ critical_mark }}&ndash;{{ pass_mark|add:-1 }}%, from {{ summary.flagged_learners }} student{{ summary.flagged_learners|pluralize }} &middot; <span class="go">View &rarr;</span></div>
   </a>
   <a class="pr-stat s-crit{% if view == 'help' and show == 'critical' %} on{% endif %}" href="{% querystring view='help' show='critical' page=None %}">
-    <div class="lab">Critical &middot; E</div>
+    <div class="lab">Results at E &middot; critical</div>
     <div class="row"><div class="num">{{ summary.critical }}</div></div>
-    <div class="sub">Below {{ critical_mark }}%, act now &middot; <span class="go">View &rarr;</span></div>
+    <div class="sub">Below {{ critical_mark }}%, from {{ summary.critical_learners }} student{{ summary.critical_learners|pluralize }} &middot; <span class="go">View &rarr;</span></div>
   </a>
 </div>
+<div class="pr-countnote">A <b>result</b> is one student&rsquo;s mark in one subject, so a student with three weak subjects adds three results but one student.</div>
+
+<!-- grade distribution -->
+{% if grade_dist.total %}
+<section class="pr-card">
+  <div class="pr-card-h">
+    <div>
+      <div class="pr-card-t">Grade distribution</div>
+      <div class="pr-card-s">{% if dist_by == 'learner' %}Counts {{ grade_dist.total }} student{{ grade_dist.total|pluralize }}, each graded on their average across {% if selected_subject %}{{ selected_subject }}{% else %}the subjects in view{% endif %}.{% else %}Counts {{ grade_dist.total }} subject result{{ grade_dist.total|pluralize }} (one per student per subject).{% endif %}</div>
+    </div>
+    <div class="pr-seg" role="group" aria-label="What the chart counts">
+      <a class="{% if dist_by == 'result' %}on{% endif %}" href="{% querystring dist=None %}">Results</a>
+      <a class="{% if dist_by == 'learner' %}on{% endif %}" href="{% querystring dist='learner' %}">Students</a>
+    </div>
+  </div>
+  {% for g in grade_dist.grades %}
+    <div class="pr-bar compact pr-dist">
+      <div class="nm"><span class="pr-g g-{% if g.grade == 'A+' %}Ap{% else %}{{ g.grade }}{% endif %}">{{ g.grade }}</span></div>
+      <div class="track"><div class="fill f-{{ g.band }}" style="width:{{ g.width }}%"></div></div>
+      <div class="v">{{ g.count }}</div>
+      <div class="n">{{ g.pct }}% of {% if dist_by == 'learner' %}students{% else %}results{% endif %}</div>
+    </div>
+  {% endfor %}
+</section>
+{% endif %}
 
 <!-- view tabs -->
 <nav class="pr-tabs" aria-label="Report view">
@@ -322,7 +350,7 @@
   <div class="pr-toolbar">
     <div class="pr-chips">
       {% for key, label, count in show_options %}
-        <a class="pr-chip{% if show == key %} on{% endif %}" href="{% querystring show=key page=None %}">{{ label }}<span class="ct">{{ count }}</span></a>
+        <a class="pr-chip{% if show == key %} on{% endif %}" href="{% querystring show=key page=None %}" title="{{ count }} {% if group == 'learner' %}student{{ count|pluralize }}{% else %}result{{ count|pluralize }}{% endif %}">{{ label }}<span class="ct">{{ count }}</span></a>
       {% endfor %}
     </div>
     <form method="get" class="pr-search" role="search">
@@ -419,9 +447,10 @@
       <div class="pr-bar compact{% if s.name == focus_subject %} sel{% endif %}">
         {% if selected_subject %}<div class="nm" title="{{ s.name }}">{{ s.name }}</div>{% else %}<a class="nm" href="{% querystring focus=s.name %}" title="Compare {{ s.name }} across classes">{{ s.name }}</a>{% endif %}
         <div class="track"><div class="fill f-{{ s.band }}" style="width:{{ s.average|floatformat:0 }}%"></div><span class="pass" style="left:{{ pass_mark }}%"></span></div>
-        <div class="v t-{{ s.band }}">{{ s.average }}%</div>
+        <div class="v t-{{ s.band }}" title="Average of {{ s.results }} result{{ s.results|pluralize }}">{{ s.average }}%</div>
       </div>
     {% endfor %}
+    <div class="pr-foot">Each bar is the average of that subject&rsquo;s results (one per student).</div>
   </section>
 </div>
 
@@ -430,7 +459,7 @@
   <div class="pr-card-h">
     <div>
       <div class="pr-card-t">Class &times; subject averages</div>
-      <div class="pr-card-s">Read across a row to see a class; down a column to see a subject.{% if selected_class %} {{ selected_class }} is outlined.{% endif %}</div>
+      <div class="pr-card-s">Each cell averages subject results, one per student. Read across a row to see a class; down a column to see a subject.{% if selected_class %} {{ selected_class }} is outlined.{% endif %}</div>
     </div>
   </div>
   <div class="pr-scroll">

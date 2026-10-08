@@ -15,12 +15,6 @@ class ReportsDashboardView(RoleRequiredMixin, TemplateView):
         # Add quick links to different reporting areas
         context["report_categories"] = [
             {
-                "title": "Academic Reports",
-                "icon": "book-open",
-                "description": "Grading, assessment performance, and class analytics.",
-                "url": "academics:analytics",
-            },
-            {
                 "title": "Performance Report",
                 "icon": "trending-up",
                 "description": "Who needs help, and how subjects perform across classes.",

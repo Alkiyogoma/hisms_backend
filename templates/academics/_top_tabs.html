@@ -30,7 +30,7 @@
   <a href="{% url 'academics:hos_signoff_list' %}" class="sub-tab {% if academics_tab == 'hos_signoff' %}active{% endif %}">HOS Sign-Off</a>
   {% endif %}
   {% if can_hos_signoff %}
-  <a href="{% url 'academics:analytics' %}" class="sub-tab {% if academics_tab == 'analytics' %}active{% endif %}">Analytics</a>
+  <a href="{% url 'academics:performance_report' %}" class="sub-tab {% if academics_tab == 'performance' %}active{% endif %}">Performance Report</a>
   {% endif %}
   {% if perms.academics.view_progressionconfig %}
   <a href="{% url 'academics:progression_config_list' %}" class="sub-tab {% if academics_tab == 'progression' %}active{% endif %}">Settings</a>

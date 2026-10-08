@@ -156,7 +156,10 @@ class AssignSecondSectionRoleTests(TestCase):
         esther = self._set_extra_roles(UserRole.LOWER_SECONDARY_HOD)
         self.assertEqual(_analytics_scope(esther), (UserRole.HEAD_OF_SCHOOL, None))
         self.client.force_login(esther)
-        self.assertEqual(self.client.get(reverse("academics:analytics")).context["dept_name"], "Whole School")
+        scope = self.client.get(reverse("academics:performance_report")).context["scope"]
+        self.assertEqual(scope.kind, "section")
+        self.assertIn("Primary", scope.label)
+        self.assertIn("Lower Secondary", scope.label)
 
     def test_hod_user_list_spans_both_sections(self):
         from hr.models import StaffProfile

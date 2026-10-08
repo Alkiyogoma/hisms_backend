@@ -191,20 +191,20 @@
 
   <div class="card" style="margin-bottom:14px">
     <div class="card-title-row">
-      <a href="{% url 'academics:analytics' %}" class="card-title" style="margin-bottom:0;text-decoration:none;color:inherit">Progression expectation status &nearr;</a>
+      <a href="{% url 'academics:progression_hod_review' %}" class="card-title" style="margin-bottom:0;text-decoration:none;color:inherit">Progression expectation status &nearr;</a>
       <span class="chip chip-red">{{ progression.not_meet }} Does Not Meet</span>
     </div>
     
     <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:10px 0 14px">
-      <a href="{% url 'academics:analytics' %}" style="background:#E8F5EC;border:1px solid #B7DFBF;border-radius:8px;padding:12px;text-align:center;text-decoration:none;display:block">
+      <a href="{% url 'academics:progression_hod_review' %}" style="background:#E8F5EC;border:1px solid #B7DFBF;border-radius:8px;padding:12px;text-align:center;text-decoration:none;display:block">
         <div style="font-size:22px;font-weight:700;color:#1B7B34;font-family:monospace">{{ progression.meets }}</div>
         <div style="font-size:10.5px;color:#1B7B34;font-weight:600;margin-top:2px">Meets expectation</div>
       </a>
-      <a href="{% url 'academics:analytics' %}" style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:12px;text-align:center;text-decoration:none;display:block">
+      <a href="{% url 'academics:progression_hod_review' %}" style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:12px;text-align:center;text-decoration:none;display:block">
         <div style="font-size:22px;font-weight:700;color:#92550A;font-family:monospace">{{ progression.towards }}</div>
         <div style="font-size:10.5px;color:#92550A;font-weight:600;margin-top:2px">Working towards</div>
       </a>
-      <a href="{% url 'academics:analytics' %}" style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:12px;text-align:center;text-decoration:none;display:block">
+      <a href="{% url 'academics:progression_hod_review' %}" style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:12px;text-align:center;text-decoration:none;display:block">
         <div style="font-size:22px;font-weight:700;color:#9B1C1C;font-family:monospace">{{ progression.not_meet }}</div>
         <div style="font-size:10.5px;color:#9B1C1C;font-weight:600;margin-top:2px">Does not meet</div>
       </a>

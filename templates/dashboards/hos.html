@@ -68,7 +68,7 @@
   <div class="card" style="border-left:4px solid var(--hodari-blue);margin:0;display:flex;flex-direction:column;justify-content:center">
     <div class="card-title-row" style="padding:0 0 6px 0">
       <span class="card-title" style="margin-bottom:0;font-size:13px">Performance pulse &middot; {{ term_label }}</span>
-      <a href="{% url 'academics:analytics' %}" class="section-link" style="font-size:11px">Full analytics &rarr;</a>
+      <a href="{% url 'academics:performance_report' %}" class="section-link" style="font-size:11px">Performance Report &rarr;</a>
     </div>
     <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px">
       <div style="text-align:center">
@@ -402,7 +402,7 @@
   </div>
   {% if at_risk_students|length > 12 %}
   <div style="text-align:center;padding:12px 0 4px">
-    <a href="{% url 'academics:analytics' %}" class="section-link">View all {{ at_risk_students|length }} flagged students &rarr;</a>
+    <a href="{% url 'academics:at_risk_list' %}" class="section-link">View all {{ at_risk_students|length }} flagged students &rarr;</a>
   </div>
   {% endif %}
 </div>

@@ -264,11 +264,39 @@ def summarise(results):
         "learners": len({r["student_id"] for r in results}),
         "average": round(sum(marks) / n, 1) if n else None,
         "average_grade": get_grade_from_score(sum(marks) / n) if n else None,
+        "passed": sum(1 for m in marks if m >= PASS_MARK),
         "pass_rate": round(sum(1 for m in marks if m >= PASS_MARK) / n * 100, 1) if n else None,
         "flagged": sum(1 for r in results if r["band"] == "support"),
         "critical": sum(1 for r in results if r["band"] == "critical"),
         "below_pass": sum(1 for r in results if needs_help(r["band"])),
         "learners_below_pass": len({r["student_id"] for r in results if needs_help(r["band"])}),
+        "flagged_learners": len({r["student_id"] for r in results if r["band"] == "support"}),
+        "critical_learners": len({r["student_id"] for r in results if r["band"] == "critical"}),
+    }
+
+
+GRADES = ("A+", "A", "B", "C", "D", "E")
+GRADE_BANDS = {"A+": "strong", "A": "strong", "B": "strong", "C": "pass", "D": "support", "E": "critical"}
+
+
+def grade_distribution(rows):
+    """How many of ``rows`` fall in each grade, best first. ``rows`` are
+    either subject results or learner rows (``learner_summary``), so the
+    caller decides — and labels — what is being counted."""
+    total = len(rows)
+    counts = {g: 0 for g in GRADES}
+    for r in rows:
+        counts[get_grade_from_score(r["mark"])] += 1
+    top = max(counts.values()) if total else 0
+    return {
+        "total": total,
+        "grades": [{
+            "grade": g,
+            "count": counts[g],
+            "pct": round(counts[g] / total * 100, 1) if total else 0,
+            "width": round(counts[g] / top * 100) if top else 0,
+            "band": GRADE_BANDS[g],
+        } for g in GRADES],
     }
 
 
