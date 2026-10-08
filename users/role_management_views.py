@@ -754,10 +754,14 @@ class UserExtraRolesView(RoleRequiredMixin, View):
 
         target.extra_roles.set(valid_roles.filter(pk__in=role_ids))
 
-        # Sync group memberships for extra roles
+        # Sync group memberships for extra roles. The group of the user's main
+        # role is never touched here: removing it would strip the main role's
+        # permissions (e.g. a Head of Primary given Head of Lower Secondary).
         for rc in valid_roles:
             # System roles use role_<role_value>, custom roles use role_custom_<pk>
             grp_name = f"role_{rc.role}" if rc.is_system else f"role_custom_{rc.pk}"
+            if rc.is_system and rc.role == target.role:
+                continue
             grp, _ = Group.objects.get_or_create(name=grp_name)
             if rc.pk in new_roles:
                 grp.user_set.add(target)

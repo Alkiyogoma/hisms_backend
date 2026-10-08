@@ -116,7 +116,7 @@ class StudentListView(RoleRequiredMixin, ListView):
 
         # FR-STU-001 / NFR-SEC-004: HODs only see students in their department(s)
         hod_roles = {UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD}
-        if self.request.user.role in hod_roles:
+        if self.request.user.has_role(*hod_roles) and not self.request.user.is_school_wide:
             my_depts = _hod_departments(self.request.user)
             if my_depts:
                 from academics.models import GradeClass
@@ -183,7 +183,8 @@ class StudentListView(RoleRequiredMixin, ListView):
         from academics.models import Department, GradeClass
         # Scope filter dropdowns to the user's allowed departments (DB/UI-configurable)
         hod_roles = {UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD}
-        allowed_depts = _hod_departments(self.request.user) if self.request.user.role in hod_roles else None
+        allowed_depts = (_hod_departments(self.request.user)
+                         if self.request.user.has_role(*hod_roles) and not self.request.user.is_school_wide else None)
         ctx["departments"] = (
             [(k, v) for (k, v) in Department.choices if k in allowed_depts]
             if allowed_depts else Department.choices

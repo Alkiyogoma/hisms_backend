@@ -742,7 +742,7 @@ class UserListView(RoleRequiredMixin, ListView):
 
         hod_roles = {UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD}
 
-        if self.request.user.role in hod_roles:
+        if self.request.user.has_role(*hod_roles) and not self.request.user.is_school_wide:
 
             my_dept = getattr(
 
@@ -750,9 +750,18 @@ class UserListView(RoleRequiredMixin, ListView):
 
             )
 
+            # Every section the user heads, plus their own staff department.
+            depts = set(self.request.user.section_departments)
             if my_dept:
+                depts.add(my_dept)
 
-                qs = qs.filter(staff_profile__department=my_dept)
+            if depts:
+
+                from django.db.models import Q
+                dept_q = Q()
+                for d in depts:
+                    dept_q |= Q(staff_profile__department__iexact=d)
+                qs = qs.filter(dept_q)
 
 
 

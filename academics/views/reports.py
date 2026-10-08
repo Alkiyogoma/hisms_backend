@@ -103,7 +103,8 @@ class ReportRouterView(RoleRequiredMixin, View):
         role = request.user.role
         if role == UserRole.PARENT:
             return redirect("academics:parent_reports")
-        elif role in {UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD}:
+        elif request.user.has_role(UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN, UserRole.PRIMARY_HOD,
+                                   UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD):
             return redirect("academics:analytics")
         elif role == UserRole.TEACHER:
             return redirect("academics:exam_scores_entry")
@@ -285,6 +286,29 @@ def _remark_rows(student, term):
     remarks = remarks_for(student, term)
     names = remark_subject_names(expected_subjects_for_class(student.class_name) | set(remarks))
     return [(name, remarks.get(name, "")) for name in sorted(names)]
+
+
+def _analytics_scope(user):
+    """(role_for_analytics, departments) for the analytics and at-risk views.
+
+    A user holding several section roles sees the union of what each role
+    sees on its own: Head of Primary -> Primary, ECD Head -> ECD; Head of
+    Lower Secondary, Head of School and Super Admin have always seen the
+    whole school (departments None). role_for_analytics keeps the existing
+    single-section paths (ECD uses ratings, not exam scores).
+    """
+    if user.is_school_wide or user.has_role(UserRole.LOWER_SECONDARY_HOD):
+        return UserRole.HEAD_OF_SCHOOL, None
+    depts = []
+    if user.has_role(UserRole.PRIMARY_HOD):
+        depts.append(Department.PRIMARY)
+    if user.has_role(UserRole.ECD_HOD):
+        depts.append(Department.ECD)
+    if depts == [Department.PRIMARY]:
+        return UserRole.PRIMARY_HOD, depts
+    if depts == [Department.ECD]:
+        return UserRole.ECD_HOD, depts
+    return (UserRole.HEAD_OF_SCHOOL, depts) if depts else (user.role, None)
 
 
 def _reopens_on(term):
@@ -1082,10 +1106,9 @@ class AcademicAnalyticsView(RoleRequiredMixin, TemplateView):
         # Completion stats
         completion_stats = []
         tracking_classes = GradeClass.objects.all()
-        if role == UserRole.PRIMARY_HOD:
-            tracking_classes = GradeClass.objects.filter(department=Department.PRIMARY)
-        elif role == UserRole.ECD_HOD:
-            tracking_classes = GradeClass.objects.filter(department=Department.ECD)
+        scope_depts = getattr(self, "_scope_depts", None)
+        if scope_depts:
+            tracking_classes = GradeClass.objects.filter(department__in=scope_depts)
             
         for cls in tracking_classes:
             cls_total = Student.objects.filter(class_name=cls.name, is_archived=False).count()
@@ -1230,27 +1253,24 @@ class AcademicAnalyticsView(RoleRequiredMixin, TemplateView):
         compare_mode = self.request.GET.get("compare", "") == "1"
         ctx["compare_mode"] = compare_mode
         
-        # 0. Department Scoping for HODs
-        role = self.request.user.role
+        # 0. Department Scoping for HODs (union across every section role held)
+        role, scope_depts = _analytics_scope(self.request.user)
+        self._scope_depts = scope_depts
         dept_filter = Q()
-        
-        if role == UserRole.PRIMARY_HOD:
-            primary_classes = GradeClass.objects.filter(department=Department.PRIMARY).values_list('name', flat=True)
-            dept_filter = Q(student__class_name__in=primary_classes)
-            ctx["dept_name"] = "Primary"
-        elif role == UserRole.ECD_HOD:
-            ecd_classes = GradeClass.objects.filter(department=Department.ECD).values_list('name', flat=True)
-            dept_filter = Q(student__class_name__in=ecd_classes)
-            ctx["dept_name"] = "ECD"
-            ctx["is_ecd_analytics"] = True
+        scope_classes = None
+        if scope_depts:
+            scope_classes = list(GradeClass.objects.filter(department__in=scope_depts).values_list('name', flat=True))
+            dept_filter = Q(student__class_name__in=scope_classes)
+            labels = dict(Department.choices)
+            ctx["dept_name"] = " & ".join(labels.get(d, d) for d in scope_depts)
+            if role == UserRole.ECD_HOD:
+                ctx["is_ecd_analytics"] = True
         else:
             ctx["dept_name"] = "Whole School"
 
         # Determine available classes for tabs
-        if role == UserRole.PRIMARY_HOD:
-            available_classes = GradeClass.objects.filter(department=Department.PRIMARY).values_list('name', flat=True).order_by('name')
-        elif role == UserRole.ECD_HOD:
-            available_classes = GradeClass.objects.filter(department=Department.ECD).values_list('name', flat=True).order_by('name')
+        if scope_depts:
+            available_classes = GradeClass.objects.filter(department__in=scope_depts).values_list('name', flat=True).order_by('name')
         else:
             available_classes = GradeClass.objects.all().values_list('name', flat=True).order_by('name')
         all_available = list(available_classes)
@@ -1278,12 +1298,9 @@ class AcademicAnalyticsView(RoleRequiredMixin, TemplateView):
             ctx.update(term_data)
             
             # Total enrolled students across scoped classes
-            if role == UserRole.PRIMARY_HOD:
-                enrolled_qs = Student.objects.filter(is_archived=False, class_name__in=primary_classes)
-            elif role == UserRole.ECD_HOD:
-                enrolled_qs = Student.objects.filter(is_archived=False, class_name__in=ecd_classes)
-            else:
-                enrolled_qs = Student.objects.filter(is_archived=False)
+            enrolled_qs = Student.objects.filter(is_archived=False)
+            if scope_classes is not None:
+                enrolled_qs = enrolled_qs.filter(class_name__in=scope_classes)
             ctx["total_enrolled_count"] = enrolled_qs.count()
 
             # Comparison: compute analytics for the current term too
@@ -1310,14 +1327,12 @@ class AtRiskStudentsListView(RoleRequiredMixin, TemplateView):
         term = get_current_term()
         ctx["current_term"] = term
         
-        role = self.request.user.role
+        # Union across every section role held (see _analytics_scope).
+        role, scope_depts = _analytics_scope(self.request.user)
         dept_filter = Q()
-        if role == UserRole.PRIMARY_HOD:
-            primary_classes = GradeClass.objects.filter(department=Department.PRIMARY).values_list('name', flat=True)
-            dept_filter = Q(student__class_name__in=primary_classes)
-        elif role == UserRole.ECD_HOD:
-            ecd_classes = GradeClass.objects.filter(department=Department.ECD).values_list('name', flat=True)
-            dept_filter = Q(student__class_name__in=ecd_classes)
+        if scope_depts:
+            scope_classes = GradeClass.objects.filter(department__in=scope_depts).values_list('name', flat=True)
+            dept_filter = Q(student__class_name__in=scope_classes)
 
         if term:
             # -- ECD At-Risk Path (uses ECDEvaluation ratings) --
