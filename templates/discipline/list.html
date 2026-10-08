@@ -19,64 +19,90 @@
   </div>
 </div>
 
+<style>
+  .dl-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+  .dl-filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+  .dl-filters .form-select { width: auto; min-width: 130px; }
+  .dl-search { flex: 1 1 220px; min-width: 180px; max-width: 320px; }
+  .dl-row { display: flex; align-items: center; gap: 14px; text-decoration: none; color: inherit; }
+  .dl-ref { font-size: 11px; font-weight: 700; color: #64748B; letter-spacing: .02em; }
+  .dl-meta { font-size: 11.5px; color: #94A3B8; margin-top: 3px; }
+  .dl-side { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+  .dl-date { font-size: 12px; color: #475569; font-weight: 600; white-space: nowrap; min-width: 82px; text-align: right; }
+  .dl-count { font-size: 12px; color: #64748B; margin: -6px 0 10px; }
+  @media (max-width: 900px) { .dl-stats { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 640px) {
+    .dl-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .dl-side { justify-content: flex-start; }
+    .dl-date { text-align: left; min-width: 0; order: -1; }
+    .dl-filters .form-select, .dl-search { flex: 1 1 100%; max-width: none; }
+  }
+</style>
+
 <!-- Stats Overview -->
-<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px">
-  {% include '_partials/stat_card.html' with label='Pending Review' value=stats.pending sub='Awaiting HOD action' variant='red' link='?status=pending_review' %}
+<div class="dl-stats">
+  {% include '_partials/stat_card.html' with label='Pending Review' value=stats.pending sub='Awaiting review' variant='red' link='?status=pending_review' %}
+  {% include '_partials/stat_card.html' with label='Under Investigation' value=stats.investigating sub='Review in progress' variant='amber' link='?status=under_investigation' %}
   {% include '_partials/stat_card.html' with label='Resolved' value=stats.resolved sub='Closed incidents' variant='green' link='?status=resolved' %}
   {% include '_partials/stat_card.html' with label='Total Reported' value=stats.total sub='All time' variant='blue' link='?' %}
 </div>
 
 <!-- Filters -->
-<form method="get" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
-  <select name="status" class="form-select" style="width:auto;min-width:140px">
+<form method="get" class="dl-filters">
+  <input type="search" name="q" value="{{ current_filters.q|default:'' }}" class="form-input dl-search" placeholder="Search learner, admission no. or DISC-…" aria-label="Search incidents">
+  <select name="status" class="form-select" aria-label="Status">
     <option value="">All statuses</option>
     {% for val, lbl in status_choices %}
       <option value="{{ val }}" {% if current_filters.status == val %}selected{% endif %}>{{ lbl }}</option>
     {% endfor %}
   </select>
-  <select name="severity" class="form-select" style="width:auto;min-width:120px">
-    <option value="">All severities</option>
+  <select name="severity" class="form-select" aria-label="Level">
+    <option value="">All levels</option>
     {% for val, lbl in severity_choices %}
       <option value="{{ val }}" {% if current_filters.severity == val %}selected{% endif %}>{{ lbl }}</option>
     {% endfor %}
   </select>
-  <select name="class_name" class="form-select" style="width:auto;min-width:120px">
+  <select name="class_name" class="form-select" aria-label="Class">
     <option value="">All classes</option>
     {% for c in available_classes %}
       <option value="{{ c }}" {% if current_filters.class_name == c %}selected{% endif %}>{{ c }}</option>
     {% endfor %}
   </select>
+  {% if current_filters.student %}<input type="hidden" name="student" value="{{ current_filters.student }}">{% endif %}
   <button type="submit" class="hf-btn hf-btn-secondary" style="padding:6px 14px;font-size:12px">Filter</button>
   {% if current_filters %}
     <a href="{% url 'discipline:list' %}" class="section-link" style="font-size:12px">Clear filters</a>
   {% endif %}
 </form>
 
+{% if current_filters %}<div class="dl-count">{{ paginator.count }} incident{{ paginator.count|pluralize }} match{{ paginator.count|pluralize:"es," }} these filters.</div>{% endif %}
+
 <!-- Incidents List -->
 <div class="card">
   {% for inc in incidents %}
-    <a href="{% url 'discipline:detail' inc.pk %}" class="trow" style="text-decoration:none;color:inherit;display:flex;align-items:center">
+    <a href="{% url 'discipline:detail' inc.pk %}" class="trow dl-row">
       <div style="flex:1;min-width:0">
+        <div class="dl-ref">{{ inc.reference }}</div>
         <div class="trow-name">
           {{ inc.student.first_name }} {{ inc.student.last_name }}
           <span style="font-weight:400;color:#64748B">&middot; {{ inc.student.class_name }}</span>
         </div>
-        <div class="trow-sub">
-          {{ inc.summary|truncatechars:100 }}
-        </div>
+        <div class="trow-sub">{{ inc.summary|truncatechars:110 }}</div>
+        <div class="dl-meta">Reported by {{ inc.reported_by.get_full_name|default:inc.reported_by.username }}{% if inc.location %} &middot; {{ inc.location }}{% endif %}</div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-        <span class="chip {% if inc.severity == 'critical' or inc.severity == 'high' %}chip-red{% elif inc.severity == 'medium' %}chip-amber{% else %}chip-blue{% endif %}" style="font-size:10px">
-          {{ inc.get_severity_display }}
-        </span>
-        <span class="chip {% if inc.status == 'pending_review' %}chip-amber{% elif inc.status == 'resolved' %}chip-green{% elif inc.status == 'dismissed' %}chip-grey{% else %}chip-blue{% endif %}" style="font-size:10px">
-          {{ inc.get_status_display }}
-        </span>
-        <span style="font-size:11px;color:#94A3B8;white-space:nowrap">{{ inc.created_at|date:"d M" }}</span>
+      <div class="dl-side">
+        {% if inc.amendment_count %}<span class="chip chip-grey" style="font-size:10px" title="Corrected after it was submitted">Amended</span>{% endif %}
+        <span class="chip {% if inc.severity == 'critical' or inc.severity == 'high' %}chip-red{% elif inc.severity == 'medium' %}chip-amber{% else %}chip-blue{% endif %}" style="font-size:10px">{{ inc.get_severity_display }}</span>
+        <span class="chip {% if inc.status == 'pending_review' %}chip-amber{% elif inc.status == 'resolved' %}chip-green{% elif inc.status == 'dismissed' %}chip-grey{% else %}chip-blue{% endif %}" style="font-size:10px">{{ inc.get_status_display }}</span>
+        <span class="dl-date" title="Date of incident">{{ inc.occurred_on|date:"j M Y" }}</span>
       </div>
     </a>
   {% empty %}
-    {% include '_partials/empty_state.html' with icon='alert' icon_color='blue' title='No behaviour incidents yet' desc='Record an incident to get started.' action_url='/behaviour/submit/' action_text='+ Record Incident' %}
+    {% if current_filters %}
+      {% include '_partials/empty_state.html' with icon='alert' icon_color='blue' title='No incidents match' desc='Try a different search or clear the filters.' %}
+    {% else %}
+      {% include '_partials/empty_state.html' with icon='alert' icon_color='blue' title='No behaviour incidents yet' desc='Record an incident to get started.' action_url='/behaviour/submit/' action_text='+ Record Incident' %}
+    {% endif %}
   {% endfor %}
 </div>
 
@@ -84,11 +110,11 @@
 {% if page_obj.has_other_pages %}
 <div style="display:flex;justify-content:center;gap:10px;margin-top:20px">
   {% if page_obj.has_previous %}
-    <a href="?page={{ page_obj.previous_page_number }}" class="hf-btn hf-btn-secondary" style="padding:6px 14px;font-size:12px;text-decoration:none">← Previous</a>
+    <a href="?{% if filter_query %}{{ filter_query }}&amp;{% endif %}page={{ page_obj.previous_page_number }}" class="hf-btn hf-btn-secondary" style="padding:6px 14px;font-size:12px;text-decoration:none">← Previous</a>
   {% endif %}
   <span style="font-size:12px;color:#64748B;padding:6px 0">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
   {% if page_obj.has_next %}
-    <a href="?page={{ page_obj.next_page_number }}" class="hf-btn hf-btn-secondary" style="padding:6px 14px;font-size:12px;text-decoration:none">Next →</a>
+    <a href="?{% if filter_query %}{{ filter_query }}&amp;{% endif %}page={{ page_obj.next_page_number }}" class="hf-btn hf-btn-secondary" style="padding:6px 14px;font-size:12px;text-decoration:none">Next →</a>
   {% endif %}
 </div>
 {% endif %}

@@ -196,7 +196,7 @@
   {% endfor %}
   {% if behaviour_pending_count > 0 %}
   <div class="trow" style="border-top:1px solid var(--border);margin-top:4px;padding-top:8px">
-    <div class="trow-name" style="font-size:12px;color:var(--text-muted)">{{ behaviour_pending_count }} incident{{ behaviour_pending_count|pluralize:",s" }} pending review &middot; <a href="{% url 'discipline:hod_queue' %}" style="color:var(--primary)">Review in HOD queue</a></div>
+    <div class="trow-name" style="font-size:12px;color:var(--text-muted)">{{ behaviour_pending_count }} incident{{ behaviour_pending_count|pluralize:",s" }} pending review &middot; <a href="{% url 'discipline:hod_queue' %}" style="color:var(--primary)">Open the review queue</a></div>
   </div>
   {% endif %}
 </div>
