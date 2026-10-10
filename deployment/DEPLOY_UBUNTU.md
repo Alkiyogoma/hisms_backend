@@ -152,6 +152,12 @@ sudo apt install -y postgresql postgresql-contrib redis-server nginx
 sudo apt install -y libpango-1.0-0 libpangocairo-1.0-0 libcairo2 \
     libgdk-pixbuf-2.0-0 libffi-dev shared-mime-info fonts-liberation
 
+# LibreOffice (headless) — lesson plan previews: Word / PowerPoint / Excel
+# attachments are converted to PDF so reviewers see them exactly as written.
+# Without it those files can only be downloaded, not previewed.
+sudo apt install -y libreoffice-writer-nogui libreoffice-impress-nogui \
+    libreoffice-calc-nogui fonts-dejavu-core
+
 sudo systemctl enable --now postgresql redis-server nginx
 ```
 
@@ -521,6 +527,7 @@ non-interactively.)
 | CSRF verification failed | Add the domain to `CSRF_TRUSTED_ORIGINS` (with `https://`) in `.env`. |
 | Static files 404 | Run `collectstatic`; check Nginx `alias` path matches `STATIC_ROOT` (`/var/www/hodari/hisms_backend/staticfiles/`). |
 | WeasyPrint / PDF errors | Install the Pango/Cairo libs from Section 3. |
+| Lesson plan Word files say "Preview not available" | LibreOffice missing — install the `libreoffice-*-nogui` packages from Section 3 (`which soffice` must find it; or set `LIBREOFFICE_BINARY` in settings). |
 | Celery tasks never run | Worker/beat not started, or Redis broker URL wrong — `celery -A config inspect ping`. |
 | `permission denied for schema public` | Run the PG15+ `GRANT ALL ON SCHEMA public` from Section 4. |
 

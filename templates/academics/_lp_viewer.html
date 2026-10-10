@@ -1,0 +1,69 @@
+{% load static %}{# Lesson plan viewer: the attached plan beside its comment thread. Include once per page; open with LPViewer.open(planId[, attachmentId]). #}
+<link rel="stylesheet" href="{% static 'academics/lp-viewer.css' %}?v=1">
+<div class="lpv" id="lpViewer" role="dialog" aria-modal="true" aria-labelledby="lpvTitle"
+     data-thread-url="{% url 'academics:lesson_plan_thread' 0 %}">
+  <div class="lpv-panel">
+    <div class="lpv-head">
+      <div class="lpv-head-txt">
+        <h3 class="lpv-title" id="lpvTitle">Lesson plan</h3>
+        <div class="lpv-sub" id="lpvSub"></div>
+      </div>
+      <button type="button" class="lpv-icon-btn lpv-close" aria-label="Close">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="lpv-switch" role="tablist" aria-label="Show">
+      <button type="button" data-pane="doc" class="on">Plan</button>
+      <button type="button" data-pane="thread">Comments<span id="lpvSwitchCount"></span></button>
+    </div>
+    <div class="lpv-body">
+      <section class="lpv-doc" aria-label="Attached plan">
+        <div class="lpv-tabs" id="lpvTabs" role="tablist" aria-label="Attached files"></div>
+        <div class="lpv-toolbar">
+          <button type="button" class="lpv-icon-btn" id="lpvPrev" data-pdf-only aria-label="Previous page" title="Previous page">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <span class="lpv-pageinfo" data-pdf-only>Page <input type="number" id="lpvPageInput" min="1" value="1" aria-label="Page number"> of <span id="lpvPageCount">1</span></span>
+          <button type="button" class="lpv-icon-btn" id="lpvNext" data-pdf-only aria-label="Next page" title="Next page">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+          <span class="sep" data-pdf-only></span>
+          <button type="button" class="lpv-icon-btn" id="lpvZoomOut" data-pdf-only aria-label="Zoom out" title="Zoom out">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="21" y1="21" x2="16" y2="16"/></svg>
+          </button>
+          <span class="lpv-zoom" id="lpvZoom" data-pdf-only aria-live="polite">100%</span>
+          <button type="button" class="lpv-icon-btn" id="lpvZoomIn" data-pdf-only aria-label="Zoom in" title="Zoom in">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="21" y1="21" x2="16" y2="16"/></svg>
+          </button>
+          <button type="button" class="lpv-btn" id="lpvFit" data-pdf-only title="Fit the page to the width">Fit width</button>
+          <span class="lpv-spacer"></span>
+          <a class="lpv-btn" id="lpvDownload" href="#" download>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download original
+          </a>
+        </div>
+        <div class="lpv-pages" id="lpvPages" tabindex="0"></div>
+      </section>
+      <aside class="lpv-thread" aria-label="Comments">
+        <div class="lpv-thread-h">
+          <h4>Comments <span id="lpvCount" style="color:#94A3B8;font-weight:600"></span></h4>
+          <p>Questions and notes between the teacher and reviewers. Commenting does not change the plan&rsquo;s status.</p>
+        </div>
+        <div class="lpv-feedback" id="lpvFeedback" hidden><strong>Review feedback:</strong> <span></span></div>
+        <div class="lpv-list" id="lpvList" aria-live="polite"></div>
+        <form class="lpv-form" id="lpvForm" method="post" hidden>
+          {% csrf_token %}
+          <label for="lpvBody" class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Comment</label>
+          <textarea id="lpvBody" name="body" maxlength="4000" placeholder="Ask a question or leave a note…"></textarea>
+          <div class="lpv-err" id="lpvErr" role="alert"></div>
+          <div class="lpv-form-row">
+            <small>Ctrl + Enter to send</small>
+            <button type="submit" class="lpv-btn primary">Send</button>
+          </div>
+        </form>
+        <div class="lpv-readonly" id="lpvReadonly" hidden>Only the teacher and the plan&rsquo;s reviewers can comment.</div>
+      </aside>
+    </div>
+  </div>
+</div>
+<script src="{% static 'academics/lp-viewer.js' %}?v=1" defer></script>

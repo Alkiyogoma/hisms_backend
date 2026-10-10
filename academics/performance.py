@@ -344,8 +344,9 @@ def subject_options(scope, results):
 
 
 def learner_summary(results):
-    """One row per learner: their average across the subjects in ``results``
-    and the subjects they are below the pass mark in (weakest first)."""
+    """One row per learner: their average across the subjects in ``results``,
+    a status from that average, and the subjects they are below the pass mark
+    in (weakest first)."""
     by_learner = defaultdict(list)
     for r in results:
         by_learner[r["student_id"]].append(r)
@@ -363,15 +364,64 @@ def learner_summary(results):
             "class_name": first["class_name"],
             "mark": avg,
             "grade": get_grade_from_score(avg),
-            # A learner needs help if their average or any one subject is
-            # below the pass mark; the status reflects the worse of the two.
-            "band": band if needs_help(band) or not weak else weak[0]["band"],
+            # Status follows the average, like the grade on the same row;
+            # single failing subjects are listed in ``weak`` instead.
+            "band": band,
             "subjects": len(rs),
             "weak": [{"subject": r["subject"], "mark": r["mark"], "band": r["band"]} for r in weak],
         })
     for row in rows:
         row["status"] = BAND_LABELS[row["band"]]
     return rows
+
+
+def classes_scope(class_names=None, label="Whole school"):
+    """A scope covering every subject in ``class_names`` (None: whole school)."""
+    pairs = None if class_names is None else {c: None for c in class_names}
+    return Scope(label, "school" if pairs is None else "section", pairs, _class_order())
+
+
+def at_risk_results(scope, term, results=None):
+    """Subject results below the pass mark in ``term`` for active learners,
+    worst first, each with its ``student``. Same approved, weighted marks as
+    the Performance Report's "By subject result" list."""
+    from students.models import Student, StudentStatus
+
+    if term is None:
+        return []
+    if results is None:
+        results = compute_results(scope, [term], term.academic_year)
+    weak = [r for r in results if needs_help(r["band"])]
+    students = Student.objects.filter(
+        id__in={r["student_id"] for r in weak}, status=StudentStatus.ACTIVE, is_archived=False,
+    ).in_bulk()
+    rows = [{**r, "student": students[r["student_id"]]} for r in weak if r["student_id"] in students]
+    rows.sort(key=lambda r: (r["mark"], r["name"], r["subject"]))
+    return rows
+
+
+def at_risk_learners(scope, term):
+    """Active learners whose average in ``term`` is below the pass mark,
+    lowest first — the By student list's status rule — each with the
+    subjects they are below the pass mark in."""
+    from students.models import Student, StudentStatus
+
+    if term is None:
+        return []
+    learners = [r for r in learner_summary(compute_results(scope, [term], term.academic_year))
+                if needs_help(r["band"])]
+    students = Student.objects.filter(
+        id__in={r["student_id"] for r in learners}, status=StudentStatus.ACTIVE, is_archived=False,
+    ).only("first_name", "last_name", "class_name", "admission_no").in_bulk()
+    out = []
+    for r in sorted(learners, key=lambda r: (r["mark"], r["name"])):
+        st = students.get(r["student_id"])
+        if st is None:
+            continue
+        st.avg, st.grade, st.band, st.status, st.weak = r["mark"], r["grade"], r["band"], r["status"], r["weak"]
+        st.year_class = r["class_name"]
+        out.append(st)
+    return out
 
 
 def class_subject_matrix(results, scope):
@@ -473,7 +523,8 @@ def learner_record(student, term):
         record["class_average"] = round(sum(averages) / len(averages), 1)
         record["class_diff"] = round(avg - record["class_average"], 1)
     for t in learner_terms(student):
-        rows = compute_results(school, [t], t.academic_year, student_ids=[student.pk])
+        # The selected term's rows are already in hand.
+        rows = mine if t == term else compute_results(school, [t], t.academic_year, student_ids=[student.pk])
         if rows:
             a = round(sum(r["mark"] for r in rows) / len(rows), 1)
             record["history"].append({"term": t, "average": a, "grade": get_grade_from_score(a),

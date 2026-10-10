@@ -65,7 +65,9 @@ setup_system() {
         supervisor \
         logrotate \
         ufw \
-        htop
+        htop \
+        libreoffice-writer-nogui libreoffice-impress-nogui libreoffice-calc-nogui \
+        fonts-liberation fonts-dejavu-core
 
     ok "System packages installed"
 }

@@ -20,6 +20,12 @@ SHOW = {
     "all": ("All results", lambda band: True),
 }
 GROUPS = ("result", "learner")
+# By-student list orderings: lowest average first, or most subjects below
+# the pass mark first (ties by lowest average).
+SORTS = {
+    "average": lambda r: (r["mark"], r["name"], r.get("subject", "")),
+    "below": lambda r: (-len(r["weak"]), r["mark"], r["name"]),
+}
 PAGE_SIZES = (25, 50, 100)
 
 
@@ -103,16 +109,19 @@ class PerformanceReportView(RoleRequiredMixin, TemplateView):
         view = params.get("view") if params.get("view") in VIEWS else "help"
         show = params.get("show") if params.get("show") in SHOW else "help"
         group = params.get("group") if params.get("group") in GROUPS else "result"
+        sort = params.get("sort") if group == "learner" and params.get("sort") in SORTS else "average"
         query = params.get("q", "").strip()
 
         # View 1 — who needs help, worst first.
-        rows = performance.learner_summary(filtered) if group == "learner" else filtered
+        # Learner rows feed both the list and (by default) the distribution;
+        # build them once.
+        learners = performance.learner_summary(filtered) if "learner" in (group, params.get("dist")) else None
+        rows = learners if group == "learner" else filtered
         if query:
             q = query.lower()
             rows = [r for r in rows if q in r["name"].lower() or q in (r["admission_no"] or "").lower()]
         show_counts = {key: sum(1 for r in rows if test(r["band"])) for key, (_, test) in SHOW.items()}
-        rows = sorted((r for r in rows if SHOW[show][1](r["band"])),
-                      key=lambda r: (r["mark"], r["name"], r.get("subject", "")))
+        rows = sorted((r for r in rows if SHOW[show][1](r["band"])), key=SORTS[sort])
         try:
             page_size = int(params.get("page_size", PAGE_SIZES[0]))
         except ValueError:
@@ -124,7 +133,7 @@ class PerformanceReportView(RoleRequiredMixin, TemplateView):
         # Grade distribution, counting results (one per learner per subject)
         # or learners (each learner's average across the subjects in view).
         dist_by = params.get("dist") if params.get("dist") in GROUPS else "result"
-        dist_rows = performance.learner_summary(filtered) if dist_by == "learner" else filtered
+        dist_rows = learners if dist_by == "learner" else filtered
 
         # View 2 — one subject across classes (ignores the class filter, since
         # the point is to compare classes), every subject ranked within the
@@ -162,6 +171,7 @@ class PerformanceReportView(RoleRequiredMixin, TemplateView):
             "show_label": SHOW[show][0],
             "show_options": [(key, label, show_counts[key]) for key, (label, _) in SHOW.items()],
             "group": group,
+            "sort": sort,
             "query": query,
             "summary": performance.summarise(filtered),
             "dist_by": dist_by,

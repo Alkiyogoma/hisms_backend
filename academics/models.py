@@ -613,6 +613,22 @@ class LessonPlanAttachment(TimeStampedModel):
         return self.filename
 
 
+class LessonPlanComment(TimeStampedModel):
+    """One message in a lesson plan's discussion thread between the teacher
+    and reviewers. Comments never change the plan's status; Reject remains
+    for plans that need resubmitting."""
+    lesson_plan = models.ForeignKey(LessonPlan, on_delete=models.CASCADE, related_name="comments")
+    author = models.ForeignKey("users.User", on_delete=models.PROTECT, related_name="lesson_plan_comments")
+    body = models.TextField()
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        indexes = [models.Index(fields=["lesson_plan", "created_at"])]
+
+    def __str__(self) -> str:
+        return f"Comment by {self.author_id} on plan {self.lesson_plan_id}"
+
+
 # --------------------------------------------------------------------------- #
 # Academic Assessments — FRD Section 9 (FR-ACAD-001…013)                       #
 # --------------------------------------------------------------------------- #

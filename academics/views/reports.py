@@ -913,18 +913,14 @@ class AtRiskStudentsListView(RoleRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        from django.db.models import Sum, F, Case, When, Value, FloatField, ExpressionWrapper, Q
-        from academics.models import Department, GradeClass, get_exam_weights
+        from django.db.models import Q
+        from academics.models import Department, GradeClass
 
         term = get_current_term()
         ctx["current_term"] = term
         
         # Union across every section role held (see _analytics_scope).
         role, scope_depts = _analytics_scope(self.request.user)
-        dept_filter = Q()
-        if scope_depts:
-            scope_classes = GradeClass.objects.filter(department__in=scope_depts).values_list('name', flat=True)
-            dept_filter = Q(student__class_name__in=scope_classes)
 
         if term:
             # -- ECD At-Risk Path (uses ECDEvaluation ratings) --
@@ -963,35 +959,15 @@ class AtRiskStudentsListView(RoleRequiredMixin, TemplateView):
                 return ctx
 
             # -- ExamScore At-Risk Path (Primary / Secondary) --
-            weights = get_exam_weights()
-            scores = ExamScore.objects.filter(term=term).filter(dept_filter)
-            
-            # Weighted calculation
-            w_scores = scores.annotate(
-                weight_val=Case(
-                    *[When(exam_type=code, then=Value(w/100.0)) for code, w in weights.items()],
-                    default=Value(0.0),
-                    output_field=FloatField()
-                )
-            ).annotate(
-                weighted_val=ExpressionWrapper(F('score') * F('weight_val'), output_field=FloatField())
-            )
+            # Learners whose average is below the pass mark, from the same
+            # approved, weighted marks as the Performance Report's By student
+            # list (single weak subjects are listed per learner).
+            from academics import performance
+            classes = None
+            if scope_depts:
+                classes = list(GradeClass.objects.filter(department__in=scope_depts).values_list("name", flat=True))
+            ctx["at_risk_students"] = performance.at_risk_learners(performance.classes_scope(classes), term)
 
-            student_totals = w_scores.values("student").annotate(
-                total_w=Sum('weighted_val'),
-                sum_w=Sum('weight_val')
-            )
-            
-            at_risk_map = {s["student"]: float(s["total_w"] / s["sum_w"]) for s in student_totals if s["sum_w"] > 0 and (s["total_w"] / s["sum_w"]) < 60}
-            
-            at_risk_students = Student.objects.filter(id__in=at_risk_map.keys()).only("first_name", "last_name", "class_name", "admission_no")
-            
-            for s in at_risk_students:
-                s.avg = round(at_risk_map[s.id], 1)
-                s.grade = get_grade_from_score(s.avg)
-                
-            ctx["at_risk_students"] = sorted(at_risk_students, key=lambda x: x.avg)
-            
         return ctx
 
 

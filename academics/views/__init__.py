@@ -23,6 +23,12 @@ from academics.views.lesson_plans import (
     LessonPlanEditModalView,
 )
 
+from academics.views.lesson_plan_viewer import (
+    LessonPlanThreadView,
+    LessonPlanAttachmentPreviewView,
+    LessonPlanCommentView,
+)
+
 from academics.views.exams import (
     ExamScoreEntryView,
     ExamScoreCorrectionView,

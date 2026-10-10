@@ -83,29 +83,6 @@
   .edit-preview-btn { color: var(--hodari-blue); font-weight: 700; text-decoration: none; font-size: 12px; cursor: pointer; background: none; border: none; padding: 4px 8px; border-radius: 6px; transition: background 0.15s; }
   .edit-preview-btn:hover { background: #EFF6FF; }
   .edit-preview-btn.active { background: #DBEAFE; }
-.edit-preview-container { margin-top: 10px; border-radius: 8px; overflow: hidden; border: 1px solid #E2E8F0; display: none; }
-.edit-preview-container.open { display: block; }
-.edit-preview-container iframe { width: 100%; height: 85vh; min-height: 600px; border: none; }
-.edit-preview-container img { width: 100%; max-height: 85vh; min-height: 600px; object-fit: contain; display: block; background: #F8FAFC; }
-
-/* Full-screen file preview modal */
-#filePreviewModal { display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); }
-#filePreviewModal .fp-inner { position:absolute; inset:16px; background:#fff; border-radius:12px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.4); }
-#filePreviewModal .fp-header { display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid #E2E8F0; background:#F8FAFC; flex-shrink:0; }
-#filePreviewModal .fp-header span { font-size:14px; font-weight:700; color:#1E293B; }
-#filePreviewModal .fp-header a { padding:5px 12px; font-size:12px; text-decoration:none; color:#64748B; border:1px solid #E2E8F0; border-radius:6px; display:inline-flex; align-items:center; gap:4px; }
-#filePreviewModal .fp-header a:hover { background:#F1F5F9; }
-#filePreviewModal .fp-close { background:none; border:none; cursor:pointer; padding:4px; color:#64748B; border-radius:6px; }
-#filePreviewModal .fp-close:hover { background:#F1F5F9; }
-#filePreviewModal .fp-body { flex:1; display:flex; align-items:center; justify-content:center; overflow:auto; background:#F1F5F9; padding:0; }
-#filePreviewModal .fp-body iframe { width:100%; height:100%; border:none; }
-#filePreviewModal .fp-body img { max-width:100%; max-height:100%; object-fit:contain; }
-  .edit-preview-container pre { width: 100%; max-height: 75vh; min-height: 400px; overflow: auto; padding: 16px; margin: 0; font-size: 12px; line-height: 1.5; background: #F8FAFC; border: none; font-family: 'SF Mono', 'Fira Code', monospace; white-space: pre-wrap; word-break: break-word; }
-  .edit-preview-container .csv-scroll { max-height: 75vh; min-height: 400px; overflow: auto; overflow-x: auto; }
-  .edit-preview-container .csv-scroll table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  .edit-preview-container .csv-scroll table th { background: #F1F5F9; padding: 8px 12px; text-align: left; font-weight: 700; color: #475569; border-bottom: 2px solid #E2E8F0; position: sticky; top: 0; }
-  .edit-preview-container .csv-scroll table td { padding: 6px 12px; border-bottom: 1px solid #F1F5F9; color: #334155; }
-  .edit-preview-container .csv-scroll table tr:hover td { background: #F8FAFC; }
 
   @media (max-width: 900px) {
     .lp-create-layout { grid-template-columns: 1fr; }
@@ -212,13 +189,12 @@
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:#64748B; flex-shrink:0"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
                     <span class="file-name" title="{{ att.filename }}">{{ att.filename }}</span>
                   </div>
-                  <button type="button" class="edit-preview-btn" data-att-id="{{ att.id }}" data-file-url="{{ att.file.url }}" data-file-name="{{ att.filename }}" onclick="toggleEditPreview(this)">Preview</button>
+                  <button type="button" class="edit-preview-btn" onclick="LPViewer.open('{{ form.instance.pk }}', '{{ att.id }}')">Preview</button>
                   <a href="{{ att.file.url }}" download style="color:var(--hodari-blue); font-weight:700; text-decoration:none; font-size:12px">Download</a>
                   {% if form.instance.status == 'draft' or form.instance.status == 'revision_requested' %}
                   <button type="button" style="background:none; border:none; color:#DC2626; cursor:pointer; font-size:12px; font-weight:700; padding:0" onclick="deleteAttachment({{ att.id }}, '{{ att.filename|escapejs }}')">Remove</button>
                   {% endif %}
                 </div>
-                <div class="edit-preview-container" id="ep-{{ att.id }}"></div>
               </div>
             {% endfor %}
           </div>
@@ -302,7 +278,7 @@
               <div id="att-list-{{ p.id }}" style="display:none; margin-top:6px; padding:6px; background:#F8FAFC; border-radius:6px; border:1px solid #E2E8F0">
                 {% for att in p.attachments.all %}
                   <div style="display:flex; align-items:center; gap:4px; padding:2px 0">
-                    <a href="#" onclick="event.preventDefault();openFilePreview('{{ att.file.url|escapejs }}','{{ att.filename|escapejs }}');return false"
+                    <a href="#" onclick="event.preventDefault();LPViewer.open('{{ p.id }}','{{ att.id }}');return false"
                        style="font-size:10px; color:var(--hodari-blue); text-decoration:none; font-weight:600; border-bottom:1px dashed var(--hodari-blue)">
                       {{ att.filename|truncatechars:25 }}
                     </a>
@@ -330,24 +306,7 @@
   </div>
 </form>
 
-<!-- Full-screen File Preview Modal -->
-<div id="filePreviewModal" onclick="if(event.target===this)closeFilePreview()">
-  <div class="fp-inner">
-    <div class="fp-header">
-      <span id="fpTitle">Document</span>
-      <div style="display:flex;gap:8px;align-items:center">
-        <a id="fpDownload" href="#" target="_blank" style="padding:5px 12px;font-size:12px;text-decoration:none;color:#64748B;border:1px solid #E2E8F0;border-radius:6px;display:inline-flex;align-items:center;gap:4px">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Download
-        </a>
-        <button class="fp-close" onclick="closeFilePreview()">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
-    </div>
-    <div class="fp-body" id="fpBody"></div>
-  </div>
-</div>
+{% include "academics/_lp_viewer.html" %}
 
 <script>
 var timetableSlotsJSON = {{ timetable_slots_json|safe }};
@@ -528,7 +487,7 @@ function selectGridSlot(chipEl) {
       if (lp.attachments && lp.attachments.length) {
         lp.attachments.forEach(function(att) {
           html += ' &mdash; ';
-          html += '<a href="#" onclick="event.preventDefault();openFilePreview(\'' + encodeURI(att.url) + '\',\'' + att.name.replace(/'/g, "\\'") + '\');return false" style="color:var(--hodari-blue);text-decoration:none;font-weight:600;cursor:pointer;border-bottom:1px dashed var(--hodari-blue)">' + att.name + '</a>';
+          html += '<a href="#" onclick="event.preventDefault();LPViewer.open(' + (+lp.pk) + ',' + (+att.id) + ');return false" style="color:var(--hodari-blue);text-decoration:none;font-weight:600;cursor:pointer;border-bottom:1px dashed var(--hodari-blue)">' + escapeEditHtml(att.name) + '</a>';
         });
       }
       html += '</span>';
@@ -795,176 +754,11 @@ function deleteAttachment(attId, filename) {
     form.submit();
   }});
 }
-function canPreviewExt(ext) {
-  return ['pdf','jpg','jpeg','png','gif','webp','svg','docx','xlsx','csv','txt'].indexOf(ext) !== -1;
-}
-
-function canPreviewOfficeEdit(ext) {
-  return ['docx', 'xlsx'].indexOf(ext) !== -1;
-}
-
-function toggleEditPreview(btn) {
-  var id = btn.getAttribute('data-att-id');
-  var fileUrl = btn.getAttribute('data-file-url');
-  var fileName = btn.getAttribute('data-file-name');
-  var container = document.getElementById('ep-' + id);
-  if (!container) return;
-
-  var isOpen = container.classList.contains('open');
-  if (isOpen) {
-    container.classList.remove('open');
-    container.innerHTML = '';
-    btn.classList.remove('active');
-    btn.textContent = 'Preview';
-    return;
-  }
-
-  var ext = getFileExt(fileName);
-  var isPdfOrImage = ext === 'pdf' || ['jpg','jpeg','png','gif','webp','svg'].indexOf(ext) !== -1;
-  if (isPdfOrImage) {
-    openFilePreview(encodeURI(fileUrl), fileName);
-    return;
-  }
-  if (!canPreviewExt(ext)) {
-    container.innerHTML = '<div style="padding:16px;text-align:center;color:#94A3B8;font-size:12px">Preview not available. <a href="' + fileUrl + '" download style="color:var(--hodari-blue);font-weight:700">Download file</a></div>';
-    container.classList.add('open');
-    btn.classList.add('active');
-    btn.textContent = 'Close';
-    return;
-  }
-
-  var fullUrl = encodeURI(fileUrl);
-  container.classList.add('open');
-  btn.classList.add('active');
-  btn.textContent = 'Close';
-
-  if (ext === 'pdf') {
-    container.innerHTML = '<iframe src="' + fullUrl + '" loading="lazy"></iframe>';
-  } else if (['jpg','jpeg','png','gif','webp','svg'].indexOf(ext) !== -1) {
-    container.innerHTML = '<img src="' + fullUrl + '" alt="' + fileName + '" loading="lazy">';
-  } else if (ext === 'docx' || ext === 'xlsx') {
-    container.innerHTML = '<div style="padding:16px;text-align:center;color:#64748B;font-size:12px">Loading preview…</div>';
-    if ((ext === 'docx' && typeof mammoth === 'undefined') || (ext === 'xlsx' && typeof XLSX === 'undefined')) {
-      container.innerHTML = '<div style="padding:16px;text-align:center;color:#94A3B8;font-size:12px">Preview library still loading. <a href="' + fileUrl + '" download style="color:var(--hodari-blue);font-weight:700">Download file</a></div>';
-      return;
-    }
-    fetch(fullUrl).then(function(r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.arrayBuffer();
-    }).then(function(buffer) {
-      if (ext === 'docx') {
-        mammoth.convertToHtml({arrayBuffer: buffer}).then(function(result) {
-          container.innerHTML = '<div style="padding:16px;font-size:13px;line-height:1.6;color:#1E293B;max-height:75vh;min-height:400px;overflow-y:auto">' + result.value + '</div>';
-        }).catch(function() {
-          container.innerHTML = '<div style="padding:16px;text-align:center;color:#DC2626;font-size:12px">Preview failed. <a href="' + fileUrl + '" download style="color:var(--hodari-blue);font-weight:700">Download file</a></div>';
-        });
-      } else {
-        var workbook = XLSX.read(buffer, {type: 'array'});
-        var sheet = workbook.Sheets[workbook.SheetNames[0]];
-        var html = XLSX.utils.sheet_to_html(sheet, {editable: false});
-        container.innerHTML = '<div class="csv-scroll">' + html + '</div>';
-      }
-    }).catch(function() {
-      container.innerHTML = '<div style="padding:16px;text-align:center;color:#DC2626;font-size:12px">Could not load file for preview. <a href="' + fileUrl + '" download style="color:var(--hodari-blue);font-weight:700">Download file</a></div>';
-    });
-  } else if (ext === 'csv') {
-    container.innerHTML = '<div style="padding:16px;text-align:center;color:#64748B;font-size:12px">Loading CSV preview...</div>';
-    fetch(fullUrl).then(function(r) { return r.text(); }).then(function(text) {
-      var lines = text.split('\n').filter(function(l) { return l.trim(); });
-      if (lines.length === 0) { container.innerHTML = '<div style="padding:16px;text-align:center;color:#94A3B8;font-size:12px">Empty CSV file</div>'; return; }
-      var rows = lines.map(function(line) { return parseEditCsvLine(line); });
-      var header = rows[0];
-      var bodyRows = rows.slice(1);
-      var html = '<div class="csv-scroll"><table><thead><tr>';
-      header.forEach(function(h) { html += '<th>' + escapeEditHtml(h.trim()) + '</th>'; });
-      html += '</tr></thead><tbody>';
-      bodyRows.forEach(function(row) {
-        html += '<tr>';
-        row.forEach(function(cell) { html += '<td>' + escapeEditHtml(cell.trim()) + '</td>'; });
-        html += '</tr>';
-      });
-      html += '</tbody></table></div>';
-      container.innerHTML = html;
-    }).catch(function() {
-      container.innerHTML = '<div style="padding:16px;text-align:center;color:#DC2626;font-size:12px">Could not load CSV preview. <a href="' + fileUrl + '" download style="color:var(--hodari-blue);font-weight:700">Download file</a></div>';
-    });
-  } else if (ext === 'txt') {
-    container.innerHTML = '<div style="padding:16px;text-align:center;color:#64748B;font-size:12px">Loading text preview...</div>';
-    fetch(fullUrl).then(function(r) { return r.text(); }).then(function(text) {
-      container.innerHTML = '<pre>' + escapeEditHtml(text) + '</pre>';
-    }).catch(function() {
-      container.innerHTML = '<div style="padding:16px;text-align:center;color:#DC2626;font-size:12px">Could not load text preview. <a href="' + fileUrl + '" download style="color:var(--hodari-blue);font-weight:700">Download file</a></div>';
-    });
-  }
-}
-
-function parseEditCsvLine(line) {
-  var result = [];
-  var current = '';
-  var inQuotes = false;
-  for (var i = 0; i < line.length; i++) {
-    var ch = line[i];
-    if (inQuotes) {
-      if (ch === '"' && i + 1 < line.length && line[i + 1] === '"') { current += '"'; i++; }
-      else if (ch === '"') { inQuotes = false; }
-      else { current += ch; }
-    } else {
-      if (ch === '"') { inQuotes = true; }
-      else if (ch === ',') { result.push(current); current = ''; }
-      else { current += ch; }
-    }
-  }
-  result.push(current);
-  return result;
-}
-
 function escapeEditHtml(text) {
   var d = document.createElement('div');
   d.appendChild(document.createTextNode(text));
   return d.innerHTML;
 }
-
-function openFilePreview(url, title) {
-  var modal = document.getElementById('filePreviewModal');
-  var body = document.getElementById('fpBody');
-  var titleEl = document.getElementById('fpTitle');
-  var downloadBtn = document.getElementById('fpDownload');
-  titleEl.textContent = title;
-  downloadBtn.href = url;
-  body.innerHTML = '';
-  var ext = url.split('.').pop().toLowerCase().split('?')[0];
-  if (['jpg','jpeg','png','gif','webp','bmp','svg'].indexOf(ext) !== -1) {
-    var img = document.createElement('img');
-    img.src = url;
-    body.appendChild(img);
-  } else if (ext === 'pdf') {
-    var iframe = document.createElement('iframe');
-    iframe.src = url;
-    body.appendChild(iframe);
-  } else {
-    body.innerHTML = '<div style="text-align:center;padding:40px;color:#64748B"><div style="font-size:48px;margin-bottom:12px">&#128196;</div><div style="font-size:14px;font-weight:600">' + title + '</div><div style="font-size:12px;margin-top:8px;color:#94A3B8">Click Download to view this file</div></div>';
-  }
-  modal.style.display = 'block';
-  document.body.style.overflow = 'hidden';
-}
-
-function closeFilePreview() {
-  var modal = document.getElementById('filePreviewModal');
-  modal.style.display = 'none';
-  document.body.style.overflow = '';
-  document.getElementById('fpBody').innerHTML = '';
-}
-
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') {
-    var fp = document.getElementById('filePreviewModal');
-    if (fp && fp.style.display === 'block') { closeFilePreview(); }
-  }
-});
 </script>
 
-{% block extra_js %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-{% endblock %}
 {% endblock %}

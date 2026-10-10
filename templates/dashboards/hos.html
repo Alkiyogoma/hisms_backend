@@ -384,7 +384,7 @@
 <div class="card hos-section-gap">
   <div class="card-title-row">
     <span class="card-title" style="margin-bottom:0">At-risk students school-wide &middot; D or below in any subject</span>
-    <span class="chip chip-red">{{ at_risk_students|length }} flagged</span>
+    <span class="chip chip-red" title="{{ at_risk_students|length }} subject result{{ at_risk_students|length|pluralize }} below the pass mark">{{ at_risk_learner_count }} student{{ at_risk_learner_count|pluralize }} &middot; {{ at_risk_students|length }} result{{ at_risk_students|length|pluralize }}</span>
   </div>
   <div class="at-risk-grid">
   {% for item in at_risk_students|slice:":12" %}
@@ -402,7 +402,7 @@
   </div>
   {% if at_risk_students|length > 12 %}
   <div style="text-align:center;padding:12px 0 4px">
-    <a href="{% url 'academics:at_risk_list' %}" class="section-link">View all {{ at_risk_students|length }} flagged students &rarr;</a>
+    <a href="{% url 'academics:performance_report' %}?term={{ at_risk_term.pk }}" class="section-link">View all {{ at_risk_students|length }} results in the Performance Report &rarr;</a>
   </div>
   {% endif %}
 </div>

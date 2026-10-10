@@ -14,6 +14,7 @@ from django.views.generic import CreateView, UpdateView, TemplateView, View
 import json
 
 from academics.ecd_utils import build_ecd_report_context, ecd_template_type_from_class_name, grade_class_names_for_department
+from academics import lesson_plan_files
 from academics.validators import attachment_rules
 from academics.forms import LessonPlanForm, LessonPlanReviewForm, ExamScoreFilterForm, SubjectForm, TermForm
 from academics.models import (
@@ -137,8 +138,8 @@ class LessonPlanListView(RoleRequiredMixin, TemplateView):
         date_from = self.request.GET.get("date_from")
         date_to = self.request.GET.get("date_to")
 
-        mine_qs = LessonPlan.objects.filter(teacher=user).select_related("term", "reviewed_by").prefetch_related("attachments").order_by("-created_at")
-        queue = LessonPlan.objects.filter(status=LessonPlanStatus.SUBMITTED).select_related("teacher", "term").prefetch_related("attachments").order_by("submitted_at", "created_at")
+        mine_qs = LessonPlan.objects.filter(teacher=user).select_related("term", "reviewed_by").prefetch_related("attachments", "comments").order_by("-created_at")
+        queue = LessonPlan.objects.filter(status=LessonPlanStatus.SUBMITTED).select_related("teacher", "term").prefetch_related("attachments", "comments").order_by("submitted_at", "created_at")
 
         if not _is_hod_like(user):
             if date_from:
@@ -158,7 +159,7 @@ class LessonPlanListView(RoleRequiredMixin, TemplateView):
             mine_total = mine_qs.count()
             queue = LessonPlan.objects.filter(
                 teacher=user, status=LessonPlanStatus.SUBMITTED
-            ).select_related("teacher", "term").prefetch_related("attachments").order_by("submitted_at", "created_at")
+            ).select_related("teacher", "term").prefetch_related("attachments", "comments").order_by("submitted_at", "created_at")
             if date_from:
                 try:
                     queue = queue.filter(week_start_date__gte=_date.fromisoformat(date_from))
@@ -184,7 +185,7 @@ class LessonPlanListView(RoleRequiredMixin, TemplateView):
             ).order_by("first_name", "last_name")
             teacher_id = self.request.GET.get("teacher")
             # HOD/SA sees ALL plans by default, or filtered to a specific teacher
-            base_qs = LessonPlan.objects.all().select_related("teacher", "term", "reviewed_by").prefetch_related("attachments").order_by("-created_at")
+            base_qs = LessonPlan.objects.all().select_related("teacher", "term", "reviewed_by").prefetch_related("attachments", "comments").order_by("-created_at")
             # Exclude MISSING records for teachers without timetable slots
             from django.db.models import Q as _Q
             from timetable.models import TimetableSlot
@@ -280,7 +281,7 @@ class LessonPlanListView(RoleRequiredMixin, TemplateView):
         if _is_hod_like(user) and status_filter == "submitted":
             display_qs = queue
         elif _is_hod_like(user):
-            display_qs = LessonPlan.objects.select_related("teacher", "term", "reviewed_by").prefetch_related("attachments").order_by("-created_at")
+            display_qs = LessonPlan.objects.select_related("teacher", "term", "reviewed_by").prefetch_related("attachments", "comments").order_by("-created_at")
             # HODs should not see unsubmitted (draft) plans from other teachers
             if not status_filter or status_filter != "draft":
                 display_qs = display_qs.exclude(status=LessonPlanStatus.DRAFT)
@@ -444,7 +445,7 @@ class LessonPlanContextMixin:
         for plan in week_plans_qs:
             key = (plan.class_name.strip(), plan.subject_name.strip(), plan.day_of_week)
             atts = plan.attachments.all()[:5]
-            att_data = [{"name": a.filename, "url": a.file.url} for a in atts]
+            att_data = [{"id": a.pk, "name": a.filename, "url": a.file.url} for a in atts]
             lp_detail_map[key] = {
                 "status": plan.status,
                 "title": plan.lesson_title or "",
@@ -933,7 +934,8 @@ def _checked_uploads(request, existing=None):
 
 def _save_uploads(plan, files, user):
     for f in files:
-        LessonPlanAttachment.objects.create(lesson_plan=plan, file=f, filename=f.name, uploaded_by=user)
+        att = LessonPlanAttachment.objects.create(lesson_plan=plan, file=f, filename=f.name, uploaded_by=user)
+        lesson_plan_files.prepare_in_background(att)
 
 
 def _modal_error(message):
@@ -1222,6 +1224,7 @@ class LessonPlanAttachmentDeleteView(RoleRequiredMixin, LoginRequiredMixin, View
             return redirect("academics:lesson_plan_edit", pk=plan.pk)
 
         file_path = att.file.path
+        lesson_plan_files.discard_cached(att)
         att.delete()
         # Remove the physical file from disk
         try:
@@ -1352,7 +1355,7 @@ def _get_missing_plan_teachers():
     return missing
 
 
-def _notify_hod_lesson_plan(plan, actor, event="submitted"):
+def _notify_hod_lesson_plan(plan, actor, event="submitted", detail=""):
     """Notify the department-appropriate HOD for lesson plan events.
 
     Resolves the department from the lesson's class_name via GradeClass and notifies
@@ -1361,7 +1364,7 @@ def _notify_hod_lesson_plan(plan, actor, event="submitted"):
     Args:
         plan: LessonPlan instance
         actor: User who performed the action
-        event: "submitted" or "withdrawn"
+        event: "submitted", "withdrawn" or "comment" (``detail`` is the comment)
     """
     from communications.email_service import dispatch_notification
     from users.models import User, UserRole
@@ -1388,7 +1391,10 @@ def _notify_hod_lesson_plan(plan, actor, event="submitted"):
         Q(role__in=hod_roles) | Q(extra_roles__role__in=hod_roles), is_active=True
     ).distinct()
     for hod in hods:
-        if event == "withdrawn":
+        if event == "comment":
+            title = "Teacher commented on a lesson plan"
+            message = f"{plan.teacher.get_full_name()} on {plan.class_name} — {plan.subject_name}:\n\n{detail}"
+        elif event == "withdrawn":
             title = "Lesson plan withdrawn"
             message = f"Lesson plan withdrawn — {plan.teacher.get_full_name()}, {plan.class_name} — {plan.subject_name}"
         else:
@@ -1846,7 +1852,7 @@ class LessonPlanReviewQueueView(RoleRequiredMixin, TemplateView):
         else:
             dept_classes = None  # school-wide reviewers (and non-section roles)
 
-        plans_qs = LessonPlan.objects.filter(term=term).select_related("teacher", "term", "reviewed_by").prefetch_related("attachments")
+        plans_qs = LessonPlan.objects.filter(term=term).select_related("teacher", "term", "reviewed_by").prefetch_related("attachments", "comments")
         
         if dept_classes is not None:
             plans_qs = plans_qs.filter(class_name__in=dept_classes)

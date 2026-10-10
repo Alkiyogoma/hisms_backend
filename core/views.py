@@ -12,6 +12,7 @@ from django.utils import timezone
 from core.permissions import RoleRequiredMixin
 from users.models import UserRole
 
+from academics import performance
 from academics.models import LessonPlan, LessonPlanStatus, Term, GradeClass, Department, ReportCard, ReportCardStatus, ExamScore
 from admissions.models import Applicant, ApplicantStatus
 from attendance.models import PRESENT_STATUSES, AttendanceEntry, AttendanceStatus
@@ -274,6 +275,16 @@ class SuperAdminDashboardView(RoleRequiredMixin, TemplateView):
 
         ctx.update(_base_ctx(user))
         return ctx
+
+
+def _at_risk_cards(scope, term):
+    """Dashboard at-risk cards: one per subject result below the pass mark."""
+    return [{
+        "student": r["student"],
+        "subject": r["subject"],
+        "average": r["mark"],
+        "flag_color": "red" if r["band"] == "critical" else "amber",
+    } for r in performance.at_risk_results(scope, term)]
 
 
 class HOSDashboardView(RoleRequiredMixin, TemplateView):
@@ -585,8 +596,6 @@ class HOSDashboardView(RoleRequiredMixin, TemplateView):
         perf_trend = None
 
         if perf_term:
-            active_students_qs = Student.objects.filter(status=StudentStatus.ACTIVE, is_archived=False)
-
             all_scores_qs = ExamScore.objects.filter(
                 term=perf_term,
                 status=ScoreStatus.APPROVED,
@@ -664,23 +673,8 @@ class HOSDashboardView(RoleRequiredMixin, TemplateView):
                 })
 
             # ── At-risk students (per-subject D or below) ──
-            students_map = {s.pk: s for s in active_students_qs}
-            for sid, subj_dict in student_groups.items():
-                for subj_name, subj_scores in subj_dict.items():
-                    wsum = tw = 0
-                    for sc in subj_scores:
-                        w = exam_weights.get(sc.exam_type, 0)
-                        wsum += float(sc.score) * w
-                        tw += w
-                    if tw > 0:
-                        avg = wsum / tw
-                        if avg < 60:
-                            at_risk_students.append({
-                                "student": students_map.get(sid),
-                                "subject": subj_name,
-                                "average": round(avg, 1),
-                                "flag_color": "red" if avg < 50 else "amber",
-                            })
+            # Same approved, weighted marks as the Performance Report.
+            at_risk_students = _at_risk_cards(performance.classes_scope(), perf_term)
 
             # ── Trend vs previous term ──
             prev_term = (
@@ -755,6 +749,8 @@ class HOSDashboardView(RoleRequiredMixin, TemplateView):
             "flagged_class_count": flagged_class_count,
             "dept_perf_list": dept_perf_list,
             "at_risk_students": at_risk_students,
+            "at_risk_learner_count": len({r["student"].pk for r in at_risk_students}),
+            "at_risk_term": perf_term,
             "perf_trend": perf_trend,
         })
         return ctx
@@ -1028,15 +1024,11 @@ class PrimaryHODDashboardView(RoleRequiredMixin, TemplateView):
         # FR-ACAD-010: Subject × Class Heatmap (HOD Reports)
         # Build heatmap grid: subjects as rows, classes as columns, cells = avg score
         # Uses aggregated queries to avoid N+1 per-subject/per-class loops.
-        from academics.models import ExamTypeConfiguration, ScoreStatus
+        from academics.models import ScoreStatus
         from django.db.models import Avg as DjangoAvg
         heatmap_data = []
         at_risk_students = []
         if term:
-            # Get active exam types for weighted average
-            exam_types = list(ExamTypeConfiguration.objects.filter(is_active=True))
-            exam_weights = {et.code: float(et.weight_percentage) for et in exam_types}
-            
             # Get all primary classes sorted
             primary_class_names = sorted(dept_classes)
             
@@ -1075,49 +1067,16 @@ class PrimaryHODDashboardView(RoleRequiredMixin, TemplateView):
                     row["classes"][cls_name] = avg if avg is not None else None
                 heatmap_data.append(row)
             
-            # At-risk students: weighted avg below 60 (D or below) in ANY subject
-            # UAT: "at-risk students averaging D or below in any subject"
-            all_scores_qs = (
-                ExamScore.objects.filter(
-                    student__class_name__in=primary_class_names,
-                    term=term,
-                    status=ScoreStatus.APPROVED,
-                )
-                .select_related('student')
-                .order_by('student_id', 'subject_name', 'exam_type')
-            )
-            _score_groups = {}
-            for sc in all_scores_qs:
-                key = (sc.student_id, sc.subject_name)
-                _score_groups.setdefault(key, []).append(sc)
+            # At-risk students: D or below in ANY subject, from the same
+            # approved, weighted marks as the Performance Report.
+            at_risk_students = _at_risk_cards(
+                performance.classes_scope(primary_class_names, "Department"), term)
 
-            students_map = {
-                s.pk: s for s in Student.objects.filter(
-                    class_name__in=primary_class_names, is_archived=False, status='active'
-                )
-            }
-
-            for (student_id, subj), scores in _score_groups.items():
-                wsum = 0
-                tw = 0
-                for sc in scores:
-                    w = exam_weights.get(sc.exam_type, 0)
-                    wsum += float(sc.score) * w
-                    tw += w
-                if tw > 0:
-                    avg = wsum / tw
-                    if avg < 60:  # D or below
-                        flag_color = "red" if avg < 50 else "amber"
-                        at_risk_students.append({
-                            "student": students_map.get(student_id),
-                            "subject": subj,
-                            "average": round(avg, 1),
-                            "flag_color": flag_color,
-                        })
-        
         ctx["heatmap_data"] = heatmap_data
         ctx["heatmap_classes"] = sorted(dept_classes)
         ctx["at_risk_students"] = at_risk_students
+        ctx["at_risk_learner_count"] = len({r["student"].pk for r in at_risk_students})
+        ctx["at_risk_term"] = term
 
         return ctx
 

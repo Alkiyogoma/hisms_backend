@@ -1,0 +1,87 @@
+/* Lesson plan viewer: faithful preview of the attached plan beside its
+   comment thread. Markup in templates/academics/_lp_viewer.html. */
+.lpv { position: fixed; inset: 0; z-index: 10000; background: rgba(15, 23, 42, .62); backdrop-filter: blur(3px); display: none; }
+.lpv.open { display: block; }
+.lpv [hidden] { display: none !important; }
+.lpv-panel { position: absolute; inset: 14px; background: #fff; border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 64px rgba(0,0,0,.35); }
+.lpv-head { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid #E2E8F0; background: #F8FAFC; flex-shrink: 0; }
+.lpv-head-txt { min-width: 0; flex: 1; }
+.lpv-title { font-size: 15px; font-weight: 700; color: #1E293B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0; }
+.lpv-sub { font-size: 12px; color: #64748B; margin-top: 2px; }
+.lpv-icon-btn { background: none; border: 1px solid transparent; border-radius: 8px; padding: 6px; cursor: pointer; color: #64748B; display: inline-flex; align-items: center; justify-content: center; }
+.lpv-icon-btn:hover:not(:disabled) { background: #EEF2F7; color: #1E293B; }
+.lpv-icon-btn:disabled { opacity: .4; cursor: default; }
+.lpv-icon-btn:focus-visible, .lpv-btn:focus-visible, .lpv-tab:focus-visible { outline: 2px solid var(--hodari-blue, #023E8A); outline-offset: 1px; }
+
+.lpv-switch { display: none; gap: 4px; padding: 8px 12px; border-bottom: 1px solid #E2E8F0; }
+.lpv-switch button { flex: 1; padding: 7px; font-size: 12.5px; font-weight: 700; border-radius: 8px; border: 1px solid #E2E8F0; background: #fff; color: #64748B; cursor: pointer; }
+.lpv-switch button.on { background: #EFF6FF; border-color: #BFDBFE; color: var(--hodari-blue, #023E8A); }
+
+.lpv-body { flex: 1; display: flex; min-height: 0; }
+.lpv-doc { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #E9EDF3; }
+.lpv-tabs { display: flex; gap: 6px; padding: 8px 12px 0; overflow-x: auto; flex-shrink: 0; }
+.lpv-tab { border: 1px solid #CBD5E1; border-bottom: none; background: #F1F5F9; color: #475569; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 8px 8px 0 0; cursor: pointer; white-space: nowrap; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+.lpv-tab.on { background: #fff; color: #1E293B; }
+.lpv-toolbar { display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: #fff; border-bottom: 1px solid #E2E8F0; flex-shrink: 0; flex-wrap: wrap; }
+.lpv-toolbar .sep { width: 1px; height: 20px; background: #E2E8F0; margin: 0 4px; }
+.lpv-pageinfo { font-size: 12.5px; color: #334155; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 4px; }
+.lpv-pageinfo input { width: 44px; padding: 3px 4px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 12.5px; text-align: center; }
+.lpv-zoom { font-size: 12.5px; color: #334155; min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; }
+.lpv-btn { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; font-size: 12px; font-weight: 600; border-radius: 7px; border: 1px solid #E2E8F0; background: #fff; color: #475569; cursor: pointer; text-decoration: none; }
+.lpv-btn:hover { background: #F1F5F9; }
+.lpv-btn.primary { background: var(--hodari-blue, #023E8A); color: #fff; border-color: var(--hodari-blue, #023E8A); }
+.lpv-btn.primary:hover { background: #022d7a; }
+.lpv-btn.primary:disabled { opacity: .55; cursor: default; }
+.lpv-spacer { flex: 1; }
+/* Pages are centred with auto margins, not align-items, so a zoomed page
+   wider than the pane stays scrollable to its left edge. */
+.lpv-pages { flex: 1; overflow: auto; padding: 16px; display: flex; flex-direction: column; align-items: flex-start; gap: 14px; outline: none; }
+.lpv-page { background: #fff; box-shadow: 0 1px 4px rgba(15,23,42,.18); flex-shrink: 0; margin: 0 auto; }
+.lpv-pages > img, .lpv-pages > pre, .lpv-pages > table, .lpv-pages > .lpv-msg { margin-left: auto; margin-right: auto; }
+.lpv-page canvas { display: block; }
+.lpv-pages img { max-width: none; background: #fff; box-shadow: 0 1px 4px rgba(15,23,42,.18); }
+.lpv-pages pre { background: #fff; padding: 16px; margin: 0; width: 100%; max-width: 960px; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; line-height: 1.55; font-family: 'SF Mono', 'Fira Code', monospace; }
+.lpv-pages table { background: #fff; border-collapse: collapse; font-size: 12px; }
+.lpv-pages th, .lpv-pages td { border: 1px solid #CBD5E1; padding: 5px 9px; text-align: left; }
+.lpv-pages th { background: #F1F5F9; }
+.lpv-msg { margin: auto; text-align: center; color: #64748B; font-size: 13px; max-width: 420px; padding: 24px; line-height: 1.6; }
+.lpv-msg b { color: #1E293B; display: block; font-size: 14px; margin-bottom: 4px; }
+.lpv-spin { width: 26px; height: 26px; border: 3px solid #CBD5E1; border-top-color: var(--hodari-blue, #023E8A); border-radius: 50%; animation: lpv-spin .8s linear infinite; margin: 0 auto 10px; }
+@keyframes lpv-spin { to { transform: rotate(360deg); } }
+
+.lpv-thread { width: 360px; flex-shrink: 0; border-left: 1px solid #E2E8F0; display: flex; flex-direction: column; min-height: 0; background: #fff; }
+.lpv-thread-h { padding: 12px 16px; border-bottom: 1px solid #F1F5F9; }
+.lpv-thread-h h4 { margin: 0; font-size: 14px; font-weight: 700; color: #1E293B; }
+.lpv-thread-h p { margin: 3px 0 0; font-size: 11.5px; color: #64748B; line-height: 1.45; }
+.lpv-feedback { margin: 10px 16px 0; padding: 8px 12px; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px; font-size: 12px; color: #92400E; line-height: 1.45; }
+.lpv-list { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; }
+.lpv-c { display: flex; gap: 9px; }
+.lpv-c-av { width: 30px; height: 30px; border-radius: 50%; background: #E0E7FF; color: #3730A3; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.lpv-c.teacher .lpv-c-av { background: #DCFCE7; color: #166534; }
+.lpv-c-main { min-width: 0; flex: 1; }
+.lpv-c-meta { font-size: 11.5px; color: #64748B; display: flex; flex-wrap: wrap; gap: 0 6px; align-items: baseline; }
+.lpv-c-meta b { color: #1E293B; font-size: 12.5px; }
+.lpv-c-role { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+.lpv-c-body { margin-top: 3px; font-size: 13px; color: #1E293B; line-height: 1.5; white-space: pre-wrap; word-break: break-word; background: #F8FAFC; border: 1px solid #EEF2F7; border-radius: 4px 10px 10px 10px; padding: 7px 10px; }
+.lpv-c.mine .lpv-c-body { background: #EFF6FF; border-color: #DBEAFE; }
+.lpv-empty { color: #94A3B8; font-size: 12.5px; text-align: center; margin: auto 0; padding: 20px 0; }
+.lpv-form { border-top: 1px solid #E2E8F0; padding: 12px 16px; background: #FCFDFE; }
+.lpv-form textarea { width: 100%; min-height: 72px; max-height: 200px; resize: vertical; padding: 8px 10px; border: 1px solid #CBD5E1; border-radius: 8px; font: inherit; font-size: 13px; box-sizing: border-box; }
+.lpv-form textarea:focus { outline: none; border-color: var(--hodari-blue, #023E8A); box-shadow: 0 0 0 3px rgba(2,62,138,.12); }
+.lpv-form-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.lpv-form-row small { flex: 1; color: #94A3B8; font-size: 11px; }
+.lpv-err { color: #DC2626; font-size: 12px; margin-top: 6px; }
+.lpv-readonly { border-top: 1px solid #E2E8F0; padding: 10px 16px; font-size: 11.5px; color: #94A3B8; }
+
+/* Comment count on the list actions */
+.lp-cmt-count { display: inline-flex; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--hodari-blue, #023E8A); color: #fff; font-size: 10px; font-weight: 700; align-items: center; justify-content: center; }
+
+@media (max-width: 900px) {
+  .lpv-panel { inset: 0; border-radius: 0; }
+  .lpv-switch { display: flex; }
+  .lpv-body { position: relative; }
+  .lpv-thread { width: auto; border-left: none; position: absolute; inset: 0; display: none; }
+  .lpv[data-pane="thread"] .lpv-thread { display: flex; }
+  .lpv[data-pane="thread"] .lpv-doc { visibility: hidden; }
+  .lpv-pages { padding: 10px; }
+}

@@ -212,7 +212,7 @@
 <!-- filters -->
 <form method="get" class="pr-filterbar" id="prFilters">
   <input type="hidden" name="view" value="{{ view }}">
-  {% if view == 'help' %}<input type="hidden" name="show" value="{{ show }}"><input type="hidden" name="group" value="{{ group }}">{% endif %}
+  {% if view == 'help' %}<input type="hidden" name="show" value="{{ show }}"><input type="hidden" name="group" value="{{ group }}">{% if group == 'learner' %}<input type="hidden" name="sort" value="{{ sort }}">{% endif %}{% endif %}
   <div class="pr-filters">
     <div class="pr-fg">
       <label for="fYear">Academic year</label>
@@ -340,10 +340,10 @@
   <div class="pr-card-h">
     <div>
       <div class="pr-card-t">Who needs help</div>
-      <div class="pr-card-s">{% if group == 'learner' %}One row per student, by average across {% if selected_subject %}{{ selected_subject }}{% else %}the subjects in view{% endif %}{% else %}One row per student per subject{% endif %} &mdash; lowest first.</div>
+      <div class="pr-card-s">{% if group == 'learner' %}One row per student, by average across {% if selected_subject %}{{ selected_subject }}{% else %}the subjects in view{% endif %}{% else %}One row per student per subject{% endif %} &mdash; {% if sort == 'below' %}most subjects below pass first{% else %}lowest first{% endif %}.</div>
     </div>
     <div class="pr-seg" role="group" aria-label="Group rows">
-      <a class="{% if group == 'result' %}on{% endif %}" href="{% querystring group='result' page=None %}">By subject result</a>
+      <a class="{% if group == 'result' %}on{% endif %}" href="{% querystring group='result' sort=None page=None %}">By subject result</a>
       <a class="{% if group == 'learner' %}on{% endif %}" href="{% querystring group='learner' page=None %}">By student</a>
     </div>
   </div>
@@ -353,6 +353,12 @@
         <a class="pr-chip{% if show == key %} on{% endif %}" href="{% querystring show=key page=None %}" title="{{ count }} {% if group == 'learner' %}student{{ count|pluralize }}{% else %}result{{ count|pluralize }}{% endif %}">{{ label }}<span class="ct">{{ count }}</span></a>
       {% endfor %}
     </div>
+    {% if group == 'learner' %}
+    <div class="pr-seg" role="group" aria-label="Sort students">
+      <a class="{% if sort == 'average' %}on{% endif %}" href="{% querystring sort=None page=None %}">Lowest average</a>
+      <a class="{% if sort == 'below' %}on{% endif %}" href="{% querystring sort='below' page=None %}">Most subjects below pass</a>
+    </div>
+    {% endif %}
     <form method="get" class="pr-search" role="search">
       {% for k, vals in request.GET.lists %}{% if k != 'q' and k != 'page' %}{% for v in vals %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}{% endif %}{% endfor %}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
@@ -397,8 +403,8 @@
     <c-empty-state title="No approved marks yet" desc="No marks have been entered and approved for this selection. Try another term, assessment type or class." icon="search" icon_color="grey" />
   {% endif %}
   <div class="pr-foot">
-    {% if help_total %}{{ help_total }} {% if group == 'learner' %}student{{ help_total|pluralize }}{% else %}result{{ help_total|pluralize }}{% endif %} shown, lowest first. {% endif %}
-    {% if group == 'learner' %}A student needs help when their average, or any single subject, is below {{ pass_mark }}%. {% endif %}
+    {% if help_total %}{{ help_total }} {% if group == 'learner' %}student{{ help_total|pluralize }}{% else %}result{{ help_total|pluralize }}{% endif %} shown, {% if sort == 'below' %}most subjects below pass first{% else %}lowest first{% endif %}. {% endif %}
+    {% if group == 'learner' %}Status follows the student&rsquo;s average; single subjects below {{ pass_mark }}% are listed under &ldquo;Below pass in&rdquo; and flagged in the By subject result view. {% endif %}
     {% if not selected_type %}Weighted averages use the configured assessment weights, rescaled over the assessments marked so far. {% endif %}
     {% if not selected_term %}With all terms selected, each mark is the average of the student's term results.{% endif %}
   </div>
