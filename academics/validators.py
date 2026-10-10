@@ -57,6 +57,27 @@ def validate_attachment_file(file, area="lesson_plans"):
             )
 
 
+def attachment_rules(area="lesson_plans"):
+    """The upload limits for *area*, in the form the screens state them."""
+    config = _get_media_config(area)
+    if config:
+        extensions = sorted(config.allowed_extensions_set)
+        max_file_mb, max_files = config.max_file_size_mb, config.max_files
+    else:
+        extensions = sorted(LESSON_PLAN_ALLOWED_EXTENSIONS)
+        max_file_mb, max_files = LESSON_PLAN_MAX_FILE_SIZE // (1024 * 1024), 5
+    return {
+        "extensions": extensions,
+        "accept": ",".join(f".{e}" for e in extensions),
+        "max_file_mb": max_file_mb,
+        "max_files": max_files,
+        "summary": (
+            f"Accepted: {', '.join(e.upper() for e in extensions)}. "
+            f"Up to {max_file_mb} MB each, {max_files} file{'s' if max_files != 1 else ''} at a time."
+        ),
+    }
+
+
 def validate_upload_batch(files, area="lesson_plans"):
     """Validate a batch of files against the MediaSettings for *area*.
 

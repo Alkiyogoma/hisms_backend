@@ -14,6 +14,7 @@ from django.views.generic import CreateView, UpdateView, TemplateView, View
 import json
 
 from academics.ecd_utils import build_ecd_report_context, ecd_template_type_from_class_name, grade_class_names_for_department
+from academics.validators import attachment_rules
 from academics.forms import LessonPlanForm, LessonPlanReviewForm, ExamScoreFilterForm, SubjectForm, TermForm
 from academics.models import (
     AcademicYear,
@@ -22,6 +23,7 @@ from academics.models import (
     ExamScore,
     ExamType,
     LessonPlan,
+    LESSON_PLAN_FILE_REQUIRED,
     LessonPlanAttachment,
     LessonPlanStatus,
     GradeClass,
@@ -85,6 +87,29 @@ def _hod_departments(user):
 
 def _is_super_admin(user) -> bool:
     return getattr(user, 'role', '') == UserRole.SUPER_ADMIN
+
+
+# Plans that are waiting on the person looking at the list come first.
+TEACHER_ACTION_STATUSES = (LessonPlanStatus.REVISION_REQUESTED, LessonPlanStatus.REJECTED, LessonPlanStatus.DRAFT)
+REVIEWER_ACTION_STATUSES = (LessonPlanStatus.SUBMITTED,)
+
+
+def _search_lesson_plans(qs, text):
+    """Every word must match the subject, class, lesson title or teacher's name."""
+    from django.db.models import Q
+    for word in (text or "").split():
+        qs = qs.filter(
+            Q(subject_name__icontains=word) | Q(class_name__icontains=word) | Q(lesson_title__icontains=word)
+            | Q(teacher__first_name__icontains=word) | Q(teacher__last_name__icontains=word)
+        )
+    return qs
+
+
+def _action_first(qs, statuses):
+    from django.db.models import Case, IntegerField, Value, When
+    return qs.annotate(
+        needs_action=Case(When(status__in=statuses, then=Value(1)), default=Value(0), output_field=IntegerField())
+    ).order_by("-needs_action", "-week_start_date", "-created_at")
 
 
 class LessonPlanListView(RoleRequiredMixin, TemplateView):
@@ -255,7 +280,7 @@ class LessonPlanListView(RoleRequiredMixin, TemplateView):
         if _is_hod_like(user) and status_filter == "submitted":
             display_qs = queue
         elif _is_hod_like(user):
-            display_qs = LessonPlan.objects.select_related("teacher", "term").prefetch_related("attachments").order_by("-created_at")
+            display_qs = LessonPlan.objects.select_related("teacher", "term", "reviewed_by").prefetch_related("attachments").order_by("-created_at")
             # HODs should not see unsubmitted (draft) plans from other teachers
             if not status_filter or status_filter != "draft":
                 display_qs = display_qs.exclude(status=LessonPlanStatus.DRAFT)
@@ -273,6 +298,20 @@ class LessonPlanListView(RoleRequiredMixin, TemplateView):
                 display_qs = display_qs.filter(status=status_filter)
         else:
             display_qs = mine_qs
+        if _is_hod_like(user) and selected_teacher:
+            display_qs = display_qs.filter(teacher=selected_teacher)
+        search = (self.request.GET.get("q") or "").strip()
+        display_qs = _search_lesson_plans(display_qs, search)
+        display_qs = _action_first(
+            display_qs, REVIEWER_ACTION_STATUSES if _is_hod_like(user) else TEACHER_ACTION_STATUSES
+        )
+        ctx["search"] = search
+        # Keeps search, dates, status and teacher when paging.
+        query = self.request.GET.copy()
+        query.pop("mine_page", None)
+        query.pop("page", None)
+        ctx["filter_query"] = query.urlencode()
+        ctx["has_filters"] = any(self.request.GET.get(k) for k in ("q", "status", "teacher", "date_from", "date_to"))
         display_total = display_qs.count()
 
         mine_page = int(self.request.GET.get("mine_page", 1))
@@ -332,6 +371,7 @@ class LessonPlanContextMixin:
         ctx = super().get_context_data(**kwargs)
         user = self.request.user
         role = user.role
+        ctx["attachment_rules"] = attachment_rules()
 
         # Recent submissions (non-draft) for the sidebar
         ctx["recent_submissions"] = (
@@ -579,6 +619,7 @@ class QuickLessonPlanView(RoleRequiredMixin, View):
             "week_start": week_start,
             "week_offset": week_offset,
             "can_choose_teacher": request.user.role != UserRole.TEACHER,
+            "attachment_rules": attachment_rules(),
         }
         return render(request, "academics/_quick_lp_modal.html", context)
 
@@ -608,6 +649,12 @@ class QuickLessonPlanView(RoleRequiredMixin, View):
         lesson_title = (request.POST.get("lesson_title") or "").strip()
         action = request.POST.get("action", "draft")
 
+        uploads, upload_errors, _ = _checked_uploads(request)
+        if upload_errors:
+            return _modal_error("Nothing was saved. " + " ".join(upload_errors))
+        if action == "submit" and not uploads:
+            return _modal_error(LESSON_PLAN_FILE_REQUIRED)
+
         plan = LessonPlan(
             teacher=teacher,
             term=term,
@@ -619,16 +666,7 @@ class QuickLessonPlanView(RoleRequiredMixin, View):
             status=LessonPlanStatus.DRAFT,
         )
         plan.save()
-
-        # Handle file uploads
-        files = request.FILES.getlist("attachments")
-        for f in files:
-            LessonPlanAttachment.objects.create(
-                lesson_plan=plan,
-                file=f,
-                filename=f.name,
-                uploaded_by=request.user,
-            )
+        _save_uploads(plan, uploads, request.user)
 
         # If submitting, change status and set submitted_at
         if action == "submit":
@@ -636,6 +674,7 @@ class QuickLessonPlanView(RoleRequiredMixin, View):
             plan.status = LessonPlanStatus.SUBMITTED
             plan.submitted_at = tz.now()
             plan.save(update_fields=["status", "submitted_at", "updated_at"])
+            _notify_hod_lesson_plan(plan, request.user)
 
         # Log it
         from audit.models import log_event
@@ -747,6 +786,7 @@ class LessonPlanEditModalView(RoleRequiredMixin, View):
         context = {
             "plan": plan,
             "attachments": attachments,
+            "attachment_rules": attachment_rules(),
         }
         return render(request, "academics/_lp_edit_modal.html", context)
 
@@ -758,9 +798,19 @@ class LessonPlanEditModalView(RoleRequiredMixin, View):
         lesson_title = (request.POST.get("lesson_title") or "").strip()
         action = request.POST.get("action", plan.status)
 
+        uploads, upload_errors, skipped = _checked_uploads(request, plan.attachments.all())
+        if upload_errors:
+            return _modal_error("Nothing was saved. " + " ".join(upload_errors))
+        if (action == "submit" and plan.status != LessonPlanStatus.SUBMITTED
+                and not uploads and not plan.attachments.exists()):
+            return _modal_error(LESSON_PLAN_FILE_REQUIRED)
+
         before = _lesson_plan_snapshot(plan)
 
         plan.lesson_title = lesson_title
+
+        # Files first, so the plan is never submitted before its file is saved.
+        _save_uploads(plan, uploads, request.user)
 
         if action == "submit" and plan.status != LessonPlanStatus.SUBMITTED:
             from django.utils import timezone as tz
@@ -789,15 +839,6 @@ class LessonPlanEditModalView(RoleRequiredMixin, View):
             plan.save()
             toast_msg_text = f"Lesson plan updated for {plan.class_name} - {plan.subject_name}"
             toast_color = "#023AA5"
-
-        files = request.FILES.getlist("attachments")
-        for f in files:
-            LessonPlanAttachment.objects.create(
-                lesson_plan=plan,
-                file=f,
-                filename=f.name,
-                uploaded_by=request.user,
-            )
 
         from audit.models import log_event
         log_event(
@@ -863,6 +904,54 @@ class LessonPlanUpdateView(LessonPlanContextMixin, RoleRequiredMixin, UpdateView
     def form_valid(self, form):
         return _lesson_plan_form_processing(self, form)
 
+def _checked_uploads(request, existing=None):
+    """The lesson plan files in ``request`` that may be saved.
+
+    Returns ``(files, errors, skipped)``: ``errors`` stops the whole request
+    (a file of the wrong type or too large), ``skipped`` names duplicates of
+    files already on the plan. Every route that saves attachments uses this,
+    so a rejected file can never be what makes a plan look complete.
+    """
+    from academics.validators import check_duplicate_file, validate_upload_batch
+    import os as _os
+    files = request.FILES.getlist("attachments")
+    if not files:
+        return [], [], []
+    try:
+        validate_upload_batch(files, area="lesson_plans")
+    except ValidationError as e:
+        return [], list(e.messages), []
+    keep, skipped = [], []
+    for f in files:
+        if existing is not None and check_duplicate_file(f, existing, area="lesson_plans"):
+            skipped.append(f.name)
+            continue
+        f.name = re.sub(r'[^\w\.\-\(\)]', '_', _os.path.basename(f.name)).strip()
+        keep.append(f)
+    return keep, [], skipped
+
+
+def _save_uploads(plan, files, user):
+    for f in files:
+        LessonPlanAttachment.objects.create(lesson_plan=plan, file=f, filename=f.name, uploaded_by=user)
+
+
+def _modal_error(message):
+    """Error for the timetable modals: shown inside the open modal, nothing saved.
+
+    htmx does not swap error responses, so this is a 200 retargeted at the
+    modal's error slot, and it re-enables the buttons that were set to busy."""
+    from django.utils.html import escape
+    resp = HttpResponse(
+        f'<div style="margin:0 0 14px;padding:10px 12px;background:#FEF2F2;border:1px solid #FECACA;'
+        f'border-radius:8px;color:#991B1B;font-size:12.5px;line-height:1.5">{escape(message)}</div>'
+        '<script>window.qlpReset && window.qlpReset();</script>'
+    )
+    resp["HX-Retarget"] = "#quick-lp-error"
+    resp["HX-Reswap"] = "innerHTML"
+    return resp
+
+
 def _lesson_plan_snapshot(plan):
     """Serialize a LessonPlan's key fields for audit log snapshots."""
     return {
@@ -911,21 +1000,8 @@ def _lesson_plan_form_processing(view_instance, form):
         is_late = now > deadline_dt
         can_bypass = view_instance.request.user.role == UserRole.SUPER_ADMIN
         
-        if view_instance.request.POST.get("action") == "submit":
-            if is_late:
-                if not can_bypass:
-                    messages.warning(view_instance.request, f"Submission deadline was {deadline_dt.strftime('%d %B, %H:%M')}. Plan will be flagged as late.")
-                else:
-                    messages.info(view_instance.request, "Super Admin: bypassing deadline.")
-                
-            form.instance.status = LessonPlanStatus.SUBMITTED
-            form.instance.submitted_at = now
-            view_instance._notify = True
-            messages.success(view_instance.request, "Lesson plan submitted for HOD review.")
-        else:
-            view_instance._notify = False
-            messages.success(view_instance.request, "Lesson plan saved as draft.")
-            
+        submitting = view_instance.request.POST.get("action") == "submit"
+
         # Enforce Teacher-Class Integration from Timetable (skip for existing plans being edited)
         from timetable.models import TimetableSlot
         is_assigned = TimetableSlot.objects.filter(
@@ -957,82 +1033,42 @@ def _lesson_plan_form_processing(view_instance, form):
             )
             return redirect("academics:lesson_plan_edit", pk=existing_plan.pk)
         
-        # Require at least one attachment for submission
-        if view_instance.request.POST.get("action") == "submit":
-            has_new = view_instance.request.FILES and len(view_instance.request.FILES.getlist('attachments')) > 0
-            has_existing = form.instance.pk and form.instance.attachments.exists()
-            if not has_new and not has_existing:
-                messages.error(view_instance.request, "Please attach at least one file before submitting.")
-                return view_instance.form_invalid(form)
+        # Check the files before anything is saved: a submitted plan must
+        # carry its file, and a rejected upload does not count as one.
+        existing = form.instance.attachments.all() if form.instance.pk else LessonPlanAttachment.objects.none()
+        uploads, upload_errors, skipped = _checked_uploads(view_instance.request, existing)
+        if upload_errors:
+            for msg in upload_errors:
+                form.add_error(None, msg)
+            messages.error(view_instance.request, "Nothing was saved. " + " ".join(upload_errors))
+            return view_instance.form_invalid(form)
+        if submitting and not uploads and not existing.exists():
+            form.add_error(None, LESSON_PLAN_FILE_REQUIRED)
+            messages.error(view_instance.request, LESSON_PLAN_FILE_REQUIRED)
+            return view_instance.form_invalid(form)
+        for name in skipped:
+            messages.warning(view_instance.request, f"File '{name}' appears to be a duplicate — skipped.")
+
+        if submitting:
+            if is_late:
+                if not can_bypass:
+                    messages.warning(view_instance.request, f"Submission deadline was {deadline_dt.strftime('%d %B, %H:%M')}. Plan will be flagged as late.")
+                else:
+                    messages.info(view_instance.request, "Super Admin: bypassing deadline.")
+            form.instance.status = LessonPlanStatus.SUBMITTED
+            form.instance.submitted_at = now
+            view_instance._notify = True
+            messages.success(view_instance.request, "Lesson plan submitted for HOD review.")
+        else:
+            view_instance._notify = False
+            messages.success(view_instance.request, "Lesson plan saved as draft.")
         
         # Capture BEFORE snapshot BEFORE saving (audit fix)
         before_snapshot = _lesson_plan_snapshot(form.instance) if form.instance.pk else None
 
         response = super(view_instance.__class__, view_instance).form_valid(form)
         
-        # Handle Attachments (with batch + duplicate + size validation)
-        if view_instance.request.FILES:
-            from academics.models import LessonPlanAttachment
-            from academics.validators import validate_upload_batch, check_duplicate_file, validate_attachment_file
-            files = view_instance.request.FILES.getlist('attachments')
-
-            # Combined size + count limit per MediaSettings
-            try:
-                validate_upload_batch(files, area="lesson_plans")
-            except ValidationError as e:
-                msg = e.message if hasattr(e, 'message') else str(e)
-                messages.error(view_instance.request, msg)
-                from communications.email_service import dispatch_notification
-                dispatch_notification(
-                    user=view_instance.request.user,
-                    title="File upload error",
-                    message=msg,
-                    link="",
-                )
-                return view_instance.form_invalid(form)
-
-            # Duplicate detection against existing attachments
-            if form.instance.pk:
-                existing_att = form.instance.attachments.all()
-            else:
-                existing_att = LessonPlanAttachment.objects.none()
-
-            for f in files:
-                duplicates = check_duplicate_file(f, existing_att, area="lesson_plans")
-                if duplicates:
-                    msg = f"File '{f.name}' appears to be a duplicate — skipped."
-                    messages.warning(view_instance.request, msg)
-                    from communications.email_service import dispatch_notification
-                    dispatch_notification(
-                        user=view_instance.request.user,
-                        title="Duplicate file skipped",
-                        message=msg,
-                        link="",
-                    )
-                    continue
-                try:
-                    validate_attachment_file(f, area="lesson_plans")
-                except ValidationError as e:
-                    msg = f"Attachment '{f.name}' rejected: {e.message}" if f.name else f"File rejected: {e.message}"
-                    messages.error(view_instance.request, msg)
-                    from communications.email_service import dispatch_notification
-                    dispatch_notification(
-                        user=view_instance.request.user,
-                        title="File validation error",
-                        message=msg,
-                        link="",
-                    )
-                    continue
-                import os as _os
-                raw_name = _os.path.basename(f.name)
-                safe_name = re.sub(r'[^\w\.\-\(\)]', '_', raw_name).strip()
-                f.name = safe_name
-                LessonPlanAttachment.objects.create(
-                    lesson_plan=form.instance,
-                    file=f,
-                    filename=safe_name,
-                    uploaded_by=view_instance.request.user
-                )
+        _save_uploads(form.instance, uploads, view_instance.request.user)
 
         if view_instance._notify:
             _notify_hod_lesson_plan(form.instance, view_instance.request.user)
@@ -1074,7 +1110,9 @@ class LessonPlanSubmitView(RoleRequiredMixin, LoginRequiredMixin, View):
             raise ValidationError("Approved lesson plans cannot be resubmitted.")
         # Require at least one attachment
         if not plan.attachments.exists():
-            messages.error(request, "Please attach at least one file before submitting.")
+            messages.error(request, LESSON_PLAN_FILE_REQUIRED)
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return JsonResponse({"success": False, "message": LESSON_PLAN_FILE_REQUIRED}, status=400)
             return redirect("academics:lesson_plans")
         before = _lesson_plan_snapshot(plan)
         plan.status = LessonPlanStatus.SUBMITTED

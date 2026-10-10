@@ -151,6 +151,62 @@
   .att-btn-sm.has-files:hover { background: #DBEAFE; }
   .att-btn-sm.no-files { background: #F1F5F9; color: #94A3B8; cursor: default; }
 
+
+  /* Rows: the lesson first, then who/when/status, then the actions. */
+  .lp-title { font-weight: 700; color: var(--text-primary); font-size: 13.5px; line-height: 1.35; }
+  .lp-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .lp-date { font-weight: 600; font-size: 13px; }
+  .lp-nowrap { white-space: nowrap; }
+  .lp-count { font-size: 12px; color: var(--text-muted); margin: -8px 0 8px; }
+  .lp-feedback { margin-top: 8px; padding: 7px 10px; border-radius: 8px; font-size: 12px; line-height: 1.5; background: #FFF1F2; border: 1px solid #FECACA; color: #991B1B; max-width: 520px; }
+  .lp-feedback-revisionrequested { background: #FFFBEB; border-color: #FDE68A; color: #78350F; }
+  .lp-feedback-approved { background: #E8F5EC; border-color: #BBF7D0; color: #14532D; }
+  .lp-table tr.lp-needs-action td:first-child { box-shadow: inset 3px 0 0 var(--hodari-blue); }
+  .lp-th-actions, .lp-td-actions { text-align: right; }
+  .lp-actions { display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+  .lp-actions form { display: inline; margin: 0; }
+  @media (min-width: 1280px) { .lp-table .lp-actions { flex-wrap: nowrap; } .lp-td-actions { width: 1%; } }
+  @media (min-width: 761px) { .results-table-container { overflow-x: auto; } .lp-td-actions { min-width: 150px; } }
+  .lp-btn { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 12px; border-radius: 7px; font-size: 12px; font-weight: 700; border: 1px solid transparent; cursor: pointer; text-decoration: none; white-space: nowrap; font-family: inherit; line-height: 1; }
+  .lp-btn:disabled { opacity: .45; cursor: not-allowed; }
+  .lp-btn-primary { background: var(--hodari-blue); color: #fff; }
+  .lp-btn-secondary { background: #fff; color: #334155; border-color: var(--border); }
+  .lp-btn-ghost { background: #EFF6FF; color: var(--hodari-blue); }
+  .lp-btn-approve { background: #16A34A; color: #fff; }
+  .lp-btn-danger { background: #FEF2F2; color: #DC2626; border-color: #FECACA; }
+  .lp-btn-icon { width: 30px; padding: 0; justify-content: center; background: #fff; color: #94A3B8; border-color: var(--border); }
+  .lp-btn-icon:hover { color: #DC2626; border-color: #FECACA; background: #FEF2F2; }
+  .st-revisionrequested { background: #FFFBEB; color: #B45309; }
+  .st-missing { background: #FEF2F2; color: #9B1C1C; }
+  .lp-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .lp-when { font-size: 11.5px; color: var(--text-muted); font-weight: 600; white-space: nowrap; }
+  .lp-card .lp-feedback { max-width: none; }
+  .lp-card-foot { margin-top: auto; padding-top: 12px; }
+  .lp-card-foot .lp-actions { justify-content: flex-start; }
+  .lp-card.lp-needs-action { border-left: 3px solid var(--hodari-blue); }
+  .lp-grid-view { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)) !important; }
+  .filter-bar { padding: 14px 16px; margin: 0 0 18px; gap: 10px; }
+  .filter-bar .hf2-input, .filter-bar .hf2-select { height: 38px; }
+
+  /* Phones: each plan becomes a card; the grid toggle is not needed. */
+  @media (max-width: 760px) {
+    .lp-table thead { display: none; }
+    .lp-table, .lp-table tbody, .lp-table tr, .lp-table td { display: block; width: 100%; }
+    .lp-table tr { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; background: #fff; }
+    .lp-table tr.lp-needs-action { border-left: 3px solid var(--hodari-blue); }
+    .lp-table tr.lp-needs-action td:first-child { box-shadow: none; }
+    .lp-table td { border: none !important; padding: 3px 0 !important; }
+    .lp-table td[data-label="Teacher"]::before, .lp-table td[data-label="Lesson date"]::before { content: attr(data-label) ": "; color: var(--text-muted); font-size: 11.5px; }
+    .lp-table td[data-label="Lesson date"] .lp-date, .lp-table td[data-label="Lesson date"] .lp-sub { display: inline; margin: 0; }
+    .lp-table td[data-label="Lesson date"] .lp-sub::before { content: " · "; }
+    .lp-td-actions { padding-top: 10px !important; }
+    .lp-actions { justify-content: flex-start; }
+    .lp-btn { height: 34px; }
+    .lp-table tr.lp-empty-row { border: none; padding: 0; }
+    .filter-bar .filter-group { flex: 1 1 100% !important; min-width: 0 !important; }
+    .view-mode-grid .results-table-container { display: block !important; }
+    .view-mode-grid .lp-grid-view { display: none !important; }
+  }
   @media print {
     .sidebar, .topbar, header, .filter-bar, .view-controls, .pagination,
     .btn-primary, .btn-secondary, .btn-danger, .hf-btn, .hf-btn-primary, .hf-btn-secondary, .hf-btn-danger,
@@ -220,16 +276,16 @@
   <form method="get" class="filter-bar">
     <div class="filter-group" style="flex: 2; min-width: 250px;">
       <span class="filter-label">Search</span>
-      <input name="q" type="text" class="hf2-input" placeholder="Subject or class name..." value="{{ request.GET.q }}" autocomplete="off">
+      <input name="q" type="search" class="hf2-input" placeholder="{% if can_review %}Lesson, subject, class or teacher{% else %}Lesson, subject or class{% endif %}" value="{{ search }}" autocomplete="off">
     </div>
 
     <div class="filter-group" style="flex: 1; min-width: 140px;">
-      <span class="filter-label">From</span>
+      <span class="filter-label">Week from</span>
       <input name="date_from" type="date" class="hf2-input" value="{{ request.GET.date_from }}" style="font-size:12px">
     </div>
 
     <div class="filter-group" style="flex: 1; min-width: 140px;">
-      <span class="filter-label">To</span>
+      <span class="filter-label">Week to</span>
       <input name="date_to" type="date" class="hf2-input" value="{{ request.GET.date_to }}" style="font-size:12px">
     </div>
 
@@ -261,224 +317,78 @@
 
     <div style="display:flex; gap:8px">
       <button type="submit" class="btn-primary" style="padding: 10px 20px;">Apply</button>
-      <a href="{% url 'academics:lesson_plans' %}" class="btn-secondary" style="padding: 10px 16px; text-decoration:none">Reset</a>
+      {% if has_filters %}<a href="{% url 'academics:lesson_plans' %}" class="btn-secondary" style="padding: 10px 16px; text-decoration:none">Reset</a>{% endif %}
     </div>
   </form>
 
   {# Grid View #}
   <div class="lp-grid-view">
     {% for p in mine %}
-    <div class="lp-card">
-      <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px">
-        <div class="card-avatar">
-          {{ p.teacher.last_name|slice:":1" }}{{ p.teacher.first_name|slice:":1" }}
-        </div>
-        <div style="flex:1; min-width:0">
-          <div class="card-name" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ p.subject_name }}</div>
-          <div class="card-admission">{{ p.class_name }}</div>
-        </div>
+    <div class="lp-card{% if p.needs_action %} lp-needs-action{% endif %}">
+      <div class="lp-card-top">
+        <span class="status-tag st-{{ p.status|cut:'_' }}">{{ p.get_status_display }}</span>
+        <span class="lp-when">{{ p.day_of_week|title|default:"Week" }} · {{ p.week_start_date|date:"j M" }}</span>
       </div>
-
-      <div style="padding-top:12px; border-top:1px solid #f1f5f9; margin-top:auto">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
-          <div class="card-class">Week of {{ p.week_start_date|date:"d M Y" }}</div>
-          <span class="status-tag {% if p.status == 'approved' %}st-approved{% elif p.status == 'rejected' %}st-rejected{% elif p.status == 'submitted' %}st-submitted{% elif p.status == 'revision_requested' %}st-revision-requested{% else %}st-draft{% endif %}">
-            {{ p.get_status_display }}
-          </span>
-        </div>
-        {% if can_review %}
-        <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px">by {{ p.teacher.get_full_name|default:p.teacher.get_username|title }}</div>
-        {% endif %}
-
-        {% if p.reviewer_feedback %}
-          <div class="feedback-box {% if p.status == 'approved' %}feedback-approved{% elif p.status == 'submitted' or p.status == 'revision_requested' %}feedback-review{% endif %}" style="margin-top:8px">
-            <div class="feedback-content" style="font-size:11px">
-              <strong>HOD:</strong> {{ p.reviewer_feedback|truncatewords:20 }}
-            </div>
-          </div>
-        {% endif %}
-
-        <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap">
-          {% with att_count=p.attachments.all|length %}
-          <button type="button" class="att-btn-sm {% if att_count > 0 %}has-files{% else %}no-files{% endif %}" onclick="openAttModal('{{ p.id }}')" {% if att_count == 0 %}disabled{% endif %}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
-            Files ({{ att_count }})
-          </button>
-          {% endwith %}
-
-          {% if p.status == 'draft' or p.status == 'rejected' or p.status == 'revision_requested' %}
-            {% if p.teacher == user %}
-            {% has_perm user "academics.change_lessonplan" as can_edit %}
-            {% if can_edit %}
-            <a href="{% url 'academics:lesson_plan_edit' p.id %}" class="att-btn-sm" style="background:#EFF6FF; color:var(--hodari-blue); text-decoration:none">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-              Edit
-            </a>
-            <form method="post" action="{% url 'academics:submit_lesson_plan' p.id %}" style="display:inline">
-              {% csrf_token %}
-              <button class="att-btn-sm" style="background:var(--hodari-blue); color:#fff">
-                Submit
-              </button>
-            </form>
-            <button type="button" class="att-btn-sm" style="background:#FEF2F2; color:#DC2626; border:1px solid #FECACA"
-              onclick="confirmDeleteModal({title:'Delete Lesson Plan?',body:'Delete this <strong>{{ p.subject_name }}</strong> lesson plan for <strong>{{ p.class_name }}</strong>?',detail:'This cannot be undone.',confirmText:'Delete Plan',url:'{% url 'academics:delete_lesson_plan' p.id %}'})">
-              Delete
-            </button>
-            {% endif %}
-            {% endif %}
-          {% elif p.status == 'submitted' %}
-            {% if can_review and p.teacher != user %}
-            <div style="display:flex; gap:4px; flex-wrap:wrap">
-              <form method="post" action="{% url 'academics:review_lesson_plan' p.id %}" style="display:inline">
-                {% csrf_token %}
-                <input type="hidden" name="feedback" value="">
-                <button name="decision" value="approved" class="att-btn-sm" style="background:#16A34A; color:#fff; border:none">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                  Approve
-                </button>
-              </form>
-              <button type="button" class="att-btn-sm" style="background:#FEF2F2; color:#DC2626; border:1px solid #FECACA"
-                onclick="openRejectModal({{ p.id }}, '{{ p.subject_name|escapejs }} — {{ p.class_name|escapejs }}')">
-                Reject
-              </button>
-            </div>
-            {% else %}
-            <form method="post" action="{% url 'academics:withdraw_lesson_plan' p.id %}" style="display:inline">
-              {% csrf_token %}
-              <button class="att-btn-sm" style="background:#F1F5F9; color:#475569">
-                Withdraw
-              </button>
-            </form>
-            {% endif %}
-          {% endif %}
-        </div>
-      </div>
+      <div class="lp-title">{{ p.lesson_title|default:"Untitled lesson" }}</div>
+      <div class="lp-sub">{{ p.subject_name }} · {{ p.class_name }}{% if can_review %} · {{ p.teacher.get_full_name|default:p.teacher.get_username }}{% endif %}</div>
+      {% if p.reviewer_feedback %}
+      <div class="lp-feedback lp-feedback-{{ p.status|cut:'_' }}"><strong>Feedback:</strong> {{ p.reviewer_feedback|truncatewords:24 }}</div>
+      {% endif %}
+      <div class="lp-card-foot">{% include "academics/_lp_actions.html" %}</div>
     </div>
     {% empty %}
     <div style="grid-column: 1 / -1;">
-      {% include '_partials/empty_state.html' with title='No lesson plans found' desc='Create your first plan for the current week.' icon='doc' icon_color='blue' action_url='/academics/lesson-plans/new/' action_text='Create Lesson Plan' action_btn='true' %}
+      {% if has_filters %}
+      {% include '_partials/empty_state.html' with title='No lesson plans match' desc='Try a different search or reset the filters.' icon='doc' icon_color='blue' %}
+      {% else %}
+      {% include '_partials/empty_state.html' with title='No lesson plans yet' desc='Create your first plan for the current week.' icon='doc' icon_color='blue' action_url='/academics/lesson-plans/new/' action_text='Create Lesson Plan' action_btn='true' %}
+      {% endif %}
     </div>
     {% endfor %}
   </div>
 
-  {# List View (Table) #}
-  <div class="results-table-container" style="overflow-x:auto">
+  {# List View #}
+  <div class="results-table-container">
+    {% if has_filters and mine %}<div class="lp-count">{{ mine_total_count }} plan{{ mine_total_count|pluralize }} match{{ mine_total_count|pluralize:"es," }}</div>{% endif %}
     <table class="lp-table">
       <thead>
         <tr>
-          <th>Subject</th>
-          <th>Class</th>
-          <th>Status</th>
+          <th>Lesson</th>
           {% if can_review %}<th>Teacher</th>{% endif %}
-          <th>Week</th>
-          <th>Day</th>
-          <th>Actions</th>
+          <th>Lesson date</th>
+          <th>Status</th>
+          <th class="lp-th-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
         {% for p in mine %}
-        <tr>
-          <td>
-            <div style="display:flex; align-items:center; gap:12px">
-              <div class="avatar-circle">
-                {{ p.teacher.last_name|slice:":1" }}{{ p.teacher.first_name|slice:":1" }}
-              </div>
-              <div>
-                <div style="font-weight:600; color:var(--text-primary)">{{ p.subject_name }}</div>
-                <div style="font-size:11px; color:var(--text-muted)">ID: #{{ p.id }}</div>
-              </div>
-            </div>
-          </td>
-          <td>
-            <div style="font-weight:500">{{ p.class_name }}</div>
-          </td>
-          <td>
-            <span class="status-tag {% if p.status == 'approved' %}st-approved{% elif p.status == 'rejected' %}st-rejected{% elif p.status == 'submitted' %}st-submitted{% elif p.status == 'revision_requested' %}st-revision-requested{% else %}st-draft{% endif %}">
-              {{ p.get_status_display }}
-            </span>
+        <tr class="{% if p.needs_action %}lp-needs-action{% endif %}">
+          <td data-label="Lesson">
+            <div class="lp-title">{{ p.lesson_title|default:"Untitled lesson" }}</div>
+            <div class="lp-sub">{{ p.subject_name }} · {{ p.class_name }}</div>
             {% if p.reviewer_feedback %}
-              <div class="feedback-box {% if p.status == 'approved' %}feedback-approved{% elif p.status == 'submitted' or p.status == 'revision_requested' %}feedback-review{% endif %}" style="margin-top:8px">
-                <div class="feedback-content" style="font-size:12px">
-                  <strong>HOD Feedback:</strong> {{ p.reviewer_feedback|truncatewords:30 }}
-                </div>
-              </div>
+            <div class="lp-feedback lp-feedback-{{ p.status|cut:'_' }}"><strong>Feedback{% if p.reviewed_by %} from {{ p.reviewed_by.get_full_name|default:p.reviewed_by.get_username }}{% endif %}:</strong> {{ p.reviewer_feedback|truncatewords:30 }}</div>
             {% endif %}
           </td>
           {% if can_review %}
-          <td>
-            <div style="font-weight:500">{{ p.teacher.get_full_name|default:p.teacher.get_username|title }}</div>
-          </td>
+          <td data-label="Teacher" class="lp-nowrap">{{ p.teacher.get_full_name|default:p.teacher.get_username }}</td>
           {% endif %}
-          <td>
-            <div style="font-size:13px">Week of {{ p.week_start_date|date:"d M Y" }}</div>
+          <td data-label="Lesson date" class="lp-nowrap">
+            <div class="lp-date">{{ p.day_of_week|title|default:"—" }}</div>
+            <div class="lp-sub">Week of {{ p.week_start_date|date:"j M Y" }}</div>
           </td>
-          <td>
-            <div style="font-size:12px; color:var(--text-muted)">{{ p.day_of_week|title|default:"-" }}</div>
-          </td>
-          <td>
-            <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap">
-              {% with att_count=p.attachments.all|length %}
-              <button type="button" class="att-btn-sm {% if att_count > 0 %}has-files{% else %}no-files{% endif %}" onclick="openAttModal('{{ p.id }}')" {% if att_count == 0 %}disabled{% endif %}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
-                Files ({{ att_count }})
-              </button>
-              {% endwith %}
-
-              {% if p.status == 'draft' or p.status == 'rejected' or p.status == 'revision_requested' %}
-                {% if p.teacher == user %}
-                {% has_perm user "academics.change_lessonplan" as can_edit %}
-                {% if can_edit %}
-                <a href="{% url 'academics:lesson_plan_edit' p.id %}" class="btn-secondary btn-sm" style="padding:6px 14px; text-decoration:none">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:4px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                  Edit
-                </a>
-                <form method="post" action="{% url 'academics:submit_lesson_plan' p.id %}" style="display:inline">
-                  {% csrf_token %}
-                  <button class="btn-primary btn-sm" style="padding:6px 14px; font-size:12px">
-                    Submit for Review
-                  </button>
-                </form>
-                <button type="button" class="btn-sm" style="padding:6px 14px; font-size:12px; background:#FEF2F2; color:#DC2626; border:1px solid #FECACA; border-radius:6px; cursor:pointer; font-weight:700"
-                  onclick="confirmDeleteModal({title:'Delete Lesson Plan?',body:'Delete this <strong>{{ p.subject_name }}</strong> lesson plan for <strong>{{ p.class_name }}</strong>?',detail:'This cannot be undone.',confirmText:'Delete Plan',url:'{% url 'academics:delete_lesson_plan' p.id %}'})">
-                  Delete
-                </button>
-                {% endif %}
-                {% if p.status == 'rejected' or p.status == 'revision_requested' %}
-                  <span style="font-size:11px; color:#EF4444; font-weight:600">Address feedback</span>
-                {% endif %}
-                {% endif %}
-              {% elif p.status == 'submitted' %}
-                {% if can_review and p.teacher != user %}
-                <div style="display:flex; gap:4px; flex-wrap:wrap">
-                  <form method="post" action="{% url 'academics:review_lesson_plan' p.id %}" style="display:inline">
-                    {% csrf_token %}
-                    <input type="hidden" name="feedback" value="">
-                    <button name="decision" value="approved" class="btn-sm" style="padding:5px 12px; font-size:11px; background:#16A34A; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:700; display:inline-flex; align-items:center; gap:3px">
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                      Approve
-                    </button>
-                  </form>
-                  <button type="button" class="btn-sm" style="padding:5px 12px; font-size:11px; background:#FEF2F2; color:#DC2626; border:1px solid #FECACA; border-radius:6px; cursor:pointer; font-weight:700; display:inline-flex; align-items:center; gap:3px"
-                    onclick="openRejectModal({{ p.id }}, '{{ p.subject_name|escapejs }} — {{ p.class_name|escapejs }}')">
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    Reject
-                  </button>
-                </div>
-                {% else %}
-                <form method="post" action="{% url 'academics:withdraw_lesson_plan' p.id %}" style="display:inline">
-                  {% csrf_token %}
-                  <button class="btn-secondary btn-sm" style="padding:6px 14px; font-size:12px">
-                    Withdraw &amp; Edit
-                  </button>
-                </form>
-                {% endif %}
-              {% endif %}
-            </div>
-          </td>
+          <td data-label="Status"><span class="status-tag st-{{ p.status|cut:'_' }}">{{ p.get_status_display }}</span></td>
+          <td data-label="Actions" class="lp-td-actions">{% include "academics/_lp_actions.html" %}</td>
         </tr>
         {% empty %}
-        <tr>
-          <td colspan="{% if can_review %}7{% else %}6{% endif %}">{% include '_partials/empty_state.html' with title='No lesson plans found' desc='Create your first plan for the current week.' icon='doc' icon_color='blue' action_url='/academics/lesson-plans/new/' action_text='Create Lesson Plan' action_btn='true' %}</td>
+        <tr class="lp-empty-row">
+          <td colspan="{% if can_review %}5{% else %}4{% endif %}">
+            {% if has_filters %}
+            {% include '_partials/empty_state.html' with title='No lesson plans match' desc='Try a different search or reset the filters.' icon='doc' icon_color='blue' %}
+            {% else %}
+            {% include '_partials/empty_state.html' with title='No lesson plans yet' desc='Create your first plan for the current week.' icon='doc' icon_color='blue' action_url='/academics/lesson-plans/new/' action_text='Create Lesson Plan' action_btn='true' %}
+            {% endif %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -493,7 +403,7 @@
     </div>
     <div style="display:flex; gap:8px">
       {% if mine_has_prev %}
-        <a href="?mine_page={{ mine_page|add:'-1' }}&status={{ status_filter }}" class="btn-secondary btn-sm">&larr; Previous</a>
+        <a href="?{% if filter_query %}{{ filter_query }}&amp;{% endif %}mine_page={{ mine_page|add:'-1' }}" class="btn-secondary btn-sm">&larr; Previous</a>
       {% endif %}
 
       <div style="padding:6px 12px; font-size:13px; font-weight:600; background:var(--hodari-blue-light); color:var(--hodari-blue); border-radius:6px">
@@ -501,7 +411,7 @@
       </div>
 
       {% if mine_has_next %}
-        <a href="?mine_page={{ mine_page|add:'1' }}&status={{ status_filter }}" class="btn-secondary btn-sm">Next &rarr;</a>
+        <a href="?{% if filter_query %}{{ filter_query }}&amp;{% endif %}mine_page={{ mine_page|add:'1' }}" class="btn-secondary btn-sm">Next &rarr;</a>
       {% endif %}
     </div>
   </div>

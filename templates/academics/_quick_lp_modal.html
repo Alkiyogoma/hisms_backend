@@ -44,6 +44,7 @@
           hx-swap="outerHTML"
           style="padding:20px 24px">
       {% csrf_token %}
+      <div id="quick-lp-error" role="alert"></div>
       <input type="hidden" name="slot_id" value="{{ slot.pk }}">
       <input type="hidden" name="action" id="quick-lp-action" value="draft">
       <input type="hidden" name="week" value="{{ week_offset|default:'0' }}">
@@ -78,18 +79,19 @@
 
       <!-- Attachments -->
       <div style="margin-bottom:18px">
-        <label style="display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#64748B; margin-bottom:6px">Attachments</label>
+        <label style="display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#64748B; margin-bottom:6px">Lesson plan file <span style="color:#DC2626">*</span></label>
         <div style="border:2px dashed #E2E8F0; border-radius:12px; padding:24px; text-align:center; cursor:pointer; transition:all 0.15s; background:#F8FAFC"
              onmouseover="this.style.borderColor='var(--hodari-blue)'; this.style.background='#EFF6FF'"
              onmouseout="this.style.borderColor='#E2E8F0'; this.style.background='#F8FAFC'"
              onclick="this.querySelector('input[type=file]').click()">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5" style="margin-bottom:8px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           <div style="font-size:13px; font-weight:600; color:#475569; margin-bottom:2px">Click to upload files</div>
-          <div style="font-size:11px; color:#94A3B8">PDF, Word, Excel, PowerPoint, Images, CSV &middot; Max 10 MB each</div>
-          <input type="file" name="attachments" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.csv,.txt"
+          <div style="font-size:11px; color:#94A3B8">{{ attachment_rules.summary }}</div>
+          <input type="file" name="attachments" multiple accept="{{ attachment_rules.accept }}"
                  style="display:none" onchange="handleQuickLPFiles(this)">
         </div>
         <div id="quick-lp-file-list" style="margin-top:8px; display:flex; flex-direction:column; gap:4px"></div>
+        <div id="qlp-file-hint" style="display:none;margin-top:6px;font-size:11.5px;color:#B45309;font-weight:600">Attach the lesson plan file to submit it for review. You can save a draft without one.</div>
       </div>
 
       <!-- Actions -->
@@ -121,30 +123,88 @@
 <style>@keyframes btn-spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }</style>
 
 <script>
+/* A plan cannot be submitted without its file: Submit stays disabled until
+   one is attached, and files the server would refuse are dropped here. */
+var QLP_RULES = {
+  exts: [{% for e in attachment_rules.extensions %}'{{ e }}'{% if not forloop.last %},{% endif %}{% endfor %}],
+  maxMb: {{ attachment_rules.max_file_mb }},
+  maxFiles: {{ attachment_rules.max_files }}
+};
+var QLP_EXISTING = 0;
+var QLP_ALREADY_SUBMITTED = false;
+
+function qlpEsc(t) { return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
 function handleQuickLPFiles(input) {
   var list = document.getElementById('quick-lp-file-list');
+  var errors = [], keep = new DataTransfer();
+  Array.from(input.files).forEach(function(f) {
+    var ext = f.name.indexOf('.') > -1 ? f.name.split('.').pop().toLowerCase() : '';
+    if (QLP_RULES.exts.indexOf(ext) === -1) { errors.push(f.name + ': this file type is not accepted.'); return; }
+    if (f.size > QLP_RULES.maxMb * 1048576) { errors.push(f.name + ': larger than ' + QLP_RULES.maxMb + ' MB.'); return; }
+    if (keep.items.length >= QLP_RULES.maxFiles) { errors.push(f.name + ': no more than ' + QLP_RULES.maxFiles + ' files at a time.'); return; }
+    keep.items.add(f);
+  });
+  input.files = keep.files;
   list.innerHTML = '';
   Array.from(input.files).forEach(function(f) {
     var row = document.createElement('div');
     row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 10px;background:#F1F5F9;border-radius:8px;font-size:12px;font-weight:600;color:#475569';
     var size = f.size > 1048576 ? (f.size/1048576).toFixed(1)+' MB' : (f.size/1024).toFixed(0)+' KB';
     row.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'
-      + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + f.name + '</span>'
+      + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + qlpEsc(f.name) + '</span>'
       + '<span style="color:#94A3B8;font-size:11px">' + size + '</span>';
     list.appendChild(row);
   });
+  if (errors.length) {
+    var err = document.createElement('div');
+    err.style.cssText = 'padding:8px 10px;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;font-size:12px;color:#991B1B;line-height:1.5';
+    err.innerHTML = errors.map(qlpEsc).join('<br>');
+    list.appendChild(err);
+  }
+  qlpSync();
+}
+
+function qlpSync() {
+  var btn = document.getElementById('qlp-submit-btn');
+  var input = document.querySelector('#quick-lp-form input[type=file]');
+  if (!btn || !input) return;
+  var ready = QLP_ALREADY_SUBMITTED || QLP_EXISTING > 0 || input.files.length > 0;
+  btn.disabled = !ready;
+  btn.style.opacity = ready ? '1' : '0.5';
+  btn.style.cursor = ready ? 'pointer' : 'not-allowed';
+  btn.title = ready ? '' : 'Attach the lesson plan file to submit';
+  var hint = document.getElementById('qlp-file-hint');
+  if (hint) hint.style.display = ready ? 'none' : 'block';
 }
 
 function quickLpSubmit(action) {
-  document.getElementById('quick-lp-action').value = action;
   var btnId = action === 'submit' ? 'qlp-submit-btn' : 'qlp-draft-btn';
   var btn = document.getElementById(btnId);
+  if (btn.disabled) return;
+  document.getElementById('quick-lp-error').innerHTML = '';
+  document.getElementById('quick-lp-action').value = action;
   btn.disabled = true;
   btn.style.opacity = '0.7';
   btn.style.cursor = 'wait';
   btn.querySelector('.qlp-btn-icon').style.display = 'none';
   btn.querySelector('.qlp-btn-spin').style.display = 'block';
+  btn.dataset.label = btn.dataset.label || btn.querySelector('.qlp-btn-label').textContent;
   btn.querySelector('.qlp-btn-label').textContent = action === 'submit' ? 'Submitting...' : 'Saving...';
   htmx.trigger('#quick-lp-form', 'submit');
 }
+
+/* Called when the server refuses the request, so the buttons work again. */
+window.qlpReset = function() {
+  ['qlp-submit-btn', 'qlp-draft-btn'].forEach(function(id) {
+    var btn = document.getElementById(id);
+    if (!btn) return;
+    btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer';
+    btn.querySelector('.qlp-btn-icon').style.display = '';
+    btn.querySelector('.qlp-btn-spin').style.display = 'none';
+    if (btn.dataset.label) btn.querySelector('.qlp-btn-label').textContent = btn.dataset.label;
+  });
+  qlpSync();
+};
+qlpSync();
 </script>

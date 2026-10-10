@@ -475,7 +475,7 @@ class PerSubjectApprovalTests(TestCase):
         self.client.force_login(self.hod)
         resp = self.client.get(reverse("academics:exam_score_approval_queue"))
         self.assertContains(resp, f'onclick="approveRow({self._score("English").pk}')
-        self.assertContains(resp, f'onclick="returnRow({self._score("Bible Studies").pk})')
+        self.assertContains(resp, f'onclick="returnRow({self._score("Bible Studies").pk}, ')
 
         self.client.post(reverse("academics:exam_score_approval_queue"), {
             "action": "approve", "score_ids": [self._score("English").pk],
@@ -485,3 +485,36 @@ class PerSubjectApprovalTests(TestCase):
         })
         self.assertEqual(self._score("English").status, ScoreStatus.APPROVED)
         self.assertEqual(self._score("Bible Studies").status, ScoreStatus.RETURNED)
+
+    def test_queue_offers_one_learner_actions_that_fit_small_screens(self):
+        """Ticking learners narrows the group buttons to them, and the row
+        buttons stay reachable on a phone (the table scrolls, not clips)."""
+        self._save("English", 70)
+        self._submit("English")
+        self.client.force_login(self.hod)
+        resp = self.client.get(reverse("academics:exam_score_approval_queue"))
+        self.assertContains(resp, 'class="aq-scroll"')
+        self.assertContains(resp, "Approve all (1)")
+        self.assertContains(resp, f'data-name="{self.student.first_name} {self.student.last_name}"')
+        self.assertContains(resp, "tick learners to act on only those")
+        # The old buttons re-ticked the whole group before submitting.
+        self.assertNotContains(resp, "allCbs.forEach(function(cb) { cb.checked = true; })")
+
+    def test_only_the_posted_score_changes(self):
+        other = Student.objects.create(
+            admission_no="G4-002", first_name="Neema", last_name="Juma",
+            class_name="Grade 4", academic_year=self.year, status=StudentStatus.ACTIVE,
+        )
+        mine = ExamScore.objects.create(
+            student=other, term=self.term, subject_name="English", exam_type="quiz",
+            score=Decimal("9"), entered_by=self.teachers["English"], status=ScoreStatus.SUBMITTED, is_locked=True,
+        )
+        self._save("English", 70)
+        self._submit("English")
+        self.client.force_login(self.hod)
+        self.client.post(reverse("academics:exam_score_approval_queue"), {
+            "action": "return", "reason": "9 looks like a typing error", "score_ids": [mine.pk],
+        })
+        mine.refresh_from_db()
+        self.assertEqual(mine.status, ScoreStatus.RETURNED)
+        self.assertEqual(self._score("English").status, ScoreStatus.SUBMITTED)
