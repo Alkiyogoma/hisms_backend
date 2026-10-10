@@ -140,3 +140,19 @@ def calculate_progression_cases_task(self, config_id, triggered_by_id, recalcula
         except Exception:
             pass
         raise
+
+
+@shared_task(ignore_result=True)
+def prepare_lesson_plan_preview_task(attachment_id):
+    """Convert an uploaded office file to its PDF preview ahead of the first
+    view, so a reviewer opening it does not wait for the conversion."""
+    from academics import lesson_plan_files
+    from academics.models import LessonPlanAttachment
+
+    att = LessonPlanAttachment.objects.filter(pk=attachment_id).first()
+    if att is None or lesson_plan_files.extension(att.filename) not in lesson_plan_files.OFFICE_EXTENSIONS:
+        return
+    try:
+        lesson_plan_files.pdf_for(att)
+    except lesson_plan_files.PreviewUnavailable as exc:
+        logger.info("Lesson plan preview not prepared for attachment %s: %s", attachment_id, exc)

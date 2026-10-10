@@ -46,27 +46,6 @@
   .action-row button { flex:1; padding:8px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; border:none; transition:all 0.15s; display:inline-flex; align-items:center; justify-content:center; gap:4px }
   .action-row button:hover { filter:brightness(0.95) }
 
-  .att-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:10000; display:none; align-items:center; justify-content:center; backdrop-filter:blur(2px) }
-  .att-overlay.active { display:flex }
-  .att-panel { background:#fff; border-radius:16px; width:90%; max-width:600px; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.3); overflow:hidden }
-  .att-panel-head { padding:16px 20px; border-bottom:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:center }
-  .att-panel-body { padding:16px 20px; overflow-y:auto; flex:1 }
-  .att-file-row { display:flex; align-items:center; gap:12px; padding:10px 14px; border:1px solid #E2E8F0; border-radius:10px; margin-bottom:8px; transition:all 0.15s }
-  .att-file-row:hover { border-color:var(--hodari-blue); background:#F8FAFC }
-  .att-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; flex-shrink:0 }
-  .att-icon.img { background:#EFF6FF; color:#1E40AF }
-  .att-icon.pdf { background:#FEF2F2; color:#9B1C1C }
-  .att-icon.doc { background:#EFF6FF; color:#1E40AF }
-  .att-icon.xls { background:#F0FDF4; color:#166534 }
-  .att-icon.other { background:#F1F5F9; color:#475569 }
-
-  .fp-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:10001; display:none; flex-direction:column }
-  .fp-overlay.active { display:flex }
-  .fp-bar { padding:10px 20px; display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.6); color:#fff }
-  .fp-body { flex:1; display:flex; align-items:center; justify-content:center; overflow:auto; padding:20px }
-  .fp-body img { max-width:100%; max-height:100%; object-fit:contain; border-radius:8px }
-  .fp-body iframe { width:100%; height:100%; border:none; border-radius:8px; min-height:70vh }
-
   .pagination { display:flex; justify-content:center; align-items:center; gap:6px; margin-top:24px }
   .pagination a, .pagination span { padding:7px 12px; border-radius:8px; font-size:12px; font-weight:600; text-decoration:none; transition:all 0.15s }
   .pagination a { background:#F1F5F9; color:#475569; border:1px solid #E2E8F0 }
@@ -160,50 +139,9 @@
 </div>
 {% endif %}
 
-<!-- Attachment Modal -->
-<div class="att-overlay" id="attOverlay" onclick="if(event.target===this)closeAttModal()">
-  <div class="att-panel">
-    <div class="att-panel-head">
-      <h3 id="attTitle" style="margin:0;font-size:15px;font-weight:700">Attachments</h3>
-      <button onclick="closeAttModal()" style="background:none;border:none;cursor:pointer;padding:4px">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-    </div>
-    <div class="att-panel-body" id="attBody"></div>
-  </div>
-</div>
-
-<!-- Full-screen File Preview -->
-<div class="fp-overlay" id="fpOverlay">
-  <div class="fp-bar">
-    <span id="fpTitle" style="font-size:13px;font-weight:600"></span>
-    <div style="display:flex;gap:8px;align-items:center">
-      <a id="fpDownload" href="#" target="_blank" style="padding:5px 12px;font-size:12px;text-decoration:none;color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:6px;display:inline-flex;align-items:center;gap:4px">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Download
-      </a>
-      <button onclick="closeFP()" style="background:none;border:none;cursor:pointer;padding:4px;color:#fff">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-    </div>
-  </div>
-  <div class="fp-body" id="fpBody"></div>
-</div>
+{% include "academics/_lp_viewer.html" %}
 
 <script>
-var attData = {
-  {% for p in plans %}
-  "{{ p.id }}": {
-    "label": "{{ p.class_name|escapejs }} — {{ p.subject_name|escapejs }}",
-    "files": [
-      {% for att in p.attachments.all %}
-        {"url": "{{ att.file.url|escapejs }}", "name": "{{ att.filename|escapejs }}"}{% if not forloop.last %},{% endif %}
-      {% endfor %}
-    ]
-  }{% if not forloop.last %},{% endif %}
-  {% endfor %}
-};
-
 function setView(mode) {
   document.getElementById('plans-list').style.display = mode === 'list' ? 'grid' : 'none';
   document.getElementById('plans-grid').style.display = mode === 'grid' ? 'grid' : 'none';
@@ -226,59 +164,8 @@ function setView(mode) {
   }
 }
 
-function getFileExt(n) { var p=n.split('.'); return p.length>1?p.pop().toLowerCase():''; }
-function getIconInfo(ext) {
-  if(['jpg','jpeg','png','gif','webp','svg'].indexOf(ext)!==-1) return {cls:'img',lbl:'IMG'};
-  if(ext==='pdf') return {cls:'pdf',lbl:'PDF'};
-  if(['doc','docx'].indexOf(ext)!==-1) return {cls:'doc',lbl:'DOC'};
-  if(['xls','xlsx'].indexOf(ext)!==-1) return {cls:'xls',lbl:'XLS'};
-  return {cls:'other',lbl:ext.toUpperCase().slice(0,3)||'FILE'};
-}
-
-function openAttModal(planId) {
-  var data = attData[planId];
-  if (!data || !data.files.length) return;
-  document.getElementById('attTitle').textContent = data.label + ' — Attachments';
-  var body = document.getElementById('attBody');
-  body.innerHTML = '';
-  data.files.forEach(function(f, idx) {
-    var ext = getFileExt(f.name);
-    var info = getIconInfo(ext);
-    var isPreviewable = ['pdf','jpg','jpeg','png','gif','webp','svg'].indexOf(ext) !== -1;
-    var row = document.createElement('div');
-    row.className = 'att-file-row';
-    row.innerHTML = '<div class="att-icon ' + info.cls + '">' + info.lbl + '</div>'
-      + '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:#1E293B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + f.name + '</div></div>'
-      + '<div style="display:flex;gap:6px;flex-shrink:0">'
-      + (isPreviewable ? '<button onclick="previewFile(\'' + f.url.replace(/'/g,"\\'") + '\',\'' + f.name.replace(/'/g,"\\'") + '\',\'' + ext + '\')" style="padding:5px 12px;border-radius:6px;font-size:11px;font-weight:600;background:#EFF6FF;color:#1E40AF;border:1px solid #BFDBFE;cursor:pointer">Preview</button>' : '')
-      + '<a href="' + encodeURI(f.url) + '" download style="padding:5px 12px;border-radius:6px;font-size:11px;font-weight:600;background:#F1F5F9;color:#475569;border:1px solid #E2E8F0;text-decoration:none">Download</a>'
-      + '</div>';
-    body.appendChild(row);
-  });
-  document.getElementById('attOverlay').classList.add('active');
-}
-function closeAttModal() { document.getElementById('attOverlay').classList.remove('active'); }
-
-function previewFile(url, name, ext) {
-  closeAttModal();
-  document.getElementById('fpTitle').textContent = name;
-  document.getElementById('fpDownload').href = encodeURI(url);
-  var body = document.getElementById('fpBody');
-  body.innerHTML = '';
-  if (ext === 'pdf') {
-    body.innerHTML = '<iframe src="' + encodeURI(url) + '"></iframe>';
-  } else if (['jpg','jpeg','png','gif','webp','svg'].indexOf(ext) !== -1) {
-    body.innerHTML = '<img src="' + encodeURI(url) + '" alt="' + name + '">';
-  }
-  document.getElementById('fpOverlay').classList.add('active');
-  document.body.style.overflow = 'hidden';
-}
-function closeFP() {
-  document.getElementById('fpOverlay').classList.remove('active');
-  document.getElementById('fpBody').innerHTML = '';
-  document.body.style.overflow = '';
-}
-document.addEventListener('keydown', function(e) { if (e.key === 'Escape') { closeFP(); closeAttModal(); } });
+// The attached plan and its comments open in the shared lesson plan viewer.
+function openAttModal(planId) { LPViewer.open(planId); }
 </script>
 {% endif %}
 {% endblock %}

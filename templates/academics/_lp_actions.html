@@ -7,6 +7,14 @@
     View{% if att_count > 1 %} ({{ att_count }}){% endif %}
   </button>
   {% endif %}
+  {% with cmt_count=p.comments.all|length %}
+  {% if cmt_count or p.status != 'draft' %}
+  <button type="button" class="lp-btn lp-btn-ghost" data-lp-comments="{{ p.id }}" onclick="LPViewer.open('{{ p.id }}', null, 'thread')" title="Questions and notes on this plan{% if cmt_count %} ({{ cmt_count }}){% endif %}">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    Comments{% if cmt_count %} <span class="lp-cmt-count">{{ cmt_count }}</span>{% endif %}
+  </button>
+  {% endif %}
+  {% endwith %}
 
   {% if p.status == 'draft' or p.status == 'rejected' or p.status == 'revision_requested' %}
     {% if p.teacher == user %}

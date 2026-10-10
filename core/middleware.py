@@ -239,6 +239,8 @@ class ContentSecurityPolicyMiddleware:
         "style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com https://cdn.quilljs.com https://cdnjs.cloudflare.com 'unsafe-inline'; "
         "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com data:; "
         "img-src 'self' data: blob:; "
+        # pdf.js (lesson plan viewer) starts its worker from a blob: URL.
+        "worker-src 'self' blob: https://cdnjs.cloudflare.com; "
         "connect-src 'self' ws: wss: https://cdn.jsdelivr.net https://unpkg.com https://cdn.quilljs.com https://cdnjs.cloudflare.com; "
         "frame-ancestors 'none'; "
         "form-action 'self'; "

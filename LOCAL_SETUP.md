@@ -17,6 +17,7 @@ Step-by-step guide to run the school management system on your own computer
 | PostgreSQL | 14+ | *Optional* — same DB engine as live | `brew install postgresql@16` |
 | Redis | 6+ | *Optional* — Celery tasks, live attendance updates | `brew install redis` |
 | Pango / Cairo | — | PDF generation (report cards, ID cards) | `brew install pango` |
+| LibreOffice | any | *Optional* — previews of Word / PowerPoint / Excel lesson plan files | `brew install --cask libreoffice` |
 
 On Ubuntu/Debian use `apt` instead:
 

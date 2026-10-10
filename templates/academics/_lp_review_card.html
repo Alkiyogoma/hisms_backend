@@ -27,6 +27,12 @@
       {{ att_count }} file{{ att_count|pluralize }}
     </button>
     {% endwith %}
+    {% with cmt_count=p.comments.all|length %}
+    <button type="button" class="att-chip{% if cmt_count %} has-files{% endif %}" data-lp-comments="{{ p.id }}" onclick="LPViewer.open('{{ p.id }}', null, 'thread')" title="Questions and notes on this plan" style="margin-left:6px">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Comments{% if cmt_count %} <span class="lp-cmt-count">{{ cmt_count }}</span>{% endif %}
+    </button>
+    {% endwith %}
   </div>
 
   {% if p.lesson_title or p.objectives %}

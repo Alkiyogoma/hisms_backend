@@ -202,6 +202,8 @@ LOGIN_LOCKOUT_DURATION = int(os.getenv("LOGIN_LOCKOUT_DURATION", "900"))  # 15 m
 # Media files (student photos etc.)
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+# LibreOffice binary for lesson plan previews (office files -> PDF); found on PATH when empty.
+LIBREOFFICE_BINARY = os.getenv("LIBREOFFICE_BINARY", "")
 
 # Lesson Plans — FRD FR-LP-003: Deadline is Monday 8:00 AM of the relevant week
 LESSON_PLAN_SUBMISSION_DEADLINE_DAY = int(os.getenv("LP_DEADLINE_DAY", "0"))  # Monday (0=Mon, 6=Sun)
