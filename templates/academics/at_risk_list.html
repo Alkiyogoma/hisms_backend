@@ -67,8 +67,9 @@
         <th style="text-align:left">Student Full Name</th>
         <th style="text-align:left">Class</th>
         <th style="text-align:left">Adm. No</th>
-        <th style="text-align:center">Weighted Avg</th>
+        <th style="text-align:center">Average</th>
         <th style="text-align:center">Rating</th>
+        <th style="text-align:left">Below pass in</th>
         <th style="text-align:right" class="print-hide">Intervention</th>
       </tr>
     </thead>
@@ -84,7 +85,7 @@
           <div style="font-weight: 700; color: var(--hodari-blue);">{{ s.get_full_name }}</div>
           <div style="font-size:11px; color:#64748B; margin-top:2px">ID: #{{ s.id }}</div>
         </td>
-        <td style="font-weight:500; color:#1A1A2E">{{ s.class_name }}</td>
+        <td style="font-weight:500; color:#1A1A2E">{{ s.year_class|default:s.class_name }}</td>
         <td style="font-family: var(--font-mono); font-size: 12px; color: #64748B">{{ s.admission_no }}</td>
         <td style="text-align:center; font-weight: 800; color: var(--red); font-size:15px">{{ s.avg }}%</td>
         <td style="text-align:center">
@@ -92,13 +93,14 @@
             Grade {{ s.grade }}
           </span>
         </td>
+        <td style="font-size:12px; color:#475569">{% for w in s.weak %}<span style="white-space:nowrap">{{ w.subject }} <b style="color:{% if w.band == 'critical' %}var(--red){% else %}#B45309{% endif %}">{{ w.mark|floatformat:0 }}%</b></span>{% if not forloop.last %}, {% endif %}{% empty %}&mdash;{% endfor %}</td>
         <td style="text-align:right" class="print-hide">
           <a href="{% url 'students:detail' s.pk %}" class="hf-btn hf-btn-secondary" style="padding:5px 12px; font-size:11px">Manage Profile</a>
         </td>
       </tr>
       {% empty %}
       <tr>
-        <td colspan="7">{% include '_partials/empty_state.html' with title='No at-risk students' desc='All students are currently performing at Grade C or above.' icon='check' icon_color='green' %}</td>
+        <td colspan="8">{% include '_partials/empty_state.html' with title='No at-risk students' desc='All students are currently performing at Grade C or above.' icon='check' icon_color='green' %}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -110,7 +112,7 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
     </div>
     <div style="font-size:13px; color:#9B1C1C; line-height:1.6">
-        <strong>Intervention Guide:</strong> Students listed here have weighted scores below the 60% school threshold. 
+        <strong>Intervention Guide:</strong> Students listed here have an average below the 60% pass mark across their subjects, from approved marks (the same figures as the Performance Report). Subjects they are below the pass mark in are listed alongside. 
         <strong style="text-decoration:underline">Grade E</strong> students (below 50%) require immediate administrative intervention and parent-teacher conferences.
         <strong style="text-decoration:underline">Grade D</strong> students (50-59%) should be monitored for academic trend improvement.
     </div>

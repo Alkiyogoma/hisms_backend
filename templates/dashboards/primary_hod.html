@@ -345,7 +345,7 @@
   <div class="card" style="margin-top:14px">
     <div class="card-title-row">
       <span class="card-title" style="margin-bottom:0">At-risk students &middot; D or below in any subject</span>
-      <span class="chip chip-red">{{ at_risk_students|length }} flagged</span>
+      <span class="chip chip-red" title="{{ at_risk_students|length }} subject result{{ at_risk_students|length|pluralize }} below the pass mark">{{ at_risk_learner_count }} student{{ at_risk_learner_count|pluralize }} &middot; {{ at_risk_students|length }} result{{ at_risk_students|length|pluralize }}</span>
     </div>
     <div class="at-risk-grid">
     {% for item in at_risk_students %}

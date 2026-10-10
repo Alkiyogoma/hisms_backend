@@ -113,7 +113,10 @@ class PerformanceReportView(RoleRequiredMixin, TemplateView):
         query = params.get("q", "").strip()
 
         # View 1 — who needs help, worst first.
-        rows = performance.learner_summary(filtered) if group == "learner" else filtered
+        # Learner rows feed both the list and (by default) the distribution;
+        # build them once.
+        learners = performance.learner_summary(filtered) if "learner" in (group, params.get("dist")) else None
+        rows = learners if group == "learner" else filtered
         if query:
             q = query.lower()
             rows = [r for r in rows if q in r["name"].lower() or q in (r["admission_no"] or "").lower()]
@@ -130,7 +133,7 @@ class PerformanceReportView(RoleRequiredMixin, TemplateView):
         # Grade distribution, counting results (one per learner per subject)
         # or learners (each learner's average across the subjects in view).
         dist_by = params.get("dist") if params.get("dist") in GROUPS else "result"
-        dist_rows = performance.learner_summary(filtered) if dist_by == "learner" else filtered
+        dist_rows = learners if dist_by == "learner" else filtered
 
         # View 2 — one subject across classes (ignores the class filter, since
         # the point is to compare classes), every subject ranked within the

@@ -330,3 +330,61 @@ class SingleSourceOfPerformanceTests(PerformanceReportTests):
         self.client.force_login(self.hod)
         resp = self.client.get(reverse("academics:report_review_queue"))
         self.assertEqual(resp.context["pending_signoffs"], [{"class_name": "Grade 4", "count": 1}])
+
+
+class AtRiskConsistencyTests(PerformanceReportTests):
+    """The At-Risk list and the dashboard at-risk cards use the Performance
+    Report's approved, weighted marks: the list by average (By student), the
+    cards per subject (By subject result)."""
+
+    def _add_noise(self):
+        # Unapproved marks never count; an archived learner never shows.
+        ExamScore.objects.create(student=self.baraka, term=self.term1, subject_name="Mathematics",
+                                 exam_type="mid_term", score=Decimal(0), entered_by=self.hos,
+                                 status=ScoreStatus.SUBMITTED)
+        gone = Student.objects.create(admission_no="G1", first_name="Gone", last_name="Learner",
+                                      class_name="Grade 5", academic_year=self.year,
+                                      status=StudentStatus.ACTIVE, is_archived=True)
+        ExamScore.objects.create(student=gone, term=self.term1, subject_name="Science",
+                                 exam_type="quiz", score=Decimal(10), entered_by=self.hos,
+                                 status=ScoreStatus.APPROVED)
+
+    def test_at_risk_list_matches_by_student_view(self):
+        self._add_noise()
+        self.client.force_login(self.hos)
+        resp = self.client.get(reverse("academics:at_risk_list"))
+        self.assertEqual(resp.status_code, 200)
+        rows = [(s.get_full_name(), s.avg, [w["subject"] for w in s.weak]) for s in resp.context["at_risk_students"]]
+        self.assertEqual(rows, [("Caren Learner", 30.0, ["Mathematics"]),
+                                ("Amani Learner", 51.5, ["Science", "Mathematics"])])
+        self.assertContains(resp, "Below pass in")
+        by_student = self._get(self.hos, term=self.term1.pk, group="learner")
+        self.assertEqual({r["name"]: r["mark"] for r in by_student.context["help_rows"]},
+                         {"Caren Learner": 30.0, "Amani Learner": 51.5, "Gone Learner": 10.0})
+
+    def test_at_risk_list_is_limited_to_the_hods_section(self):
+        self._add_noise()
+        self.client.force_login(self.hod)
+        resp = self.client.get(reverse("academics:at_risk_list"))
+        self.assertEqual([s.first_name for s in resp.context["at_risk_students"]], ["Amani"])
+
+    def test_dashboard_cards_are_subject_results_below_pass(self):
+        self._add_noise()
+        from academics import performance
+        rows = performance.at_risk_results(performance.classes_scope(), self.term1)
+        self.assertEqual([(r["student"].first_name, r["subject"], r["mark"]) for r in rows],
+                         [("Caren", "Mathematics", 30.0), ("Amani", "Science", 45.0), ("Amani", "Mathematics", 58.0)])
+        self.client.force_login(self.hos)
+        resp = self.client.get(reverse("core:dashboard"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.context["at_risk_students"]), 3)
+        self.assertEqual(resp.context["at_risk_learner_count"], 2)
+        self.assertContains(resp, "2 students &middot; 3 results")
+
+    def test_primary_hod_dashboard_cards(self):
+        self._add_noise()
+        self.client.force_login(self.hod)
+        resp = self.client.get(reverse("core:dashboard"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual({(r["student"].first_name, r["subject"]) for r in resp.context["at_risk_students"]},
+                         {("Amani", "Science"), ("Amani", "Mathematics")})
