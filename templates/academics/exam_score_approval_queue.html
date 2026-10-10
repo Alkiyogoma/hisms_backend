@@ -32,6 +32,12 @@
 }
 .class-tab:hover { color: #023AA5; background: #F8FAFC; }
 .class-tab.active { color: #023AA5; border-bottom-color: #023AA5; }
+/* The table scrolls sideways on narrow screens so each row's Approve / Return stays reachable. */
+.aq-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.aq-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.aq-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.aq-hint { font-size: 11.5px; color: var(--text-muted); width: 100%; margin-top: 6px; }
+@media (max-width: 640px) { .aq-actions { width: 100%; } .aq-actions .hf-btn { flex: 1 1 auto; } }
 </style>
 {% endblock %}
 
@@ -117,7 +123,7 @@
 
     {% for group in groups %}
     <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden">
-      <div class="card-title-row" style="padding:14px 20px;border-bottom:1px solid var(--border);margin-bottom:0">
+      <div class="card-title-row aq-head" style="padding:14px 20px;border-bottom:1px solid var(--border);margin-bottom:0">
         <div>
           <span style="font-weight:700;font-size:15px;color:var(--text-primary)">{{ group.class_name }} &mdash; {{ group.subject_name }}</span>
           <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
@@ -128,27 +134,25 @@
         {% if can_approve and group.block_reason %}
         <div style="font-size:12px;color:var(--text-muted);max-width:320px;text-align:right">{{ group.block_reason }}</div>
         {% elif can_approve %}
-        <div style="display:flex;gap:6px;align-items:center">
-          <button type="button" class="hf-btn hf-btn-secondary" style="font-size:11px;padding:5px 12px" onclick="var cbs=document.querySelectorAll('.cb-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}');var allChecked=Array.from(cbs).every(cb=>cb.checked);cbs.forEach(cb=>cb.checked=!allChecked)">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:2px"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-            Select All
-          </button>
-          <button type="button" class="hf-btn hf-btn-primary" style="font-size:11px;padding:5px 12px;background:#16A34A;border-color:#16A34A" onclick="submitAction('{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}', 'approve')">
+        <div class="aq-actions" data-group="{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}" data-total="{{ group.score_count }}">
+          <button type="button" class="hf-btn hf-btn-primary" data-approve style="font-size:11px;padding:5px 12px;background:#16A34A;border-color:#16A34A" onclick="submitAction('{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}', 'approve')">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:2px"><path d="M20 6L9 17l-5-5"/></svg>
-            Approve All
+            <span data-label>Approve all ({{ group.score_count }})</span>
           </button>
-          <button type="button" class="hf-btn hf-btn-secondary" style="font-size:11px;padding:5px 12px;color:var(--red);border-color:var(--red-bd)" onclick="submitReturn('{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}')">
+          <button type="button" class="hf-btn hf-btn-secondary" data-return style="font-size:11px;padding:5px 12px;color:var(--red);border-color:var(--red-bd)" onclick="submitReturn('{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}')">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:2px"><path d="M18 6L6 18M6 6l12 12"/></svg>
-            Return All
+            <span data-label>Return all ({{ group.score_count }})</span>
           </button>
         </div>
+        <div class="aq-hint">Approve or return one learner with the buttons on their row, or tick learners to act on only those.</div>
         {% endif %}
       </div>
 
+      <div class="aq-scroll">
       <table class="h-table">
         <thead>
           <tr>
-            {% if can_approve %}<th style="width:36px">{% if not group.block_reason %}<input type="checkbox" onchange="toggleGroup('{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}', this.checked)">{% endif %}</th>{% endif %}
+            {% if can_approve %}<th style="width:36px">{% if not group.block_reason %}<input type="checkbox" aria-label="Tick every learner in this group" id="cb-all-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}" onchange="toggleGroup('{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}', this.checked)">{% endif %}</th>{% endif %}
             <th>Student</th>
             <th>Score</th>
             <th>Entered By</th>
@@ -160,7 +164,7 @@
         <tbody>
           {% for score in group.scores %}
           <tr>
-            {% if can_approve %}<td>{% if score.block_reason %}<span title="{{ score.block_reason }}" style="color:var(--text-muted)">&mdash;</span>{% else %}<input type="checkbox" name="score_ids" value="{{ score.id }}" id="cb-score-{{ score.id }}" class="cb-{{ forloop.parentloop.parentloop.counter0 }}-{{ forloop.parentloop.counter0 }}">{% endif %}</td>{% endif %}
+            {% if can_approve %}<td>{% if score.block_reason %}<span title="{{ score.block_reason }}" style="color:var(--text-muted)">&mdash;</span>{% else %}<input type="checkbox" name="score_ids" value="{{ score.id }}" id="cb-score-{{ score.id }}" class="cb-{{ forloop.parentloop.parentloop.counter0 }}-{{ forloop.parentloop.counter0 }}" data-group="{{ forloop.parentloop.parentloop.counter0 }}-{{ forloop.parentloop.counter0 }}" data-name="{{ score.student.first_name }} {{ score.student.last_name }}" aria-label="Tick {{ score.student.first_name }} {{ score.student.last_name }}">{% endif %}</td>{% endif %}
             <td>
               <div style="font-weight:600;font-size:13px;color:var(--text-primary)">{{ score.student.get_full_name }}</div>
               <div style="font-size:11px;color:var(--text-muted)">{{ score.student.admission_no }}</div>
@@ -186,8 +190,8 @@
               {% if score.block_reason %}
                 <span style="font-size:11px;color:var(--text-muted)" title="{{ score.block_reason }}">Not allowed</span>
               {% elif score.status == 'submitted' %}
-                <button type="button" class="hf-btn hf-btn-primary" style="font-size:11px;padding:4px 10px;background:#16A34A;border-color:#16A34A" onclick="approveRow({{ score.id }}, '{{ score.student.get_full_name|escapejs }}')">Approve</button>
-                <button type="button" class="hf-btn hf-btn-secondary" style="font-size:11px;padding:4px 10px;color:var(--red);border-color:var(--red-bd)" onclick="returnRow({{ score.id }})">Return</button>
+                <button type="button" class="hf-btn hf-btn-primary" style="font-size:11px;padding:4px 10px;background:#16A34A;border-color:#16A34A" onclick="approveRow({{ score.id }}, '{{ score.student.first_name|escapejs }} {{ score.student.last_name|escapejs }}')">Approve</button>
+                <button type="button" class="hf-btn hf-btn-secondary" style="font-size:11px;padding:4px 10px;color:var(--red);border-color:var(--red-bd)" onclick="returnRow({{ score.id }}, '{{ score.student.first_name|escapejs }} {{ score.student.last_name|escapejs }}')">Return</button>
               {% endif %}
             </td>
             {% endif %}
@@ -195,6 +199,7 @@
           {% endfor %}
         </tbody>
       </table>
+      </div>
     </div>
     {% endfor %}
 
@@ -209,7 +214,8 @@
         <button onclick="closeReturnModal()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted);padding:0 4px">&times;</button>
       </div>
       <div style="padding:20px 22px">
-        <p style="font-size:13px;color:var(--text-muted);margin:0 0 12px">A mandatory reason is required when returning scores to the teacher.</p>
+        <p id="return-who" style="font-size:13px;color:var(--text-primary);margin:0 0 8px;font-weight:600"></p>
+        <p style="font-size:13px;color:var(--text-muted);margin:0 0 12px">A reason is required. Only these scores go back to the teacher; the rest stay in the queue.</p>
         <textarea id="return-reason" style="width:100%;min-height:100px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--font-ui);resize:vertical;outline:none" placeholder="Explain what needs to be corrected..."></textarea>
       </div>
       <div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 22px;border-top:1px solid var(--border)">
@@ -235,7 +241,25 @@ function switchExamTab(e, tabId) {
 function toggleGroup(idx, checked) {
   if (typeof checked === 'object') checked = checked.target ? checked.target.checked : false;
   document.querySelectorAll('.cb-' + idx).forEach(cb => cb.checked = checked);
+  refreshGroup(idx);
 }
+
+// The group buttons act on the ticked learners; with nobody ticked, on the whole group.
+function refreshGroup(idx) {
+  var bar = document.querySelector('.aq-actions[data-group="' + idx + '"]');
+  if (!bar) return;
+  var ticked = document.querySelectorAll('.cb-' + idx + ':checked').length;
+  var total = document.querySelectorAll('.cb-' + idx).length;
+  var word = ticked ? 'selected (' + ticked + ')' : 'all (' + total + ')';
+  bar.querySelector('[data-approve] [data-label]').textContent = 'Approve ' + word;
+  bar.querySelector('[data-return] [data-label]').textContent = 'Return ' + word;
+  var all = document.getElementById('cb-all-' + idx);
+  if (all) { all.checked = ticked > 0 && ticked === total; all.indeterminate = ticked > 0 && ticked < total; }
+}
+
+document.querySelectorAll('input[name="score_ids"]').forEach(function(cb) {
+  cb.addEventListener('change', function() { refreshGroup(cb.dataset.group); });
+});
 
 function showInfoModal(title, body) {
   confirmDeleteModal({
@@ -246,73 +270,86 @@ function showInfoModal(title, body) {
   });
 }
 
-var pendingSelector = null;
+var pendingIds = null;
 
-function selectOnly(selector) {
-  document.querySelectorAll('input[name="score_ids"]').forEach(function(cb) { cb.checked = false; });
-  document.querySelectorAll(selector).forEach(function(cb) { cb.checked = true; });
-  return document.querySelectorAll(selector + ':checked').length;
+function escapeHtml(text) {
+  return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// The ticked learners in a group, or every learner when none is ticked.
+function groupSelection(idx) {
+  var ticked = document.querySelectorAll('.cb-' + idx + ':checked');
+  return Array.from(ticked.length ? ticked : document.querySelectorAll('.cb-' + idx));
+}
+
+function describe(boxes) {
+  var names = boxes.map(function(cb) { return cb.dataset.name; });
+  if (names.length === 1) return 'the score for <strong>' + escapeHtml(names[0]) + '</strong>';
+  var shown = names.slice(0, 5).map(escapeHtml).join(', ');
+  return '<strong>' + names.length + '</strong> scores (' + shown + (names.length > 5 ? ', …' : '') + ')';
+}
+
+// Send exactly these score ids. The tick boxes are left out of the request,
+// so nothing the approver did not choose can be approved or returned.
+function send(action, ids, reason) {
+  var form = document.getElementById('approval-form');
+  form.querySelectorAll('input[data-sent]').forEach(function(el) { el.remove(); });
+  form.querySelectorAll('input[name="score_ids"]').forEach(function(cb) { cb.disabled = true; });
+  ids.forEach(function(id) {
+    var el = document.createElement('input');
+    el.type = 'hidden'; el.name = 'score_ids'; el.value = id; el.dataset.sent = '1';
+    form.appendChild(el);
+  });
+  if (reason !== undefined) {
+    var r = document.createElement('input');
+    r.type = 'hidden'; r.name = 'reason'; r.value = reason; r.dataset.sent = '1';
+    form.appendChild(r);
+  }
+  document.getElementById('action-input').value = action;
+  form.submit();
+}
+
+function confirmApprove(ids, who) {
+  confirmDeleteModal({
+    title: ids.length === 1 ? "Approve this score?" : "Approve " + ids.length + " scores?",
+    body: 'Approve ' + who + '? This locks ' + (ids.length === 1 ? 'the score' : 'these scores') +
+          ' and notifies the teacher. Anything not included stays in the queue.',
+    confirmText: "Approve",
+    type: "warning",
+    onConfirm: function() { send('approve', ids); }
+  });
+}
+
+function openReturn(ids, who) {
+  pendingIds = ids;
+  document.getElementById('return-who').innerHTML = 'Returning ' + who + '.';
+  document.getElementById('returnModal').style.display = 'flex';
 }
 
 function approveRow(scoreId, studentName) {
-  if (!selectOnly('#cb-score-' + scoreId)) return;
-  confirmDeleteModal({
-    title: "Approve this score?",
-    body: 'Approve the score for <strong>' + studentName + '</strong>? This locks the score and notifies the teacher.',
-    confirmText: "Approve",
-    type: "warning",
-    onConfirm: function() {
-      document.getElementById('action-input').value = 'approve';
-      document.getElementById('approval-form').submit();
-    }
-  });
+  confirmApprove([String(scoreId)], 'the score for <strong>' + escapeHtml(studentName) + '</strong> only');
 }
 
-function returnRow(scoreId) {
-  if (!selectOnly('#cb-score-' + scoreId)) return;
-  pendingSelector = '#cb-score-' + scoreId;
-  document.getElementById('returnModal').style.display = 'flex';
+function returnRow(scoreId, studentName) {
+  openReturn([String(scoreId)], 'the score for <strong>' + escapeHtml(studentName) + '</strong> only');
 }
 
 function submitAction(idx, action) {
-  selectOnly('.cb-' + idx);
-  var allCbs = document.querySelectorAll('.cb-' + idx);
-  allCbs.forEach(function(cb) { cb.checked = true; });
-  var checked = document.querySelectorAll('.cb-' + idx + ':checked');
-  if (checked.length === 0) {
-    showToast("No scores available to approve.", "warning");
-    return;
-  }
-  confirmDeleteModal({
-    title: "Approve All Scores?",
-    body: 'You are about to approve <strong>' + checked.length + '</strong> score(s). This will lock the scores and notify the teachers.',
-    detail: "This action cannot be undone.",
-    confirmText: "Approve All",
-    type: "warning",
-    onConfirm: function() {
-      document.getElementById('action-input').value = action;
-      document.getElementById('approval-form').submit();
-    }
-  });
+  var boxes = groupSelection(idx);
+  if (!boxes.length) { showToast("No scores available to approve.", "warning"); return; }
+  confirmApprove(boxes.map(function(cb) { return cb.value; }), describe(boxes));
 }
 
 function submitReturn(idx) {
-  selectOnly('.cb-' + idx);
-  var allCbs = document.querySelectorAll('.cb-' + idx);
-  allCbs.forEach(function(cb) { cb.checked = true; });
-  var checked = document.querySelectorAll('.cb-' + idx + ':checked');
-  if (checked.length === 0) {
-    showToast("No scores available to return.", "warning");
-    return;
-  }
-  pendingSelector = '.cb-' + idx;
-  document.getElementById('returnModal').style.display = 'flex';
+  var boxes = groupSelection(idx);
+  if (!boxes.length) { showToast("No scores available to return.", "warning"); return; }
+  openReturn(boxes.map(function(cb) { return cb.value; }), describe(boxes));
 }
 
 function closeReturnModal() {
   document.getElementById('returnModal').style.display = 'none';
   document.getElementById('return-reason').value = '';
-  pendingSelector = null;
+  pendingIds = null;
 }
 
 function confirmReturn() {
@@ -321,27 +358,14 @@ function confirmReturn() {
     showInfoModal("Reason Required", "A reason is required when returning scores for correction.");
     return;
   }
-  const count = document.querySelectorAll(pendingSelector + ':checked').length;
+  const ids = pendingIds || [];
   confirmDeleteModal({
-    title: "Return Scores for Correction?",
-    body: 'You are about to return <strong>' + count + '</strong> score(s) to the teacher.',
-    detail: "The teacher will be notified and can edit and resubmit.",
+    title: ids.length === 1 ? "Return this score?" : "Return " + ids.length + " scores?",
+    body: 'You are about to return <strong>' + ids.length + '</strong> score' + (ids.length === 1 ? '' : 's') + ' to the teacher.',
+    detail: "The teacher will be notified and can correct and resubmit them. Other scores are not affected.",
     confirmText: "Return",
     type: "warning",
-    onConfirm: function() {
-      const form = document.getElementById('approval-form');
-      let existing = document.getElementById('return-reason-input');
-      if (!existing) {
-        existing = document.createElement('input');
-        existing.type = 'hidden';
-        existing.name = 'reason';
-        existing.id = 'return-reason-input';
-        form.appendChild(existing);
-      }
-      existing.value = reason;
-      document.getElementById('action-input').value = 'return';
-      form.submit();
-    }
+    onConfirm: function() { send('return', ids, reason); }
   });
 }
 

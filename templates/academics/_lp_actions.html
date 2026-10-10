@@ -1,0 +1,52 @@
+{% load role_tags %}{# One lesson plan's actions, shared by the list and grid views. Expects ``p``. #}
+<div class="lp-actions">
+  {% with att_count=p.attachments.all|length %}
+  {% if att_count %}
+  <button type="button" class="lp-btn lp-btn-ghost" onclick="openAttModal('{{ p.id }}')" title="Open the attached plan">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+    View{% if att_count > 1 %} ({{ att_count }}){% endif %}
+  </button>
+  {% endif %}
+
+  {% if p.status == 'draft' or p.status == 'rejected' or p.status == 'revision_requested' %}
+    {% if p.teacher == user %}
+    {% has_perm user "academics.change_lessonplan" as can_edit %}
+    {% if can_edit %}
+    <a href="{% url 'academics:lesson_plan_edit' p.id %}" class="lp-btn {% if p.status == 'draft' %}lp-btn-secondary{% else %}lp-btn-primary{% endif %}">
+      {% if p.status == 'draft' %}Edit{% else %}Revise{% endif %}
+    </a>
+    {% if p.status == 'draft' %}
+    <form method="post" action="{% url 'academics:submit_lesson_plan' p.id %}">
+      {% csrf_token %}
+      <button class="lp-btn lp-btn-primary" {% if not att_count %}disabled title="Attach the lesson plan file before submitting"{% endif %}>Submit</button>
+    </form>
+    {% endif %}
+    <button type="button" class="lp-btn lp-btn-icon" title="Delete this plan" aria-label="Delete this plan"
+      onclick="confirmDeleteModal({title:'Delete Lesson Plan?',body:'Delete this <strong>{{ p.subject_name|escapejs }}</strong> lesson plan for <strong>{{ p.class_name|escapejs }}</strong>?',detail:'This cannot be undone.',confirmText:'Delete Plan',url:'{% url 'academics:delete_lesson_plan' p.id %}'})">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+    </button>
+    {% endif %}
+    {% endif %}
+  {% elif p.status == 'submitted' %}
+    {% if can_review and p.teacher != user %}
+    <form method="post" action="{% url 'academics:review_lesson_plan' p.id %}">
+      {% csrf_token %}
+      <input type="hidden" name="feedback" value="">
+      <button name="decision" value="approved" class="lp-btn lp-btn-approve">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><polyline points="20 6 9 17 4 12"/></svg>
+        Approve
+      </button>
+    </form>
+    <button type="button" class="lp-btn lp-btn-danger"
+      onclick="openRejectModal({{ p.id }}, '{{ p.lesson_title|default:p.subject_name|escapejs }} — {{ p.class_name|escapejs }}, {{ p.teacher.get_full_name|escapejs }}')">
+      Reject
+    </button>
+    {% elif p.teacher == user %}
+    <form method="post" action="{% url 'academics:withdraw_lesson_plan' p.id %}">
+      {% csrf_token %}
+      <button class="lp-btn lp-btn-secondary" title="Take the plan back to edit it; it leaves the review queue">Withdraw</button>
+    </form>
+    {% endif %}
+  {% endif %}
+  {% endwith %}
+</div>

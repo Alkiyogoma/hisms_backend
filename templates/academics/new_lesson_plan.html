@@ -196,7 +196,11 @@
 
       <!-- Attachments (below form) -->
       <div class="card" style="padding:20px">
-        <div class="sidebar-section-title" style="border-bottom:none; padding-bottom:0; margin-bottom:14px">Attachments</div>
+        <div class="sidebar-section-title" style="border-bottom:none; padding-bottom:0; margin-bottom:6px">Lesson plan file <span style="color:#DC2626">*</span></div>
+        <div style="font-size:12px; color:#64748B; margin-bottom:14px">Required to submit: the plan is reviewed from this file. You can save a draft without one.</div>
+        {% if form.non_field_errors %}
+        <div role="alert" style="margin-bottom:14px; padding:10px 12px; background:#FEF2F2; border:1px solid #FECACA; border-radius:8px; font-size:12.5px; color:#991B1B; line-height:1.5">{% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}</div>
+        {% endif %}
 
         {% if form.instance.pk and form.instance.attachments.exists %}
           <div style="margin-bottom:16px">
@@ -225,10 +229,10 @@
             <div style="color:#94A3B8; margin-bottom:10px">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
             </div>
-            <div style="font-size:13px; font-weight:700; color:#1E293B">Add Resources</div>
-            <div style="font-size:11px; color:#64748B; margin-top:4px">PDF, Word, Excel, PowerPoint, Images, CSV &middot; Max 10 MB each</div>
+            <div style="font-size:13px; font-weight:700; color:#1E293B">Attach the lesson plan</div>
+            <div style="font-size:11px; color:#64748B; margin-top:4px">{{ attachment_rules.summary }}</div>
           </div>
-          <input type="file" name="attachments" id="file-input" multiple style="display:none" onchange="handleFileSelection(this)">
+          <input type="file" name="attachments" id="file-input" multiple accept="{{ attachment_rules.accept }}" style="display:none" onchange="handleFileSelection(this)">
         </div>
 
         <div id="new-files-list" style="margin-top:14px; display:none">
@@ -243,6 +247,7 @@
         <button type="submit" name="action" value="draft" id="btn-draft" class="hf-btn hf-btn-secondary">Save as Draft</button>
         <button type="submit" name="action" value="submit" id="btn-submit" class="hf-btn hf-btn-primary">Submit for Review</button>
       </div>
+      <div id="submit-file-hint" style="display:none; margin-top:-6px; text-align:right; font-size:12px; color:#B45309; font-weight:600">Attach the lesson plan file to submit it for review.</div>
     </div>
 
     <!-- ============ RIGHT: Recent Submissions + Tips ============ -->
@@ -274,7 +279,7 @@
                 </a>
                 <form method="post" action="{% url 'academics:submit_lesson_plan' p.id %}" style="display:inline">
                   {% csrf_token %}
-                  <button class="hf-btn hf-btn-primary hf-btn-sm" style="font-size:10px; padding:3px 8px">
+                  <button class="hf-btn hf-btn-primary hf-btn-sm" {% if not att_count %}disabled title="Attach the lesson plan file before submitting"{% endif %} style="font-size:10px; padding:3px 8px{% if not att_count %};opacity:.5;cursor:not-allowed{% endif %}">
                     {% if p.status == 'revision_requested' %}Resubmit{% else %}Submit{% endif %}
                   </button>
                 </form>
@@ -316,7 +321,7 @@
       <div class="tips-card">
         <h4>Submission Tips</h4>
         <ul>
-          <li>Attach supporting documents (PDF/PPT) in the upload area above.</li>
+          <li>Attach the lesson plan file. A plan cannot be submitted without it.</li>
           <li>Submit before Monday 8:00 AM to avoid late flags.</li>
           <li>Only one lesson plan per subject per week is allowed.</li>
         </ul>
@@ -558,28 +563,61 @@ renderTimetableGrid();
 })();
 
 /*  File upload handling with validation + duplicate detection  */
-var ALLOWED_EXTENSIONS = ['pdf','doc','docx','xls','xlsx','csv','ppt','pptx','jpg','jpeg','png','gif','webp','svg','txt'];
-var MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+var ALLOWED_EXTENSIONS = [{% for e in attachment_rules.extensions %}'{{ e }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+var MAX_FILE_MB = {{ attachment_rules.max_file_mb }};
+var MAX_FILE_SIZE = MAX_FILE_MB * 1024 * 1024;
+var MAX_FILES = {{ attachment_rules.max_files }};
+var EXISTING_ATTACHMENTS = {% if form.instance.pk %}{{ form.instance.attachments.count }}{% else %}0{% endif %};
+
+/* Submit stays disabled until the plan has a file (the server enforces this too). */
+function syncSubmitButton() {
+  var btn = document.getElementById('btn-submit');
+  if (!btn) return;
+  var ready = EXISTING_ATTACHMENTS > 0 || accumulatedFiles.length > 0;
+  btn.disabled = !ready;
+  btn.style.opacity = ready ? '' : '0.5';
+  btn.style.cursor = ready ? '' : 'not-allowed';
+  btn.title = ready ? '' : 'Attach the lesson plan file to submit';
+  var hint = document.getElementById('submit-file-hint');
+  if (hint) hint.style.display = ready ? 'none' : 'block';
+}
+document.addEventListener('DOMContentLoaded', syncSubmitButton);
 var CSRF_TOKEN = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
 var LESSON_PLAN_ID = '{{ form.instance.pk|default:"" }}';
 
 /* Accumulated file list across multiple picker selections */
 var accumulatedFiles = [];
 
+function fileProblem(file) {
+  var ext = file.name.indexOf('.') > -1 ? file.name.split('.').pop().toLowerCase() : '';
+  if (ALLOWED_EXTENSIONS.indexOf(ext) === -1) return file.name + ': ".' + ext + '" is not an allowed file type.';
+  if (file.size > MAX_FILE_SIZE) return file.name + ': ' + (file.size / 1048576).toFixed(1) + ' MB exceeds the ' + MAX_FILE_MB + ' MB limit.';
+  return '';
+}
+
+var droppedFiles = [];
+
 function handleFileSelection(input) {
-  // Merge new files into accumulated list, avoiding duplicates by name+size
+  // Merge new files into accumulated list, avoiding duplicates by name+size.
+  // Files the server would refuse are never queued, so they cannot be sent.
+  droppedFiles = [];
   for (var i = 0; i < input.files.length; i++) {
     var newFile = input.files[i];
     var isDupe = accumulatedFiles.some(function(f) {
       return f.name === newFile.name && f.size === newFile.size;
     });
-    if (!isDupe) accumulatedFiles.push(newFile);
+    if (isDupe) continue;
+    var problem = fileProblem(newFile);
+    if (!problem && accumulatedFiles.length >= MAX_FILES) problem = newFile.name + ': no more than ' + MAX_FILES + ' files at a time.';
+    if (problem) { droppedFiles.push(problem); continue; }
+    accumulatedFiles.push(newFile);
   }
   // Replace input.files so the form submits the accumulated set
   var dt = new DataTransfer();
   accumulatedFiles.forEach(function(f) { dt.items.add(f); });
   input.files = dt.files;
   updateFileList(input);
+  syncSubmitButton();
 }
 
 function removeQueuedFile(name, size) {
@@ -590,7 +628,9 @@ function removeQueuedFile(name, size) {
   var dt = new DataTransfer();
   accumulatedFiles.forEach(function(f) { dt.items.add(f); });
   input.files = dt.files;
+  droppedFiles = [];
   updateFileList(input);
+  syncSubmitButton();
 }
 
 /* SHA-256 hash of first 64 KB — matches server-side _compute_file_hash */
@@ -641,7 +681,7 @@ function updateFileList(input) {
 
   if (input.files.length > 0) {
     container.style.display = 'block';
-    var rejected = [];
+    var rejected = droppedFiles.slice();
     var validFiles = [];
     for (var i = 0; i < input.files.length; i++) {
       var file = input.files[i];
@@ -655,7 +695,7 @@ function updateFileList(input) {
       }
       // Validate size
       if (file.size > MAX_FILE_SIZE) {
-        rejected.push(file.name + ': ' + sizeMB + ' MB exceeds the 10 MB limit.');
+        rejected.push(file.name + ': ' + sizeMB + ' MB exceeds the ' + MAX_FILE_MB + ' MB limit.');
         continue;
       }
       validFiles.push(file);
@@ -716,6 +756,16 @@ function updateFileList(input) {
     }
   } else {
     container.style.display = 'none';
+    if (droppedFiles.length) {
+      if (!errorDiv) {
+        errorDiv = document.createElement('div');
+        errorDiv.id = 'file-errors';
+        errorDiv.style.cssText = 'margin-top:10px; padding:10px 12px; background:#FEF2F2; border:1px solid #FECACA; border-radius:8px; font-size:12px; color:#991B1B; line-height:1.6;';
+        container.parentNode.insertBefore(errorDiv, container.nextSibling);
+      }
+      errorDiv.textContent = '';
+      droppedFiles.forEach(function(r) { errorDiv.appendChild(document.createTextNode(r)); errorDiv.appendChild(document.createElement('br')); });
+    }
   }
 }
 

@@ -544,6 +544,11 @@ class LessonPlanStatus(models.TextChoices):
     MISSING = "missing", "Missing"
 
 
+LESSON_PLAN_FILE_REQUIRED = (
+    "Attach the lesson plan file before submitting. A plan cannot be submitted without one."
+)
+
+
 class LessonPlan(TimeStampedModel):
     teacher = models.ForeignKey("users.User", on_delete=models.PROTECT, related_name="lesson_plans")
     term = models.ForeignKey(Term, on_delete=models.PROTECT, related_name="lesson_plans")
@@ -582,6 +587,13 @@ class LessonPlan(TimeStampedModel):
             raise ValidationError("reviewed_by is required for approved/rejected/revision plans.")
         if self.status in {LessonPlanStatus.REJECTED, LessonPlanStatus.REVISION_REQUESTED} and not (self.reviewer_feedback or "").strip():
             raise ValidationError("Feedback is required when rejecting or requesting revision.")
+        # A submitted plan is reviewed from its attached file, so it cannot be
+        # submitted without one. Checked when a plan becomes submitted, so one
+        # submitted earlier without a file can still be edited to add it.
+        if self.status == LessonPlanStatus.SUBMITTED and not (self.pk and self.attachments.exists()):
+            was = LessonPlan.objects.filter(pk=self.pk).values_list("status", flat=True).first() if self.pk else None
+            if was != LessonPlanStatus.SUBMITTED:
+                raise ValidationError(LESSON_PLAN_FILE_REQUIRED)
 
     def __str__(self) -> str:
         return f"{self.week_start_date} {self.class_name} {self.subject_name} ({self.status})"
