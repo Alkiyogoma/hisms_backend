@@ -162,7 +162,7 @@
   {% else %}
 
   <!-- 1. Who needs help -->
-  <h2>1. Who needs help <small>{{ show_label }}{% if group == 'learner' %} &middot; by student{% endif %}{% if query %} &middot; matching “{{ query }}”{% endif %} &middot; lowest first</small></h2>
+  <h2>1. Who needs help <small>{{ show_label }}{% if group == 'learner' %} &middot; by student{% endif %}{% if query %} &middot; matching “{{ query }}”{% endif %} &middot; {% if sort == 'below' %}most subjects below pass first{% else %}lowest first{% endif %}</small></h2>
   {% if help_rows %}
   <table class="t">
     <thead><tr>

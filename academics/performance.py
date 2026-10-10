@@ -344,8 +344,9 @@ def subject_options(scope, results):
 
 
 def learner_summary(results):
-    """One row per learner: their average across the subjects in ``results``
-    and the subjects they are below the pass mark in (weakest first)."""
+    """One row per learner: their average across the subjects in ``results``,
+    a status from that average, and the subjects they are below the pass mark
+    in (weakest first)."""
     by_learner = defaultdict(list)
     for r in results:
         by_learner[r["student_id"]].append(r)
@@ -363,9 +364,9 @@ def learner_summary(results):
             "class_name": first["class_name"],
             "mark": avg,
             "grade": get_grade_from_score(avg),
-            # A learner needs help if their average or any one subject is
-            # below the pass mark; the status reflects the worse of the two.
-            "band": band if needs_help(band) or not weak else weak[0]["band"],
+            # Status follows the average, like the grade on the same row;
+            # single failing subjects are listed in ``weak`` instead.
+            "band": band,
             "subjects": len(rs),
             "weak": [{"subject": r["subject"], "mark": r["mark"], "band": r["band"]} for r in weak],
         })

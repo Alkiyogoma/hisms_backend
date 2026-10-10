@@ -11,6 +11,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 import academics.tests  # noqa: F401  (applies the SQLite teardown shim)
+from academics import performance
 from academics.models import (
     AcademicYear, Department, ExamScore, ExamTypeConfiguration, GradeClass,
     ScoreStatus, Subject, Term,
@@ -179,6 +180,29 @@ class PerformanceReportTests(TestCase):
         self.assertEqual(set(rows), {"Amani Learner", "Caren Learner"})
         self.assertEqual(rows["Amani Learner"]["mark"], 51.5)
         self.assertEqual([w["subject"] for w in rows["Amani Learner"]["weak"]], ["Science", "Mathematics"])
+
+    def test_by_student_status_follows_average_not_weakest_subject(self):
+        def result(sid, subject, mark):
+            return {"student_id": sid, "name": f"L{sid}", "initials": "L", "admission_no": str(sid),
+                    "class_name": "Grade 4", "subject": subject, "mark": mark,
+                    "band": performance._mark_band(mark)}
+        # L1 averages 64.5 (C) with one critical subject; L2 averages 51.5 (D).
+        results = [result(1, "French", 30), result(1, "English", 99),
+                   result(2, "Mathematics", 58), result(2, "Science", 45)]
+        rows = {r["name"]: r for r in performance.learner_summary(results)}
+        self.assertEqual((rows["L1"]["grade"], rows["L1"]["status"]), ("C", "On track"))
+        self.assertEqual([w["subject"] for w in rows["L1"]["weak"]], ["French"])
+        self.assertEqual((rows["L2"]["grade"], rows["L2"]["status"]), ("D", "Requires support"))
+
+    def test_by_student_sorts_by_subjects_below_pass(self):
+        resp = self._get(self.hos, term=self.term1.pk, group="learner", show="all", sort="below")
+        self.assertEqual(resp.context["sort"], "below")
+        self.assertEqual([r["name"] for r in resp.context["help_rows"]],
+                         ["Amani Learner", "Caren Learner", "Baraka Learner"])
+        self.assertContains(resp, "most subjects below pass first")
+        # The sort only applies to the by-student list.
+        resp = self._get(self.hos, term=self.term1.pk, sort="below")
+        self.assertEqual(resp.context["sort"], "average")
 
     def test_class_subject_matrix(self):
         resp = self._get(self.hos, term=self.term1.pk, view="subjects")
