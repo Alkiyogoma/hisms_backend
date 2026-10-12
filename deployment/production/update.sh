@@ -11,6 +11,23 @@ VENV=/opt/hodari/venv
 APPUSER=hodari
 BACKUP_DIR=/var/backups/hodari
 
+# Uploaded files (lesson plans, photos …): MEDIA_ROOT from .env, else the
+# media/ folder inside the code. Keep them outside the code folder — see
+# PRODUCTION_DEPLOY.md "Uploaded files".
+MEDIA="$(grep -E '^MEDIA_ROOT=' "$APP/.env" | tail -1 | cut -d= -f2- | tr -d '\r" ')"
+MEDIA="${MEDIA:-$APP/media}"
+count_media() { find "$MEDIA" -type f ! -path '*/previews/*' 2>/dev/null | wc -l; }
+
+echo "==> 0/7 Backing up uploaded files ($MEDIA)"
+case "$MEDIA" in "$APP"|"$APP"/*)
+  echo "    WARNING: uploads are inside the code folder. Move them out (PRODUCTION_DEPLOY.md, 'Uploaded files')." ;;
+esac
+mkdir -p "$BACKUP_DIR/media"
+# Adds and updates, never deletes: a file lost from the server stays here.
+rsync -a "$MEDIA/" "$BACKUP_DIR/media/"
+MEDIA_BEFORE=$(count_media)
+echo "    $MEDIA_BEFORE files, copied to $BACKUP_DIR/media/"
+
 echo "==> 1/7 Backing up the database"
 DB_NAME="$(grep -E '^POSTGRES_DB=' "$APP/.env" | tail -1 | cut -d= -f2- | tr -d '\r" ')"
 mkdir -p "$BACKUP_DIR"
@@ -34,6 +51,14 @@ sudo -u "$APPUSER" "$VENV/bin/python" "$APP/manage.py" migrate --noinput
 
 echo "==> 6/7 Collecting static files (CSS/JS/images -> staticfiles/)"
 sudo -u "$APPUSER" "$VENV/bin/python" "$APP/manage.py" collectstatic --noinput
+
+MEDIA_AFTER=$(count_media)
+if [ "$MEDIA_AFTER" -lt "$MEDIA_BEFORE" ]; then
+  echo "!!  Uploaded files went from $MEDIA_BEFORE to $MEDIA_AFTER during the update. NOT restarting."
+  echo "    Restore them with:  rsync -a $BACKUP_DIR/media/ $MEDIA/ && chown -R $APPUSER: $MEDIA"
+  exit 1
+fi
+chown -R "$APPUSER:$APPUSER" "$MEDIA"
 
 echo "==> 7/7 Restarting services (loads new templates + code)"
 systemctl restart hodari hodari-celery hodari-celery-beat

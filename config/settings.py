@@ -199,9 +199,11 @@ SESSION_IDLE_TIMEOUT = int(os.getenv("SESSION_IDLE_TIMEOUT", "1800"))  # 30 min 
 LOGIN_MAX_ATTEMPTS = int(os.getenv("LOGIN_MAX_ATTEMPTS", "5"))
 LOGIN_LOCKOUT_DURATION = int(os.getenv("LOGIN_LOCKOUT_DURATION", "900"))  # 15 min in seconds
 
-# Media files (student photos etc.)
+# Media files (student photos, lesson plan files etc.)
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+# Uploads should live outside the code folder on servers (e.g. /opt/hodari/media),
+# so replacing or re-cloning the code can never take them with it.
+MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT") or BASE_DIR / "media")
 # LibreOffice binary for lesson plan previews (office files -> PDF); found on PATH when empty.
 LIBREOFFICE_BINARY = os.getenv("LIBREOFFICE_BINARY", "")
 

@@ -315,11 +315,15 @@ sudo bash /opt/hodari/hisms_backend/deployment/production/update.sh
 
 The script (same steps as the testing script `deployment/nguzo/update.sh`):
 
+0. copies every uploaded file to `/var/backups/hodari/media/` (adds, never
+   deletes) and counts them;
 1. backs up the database to `/var/backups/hodari/<db>_<date>.dump` and prints
    the commit the server was on;
 2. pulls the latest code on the checked-out branch (`git pull`);
 3. fixes ownership, installs requirements, runs `migrate` and `collectstatic`;
-4. restarts `hodari`, `hodari-celery`, `hodari-celery-beat` and shows their
+4. counts the uploaded files again and **refuses to restart** if any went
+   missing, printing the command that restores them from the backup;
+5. restarts `hodari`, `hodari-celery`, `hodari-celery-beat` and shows their
    status and the site's HTTP response.
 
 If something goes wrong, roll back to the commit printed in step 1 and, only if
@@ -335,7 +339,75 @@ systemctl stop hodari hodari-celery hodari-celery-beat && sudo -u postgres pg_re
 
 ---
 
-## 5. Rules
+## 5. Uploaded files (once): keep them outside the code folder
+
+Uploads (lesson plan files, photos, documents) used to live in
+`/opt/hodari/hisms_backend/media/`, inside the code folder. Anything that
+replaces that folder (a folder swap like section 3, a fresh clone, a restore
+from a code backup) takes the uploads with it: five early lesson plan files
+were lost this way. Move them to a folder that no deploy touches.
+
+Check first — this is the folder the app writes to today (`MEDIA_ROOT`, if
+`.env` has none, is `media/` in the code folder):
+
+```bash
+grep -E '^MEDIA_ROOT=' /opt/hodari/hisms_backend/.env; ls /opt/hodari/hisms_backend/media
+```
+
+Look for the lost files before anything else (an old folder from section 3,
+or the testing site, may still have them):
+
+```bash
+find / -xdev \( -name 'LESSON_PLN_G5*' -o -name 'LSP_GRADE_4_VITENDAWILI*' -o -name 'LESSON_PLAN_G3*' -o -name 'LESSON_PLN_G7*' -o -name 'LESSON_PLAN_GRADE_2-1-5-IJU*' \) 2>/dev/null
+```
+
+Copy any found into `/opt/hodari/hisms_backend/media/lesson_plans/attachments/`
+under the name `lesson_plan_previews` reported (for example
+`LESSON_PLAN_GRADE_2-1-5-IJU_1.docx`). Otherwise ask the teachers to upload
+them again.
+
+Move the uploads (short downtime):
+
+```bash
+systemctl stop hodari hodari-celery hodari-celery-beat
+mkdir -p /opt/hodari/media && rsync -a /opt/hodari/hisms_backend/media/ /opt/hodari/media/ && chown -R hodari: /opt/hodari/media
+echo 'MEDIA_ROOT=/opt/hodari/media' >> /opt/hodari/hisms_backend/.env
+```
+
+Point nginx's `/media/` at the new folder. Find the production server block:
+
+```bash
+grep -n "location /media" -A2 /etc/nginx/sites-enabled/* | grep -v nguzo
+```
+
+and change its `alias` to `/opt/hodari/media/;` (keep the trailing slash).
+If `systemctl cat hodari hodari-celery` shows `ReadWritePaths=`, add
+`/opt/hodari/media` to it with a drop-in override (`systemctl edit hodari`,
+then the same for `hodari-celery`).
+
+```bash
+nginx -t && systemctl reload nginx && systemctl daemon-reload && systemctl start hodari hodari-celery hodari-celery-beat
+```
+
+Check: open a lesson plan file and a student photo on the site, then
+
+```bash
+cd /opt/hodari/hisms_backend && sudo -u hodari /opt/hodari/venv/bin/python manage.py lesson_plan_previews
+```
+
+should report the same counts as before. Keep the old
+`hisms_backend/media/` folder for a week, then delete everything in it except
+`branding/` (tracked in git).
+
+Nightly copy of uploads, in addition to the copy every deploy makes:
+
+```bash
+echo '30 1 * * * root rsync -a /opt/hodari/media/ /var/backups/hodari/media/' > /etc/cron.d/hodari-media-backup
+```
+
+---
+
+## 6. Rules
 
 - **Never edit code on the production server.** Change it in the repo → `main`
   → testing → `production`. The update script refuses to run over hand edits.
