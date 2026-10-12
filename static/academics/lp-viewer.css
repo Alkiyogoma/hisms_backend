@@ -37,7 +37,12 @@
    wider than the pane stays scrollable to its left edge. */
 .lpv-pages { flex: 1; overflow: auto; padding: 16px; display: flex; flex-direction: column; align-items: flex-start; gap: 14px; outline: none; }
 .lpv-page { background: #fff; box-shadow: 0 1px 4px rgba(15,23,42,.18); flex-shrink: 0; margin: 0 auto; }
-.lpv-pages > img, .lpv-pages > pre, .lpv-pages > table, .lpv-pages > .lpv-msg { margin-left: auto; margin-right: auto; }
+.lpv-pages > img, .lpv-pages > pre, .lpv-pages > table, .lpv-pages > .lpv-note { width: 100%; max-width: 960px; margin: 0 auto; padding: 8px 12px; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px; font-size: 12px; color: #92400E; line-height: 1.45; box-sizing: border-box; }
+.lpv-html { width: 100%; }
+.lpv-html .docx-wrapper { background: transparent; padding: 0 0 16px; }
+.lpv-html .docx-wrapper > section.docx { box-shadow: 0 1px 4px rgba(15,23,42,.18); margin-bottom: 14px; }
+.lpv-sheet { margin: 12px 0 6px; font-size: 13px; color: #1E293B; }
+.lpv-msg { margin-left: auto; margin-right: auto; }
 .lpv-page canvas { display: block; }
 .lpv-pages img { max-width: none; background: #fff; box-shadow: 0 1px 4px rgba(15,23,42,.18); }
 .lpv-pages pre { background: #fff; padding: 16px; margin: 0; width: 100%; max-width: 960px; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; line-height: 1.55; font-family: 'SF Mono', 'Fira Code', monospace; }

@@ -34,7 +34,18 @@ CONVERT_TIMEOUT = 60  # seconds; under the 120 s gunicorn worker timeout
 
 
 class PreviewUnavailable(Exception):
-    """The file cannot be shown as a PDF (no converter, or conversion failed)."""
+    """The file cannot be shown as a PDF. ``reason`` says why, for the viewer
+    and for the ``lesson_plan_previews`` check: no_converter, conversion_failed,
+    file_missing or unsupported."""
+
+    def __init__(self, message, reason="conversion_failed"):
+        super().__init__(message)
+        self.reason = reason
+
+
+# Office files the browser can still render itself when the server cannot
+# convert them (the viewer falls back to an in-browser renderer).
+BROWSER_FALLBACK = {"docx": "docx", "xlsx": "sheet", "xls": "sheet", "csv": "sheet"}
 
 
 def extension(name: str) -> str:
@@ -65,9 +76,24 @@ def converter() -> str | None:
 
 
 def _cache_dir() -> Path:
-    path = Path(settings.MEDIA_ROOT) / "lesson_plans" / "previews"
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+    """Where converted PDFs are kept: next to the media files, or the system
+    temp directory when the media folder is not writable by the app."""
+    for path in (Path(settings.MEDIA_ROOT) / "lesson_plans" / "previews",
+                 Path(tempfile.gettempdir()) / "hodari-lesson-plan-previews"):
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            continue
+        if os.access(path, os.W_OK):
+            return path
+    raise PreviewUnavailable("No writable folder for previews on the server", reason="conversion_failed")
+
+
+def file_exists(attachment) -> bool:
+    try:
+        return bool(attachment.file) and attachment.file.storage.exists(attachment.file.name)
+    except Exception:
+        return False
 
 
 def _fingerprint(attachment) -> str:
@@ -89,20 +115,23 @@ def pdf_for(attachment) -> Path:
     """A local PDF path for ``attachment``: the file itself when it is a PDF,
     otherwise a cached LibreOffice conversion. Raises PreviewUnavailable."""
     ext = extension(attachment.filename or attachment.file.name)
+    if ext not in PDF_EXTENSIONS and ext not in OFFICE_EXTENSIONS:
+        raise PreviewUnavailable(f".{ext} files are not shown as PDF", reason="unsupported")
+    if not file_exists(attachment):
+        raise PreviewUnavailable("The file is missing from the server — ask the teacher to upload it again",
+                                 reason="file_missing")
     if ext in PDF_EXTENSIONS:
         try:
             return Path(attachment.file.path)
         except NotImplementedError:  # remote storage: copy through the cache
             return _copy_to_cache(attachment)
-    if ext not in OFFICE_EXTENSIONS:
-        raise PreviewUnavailable(f".{ext} files are not shown as PDF")
 
     target = cached_pdf_path(attachment)
     if target.exists() and target.stat().st_size > 0:
         return target
     binary = converter()
     if not binary:
-        raise PreviewUnavailable("LibreOffice is not installed on the server")
+        raise PreviewUnavailable("LibreOffice is not installed on the server", reason="no_converter")
 
     with tempfile.TemporaryDirectory(prefix="lp-preview-") as tmp:
         tmp_path = Path(tmp)
@@ -114,16 +143,21 @@ def pdf_for(attachment) -> Path:
         profile = (tmp_path / "profile").as_uri()
         cmd = [binary, f"-env:UserInstallation={profile}", "--headless", "--norestore",
                "--convert-to", "pdf", "--outdir", str(tmp_path), str(source)]
+        # The web service's user often has no writable home; LibreOffice and
+        # fontconfig need one.
+        env = {**os.environ, "HOME": str(tmp_path)}
         try:
-            subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                           timeout=CONVERT_TIMEOUT, check=False)
+            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+                                    timeout=CONVERT_TIMEOUT, check=False)
         except (OSError, subprocess.TimeoutExpired) as exc:
             logger.warning("Lesson plan preview conversion failed for attachment %s: %s", attachment.pk, exc)
-            raise PreviewUnavailable("The file could not be converted") from exc
+            raise PreviewUnavailable("The file could not be converted", reason="conversion_failed") from exc
         produced = tmp_path / "source.pdf"
         if not produced.exists() or produced.stat().st_size == 0:
-            logger.warning("Lesson plan preview conversion produced no PDF for attachment %s", attachment.pk)
-            raise PreviewUnavailable("The file could not be converted")
+            detail = (result.stderr or result.stdout or b"").decode(errors="replace").strip()[-500:]
+            logger.warning("Lesson plan preview conversion produced no PDF for attachment %s (exit %s): %s",
+                           attachment.pk, result.returncode, detail)
+            raise PreviewUnavailable("The file could not be converted", reason="conversion_failed")
         _prune_old(attachment.pk, keep=target.name)
         # Atomic: a concurrent request never reads a half-written PDF.
         partial = target.with_suffix(".part")

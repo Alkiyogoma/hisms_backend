@@ -143,6 +143,35 @@ class LessonPlanViewerTests(LessonPlanFixture):
         with mock.patch("academics.lesson_plan_files.converter", return_value=None):
             resp = self.client.get(reverse("academics:lesson_plan_attachment_preview", args=[self.att.pk]))
         self.assertEqual(resp.status_code, 503)
+        # The viewer then renders the Word file in the browser instead.
+        self.assertEqual(resp["X-Preview-Reason"], "no_converter")
+        self.assertEqual(self.thread(self.hod).json()["files"][0]["fallback"], "docx")
+
+    def test_missing_file_says_so_instead_of_failing(self):
+        Path(self.att.file.path).unlink()
+        self.client.force_login(self.hod)
+        resp = self.client.get(reverse("academics:lesson_plan_attachment_preview", args=[self.att.pk]))
+        self.assertEqual((resp.status_code, resp["X-Preview-Reason"]), (404, "file_missing"))
+        self.assertIn("missing", resp.content.decode())
+
+    def test_conversion_failure_gives_a_reason(self):
+        self.client.force_login(self.hod)
+        with mock.patch("academics.lesson_plan_files.subprocess.run",
+                        return_value=subprocess.CompletedProcess([], 1, b"", b"boom")), \
+                mock.patch("academics.lesson_plan_files.converter", return_value="/usr/bin/soffice"):
+            resp = self.client.get(reverse("academics:lesson_plan_attachment_preview", args=[self.att.pk]))
+        self.assertEqual((resp.status_code, resp["X-Preview-Reason"]), (503, "conversion_failed"))
+
+    def test_preview_check_command_reports_each_attachment(self):
+        from django.core.management import call_command
+        Path(self.att.file.path).unlink()
+        out = io.StringIO()
+        with mock.patch("academics.lesson_plan_files.converter", return_value=None):
+            call_command("lesson_plan_previews", stdout=out)
+        text = out.getvalue()
+        self.assertIn("LibreOffice: NOT FOUND", text)
+        self.assertIn("MISSING", text)
+        self.assertIn("1  file missing", text)
 
     def test_pdf_attachment_is_served_inline(self):
         att = LessonPlanAttachment.objects.create(
