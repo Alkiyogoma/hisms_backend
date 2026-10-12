@@ -7,6 +7,8 @@ comment thread between the teacher and reviewers.
 * ``preview`` — an attachment as PDF (office files converted on the server).
 * ``comment`` — add a comment. Comments never change the plan's status.
 """
+import logging
+
 from django.core.exceptions import PermissionDenied
 from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
@@ -19,6 +21,8 @@ from academics.models import GradeClass, LessonPlan, LessonPlanAttachment, Lesso
 from core.permissions import RoleRequiredMixin
 
 COMMENT_MAX_LENGTH = 4000
+
+logger = logging.getLogger(__name__)
 
 
 def can_view_plan(user, plan) -> bool:
@@ -83,6 +87,8 @@ class LessonPlanThreadView(RoleRequiredMixin, View):
             "id": a.pk,
             "name": a.filename,
             "kind": lesson_plan_files.preview_kind(a.filename),
+            # How the browser can still show it if the server cannot convert it.
+            "fallback": lesson_plan_files.BROWSER_FALLBACK.get(lesson_plan_files.extension(a.filename)),
             "preview_url": reverse("academics:lesson_plan_attachment_preview", args=[a.pk]),
             "download_url": a.file.url,
         } for a in plan.attachments.order_by("created_at", "id")]
@@ -113,18 +119,25 @@ class LessonPlanAttachmentPreviewView(RoleRequiredMixin, View):
         if not can_view_plan(request.user, att.lesson_plan):
             raise PermissionDenied()
         kind = lesson_plan_files.preview_kind(att.filename)
-        if kind == "pdf":
-            try:
+        try:
+            if kind == "pdf":
                 path = lesson_plan_files.pdf_for(att)
-            except lesson_plan_files.PreviewUnavailable as exc:
-                return HttpResponse(str(exc), status=503, content_type="text/plain")
-            response = FileResponse(open(path, "rb"), content_type="application/pdf")
-        elif kind in ("image", "text"):
-            response = FileResponse(att.file.open("rb"))
-            if kind == "text":
-                response["Content-Type"] = "text/plain; charset=utf-8"
-        else:
-            return HttpResponse("This file type has no preview.", status=415, content_type="text/plain")
+                response = FileResponse(open(path, "rb"), content_type="application/pdf")
+            elif kind in ("image", "text"):
+                if not lesson_plan_files.file_exists(att):
+                    raise lesson_plan_files.PreviewUnavailable(
+                        "The file is missing from the server — ask the teacher to upload it again",
+                        reason="file_missing")
+                response = FileResponse(att.file.open("rb"))
+                if kind == "text":
+                    response["Content-Type"] = "text/plain; charset=utf-8"
+            else:
+                raise lesson_plan_files.PreviewUnavailable("This file type has no preview", reason="unsupported")
+        except lesson_plan_files.PreviewUnavailable as exc:
+            return _unavailable(str(exc), exc.reason)
+        except OSError:
+            logger.exception("Lesson plan preview failed for attachment %s", att.pk)
+            return _unavailable("The file could not be read on the server", "conversion_failed")
         response["Content-Disposition"] = "inline"
         response["X-Content-Type-Options"] = "nosniff"
         # Uploaded files are untrusted: opened directly (an SVG, say) they
@@ -132,6 +145,15 @@ class LessonPlanAttachmentPreviewView(RoleRequiredMixin, View):
         response["Content-Security-Policy"] = "sandbox; default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'"
         response["Cache-Control"] = "private, max-age=300"
         return response
+
+
+def _unavailable(message, reason):
+    """Why a file cannot be previewed; the viewer shows the message and, for
+    Word and Excel files the server could not convert, renders them itself."""
+    status = {"file_missing": 404, "unsupported": 415}.get(reason, 503)
+    response = HttpResponse(message, status=status, content_type="text/plain; charset=utf-8")
+    response["X-Preview-Reason"] = reason
+    return response
 
 
 class LessonPlanCommentView(RoleRequiredMixin, View):

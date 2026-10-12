@@ -7,6 +7,10 @@
   'use strict';
 
   var PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+  // In-browser renderers for Word / Excel files the server could not convert.
+  var JSZIP = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+  var DOCX = 'https://cdn.jsdelivr.net/npm/docx-preview@0.3.7/dist/docx-preview.min.js';
+  var SHEETJS = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
   var root, state = {};
 
   function $(sel) { return root.querySelector(sel); }
@@ -17,6 +21,21 @@
     return n;
   }
   function threadUrl(id) { return root.dataset.threadUrl.replace('/0/', '/' + id + '/'); }
+
+  var scripts = {};
+  function loadScript(src, ready) {
+    if (ready()) return Promise.resolve();
+    if (!scripts[src]) {
+      scripts[src] = new Promise(function (resolve, reject) {
+        var s = document.createElement('script');
+        s.src = src;
+        s.onload = function () { resolve(); };
+        s.onerror = function () { delete scripts[src]; reject(new Error('viewer')); };
+        document.head.appendChild(s);
+      });
+    }
+    return scripts[src];
+  }
 
   var pdfjsReady;
   function loadPdfJs() {
@@ -124,6 +143,7 @@
     var token = state.token = {};
     if (state.pdf) { try { state.pdf.destroy(); } catch (e) {} state.pdf = null; }
     state.scale = null;
+    state.html = null;
     state.page = 1;
     if (f.kind === 'pdf') return showPdf(f, token);
     toolbar(false);
@@ -153,7 +173,7 @@
     unavailable(f, 'There is no preview for this type of file.');
   }
 
-  function unavailable(f, why) {
+  function unavailable(f, why, isPdf) {
     toolbar(false);
     var pages = $('#lpvPages');
     pages.innerHTML = '';
@@ -166,6 +186,15 @@
     a.style.cssText = 'color:var(--hodari-blue,#023E8A);font-weight:700';
     box.appendChild(a);
     box.appendChild(document.createTextNode(' to open it.'));
+    if (isPdf) {
+      box.appendChild(el('br'));
+      var tab = el('a', '', 'Open it in a new tab');
+      tab.href = f.preview_url;
+      tab.target = '_blank';
+      tab.rel = 'noopener';
+      tab.style.cssText = 'color:var(--hodari-blue,#023E8A);font-weight:700';
+      box.appendChild(tab);
+    }
     pages.appendChild(box);
   }
 
@@ -180,29 +209,87 @@
   }
 
   // ── PDF ──────────────────────────────────────────────────────────────
+  // The server sends the PDF (office files converted to PDF). When it
+  // cannot convert a Word or Excel file, the browser renders that file itself.
   function showPdf(f, token) {
     toolbar(false);
     var office = !/\.pdf$/i.test(f.name);
     message('spin', office ? 'Preparing the preview…' : 'Loading…',
             office ? 'Word and other office files are converted to PDF so they look exactly as written. The first view can take a few seconds.' : '');
-    var stage = 'viewer';
-    loadPdfJs()
-      .then(function (pdfjsLib) {
-        stage = 'file';
-        return pdfjsLib.getDocument({ url: f.preview_url, withCredentials: true }).promise;
+    var file = fetch(f.preview_url, { credentials: 'same-origin' }).then(function (r) {
+      if (r.ok) return r.arrayBuffer();
+      return r.text().then(function (text) {
+        var err = new Error(text || 'The file could not be shown.');
+        err.reason = r.headers.get('X-Preview-Reason') || 'error';
+        throw err;
+      });
+    });
+    var viewer = loadPdfJs();
+    Promise.all([file, viewer])
+      .then(function (both) {
+        if (token !== state.token) return;
+        return both[1].getDocument({ data: both[0] }).promise;
       })
       .then(function (pdf) {
+        if (!pdf) return;
         if (token !== state.token) { pdf.destroy(); return; }
         state.pdf = pdf;
         $('#lpvPageCount').textContent = pdf.numPages;
         $('#lpvPageInput').max = pdf.numPages;
-        toolbar(true);
+        toolbar('pdf');
         return renderPages(token, true);
+      })
+      .catch(function (err) {
+        if (token !== state.token) return;
+        var serverCannot = err && (err.reason === 'no_converter' || err.reason === 'conversion_failed');
+        var viewerMissing = err && err.message === 'viewer';
+        if (f.fallback && (serverCannot || viewerMissing)) return showInBrowser(f, token);
+        if (viewerMissing) return unavailable(f, 'The viewer could not load — check your connection.', !office);
+        unavailable(f, err && err.reason ? err.message : (office ? 'The file could not be converted for preview.'
+          : 'This PDF could not be shown here.'), !office);
+      });
+  }
+
+  // ── In-browser fallback (Word via docx-preview, Excel via SheetJS) ───
+  function showInBrowser(f, token) {
+    message('spin', 'Opening the file in the browser…');
+    var libs = f.fallback === 'docx'
+      ? loadScript(JSZIP, function () { return !!window.JSZip; })
+          .then(function () { return loadScript(DOCX, function () { return !!(window.docx && window.docx.renderAsync); }); })
+      : loadScript(SHEETJS, function () { return !!window.XLSX; });
+    var data = fetch(f.download_url, { credentials: 'same-origin' })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); });
+    Promise.all([libs, data])
+      .then(function (both) {
+        if (token !== state.token) return;
+        var pages = $('#lpvPages');
+        pages.innerHTML = '';
+        var note = el('div', 'lpv-note', 'Shown by your browser: the server could not convert this file. '
+          + 'Layout can differ slightly from the original — download it to check.');
+        pages.appendChild(note);
+        var body = el('div', 'lpv-html');
+        pages.appendChild(body);
+        state.html = body;
+        state.htmlZoom = 1;
+        toolbar('html');
+        updateZoom();
+        if (f.fallback === 'docx') {
+          return window.docx.renderAsync(both[1], body, null, {
+            inWrapper: true, breakPages: true, ignoreLastRenderedPageBreak: true,
+            renderHeaders: true, renderFooters: true, experimental: true
+          });
+        }
+        var wb = window.XLSX.read(both[1], { type: 'array' });
+        wb.SheetNames.forEach(function (name) {
+          if (wb.SheetNames.length > 1) body.appendChild(el('h4', 'lpv-sheet', name));
+          var wrap = el('div');
+          wrap.innerHTML = window.XLSX.utils.sheet_to_html(wb.Sheets[name], { editable: false });
+          body.appendChild(wrap);
+        });
       })
       .catch(function () {
         if (token !== state.token) return;
-        unavailable(f, stage === 'viewer' ? 'The viewer could not load — check your connection.'
-          : office ? 'The file could not be converted for preview.' : 'This PDF could not be shown here.');
+        unavailable(f, 'The file could not be shown here.');
       });
   }
 
@@ -262,13 +349,25 @@
     });
   }
 
-  function toolbar(on) {
-    root.querySelectorAll('[data-pdf-only]').forEach(function (n) { n.hidden = !on; });
+  // mode: 'pdf' (pages + zoom), 'html' (zoom only) or false (none).
+  function toolbar(mode) {
+    root.querySelectorAll('[data-pdf-only]').forEach(function (n) {
+      n.hidden = !(mode === 'pdf' || (mode === 'html' && n.hasAttribute('data-zoom')));
+    });
   }
 
-  function updateZoom() { $('#lpvZoom').textContent = Math.round(state.scale * 100) + '%'; }
+  function updateZoom() {
+    var z = state.html ? state.htmlZoom : state.scale;
+    $('#lpvZoom').textContent = Math.round(z * 100) + '%';
+  }
 
   function zoom(factor) {
+    if (state.html) {
+      state.htmlZoom = Math.min(3, Math.max(0.4, state.htmlZoom * factor));
+      state.html.style.zoom = state.htmlZoom;
+      updateZoom();
+      return;
+    }
     if (!state.pdf) return;
     var next = Math.min(4, Math.max(0.3, state.scale * factor));
     if (Math.abs(next - state.scale) < 0.001) return;
@@ -278,6 +377,7 @@
   }
 
   function fit() {
+    if (state.html) { state.htmlZoom = 1; state.html.style.zoom = ''; updateZoom(); return; }
     if (!state.pdf) return;
     state.token = {};
     renderPages(state.token, true);
@@ -288,6 +388,9 @@
     n = Math.min(state.pdf.numPages, Math.max(1, n | 0));
     var target = root.querySelector('.lpv-page[data-page="' + n + '"]');
     state.page = n;
+    // Ignore the scroll events of our own (smooth) scroll, so quick repeated
+    // clicks keep counting from the page asked for.
+    state.navUntil = Date.now() + (instant ? 100 : 700);
     syncPage();
     if (target) {
       var pages = $('#lpvPages');
@@ -302,7 +405,7 @@
   }
 
   function onScroll() {
-    if (!state.pdf) return;
+    if (!state.pdf || Date.now() < (state.navUntil || 0)) return;
     var pages = $('#lpvPages');
     var mid = pages.scrollTop + pages.clientHeight / 3;
     var current = 1;
@@ -437,7 +540,7 @@
       if (!root.classList.contains('open')) return;
       if (e.key === 'Escape') { e.stopImmediatePropagation(); close(); return; }
       var typing = /^(TEXTAREA|INPUT)$/.test((e.target || {}).tagName);
-      if (typing || !state.pdf) return;
+      if (typing || !(state.pdf || state.html)) return;
       if (e.key === 'PageDown' || e.key === 'ArrowRight') { e.preventDefault(); goTo(state.page + 1); }
       if (e.key === 'PageUp' || e.key === 'ArrowLeft') { e.preventDefault(); goTo(state.page - 1); }
       if ((e.key === '+' || e.key === '=') && !e.ctrlKey && !e.metaKey) zoom(1.2);
