@@ -147,7 +147,11 @@ def export_student_data(student) -> dict[str, Any]:
 
     data["attendance_history"] = _safe_qs_to_list(
         AttendanceEntry.objects.filter(student=student).order_by("-date"),
-        ["id", "date", "status", "time_in", "time_out", "notes", "created_at"],
+        [
+            "id", "date", "status", "class_name", "check_in_time", "check_out_time",
+            "is_early_departure", "reason", "parent_name", "original_status",
+            "correction_reason", "created_at",
+        ],
     )
 
     # ── 6. Financial records ─────────────────────────────────────────────
@@ -199,21 +203,24 @@ def export_student_data(student) -> dict[str, Any]:
         "exam_scores": _safe_qs_to_list(
             ExamScore.objects.filter(student=student).order_by("-created_at")[:500],
             [
-                "id", "term_id", "subject_id", "exam_type", "score",
-                "grade", "position", "comments", "created_at",
+                "id", "term_id", "subject_name", "exam_type", "score", "max_score",
+                "status", "hod_feedback", "previous_score", "correction_reason", "created_at",
             ],
         ),
         "report_cards": _safe_qs_to_list(
             ReportCard.objects.filter(student=student).order_by("-created_at")[:100],
             [
-                "id", "term_id", "academic_year_id", "class_name",
-                "overall_grade", "overall_position", "comments",
-                "generated_at", "created_at",
+                "id", "term_id", "status", "overall_average", "teacher_comments",
+                "hos_comments", "general_traits", "ecd_remarks", "attendance_days_present",
+                "attendance_days_absent", "attendance_days_late", "attendance_rate",
+                "published_at", "parent_signed", "parent_signed_at", "parent_signature_name",
+                "created_at",
             ],
         ),
         "ecd_evaluations": _safe_qs_to_list(
-            ECDEvaluation.objects.filter(student=student).order_by("-created_at")[:100],
-            ["id", "term_id", "subject_id", "rating", "comments", "created_at"],
+            # Evaluations belong to a report card, not directly to the learner.
+            ECDEvaluation.objects.filter(report_card__student=student).order_by("-created_at")[:100],
+            ["id", "report_card_id", "report_card__term_id", "domain", "rating", "created_at"],
         ),
     }
 
@@ -236,8 +243,9 @@ def export_student_data(student) -> dict[str, Any]:
         data["welfare_records"] = _safe_qs_to_list(
             WelfareObservation.all_objects.filter(student=student).order_by("-created_at"),
             [
-                "id", "observation_type", "description", "severity",
-                "action_taken", "observed_by_id", "created_at",
+                "id", "note_type", "concern_type", "severity", "status", "observation_date",
+                "observation_text", "action_taken", "parent_contacted", "follow_up_required",
+                "follow_up_date", "hod_status", "hod_notes", "submitted_by_id", "created_at",
             ],
         )
     except (ImportError, Exception):
@@ -247,14 +255,15 @@ def export_student_data(student) -> dict[str, Any]:
     from admissions.models import Applicant
 
     applicants = Applicant.objects.filter(
-        Q(child_full_name__icontains=student.first_name)
-        & Q(child_full_name__icontains=student.last_name)
-    )[:5]
+        Q(enrolled_student=student)
+        | (Q(child_full_name__icontains=student.first_name)
+           & Q(child_full_name__icontains=student.last_name))
+    ).order_by("-created_at")[:5]
 
     data["admissions_history"] = _safe_qs_to_list(
         applicants,
         [
-            "id", "parent_full_name", "parent_phone", "parent_email",
+            "id", "reference_number", "parent_full_name", "parent_phone", "parent_email",
             "child_full_name", "child_date_of_birth", "grade_applying_for",
             "status", "inquiry_channel", "sibling_matched_parent_id",
             "created_at",
@@ -267,10 +276,10 @@ def export_student_data(student) -> dict[str, Any]:
 
         data["notifications"] = _safe_qs_to_list(
             Notification.objects.filter(
-                Q(message__icontains=student.first_name)
-                | Q(message__icontains=student.last_name)
+                Q(body__icontains=student.first_name)
+                | Q(body__icontains=student.last_name)
             ).order_by("-created_at")[:200],
-            ["id", "title", "message", "is_read", "created_at"],
+            ["id", "recipient_id", "category", "title", "body", "link", "is_read", "created_at"],
         )
     except (ImportError, Exception):
         data["notifications"] = []
