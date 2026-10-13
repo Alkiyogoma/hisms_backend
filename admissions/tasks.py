@@ -529,6 +529,7 @@ def send_invoice_30day_reminder_task():
             "application_link": f"/admissions/applicant/{app.pk}/",
             "school_name": "Hodari Christian School",
         }
+        from communications.email_service import send_email_safe
         from core.email_templates import send_dynamic_email
         for staff in all_staff:
             dispatch_notification(

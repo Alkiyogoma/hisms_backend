@@ -385,7 +385,7 @@ def verify_deployment(client, password):
         warn("No HTTP response on port 8009")
 
     # Test through nginx (HTTPS, routed by Host)
-    out, _, code = run_cmd(client, f"curl -sk -o /dev/null -w '%{http_code}' -H 'Host: {DOMAIN}' https://127.0.0.1/ 2>/dev/null || echo 000", timeout=10)
+    out, _, code = run_cmd(client, f"curl -sk -o /dev/null -w '%{{http_code}}' -H 'Host: {DOMAIN}' https://127.0.0.1/ 2>/dev/null || echo 000", timeout=10)
     if out and out != "000":
         ok(f"Nginx proxy response: {out}")
     else:

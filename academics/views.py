@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from decimal import Decimal
+from decimal import Decimal, DecimalException
 
 from django.conf import settings
 from django.contrib import messages
