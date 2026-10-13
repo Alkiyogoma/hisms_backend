@@ -314,3 +314,49 @@ class DisciplineAmendForm(forms.ModelForm):
         for error in notes_conflicts(notes, incident.parent_contacted, incident.follow_up_required):
             self.add_error(None, error)
         return cleaned
+
+
+REASON_REQUIRED = "Give the reason for deleting, so the record shows why it went."
+
+
+def _clean_deletion_reason(form):
+    reason = (form.cleaned_data.get("reason") or "").strip()
+    if len(reason) < 5:
+        raise forms.ValidationError(REASON_REQUIRED)
+    return reason
+
+
+class DisciplineDeleteForm(forms.Form):
+    """Delete one incident. A reason is required; if it is a repeat of another
+    incident, say which one is kept."""
+
+    reason = forms.CharField(widget=forms.Textarea(attrs={"rows": 3}), max_length=1000,
+                             error_messages={"required": REASON_REQUIRED})
+    duplicate_of = forms.ModelChoiceField(queryset=DisciplineIncident.objects.none(), required=False)
+
+    def __init__(self, *args, incident, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.incident = incident
+        self.fields["duplicate_of"].queryset = (
+            DisciplineIncident.objects.filter(student_id=incident.student_id).exclude(pk=incident.pk)
+        )
+
+    clean_reason = _clean_deletion_reason
+
+
+class DisciplineKeepOneForm(forms.Form):
+    """Keep one incident and delete the repeats of it."""
+
+    reason = forms.CharField(widget=forms.Textarea(attrs={"rows": 3}), max_length=1000,
+                             error_messages={"required": REASON_REQUIRED})
+    delete = forms.ModelMultipleChoiceField(
+        queryset=DisciplineIncident.objects.none(),
+        error_messages={"required": "Tick at least one incident to delete."},
+    )
+
+    def __init__(self, *args, keep, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.keep = keep
+        self.fields["delete"].queryset = keep.likely_duplicates()
+
+    clean_reason = _clean_deletion_reason

@@ -585,6 +585,22 @@ document.addEventListener('DOMContentLoaded', function() {
     if (sec && sec.querySelector('.field-error')) { firstErrorStep = si; break; }
   }
   if (firstErrorStep > 1) showStep(firstErrorStep);
+
+  // Submit once. On a slow connection a second press would record the
+  // incident again, so the button stays disabled while the first is sent.
+  form.addEventListener('submit', function (e) {
+    if (form.dataset.sending) { e.preventDefault(); return; }
+    form.dataset.sending = '1';
+    if (btnSubmit) {
+      btnSubmit.disabled = true;
+      btnSubmit.textContent = 'Submitting… please wait';
+    }
+  });
+  // Coming back to the page (browser Back) re-enables it.
+  window.addEventListener('pageshow', function () {
+    delete form.dataset.sending;
+    if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.textContent = 'Submit Incident Report'; }
+  });
 });
 </script>
 {% endblock %}

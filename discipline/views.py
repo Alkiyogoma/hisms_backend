@@ -1,8 +1,10 @@
-from datetime import date
+from datetime import date, timedelta
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.db.models import Case, Count, F, Q, Value, When
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
@@ -20,7 +22,9 @@ from .consistency import notes_conflicts
 from .forms import (
     CONTACT_FIELDS,
     DisciplineAmendForm,
+    DisciplineDeleteForm,
     DisciplineIncidentForm,
+    DisciplineKeepOneForm,
     DisciplineReviewForm,
     apply_parent_contact,
     parent_contact_initial,
@@ -71,6 +75,54 @@ SHARED_ACCOUNT_MESSAGE = (
 def can_amend(user):
     """The super admin and the Head of School may correct a submitted incident."""
     return user.has_role(UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL)
+
+
+def can_delete(user):
+    """Only the super admin may delete an incident."""
+    return user.has_role(UserRole.SUPER_ADMIN)
+
+
+def delete_incident(incident, user, reason, duplicate_of=None, request=None):
+    """Delete ``incident``: hide it from every list, count and queue, keeping the
+    row with who deleted it, when and why, and an audit entry holding what it
+    said. Returns False if it was already deleted."""
+    snapshot = {label: value for label, value, _ in _amend_values(incident)}
+    snapshot.update({
+        "Reference": incident.reference,
+        "Status": incident.get_status_display(),
+        "Reported by": f"{staff_name(incident.reported_by)}, {staff_title(incident.reported_by)}",
+        "Recorded at": timezone.localtime(incident.created_at).strftime("%d %b %Y, %H:%M"),
+    })
+    now = timezone.now()
+    with transaction.atomic():
+        # Conditional update: two clicks on Delete record one deletion, not two.
+        done = DisciplineIncident.objects.filter(pk=incident.pk).update(
+            deleted_at=now, deleted_by=user, deletion_reason=reason,
+            duplicate_of=duplicate_of, updated_at=now,
+        )
+        if not done:
+            return False
+        # Open follow-up tasks for a deleted incident no longer need doing.
+        from tasks.models import Task
+        Task.objects.filter(
+            content_type=ContentType.objects.get_for_model(DisciplineIncident),
+            object_id=incident.pk, status__in=["pending", "in_progress", "deferred"],
+        ).update(status="cancelled")
+        why = f"duplicate of {duplicate_of.reference}: {reason}" if duplicate_of else reason
+        log_event(
+            actor=user,
+            action_type="discipline_incident_deleted",
+            model_name="DisciplineIncident",
+            object_id=incident.pk,
+            description=f"{incident.reference} for {incident.student} deleted — {why[:200]}",
+            before=snapshot,
+            after={"deleted_at": now.isoformat(), "deleted_by": staff_name(user), "reason": reason,
+                   "duplicate_of": duplicate_of.reference if duplicate_of else None},
+            request=request,
+        )
+    incident.deleted_at, incident.deleted_by, incident.deletion_reason = now, user, reason
+    incident.duplicate_of = duplicate_of
+    return True
 
 
 
@@ -160,6 +212,14 @@ class DisciplineSubmitView(DepartmentScopedMixin, RoleRequiredMixin, CreateView)
         if incident.severity == IncidentSeverity.HIGH:
             incident.escalated = True
 
+        repeat = self._repeat_of(incident)
+        if repeat:
+            messages.info(
+                self.request,
+                f"This incident was already recorded as {repeat.reference}, so it was not recorded again.",
+            )
+            return redirect("discipline:detail", pk=repeat.pk)
+
         incident.save()
 
         # Log to audit trail
@@ -183,6 +243,20 @@ class DisciplineSubmitView(DepartmentScopedMixin, RoleRequiredMixin, CreateView)
 
         messages.success(self.request, f"Behaviour incident recorded for {incident.student.first_name}.")
         return redirect("discipline:detail", pk=incident.pk)
+
+    REPEAT_WINDOW = timedelta(minutes=10)
+
+    def _repeat_of(self, incident):
+        """The same report sent again (submit pressed twice, or resent after a
+        dropped connection): same reporter, learner, date and summary, within a
+        few minutes."""
+        return (
+            DisciplineIncident.objects.filter(
+                reported_by=incident.reported_by, student=incident.student,
+                incident_date=incident.incident_date, summary=incident.summary,
+                created_at__gte=timezone.now() - self.REPEAT_WINDOW,
+            ).order_by("created_at").first()
+        )
 
     def form_invalid(self, form):
         messages.error(self.request, "Please correct the errors below.")
@@ -288,12 +362,19 @@ class DisciplineListView(DepartmentScopedMixin, RoleRequiredMixin, ListView):
     def scoped(self):
         return visible_incidents(self.request.user)
 
+    def show_deleted(self):
+        return self.request.GET.get("status") == "deleted" and can_delete(self.request.user)
+
     def get_queryset(self):
-        qs = self.scoped()
+        if self.show_deleted():
+            qs = DisciplineIncident.all_objects.deleted().select_related(
+                "student", "reported_by", "deleted_by", "duplicate_of")
+        else:
+            qs = self.scoped()
         get = self.request.GET
         if get.get("q", "").strip():
             qs = search_incidents(qs, get["q"])
-        if get.get("status"):
+        if get.get("status") and not self.show_deleted():
             qs = qs.filter(status=get["status"])
         if get.get("severity"):
             qs = qs.filter(severity=get["severity"])
@@ -326,6 +407,10 @@ class DisciplineListView(DepartmentScopedMixin, RoleRequiredMixin, ListView):
             resolved=Count("pk", filter=Q(status=IncidentStatus.RESOLVED)),
         )
         ctx["stats"] = counts
+        ctx["can_delete"] = can_delete(self.request.user)
+        ctx["showing_deleted"] = self.show_deleted()
+        if ctx["can_delete"]:
+            ctx["deleted_count"] = DisciplineIncident.all_objects.deleted().count()
 
         # FRD: Behaviour list filter — Primary + Secondary only (no ECD)
         if _primary_only_head(self.request.user):
@@ -351,15 +436,27 @@ class DisciplineDetailView(RoleRequiredMixin, DetailView):
 
     def get_queryset(self):
         # Teachers see their own reports; heads of section their own sections.
+        # The super admin can still open a deleted incident, to see why it went.
+        if can_delete(self.request.user):
+            return DisciplineIncident.all_objects.select_related(
+                "student", "reported_by", "reviewed_by", "deleted_by", "duplicate_of")
         return visible_incidents(self.request.user)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["discipline_tab"] = "detail"
         incident = self.object
+        user = self.request.user
+        live = not incident.is_deleted
         locked = incident.status in {IncidentStatus.RESOLVED, IncidentStatus.DISMISSED}
         ctx["is_incident_locked"] = locked
-        ctx["can_review"] = self.request.user.has_perm("discipline.can_review_incident")
+        ctx["can_review"] = live and user.has_perm("discipline.can_review_incident")
+        ctx["can_delete"] = live and can_delete(user)
+        if incident.is_deleted:
+            ctx["deleted_by_name"] = staff_name(incident.deleted_by)
+            ctx["deleted_by_title"] = staff_title(incident.deleted_by)
+        elif ctx["can_delete"]:
+            ctx["likely_duplicates"] = list(incident.likely_duplicates())
         ctx["review_form"] = kwargs.get("review_form") or DisciplineReviewForm(
             incident=incident,
             locked=locked,
@@ -367,7 +464,7 @@ class DisciplineDetailView(RoleRequiredMixin, DetailView):
                      **parent_contact_initial(incident)},
         )
         ctx["reviewer_title"] = staff_title(self.request.user)
-        ctx["can_amend"] = can_amend(self.request.user)
+        ctx["can_amend"] = live and can_amend(user)
         ctx["amendments"] = list(incident.amendments.select_related("changed_by"))
         for amendment in ctx["amendments"]:
             amendment.by_name = staff_name(amendment.changed_by)
@@ -667,3 +764,89 @@ class DisciplineParentConfirmView(DepartmentScopedMixin, RoleRequiredMixin, View
 
         messages.success(request, "Parent confirmation recorded.")
         return redirect("discipline:detail", pk=pk)
+
+
+class _IncidentDeletionView(RoleRequiredMixin, TemplateView):
+    """Shared by the two ways the super admin deletes incidents."""
+    template_name = "discipline/delete.html"
+    allowed_roles = [UserRole.SUPER_ADMIN]
+    required_permission = "discipline.view_disciplineincident"
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and not can_delete(request.user):
+            raise PermissionDenied("Only the super admin can delete an incident.")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_incident(self):
+        return get_object_or_404(
+            DisciplineIncident.objects.select_related("student", "reported_by"), pk=self.kwargs["pk"])
+
+    def render_form(self, form, **ctx):
+        incident = form.incident if hasattr(form, "incident") else form.keep
+        reporter = incident.reported_by
+        return self.render_to_response(self.get_context_data(
+            form=form, incident=incident, discipline_tab="detail",
+            reporter_name=staff_name(reporter), reporter_title=staff_title(reporter),
+            shared_account=is_shared_account(self.request.user), **ctx))
+
+    def refuse_shared_account(self, form):
+        if is_shared_account(self.request.user):
+            form.add_error(None, SHARED_ACCOUNT_MESSAGE)
+            return True
+        return False
+
+
+class DisciplineDeleteView(_IncidentDeletionView):
+    """Delete one incident, with a reason; optionally as a repeat of another."""
+
+    def get(self, request, pk):
+        incident = self.get_incident()
+        duplicates = list(incident.likely_duplicates())
+        initial = {"duplicate_of": duplicates[0].pk} if duplicates else {}
+        return self.render_form(DisciplineDeleteForm(incident=incident, initial=initial),
+                                mode="one", likely_duplicates=duplicates)
+
+    def post(self, request, pk):
+        incident = self.get_incident()
+        form = DisciplineDeleteForm(request.POST, incident=incident)
+        if not form.is_valid() or self.refuse_shared_account(form):
+            messages.error(request, "Not deleted. Fix the points below.")
+            return self.render_form(form, mode="one", likely_duplicates=list(incident.likely_duplicates()))
+        kept = form.cleaned_data["duplicate_of"]
+        delete_incident(incident, request.user, form.cleaned_data["reason"], duplicate_of=kept, request=request)
+        if kept:
+            messages.success(request, f"{incident.reference} deleted as a duplicate of {kept.reference}.")
+            return redirect("discipline:detail", pk=kept.pk)
+        messages.success(request, f"{incident.reference} deleted. It no longer appears in lists or counts.")
+        return redirect("discipline:list")
+
+
+class DisciplineKeepOneView(_IncidentDeletionView):
+    """Keep this incident and delete the repeats of it (same learner, same
+    reporter, same day)."""
+
+    def get(self, request, pk):
+        keep = self.get_incident()
+        duplicates = list(keep.likely_duplicates())
+        if not duplicates:
+            messages.info(request, f"{keep.reference} has no repeats to delete.")
+            return redirect("discipline:detail", pk=pk)
+        form = DisciplineKeepOneForm(keep=keep, initial={
+            "delete": [d.pk for d in duplicates],
+            "reason": "Submitted more than once; the same incident.",
+        })
+        return self.render_form(form, mode="keep", likely_duplicates=duplicates)
+
+    def post(self, request, pk):
+        keep = self.get_incident()
+        form = DisciplineKeepOneForm(request.POST, keep=keep)
+        if not form.is_valid() or self.refuse_shared_account(form):
+            messages.error(request, "Nothing deleted. Fix the points below.")
+            return self.render_form(form, mode="keep", likely_duplicates=list(keep.likely_duplicates()))
+        reason = form.cleaned_data["reason"]
+        deleted = [
+            d.reference for d in form.cleaned_data["delete"]
+            if delete_incident(d, request.user, reason, duplicate_of=keep, request=request)
+        ]
+        messages.success(request, f"Kept {keep.reference}; deleted {', '.join(deleted) or 'nothing'}.")
+        return redirect("discipline:detail", pk=keep.pk)

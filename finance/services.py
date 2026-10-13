@@ -313,6 +313,9 @@ def generate_midterm_invoices(term, actor) -> dict:
         )
 
         # Notify parent
+        from communications.email_service import send_parent_notification
+        from students.models import ParentGuardian
+
         guardians = ParentGuardian.objects.filter(
             studentguardian__student=student,
             studentguardian__is_primary=True,

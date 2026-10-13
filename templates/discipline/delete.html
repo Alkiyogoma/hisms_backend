@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}{% if mode == "keep" %}Remove repeats of{% else %}Delete{% endif %} {{ incident.reference }} — {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}{% if mode == "keep" %}Remove repeats of{% else %}Delete{% endif %} {{ incident.reference }}{% endblock %}
+{% block topbar_date %}{{ incident.student.first_name }} {{ incident.student.last_name }}{% endblock %}
+
+{% block content %}
+{% include "discipline/_top_tabs.html" %}
+<style>
+  .dd-wrap { max-width: 760px; margin: 0 auto; }
+  .dd-lead { font-size: 13px; color: #475569; margin: 6px 0 16px; line-height: 1.55; }
+  .dd-err { color: #DC2626; font-size: 12px; margin-top: 4px; display: block; }
+  .dd-box { border: 1px solid #E2E8F0; border-radius: 10px; overflow: hidden; margin-bottom: 18px; }
+  .dd-row { display: flex; gap: 12px; align-items: flex-start; padding: 11px 14px; font-size: 13px; line-height: 1.5; }
+  .dd-row + .dd-row { border-top: 1px solid #EEF2F6; }
+  .dd-row.keep { background: #F0FDF4; }
+  .dd-row label { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; flex: 1; min-width: 0; }
+  .dd-ref { font-weight: 700; color: #0F172A; }
+  .dd-meta { color: #64748B; font-size: 12px; }
+  .dd-sum { color: #334155; overflow-wrap: anywhere; }
+  .dd-tag { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .dd-tag.keep { background: #DCFCE7; color: #166534; }
+  .dd-tag.del { background: #FEE2E2; color: #991B1B; }
+  .dd-alert { border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; font-size: 13px; line-height: 1.55; }
+  .dd-alert.warn { background: #FFF7ED; border: 1px solid #FED7AA; color: #9A3412; }
+  .dd-alert.err { background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; }
+  .dd-reason { background: #FFF9EC; border: 1px solid #F0DFB4; border-radius: 12px; padding: 16px; }
+  .dd-reason textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; font: inherit; font-size: 13px; margin-top: 6px; }
+  .dd-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
+  .dd-danger { padding: 9px 20px; border-radius: 8px; border: none; background: #DC2626; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .dd-danger:disabled { opacity: .6; cursor: progress; }
+</style>
+
+<div class="dd-wrap">
+  <div class="card" style="padding:20px 24px">
+    <div class="card-title-row">
+      <div class="card-title">{% if mode == "keep" %}Keep {{ incident.reference }}, delete its repeats{% else %}Delete {{ incident.reference }}{% endif %}</div>
+      <a href="{% url 'discipline:detail' incident.pk %}" class="btn-secondary btn-sm">← Back to record</a>
+    </div>
+    <p class="dd-lead">
+      {% if mode == "keep" %}
+      These incidents are for the same learner, reported by the same member of staff for the same day.
+      Untick any that is a genuinely separate incident.
+      {% else %}
+      Deleting removes the incident from the learner&rsquo;s record, the incident list, the review queue and the
+      previous-incident count.
+      {% endif %}
+      What was deleted, your name, the time and your reason are kept in the audit log, and the super admin can
+      still open it under <em>Deleted</em> in the incident list.
+    </p>
+
+    {% if shared_account %}
+    <div class="dd-alert warn">You are signed in with a shared system account. Deleting must be done by a named member of staff. Sign in with your own account.</div>
+    {% endif %}
+    {% if form.non_field_errors %}
+    <div class="dd-alert err">{% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}</div>
+    {% endif %}
+
+    <form method="post" id="dd-form">
+      {% csrf_token %}
+
+      {% if mode == "keep" %}
+      <div class="dd-box">
+        <div class="dd-row keep">
+          <span class="dd-tag keep">Keep</span>
+          <div style="flex:1;min-width:0">
+            <div><span class="dd-ref">{{ incident.reference }}</span> <span class="dd-meta">· recorded {{ incident.created_at|date:"j M Y, H:i:s" }} · {{ incident.get_status_display }}</span></div>
+            <div class="dd-sum">{{ incident.summary|truncatechars:160 }}</div>
+          </div>
+        </div>
+        {% for d in likely_duplicates %}
+        <div class="dd-row">
+          <label>
+            <input type="checkbox" name="delete" value="{{ d.pk }}" {% if form.delete.value %}{% for v in form.delete.value %}{% if v|stringformat:"s" == d.pk|stringformat:"s" %}checked{% endif %}{% endfor %}{% endif %}>
+            <div style="flex:1;min-width:0">
+              <div><span class="dd-ref">{{ d.reference }}</span> <span class="dd-meta">· recorded {{ d.created_at|date:"j M Y, H:i:s" }} · {{ d.get_status_display }}{% if d.summary == incident.summary %} · same summary{% endif %}</span></div>
+              <div class="dd-sum">{{ d.summary|truncatechars:160 }}</div>
+            </div>
+          </label>
+          <span class="dd-tag del">Delete</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% for e in form.delete.errors %}<span class="dd-err" style="margin:-10px 0 14px">{{ e }}</span>{% endfor %}
+      {% else %}
+      <div class="dd-box">
+        <div class="dd-row">
+          <div style="flex:1;min-width:0">
+            <div><span class="dd-ref">{{ incident.reference }}</span> <span class="dd-meta">· {{ incident.student.first_name }} {{ incident.student.last_name }} ({{ incident.student.class_name }}) · {{ incident.occurred_on|date:"j M Y" }} · {{ incident.get_severity_display }} · {{ incident.get_status_display }}</span></div>
+            <div class="dd-meta">Reported by {{ reporter_name }}, {{ reporter_title }} · recorded {{ incident.created_at|date:"j M Y, H:i:s" }}</div>
+            <div class="dd-sum" style="margin-top:4px">{{ incident.summary|truncatechars:300 }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hf2-group" style="margin-bottom:16px">
+        <label class="hf2-label" for="id_duplicate_of">Is this a repeat of another incident?</label>
+        <select name="duplicate_of" id="id_duplicate_of" class="hf2-select">
+          <option value="">No — delete it for another reason</option>
+          {% for d in likely_duplicates %}
+          <option value="{{ d.pk }}" {% if form.duplicate_of.value|stringformat:"s" == d.pk|stringformat:"s" %}selected{% endif %}>Yes — a repeat of {{ d.reference }} (same reporter and day), which is kept</option>
+          {% endfor %}
+          {% for value, label in form.fields.duplicate_of.choices %}{% if value and value.instance not in likely_duplicates %}
+          <option value="{{ value }}" {% if form.duplicate_of.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>Yes — a repeat of {{ value.instance.reference }} ({{ value.instance.occurred_on|date:"j M Y" }}), which is kept</option>
+          {% endif %}{% endfor %}
+        </select>
+        {% for e in form.duplicate_of.errors %}<span class="dd-err">{{ e }}</span>{% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="dd-reason">
+        <label class="hf2-label" for="id_reason">Reason for deleting *</label>
+        <textarea name="reason" id="id_reason" class="hf2-input" rows="3" maxlength="1000" required placeholder="For example: the teacher pressed submit three times; DISC-8 is the one kept.">{{ form.reason.value|default:'' }}</textarea>
+        {% for e in form.reason.errors %}<span class="dd-err">{{ e }}</span>{% endfor %}
+      </div>
+
+      <div class="dd-actions">
+        <a href="{% url 'discipline:detail' incident.pk %}" class="hf-btn hf-btn-secondary" style="text-decoration:none">Cancel</a>
+        <button type="submit" class="dd-danger" {% if shared_account %}disabled{% endif %}>{% if mode == "keep" %}Delete ticked repeats{% else %}Delete {{ incident.reference }}{% endif %}</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+  // One click, one deletion: stop a second press while the first is on its way.
+  document.getElementById('dd-form').addEventListener('submit', function (e) {
+    const btn = this.querySelector('.dd-danger');
+    if (btn.disabled) { e.preventDefault(); return; }
+    btn.disabled = true;
+    btn.textContent = 'Deleting…';
+  });
+</script>
+{% endblock %}

@@ -55,6 +55,7 @@
     {% for val, lbl in status_choices %}
       <option value="{{ val }}" {% if current_filters.status == val %}selected{% endif %}>{{ lbl }}</option>
     {% endfor %}
+    {% if can_delete %}<option value="deleted" {% if showing_deleted %}selected{% endif %}>Deleted{% if deleted_count %} ({{ deleted_count }}){% endif %}</option>{% endif %}
   </select>
   <select name="severity" class="form-select" aria-label="Level">
     <option value="">All levels</option>
@@ -89,8 +90,10 @@
         </div>
         <div class="trow-sub">{{ inc.summary|truncatechars:110 }}</div>
         <div class="dl-meta">Reported by {{ inc.reported_by.get_full_name|default:inc.reported_by.username }}{% if inc.location %} &middot; {{ inc.location }}{% endif %}</div>
+        {% if inc.deleted_at %}<div class="dl-meta" style="color:#991B1B">Deleted {{ inc.deleted_at|date:"j M Y, H:i" }} by {{ inc.deleted_by.get_full_name|default:inc.deleted_by.username }}{% if inc.duplicate_of %} &middot; repeat of {{ inc.duplicate_of.reference }}{% endif %} &middot; {{ inc.deletion_reason|truncatechars:90 }}</div>{% endif %}
       </div>
       <div class="dl-side">
+        {% if inc.deleted_at %}<span class="chip chip-red" style="font-size:10px">Deleted</span>{% endif %}
         {% if inc.amendment_count %}<span class="chip chip-grey" style="font-size:10px" title="Corrected after it was submitted">Amended</span>{% endif %}
         <span class="chip {% if inc.severity == 'critical' or inc.severity == 'high' %}chip-red{% elif inc.severity == 'medium' %}chip-amber{% else %}chip-blue{% endif %}" style="font-size:10px">{{ inc.get_severity_display }}</span>
         <span class="chip {% if inc.status == 'pending_review' %}chip-amber{% elif inc.status == 'resolved' %}chip-green{% elif inc.status == 'dismissed' %}chip-grey{% else %}chip-blue{% endif %}" style="font-size:10px">{{ inc.get_status_display }}</span>

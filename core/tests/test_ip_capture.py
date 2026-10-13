@@ -19,6 +19,7 @@ Covers:
    - PersonalDataExportView._handle_export passes request (15)
 """
 import json
+from datetime import date
 from unittest.mock import patch, MagicMock, PropertyMock
 
 from django.test import TestCase, RequestFactory, TransactionTestCase
@@ -27,6 +28,8 @@ from django.contrib.sessions.middleware import SessionMiddleware
 from django.contrib.messages.middleware import MessageMiddleware
 from django.contrib.messages.storage import default_storage
 
+import academics.tests  # noqa: F401  (applies the shared fixture-teardown shim)
+from academics.tests import assign_role_group
 from core.utils import get_client_ip
 from audit.models import AuditLog, log_event
 
@@ -165,6 +168,10 @@ class StopImpersonationIPTest(TestCase):
         self.assertEqual(entry.ip_address, "10.0.0.88")
 
 
+# The weekly focus views only accept the current ISO week.
+CURRENT_WEEK = date.today().isocalendar()[1]
+
+
 class ThreadedCallerIPTest(TestCase):
     """Tests 8-15: Each specific caller produces an AuditLog row with ip_address populated."""
 
@@ -198,7 +205,7 @@ class ThreadedCallerIPTest(TestCase):
             full_name="Parent", phone="+255700000000",
         )
         StudentGuardian.objects.create(
-            student=sibling, guardian=guardian, relationship="Parent",
+            student=sibling, guardian=guardian, relationship="parent",
         )
 
         request = self.factory.post("/test/", REMOTE_ADDR="10.0.0.50")
@@ -236,6 +243,7 @@ class ThreadedCallerIPTest(TestCase):
             role="teacher",
         )
         from datetime import date as dt_date
+        assign_role_group(teacher)
         sp, _ = StaffProfile.objects.get_or_create(
             user=teacher, defaults=dict(
                 full_name="ECD Teacher",
@@ -251,7 +259,7 @@ class ThreadedCallerIPTest(TestCase):
 
         request = self.factory.post("/communications/weekly-focus/submit/", {
             "class_name": "Pre-Kindergarten",
-            "week_number": "10",
+            "week_number": str(CURRENT_WEEK),
             "theme": "Animals",
             "planned_activities": "Coloring, Singing",
         }, REMOTE_ADDR="10.0.0.51")
@@ -295,6 +303,7 @@ class ThreadedCallerIPTest(TestCase):
             username="ecdteach2", password="pass", email="ecd2@sch.com",
             role="teacher",
         )
+        assign_role_group(teacher)
         sp, _ = StaffProfile.objects.get_or_create(
             user=teacher, defaults=dict(
                 full_name="ECD Teacher 2",
@@ -312,7 +321,7 @@ class ThreadedCallerIPTest(TestCase):
         entry = WeeklyFocus.objects.create(
             teacher=teacher,
             class_name="Pre-Kindergarten",
-            week_number=10,
+            week_number=CURRENT_WEEK,
             theme="Animals",
             planned_activities="Coloring",
             status=WeeklyFocusStatus.DRAFT,
@@ -320,7 +329,7 @@ class ThreadedCallerIPTest(TestCase):
 
         request = self.factory.post(f"/communications/weekly-focus/{entry.pk}/edit/", {
             "class_name": "Pre-Kindergarten",
-            "week_number": "10",
+            "week_number": str(CURRENT_WEEK),
             "theme": "Animals Updated",
             "planned_activities": "Coloring, Singing, Dancing",
         }, REMOTE_ADDR="10.0.0.52")
@@ -362,6 +371,7 @@ class ThreadedCallerIPTest(TestCase):
             username="hod1", password="pass", email="hod1@sch.com",
             role="ecd_hod",
         )
+        assign_role_group(hod)
         teacher = User.objects.create_user(
             username="tchr1", password="pass", email="tchr1@sch.com",
         )
@@ -418,6 +428,7 @@ class ThreadedCallerIPTest(TestCase):
             username="hod2", password="pass", email="hod2@sch.com",
             role="ecd_hod",
         )
+        assign_role_group(hod)
         teacher = User.objects.create_user(
             username="tchr2", password="pass", email="tchr2@sch.com",
         )
@@ -466,6 +477,9 @@ class ThreadedCallerIPTest(TestCase):
         ParentGuardian.objects.create(
             full_name="Jane Parent", phone="+255711000000",
         )
+        # The form offers the classes on record for the department.
+        from academics.models import GradeClass
+        GradeClass.objects.get_or_create(name="Grade 1", defaults={"department": "PRIMARY"})
 
         request = self.factory.post("/admissions/inquiry/new/", {
             "child_full_name": "Test Child",

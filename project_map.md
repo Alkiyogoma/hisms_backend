@@ -1634,7 +1634,9 @@ FINALIZED → (none — terminal)
 | 829 | `PasswordResetConfirmView` | FormView |
 | 907 | `PasswordResetCompleteView` | TemplateView |
 
-### academics/views.py (5964 lines)
+### academics/views/ (package)
+Split across modules in `academics/views/` and re-exported from `academics/views/__init__.py`; the line numbers below are from the old single `academics/views.py` and are out of date.
+
 | Line | View | Type |
 |------|------|------|
 | 68 | `LessonPlanListView` | TemplateView |

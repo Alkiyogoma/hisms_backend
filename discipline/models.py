@@ -69,6 +69,22 @@ class IncidentStatus(models.TextChoices):
     DISMISSED = "dismissed", "Dismissed"
 
 
+class IncidentQuerySet(models.QuerySet):
+    def live(self):
+        return self.filter(deleted_at__isnull=True)
+
+    def deleted(self):
+        return self.filter(deleted_at__isnull=False)
+
+
+class LiveIncidentManager(models.Manager.from_queryset(IncidentQuerySet)):
+    """Incidents that have not been deleted. Every count, list and queue reads
+    through this manager, so a deleted incident drops out of all of them."""
+
+    def get_queryset(self):
+        return super().get_queryset().live()
+
+
 class DisciplineIncident(TimeStampedModel):
     student = models.ForeignKey(Student, on_delete=models.PROTECT, related_name="incidents")
     reported_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="reported_incidents")
@@ -123,8 +139,29 @@ class DisciplineIncident(TimeStampedModel):
     )
     reviewed_at = models.DateTimeField(null=True, blank=True)
 
+    # Deletion by the super admin. The row is kept, hidden from every list and
+    # count, so what was deleted, by whom, when and why stays on record.
+    deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    deleted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="discipline_deleted",
+    )
+    deletion_reason = models.TextField(blank=True)
+    duplicate_of = models.ForeignKey(
+        "self", on_delete=models.PROTECT, null=True, blank=True, related_name="deleted_duplicates",
+    )
+
+    objects = LiveIncidentManager()
+    all_objects = IncidentQuerySet.as_manager()
+
     class Meta:
         ordering = ["-created_at"]
+        # Related lookups (incident.duplicate_of, task targets) still reach a
+        # deleted incident.
+        base_manager_name = "all_objects"
         permissions = [
             ("can_review_incident", "Can review and approve discipline incidents"),
         ]
@@ -137,6 +174,10 @@ class DisciplineIncident(TimeStampedModel):
     def reference(self) -> str:
         """The record's one printed identifier."""
         return f"DISC-{self.pk}"
+
+    @property
+    def is_deleted(self) -> bool:
+        return self.deleted_at is not None
 
     @property
     def occurred_on(self):
@@ -158,6 +199,18 @@ class DisciplineIncident(TimeStampedModel):
         )
         key = (self.occurred_on, self.pk)
         return [i for i in others if (i.occurred_on, i.pk) < key]
+
+    def likely_duplicates(self):
+        """Other live incidents for the same learner, reported by the same member
+        of staff for the same day: what a repeated submit produces."""
+        same_day = models.Q(incident_date=self.incident_date) if self.incident_date else models.Q(
+            incident_date__isnull=True, created_at__date=self.created_at.date())
+        return (
+            DisciplineIncident.objects.filter(student_id=self.student_id, reported_by_id=self.reported_by_id)
+            .filter(same_day)
+            .exclude(pk=self.pk)
+            .order_by("created_at", "pk")
+        )
 
     def __str__(self) -> str:
         parts = [f"#{self.id} - {self.student} ({self.severity})"]
