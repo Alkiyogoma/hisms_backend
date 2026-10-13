@@ -421,3 +421,144 @@ class QueueTests(IncidentBase):
         self.client.force_login(teacher)
         resp = self.client.get(reverse("discipline:list"))
         self.assertNotContains(resp, "Review Queue")
+
+
+class DeleteTests(IncidentBase):
+    """The super admin deletes an incident (with a reason, on record); repeats of
+    one incident can be removed while keeping one."""
+
+    def setUp(self):
+        super().setUp()
+        self.admin = User.objects.create_user("sa", "sa@x.edu", "pw", role=UserRole.SUPER_ADMIN,
+                                              first_name="Grace", last_name="Mollel")
+        assign_role_group(self.admin)
+        self.first = self.incident()
+        self.second = self.incident()
+        self.third = self.incident()
+
+    def test_only_super_admin_can_delete(self):
+        for user in (self.hos, self.hod):
+            self.client.force_login(user)
+            self.assertEqual(self.client.get(reverse("discipline:delete", args=[self.second.pk])).status_code, 403)
+            resp = self.client.post(reverse("discipline:delete", args=[self.second.pk]), {"reason": "Repeat entry"})
+            self.assertEqual(resp.status_code, 403)
+            self.assertNotContains(self.client.get(reverse("discipline:detail", args=[self.first.pk])),
+                                   reverse("discipline:delete", args=[self.first.pk]))
+        self.assertFalse(DisciplineIncident.all_objects.filter(deleted_at__isnull=False).exists())
+
+    def test_reason_required(self):
+        self.client.force_login(self.admin)
+        resp = self.client.post(reverse("discipline:delete", args=[self.second.pk]), {"reason": "  "})
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Give the reason for deleting")
+        self.assertIsNone(DisciplineIncident.all_objects.get(pk=self.second.pk).deleted_at)
+
+    def test_delete_records_who_when_why_and_audits(self):
+        from audit.models import AuditLog
+        self.client.force_login(self.admin)
+        resp = self.client.post(reverse("discipline:delete", args=[self.third.pk]),
+                                {"reason": "Pressed submit twice", "duplicate_of": self.first.pk})
+        self.assertRedirects(resp, reverse("discipline:detail", args=[self.first.pk]))
+        gone = DisciplineIncident.all_objects.get(pk=self.third.pk)
+        self.assertEqual(gone.deleted_by, self.admin)
+        self.assertIsNotNone(gone.deleted_at)
+        self.assertEqual(gone.deletion_reason, "Pressed submit twice")
+        self.assertEqual(gone.duplicate_of, self.first)
+        log = AuditLog.objects.get(action_type="discipline_incident_deleted", object_id=str(self.third.pk))
+        self.assertEqual(log.actor, self.admin)
+        self.assertEqual(log.before_snapshot["Incident summary"], "Pushed a Grade 2 learner.")
+        self.assertEqual(log.after_snapshot["reason"], "Pressed submit twice")
+        # Deleting again records nothing more.
+        self.client.post(reverse("discipline:delete", args=[self.third.pk]), {"reason": "Again please"})
+        self.assertEqual(AuditLog.objects.filter(action_type="discipline_incident_deleted").count(), 1)
+
+    def test_keep_one_delete_the_rest(self):
+        self.client.force_login(self.admin)
+        detail = self.client.get(reverse("discipline:detail", args=[self.first.pk]))
+        self.assertContains(detail, "Possibly submitted more than once")
+        self.assertContains(detail, reverse("discipline:keep_one", args=[self.first.pk]))
+        page = self.client.get(reverse("discipline:keep_one", args=[self.first.pk]))
+        self.assertContains(page, self.second.reference)
+        self.assertContains(page, self.third.reference)
+        resp = self.client.post(reverse("discipline:keep_one", args=[self.first.pk]), {
+            "reason": "Teacher pressed submit three times", "delete": [self.second.pk, self.third.pk]})
+        self.assertRedirects(resp, reverse("discipline:detail", args=[self.first.pk]))
+        self.assertEqual(list(DisciplineIncident.objects.filter(student=self.student)), [self.first])
+        self.assertEqual(DisciplineIncident.all_objects.filter(duplicate_of=self.first).count(), 2)
+        self.assertNotContains(self.client.get(reverse("discipline:detail", args=[self.first.pk])),
+                               "Possibly submitted more than once")
+
+    def test_keep_one_only_offers_true_repeats(self):
+        other_day = self.incident(incident_date=TODAY - timedelta(days=5))
+        by_hod = self.incident(reported_by=self.hod)
+        self.client.force_login(self.admin)
+        self.client.post(reverse("discipline:keep_one", args=[self.first.pk]),
+                         {"reason": "Repeat entries", "delete": [other_day.pk, by_hod.pk]})
+        self.assertEqual(DisciplineIncident.all_objects.deleted().count(), 0)
+
+    def test_deleted_incident_leaves_counts_queue_and_record(self):
+        self.client.force_login(self.admin)
+        self.client.post(reverse("discipline:keep_one", args=[self.first.pk]),
+                         {"reason": "Submitted three times", "delete": [self.second.pk, self.third.pk]})
+        later = self.incident(incident_date=TODAY)
+        # Previous-incident count on a later incident: only the one kept.
+        self.assertEqual(len(later.earlier_incidents()), 1)
+        self.client.force_login(self.hos)
+        self.assertEqual(self.client.get(reverse("discipline:detail", args=[later.pk])).context["previous_count"], 1)
+        queue = self.client.get(reverse("discipline:hod_queue"))
+        self.assertEqual({i.pk for i in queue.context["pending_incidents"]}, {self.first.pk, later.pk})
+        self.assertEqual(queue.context["stats"]["total"], 2)
+        listing = self.client.get(reverse("discipline:list"))
+        self.assertEqual(listing.context["stats"]["total"], 2)
+        self.assertEqual(self.student.incidents.count(), 2)
+        # Others cannot open a deleted incident, or act on it.
+        self.assertEqual(self.client.get(reverse("discipline:detail", args=[self.second.pk])).status_code, 404)
+        self.assertEqual(self.client.post(reverse("discipline:review", args=[self.second.pk]),
+                                          {"status": "resolved"}).status_code, 404)
+
+    def test_super_admin_sees_deleted_list_and_record(self):
+        self.client.force_login(self.admin)
+        self.client.post(reverse("discipline:delete", args=[self.second.pk]),
+                         {"reason": "Entered for the wrong learner"})
+        listing = self.client.get(reverse("discipline:list"), {"status": "deleted"})
+        self.assertEqual([i.pk for i in listing.context["incidents"]], [self.second.pk])
+        self.assertContains(listing, "Entered for the wrong learner")
+        detail = self.client.get(reverse("discipline:detail", args=[self.second.pk]))
+        self.assertContains(detail, "Deleted ")
+        self.assertContains(detail, "Grace Mollel")
+        self.assertFalse(detail.context["can_review"])
+        self.assertFalse(detail.context["can_delete"])
+        # The status filter means nothing to anyone else.
+        self.client.force_login(self.hos)
+        listing = self.client.get(reverse("discipline:list"), {"status": "deleted"})
+        self.assertNotIn(self.second.pk, [i.pk for i in listing.context["incidents"]])
+
+    def test_open_tasks_cancelled(self):
+        from django.contrib.contenttypes.models import ContentType
+        from tasks.models import Task
+        task = Task.objects.create(
+            title="Contact parent", task_type="discipline_contact", assigned_to=self.hod, created_by=self.hos,
+            content_type=ContentType.objects.get_for_model(DisciplineIncident), object_id=self.second.pk,
+        )
+        self.client.force_login(self.admin)
+        self.client.post(reverse("discipline:delete", args=[self.second.pk]), {"reason": "Repeat entry"})
+        task.refresh_from_db()
+        self.assertEqual(task.status, "cancelled")
+
+
+class RepeatSubmitTests(IncidentBase):
+    def test_same_report_sent_twice_is_recorded_once(self):
+        self.client.force_login(self.hod)
+        first = self.client.post(reverse("discipline:submit"), self.submit_data())
+        again = self.client.post(reverse("discipline:submit"), self.submit_data())
+        self.assertEqual(DisciplineIncident.objects.count(), 1)
+        incident = DisciplineIncident.objects.get()
+        self.assertRedirects(first, reverse("discipline:detail", args=[incident.pk]))
+        self.assertRedirects(again, reverse("discipline:detail", args=[incident.pk]), fetch_redirect_response=False)
+
+    def test_different_summary_is_a_new_incident(self):
+        self.client.force_login(self.hod)
+        self.client.post(reverse("discipline:submit"), self.submit_data())
+        self.client.post(reverse("discipline:submit"), self.submit_data(summary="Took a pen from a classmate."))
+        self.assertEqual(DisciplineIncident.objects.count(), 2)
+

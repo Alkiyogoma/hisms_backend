@@ -221,10 +221,11 @@ def export_student_data(student) -> dict[str, Any]:
     from discipline.models import DisciplineIncident
 
     data["discipline_records"] = _safe_qs_to_list(
-        DisciplineIncident.objects.filter(student=student).order_by("-incident_date"),
+        # Deleted incidents are still held, so they are exported too, marked.
+        DisciplineIncident.all_objects.filter(student=student).order_by("-incident_date"),
         [
-            "id", "incident_date", "incident_type", "description",
-            "action_taken", "reported_by_id", "created_at",
+            "id", "incident_date", "severity", "summary", "action_taken", "status",
+            "reported_by_id", "created_at", "deleted_at", "deletion_reason",
         ],
     )
 
