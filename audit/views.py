@@ -14,6 +14,7 @@ from django.utils import timezone
 
 from audit.models import AuditLog, log_event
 from core.permissions import RoleRequiredMixin
+from core.utils import get_client_ip
 from students.models import Student, ParentGuardian
 from users.models import UserRole
 
