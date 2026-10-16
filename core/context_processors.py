@@ -42,22 +42,25 @@ def globals(request):
     }
 
 
+BRANDING_DEFAULTS = {
+    "school_name": "Hodari Christian School",
+    "tagline": "The courage to stand out",
+    "address": "House No. 14, Nova Road, Kawe Beach, P.O. Box 1114, Dar es Salaam, Tanzania",
+    "email": "hello@hodari.ac.tz",
+    "phone": "+255 767 016 940 / +255 743 791 828",
+    "website": "www.hodari.ac.tz",
+    "login_heading": "Welcome back to\n{school_name}",
+    "login_description": "Manage admissions, academics, finance, and school operations from one secure dashboard.",
+    "login_feature1": "Role-based access for all staff",
+    "login_feature2": "Immutable audit log on all changes",
+    "login_feature3": "Finance, HR, and academics in one place",
+    "login_right_heading": "Sign in to your account",
+    "login_right_subtitle": "Choose your login type and enter your credentials.",
+}
+
+
 def branding(request):
-    defaults = {
-        "school_name": "Hodari Christian School",
-        "tagline": "The courage to stand out",
-        "address": "House No. 14, Nova Road, Kawe Beach, P.O. Box 1114, Dar es Salaam, Tanzania",
-        "email": "hello@hodari.ac.tz",
-        "phone": "+255 767 016 940 / +255 743 791 828",
-        "website": "www.hodari.ac.tz",
-        "login_heading": "Welcome back to\n{school_name}",
-        "login_description": "Manage admissions, academics, finance, and school operations from one secure dashboard.",
-        "login_feature1": "Role-based access for all staff",
-        "login_feature2": "Immutable audit log on all changes",
-        "login_feature3": "Finance, HR, and academics in one place",
-        "login_right_heading": "Sign in to your account",
-        "login_right_subtitle": "Choose your login type and enter your credentials.",
-    }
+    defaults = BRANDING_DEFAULTS
     try:
         from core.models import SchoolSettings
         settings_obj = SchoolSettings.get_settings()

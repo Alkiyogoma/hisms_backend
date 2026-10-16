@@ -3,6 +3,7 @@ import time
 from django.conf import settings
 from django.core.mail import send_mail
 from audit.models import log_event
+from .email_layout import looks_like_html, render_branded_email, render_plain_email
 from .models import Notification
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,15 @@ def send_email_safe(to_email, subject, body, html_body=None, actor=None, action_
 
     # Subjects must be a single line (multi-line ones raise BadHeaderError).
     subject = " ".join(str(subject or "").split())
+
+    # Never send plain text as the HTML part: wrap it in the school's
+    # branded layout so line breaks, links and branding survive.
+    if not looks_like_html(html_body):
+        try:
+            html_body = render_branded_email(subject, html_body or body)
+        except Exception:
+            logger.exception("Branded email layout failed for '%s'", subject)
+            html_body = None
 
     try:
         from core.email_backend import resolve_delivery
@@ -125,16 +135,20 @@ def dispatch_notification(user, title, message, link=None, html_body=None, actor
 
         if to_email:
             email_start = time.monotonic()
-            site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000')
-            if link:
-                email_body = f"{message}\n\nView details: {site_url}{link}"
-            else:
-                email_body = message
+            # Address by name only when the email goes to the user themselves.
+            recipient = user if user and not external_email else None
+            email_body = render_plain_email(message, link, recipient=recipient)
+            if not html_body:
+                html_body = render_branded_email(
+                    title, message, link,
+                    recipient=recipient,
+                    section=_section_label(category, link),
+                )
             send_email_safe(
                 to_email=to_email,
                 subject=title,
                 body=email_body,
-                html_body=html_body or email_body,
+                html_body=html_body,
                 actor=actor,
                 action_type=action_type,
             )
@@ -152,6 +166,16 @@ def dispatch_notification(user, title, message, link=None, html_body=None, actor
         logger.error(f"dispatch_notification failed (title='{title}'): {e}")
 
     return notif
+
+
+def _section_label(category, link):
+    """Heading above the email title: the notification category, else the link's area."""
+    from .email_layout import section_for_link
+    from .models import NotificationCategory
+    if category in NotificationCategory.values and category not in (
+            NotificationCategory.BROADCAST, NotificationCategory.SYSTEM):
+        return NotificationCategory(category).label
+    return section_for_link(link) or ("Announcement" if category == NotificationCategory.BROADCAST else "")
 
 
 def _alert_sla_breach(channel, elapsed, title, user):
