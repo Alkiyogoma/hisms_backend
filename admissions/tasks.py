@@ -435,7 +435,7 @@ def send_hos_review_reminders_task():
 
 @shared_task
 def send_form_outstanding_reminder_task():
-    """E17: Day 14 form outstanding → admissions notification (in-app + email)."""
+    """E17: Day 14 form outstanding → admissions notification (in-app + one email)."""
     from admissions.models import Applicant, ApplicantStatus
     from communications.email_service import dispatch_notification, send_email_safe
     from users.models import User, UserRole
@@ -473,6 +473,7 @@ def send_form_outstanding_reminder_task():
                 ),
                 link=f"/admissions/applicant/{app.pk}/",
                 actor=None,
+                send_email=False,  # emailed below with the full template
             )
             if ao.email:
                 db_sent = send_dynamic_email(
@@ -541,6 +542,7 @@ def send_invoice_30day_reminder_task():
                 ),
                 link=f"/admissions/applicant/{app.pk}/",
                 actor=None,
+                send_email=False,  # emailed below with the full template
             )
             if staff.email:
                 db_sent = send_dynamic_email(

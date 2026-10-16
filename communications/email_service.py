@@ -93,7 +93,7 @@ def _log_email_send(to_email, subject, success, error_message, actor, action_typ
     except Exception:
         logger.warning("Failed to write EmailSendLog for %s", to_email)
 
-def dispatch_notification(user, title, message, link=None, html_body=None, actor=None, external_email=None, phone=None, category=None, action_type=""):
+def dispatch_notification(user, title, message, link=None, html_body=None, actor=None, external_email=None, phone=None, category=None, action_type="", send_email=True):
     """
     Creates an in-app notification (if user provided) and attempts to dispatch an email
     to the user or to the provided external_email. Falls back to SMS if no email is
@@ -106,6 +106,8 @@ def dispatch_notification(user, title, message, link=None, html_body=None, actor
         category: NotificationCategory value. Defaults to BROADCAST (not SYSTEM)
                  to prevent accidental classification of dispatched notifications.
         action_type: Label for EmailSendLog (e.g. PARENT_PORTAL_ACCOUNT, BROADCAST).
+        send_email: False to create the in-app notification only, when the
+                    caller emails the same person itself (e.g. a DB template).
 
     Returns the Notification instance (or None if no user was provided).
     """
@@ -132,6 +134,8 @@ def dispatch_notification(user, title, message, link=None, html_body=None, actor
 
         # 2. Fire email if user has an email or external_email is provided
         to_email = external_email or (user.email if user and user.email else None)
+        if not send_email:
+            to_email = phone = None
 
         if to_email:
             email_start = time.monotonic()
