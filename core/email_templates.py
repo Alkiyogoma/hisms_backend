@@ -17,40 +17,40 @@ TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates" / "registrat
 
 # ── Shared branded email wrapper ──────────────────────────────────────
 
-_HEADER = (
-    '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
-    '<meta name="viewport" content="width=device-width,initial-scale=1.0"></head>'
-    '<body style="margin:0;padding:0;background:#f0f2f5;font-family:-apple-system,'
-    "BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;"
-    '-webkit-text-size-adjust:100%">'
-    '<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f2f5;padding:32px 16px">'
-    '<tr><td align="center">'
-    '<table width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;'
-    'border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)">'
-    '<tr><td style="background:linear-gradient(135deg,#023AA5 0%,#0152c7 100%);'
-    'padding:32px 24px;text-align:center">'
-    '<img src="{{ site_url }}{{ static_url }}branding/hodari-logo-white.png" '
-    'alt="{{ school_name }}" style="height:96px;margin-bottom:8px" />'
-    '<p style="color:#C8A951;margin:0;font-size:12px;letter-spacing:1.5px;'
-    'text-transform:uppercase;font-weight:500">{subtitle}</p>'
-    '</td></tr>'
-    '<tr><td style="padding:32px 24px">'
-)
+# The same layout as every other system email (communications.email_layout),
+# with Django placeholders so DB templates pick up the school name and
+# contacts at send time. Each falls back to the shipped branding when a
+# caller's context doesn't provide it (e.g. plain render_to_string()).
+_TEMPLATE_FIELDS = {
+    "school_name": "school_name",
+    "tagline": "school_tagline",
+    "address": "school_address",
+    "phone": "school_phone",
+    "email": "school_email",
+    "website": "school_website",
+}
+_BODY_MARKER = "<!--EMAIL-BODY-->"
 
-_FOOTER = (
-    '</td></tr>'
-    '<tr><td style="padding:20px 24px;border-top:1px solid #f0f2f5;text-align:center">'
-    '<p style="color:#9ca3af;font-size:12px;margin:0 0 4px">{footer}</p>'
-    '<p style="color:#9ca3af;font-size:11px;margin:0">&copy; {{ school_name }}</p>'
-    '</td></tr>'
-    '</table></td></tr></table>'
-    '</body></html>'
-)
+
+def _shell(subtitle, footer):
+    """(header_html, footer_html) around the body of a DB template."""
+    from communications.email_layout import wrap_html
+    from core.context_processors import BRANDING_DEFAULTS
+    brand = {k: f"@@{k}@@" for k in _TEMPLATE_FIELDS}
+    brand["logo_url"] = "{{ site_url }}{{ static_url }}branding/hodari-logo-white.png"
+    doc = wrap_html(_BODY_MARKER, section=subtitle, footer_note=footer, brand=brand,
+                    signature=False, year="{% now 'Y' %}")
+    for key, var in _TEMPLATE_FIELDS.items():
+        fallback = BRANDING_DEFAULTS[key].replace('"', "")
+        doc = doc.replace(f"@@{key}@@", f'{{{{ {var}|default:"{fallback}" }}}}')
+    head, tail = doc.split(_BODY_MARKER)
+    return head, tail
 
 
 def _brand(subtitle, body, footer="This is an automated message, please do not reply.", cta_url="", cta_text=""):
     """Build a complete branded email from a subtitle + inner body HTML."""
-    parts = [_HEADER.replace("{subtitle}", subtitle), body]
+    header, footer_html = _shell(subtitle, footer)
+    parts = [header, body]
     if cta_url and cta_text:
         parts.append(
             '<table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 8px">'
@@ -60,7 +60,7 @@ def _brand(subtitle, body, footer="This is an automated message, please do not r
             f'width:100%;box-sizing:border-box;text-align:center">{cta_text}</a>'
             '</td></tr></table>'
         )
-    parts.append(_FOOTER.format(footer=footer))
+    parts.append(footer_html)
     return "".join(parts)
 
 
@@ -86,19 +86,8 @@ def _warning_card(text):
 
 def _details_card(rows):
     """rows: list of (label, value) tuples."""
-    cells = ""
-    for label, value in rows:
-        cells += (
-            f'<p style="color:#6b7280;font-size:11px;margin:0 0 6px;text-transform:uppercase;'
-            f'letter-spacing:1px;font-weight:600">{label}</p>'
-            f'<p style="color:#023AA5;font-size:15px;font-weight:600;margin:0 0 16px;'
-            f"font-family:'SF Mono',Monaco,Consolas,monospace\">{value}</p>"
-        )
-    return (
-        '<table width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;'
-        'border:1px solid #e5e7eb;border-radius:8px;margin:0 0 24px">'
-        f'<tr><td style="padding:20px">{cells}</td></tr></table>'
-    )
+    from communications.email_layout import details_table
+    return details_table(rows)
 
 
 def _p(text, size="14px", color="#6b7280", mb="24px", bold=False):
@@ -208,12 +197,14 @@ def send_dynamic_email(template_type, to_email, context, actor=None, extra_subje
     if not _static.startswith('/'):
         _static = '/' + _static
     context.setdefault("static_url", _static)
-    if "school_name" not in context:
-        try:
-            from core.models import SchoolSettings
-            context["school_name"] = SchoolSettings.get_settings().school_name or ""
-        except Exception:
-            pass
+    from communications.email_layout import school_branding
+    _b = school_branding()
+    context.setdefault("school_name", _b["school_name"])
+    context.setdefault("school_tagline", _b["tagline"])
+    context.setdefault("school_address", _b["address"])
+    context.setdefault("school_phone", _b["phone"])
+    context.setdefault("school_email", _b["email"])
+    context.setdefault("school_website", _b["website"])
 
     # Auto-resolve portal_link to an absolute URL if it's a relative path.
     _pl = context.get("portal_link", "")
