@@ -535,6 +535,7 @@ class InquiryCreateView(AdmissionsCountsMixin, PermissionCacheMixin, AdmissionsR
                         message=f"New inquiry received for {child_name} ({grade}).",
                         link=f"/admissions/applicant/{applicant_id_str}/",
                         actor=request_user,
+                        send_email=False,  # the admissions mailbox gets the E01 email below
                     )
                 # E01: Email to admissions group + Head of School
                 from core.models import SchoolSettings as _SS
@@ -2937,6 +2938,7 @@ class ParentInquiryView(TemplateView):
                         message=f"New inquiry received for {_child_name} ({_grade}).",
                         link=f"/admissions/applicant/{_applicant_pk}/",
                         actor=None,
+                        send_email=False,  # the admissions mailbox gets the E01 email below
                     )
                 # E01: Email to admissions group + Head of School
                 from core.models import SchoolSettings as _SS

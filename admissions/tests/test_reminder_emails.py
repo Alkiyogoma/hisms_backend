@@ -1,9 +1,12 @@
-"""Staff reminders (E17, E20) send one email per person, not an alert plus the template."""
+"""Staff alerts that come with a template email (E01, E17, E20) don't email the same person twice."""
+import json
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.conf import settings as django_settings
 from django.core import mail
 from django.test import TestCase, override_settings
+from django.urls import reverse
 from django.utils import timezone
 
 from admissions.models import Applicant, ApplicantStatus
@@ -57,3 +60,34 @@ class StaffReminderEmailTests(TestCase):
 
         self.assertEqual(len([m for m in mail.outbox if finance.email in m.to]), 1)
         self.assertTrue(Notification.objects.filter(recipient=finance).exists())
+
+
+class _InlineThread:
+    """Runs a background-notification thread's target immediately."""
+
+    def __init__(self, target=None, **kwargs):
+        self.target = target
+
+    def start(self):
+        self.target()
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend", SITE_URL="https://school.test")
+class NewInquiryAlertTests(TestCase):
+    def test_admin_officers_get_in_app_alert_only(self):
+        officer = User.objects.create_user(
+            username="office", email="office@school.test", password="pw-12345!", role=UserRole.ADMIN_OFFICER)
+        data = {
+            "child": {"name": "Baraka Massawe", "grade": "Grade 3"},
+            "parent": {"name": "Neema Massawe", "phone": "+255700000123", "email": "neema@example.test"},
+            "appointment": {},
+        }
+        with patch("threading.Thread", _InlineThread):
+            resp = self.client.post(reverse("admissions:parent_inquiry"),
+                                    {"action": "parent_submit", "data": json.dumps(data)})
+        self.assertEqual(resp.status_code, 200)
+
+        self.assertTrue(Notification.objects.filter(recipient=officer, title="New Inquiry Received").exists())
+        self.assertFalse([m for m in mail.outbox if officer.email in m.to])
+        # The admissions mailbox still gets the full inquiry email.
+        self.assertTrue(any("inquiry" in m.subject.lower() for m in mail.outbox))
