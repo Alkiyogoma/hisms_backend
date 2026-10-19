@@ -100,7 +100,7 @@ def _email_link(invite, token, *, intro):
     if applicant.parent_email:
         send_email_safe(
             to_email=applicant.parent_email,
-            subject=f"Admission form for your child — {_school_name()}",
+            subject=f"Admission form for your child  {_school_name()}",
             body=body,
         )
 
@@ -165,7 +165,7 @@ def mark_opened(invite):
 
 def _store_uploads(invite, files):
     """Save uploaded documents against the applicant. Files are validated
-    strictly — this endpoint is public."""
+    strictly  this endpoint is public."""
     from academics.validators import validate_attachment_file
     saved = {}
     for key, (doc_type, label) in UPLOADS.items():

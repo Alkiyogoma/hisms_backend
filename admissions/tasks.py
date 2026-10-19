@@ -66,7 +66,7 @@ def flag_expired_offers_task():
                 applicant=applicant,
                 to_status=ApplicantStatus.FLAGGED_FOR_REVIEW,
                 actor=None,
-                reason="Offer expired — 14-day window passed without enrolment.",
+                reason="Offer expired  14-day window passed without enrolment.",
             )
             count += 1
             logger.info("Flagged expired offer for applicant %s (%s)", applicant.pk, applicant.child_full_name)
@@ -222,7 +222,7 @@ def send_form_reminders_task():
             if phone:
                 dispatch_notification(
                     user=None, title="Form Reminder",
-                    message=f"Hodari: Reminder — please complete the admission form for {app.child_full_name}. Ref {app.reference_number}.",
+                    message=f"Hodari: Reminder  please complete the admission form for {app.child_full_name}. Ref {app.reference_number}.",
                     link=None, actor=None, external_email=None, phone=phone,
                 )
 
@@ -320,10 +320,10 @@ def send_meeting_reminders_task():
             if parent_phone:
                 if hours == 24:
                     # S03: Meeting reminder 24h (spec copy)
-                    sms_msg = f"Hodari: Reminder — your meeting with the Head of School is tomorrow at {time_str}. Ref {app.reference_number}."
+                    sms_msg = f"Hodari: Reminder  your meeting with the Head of School is tomorrow at {time_str}. Ref {app.reference_number}."
                 else:
                     # 48h reminder
-                    sms_msg = f"Hodari: Reminder — your meeting with the Head of School is in 2 days on {day_str} at {time_str}. Ref {app.reference_number}."
+                    sms_msg = f"Hodari: Reminder  your meeting with the Head of School is in 2 days on {day_str} at {time_str}. Ref {app.reference_number}."
                 dispatch_notification(
                     user=None, title="Meeting Reminder",
                     message=sms_msg,
@@ -383,10 +383,10 @@ def send_assessment_24h_reminders_task():
             if parent_phone:
                 if hours == 24:
                     # S04: Assessment reminder 24h (spec copy)
-                    sms_msg = f"Hodari: Reminder — {app.child_full_name}'s assessment is tomorrow, arrive {assessment.scheduled_time}. Ref {app.reference_number}."
+                    sms_msg = f"Hodari: Reminder  {app.child_full_name}'s assessment is tomorrow, arrive {assessment.scheduled_time}. Ref {app.reference_number}."
                 else:
                     # 48h reminder
-                    sms_msg = f"Hodari: Reminder — {app.child_full_name}'s assessment is in 2 days on {assessment.scheduled_date}, arrive {assessment.scheduled_time}. Ref {app.reference_number}."
+                    sms_msg = f"Hodari: Reminder  {app.child_full_name}'s assessment is in 2 days on {assessment.scheduled_date}, arrive {assessment.scheduled_time}. Ref {app.reference_number}."
                 dispatch_notification(
                     user=None, title="Assessment Reminder",
                     message=sms_msg,
@@ -484,7 +484,7 @@ def send_form_outstanding_reminder_task():
                 if not db_sent:
                     send_email_safe(
                         to_email=ao.email,
-                        subject=f"Form outstanding: {app.child_full_name} — {app.reference_number}",
+                        subject=f"Form outstanding: {app.child_full_name}  {app.reference_number}",
                         body=(
                             f"The admission form for {app.child_full_name} ({app.reference_number}) "
                             f"has not been completed 14 days after the offer was sent.\n\n"
@@ -553,7 +553,7 @@ def send_invoice_30day_reminder_task():
                 if not db_sent:
                     send_email_safe(
                         to_email=staff.email,
-                        subject=f"Invoice still outstanding: {app.child_full_name} — {app.reference_number}",
+                        subject=f"Invoice still outstanding: {app.child_full_name}  {app.reference_number}",
                         body=(
                             f"This is an automatic reminder that the following admission invoice is now 30 days overdue.\n\n"
                             f"Student: {app.child_full_name}\n"

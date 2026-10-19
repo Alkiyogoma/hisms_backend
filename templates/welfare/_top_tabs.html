@@ -1,4 +1,4 @@
-{# Unified welfare sub-navigation — single set of tabs for all departments #}
+{# Unified welfare sub-navigation  single set of tabs for all departments #}
 <div class="sub-nav">
   {% if perms.welfare.view_welfareobservation %}
   <a href="{% url 'welfare:student_incidents' %}" class="sub-tab {% if welfare_tab == 'student_incidents' %}active{% endif %}">Overview</a>

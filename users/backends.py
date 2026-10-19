@@ -9,7 +9,7 @@ from users.models import User
 
 def find_user_by_login(identifier):
     """Resolve a login identifier to a user: exact username first, then email
-    (case-insensitive). Returns None when nothing — or more than one account —
+    (case-insensitive). Returns None when nothing  or more than one account —
     matches, so an ambiguous email can never sign someone into the wrong account."""
     identifier = (identifier or "").strip()
     if not identifier:

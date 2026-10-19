@@ -59,7 +59,7 @@ class Command(BaseCommand):
         if not is_school_day(target_date):
             self.stdout.write(
                 self.style.WARNING(
-                    f"{target_date} is not a school day — skipping."
+                    f"{target_date} is not a school day  skipping."
                 )
             )
             return
@@ -114,7 +114,7 @@ class Command(BaseCommand):
             )
             created_count += 1
 
-        # Absence Alert emails disabled — too many sends hitting Gmail rate limits.
+        # Absence Alert emails disabled  too many sends hitting Gmail rate limits.
         # Re-enable when email retry queue system is deployed.
         # if created_count:
         #     from communications.email_service import send_parent_notification

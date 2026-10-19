@@ -1,4 +1,4 @@
-# Generated manually — adds grading_deadline to academics_term
+# Generated manually  adds grading_deadline to academics_term
 
 from django.db import migrations, models
 

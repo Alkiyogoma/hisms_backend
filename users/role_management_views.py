@@ -1,5 +1,5 @@
 """
-Role Management Views — FRD OP3.3: Permission group → Read / Update
+Role Management Views  FRD OP3.3: Permission group → Read / Update
 
 Super Admin can view all roles, see user counts, configure default
 departments, and manage which Django permissions are assigned to each role.
@@ -413,7 +413,7 @@ class RoleCreateView(RoleRequiredMixin, CreateView):
 
 class RoleUpdateView(RoleRequiredMixin, UpdateView):
     """Edit a role's metadata (label, description, departments, color).
-    System roles are immutable — same contract enforced by Delete/Toggle.
+    System roles are immutable  same contract enforced by Delete/Toggle.
     """
     model = RoleConfig
     template_name = "users/role_form.html"
@@ -471,7 +471,7 @@ class RoleDeleteView(RoleRequiredMixin, DeleteView):
         if user_count > 0:
             messages.error(
                 self.request,
-                f"Cannot delete '{self.object.label}' — {user_count} user(s) are assigned to this role. "
+                f"Cannot delete '{self.object.label}'  {user_count} user(s) are assigned to this role. "
                 "Remove all users first."
             )
             return redirect("users:role_list")

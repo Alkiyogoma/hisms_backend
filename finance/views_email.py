@@ -152,7 +152,7 @@ class SendInvoiceEmailView(RoleRequiredMixin, View):
                 return redirect("finance:invoice_detail", pk=pk)
 
             if not db_sent:
-                subject = f"Hodari Christian School — Invoice {invoice.invoice_number}"
+                subject = f"Hodari Christian School  Invoice {invoice.invoice_number}"
                 body = (
                     f"Dear {guardian.full_name},\n\n"
                     f"Please find attached the fee invoice for "

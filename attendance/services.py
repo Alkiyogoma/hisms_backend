@@ -253,7 +253,7 @@ class AttendanceService:
             # Send parent notifications asynchronously (deferred to Celery)
             AttendanceService._send_checkin_notifications(student, timestamp, entry_id=entry.id)
             
-            # Broadcast real-time event (deferred to Celery — avoids blocking response)
+            # Broadcast real-time event (deferred to Celery  avoids blocking response)
             try:
                 from attendance.tasks import broadcast_checkin_event_task, broadcast_statistics_update_task, audit_log_task
                 broadcast_checkin_event_task.delay(
@@ -267,7 +267,7 @@ class AttendanceService:
                 logger = logging.getLogger(__name__)
                 logger.error(f"Error scheduling broadcast for check-in: {str(e)}")
             
-            # Audit log (deferred to Celery — avoids sync DB write blocking response)
+            # Audit log (deferred to Celery  avoids sync DB write blocking response)
             try:
                 from attendance.tasks import audit_log_task
                 audit_log_task.delay(
@@ -275,7 +275,7 @@ class AttendanceService:
                     action_type="CHECKIN_EVENT",
                     model_name="AttendanceEntry",
                     object_id=str(entry.pk),
-                    description=f"Check-in: {student.get_full_name()} at {timestamp.strftime('%H:%M')} — {entry.status}",
+                    description=f"Check-in: {student.get_full_name()} at {timestamp.strftime('%H:%M')}  {entry.status}",
                     after={"student": student.pk, "status": entry.status, "check_in_time": entry.check_in_time.strftime('%H:%M:%S')},
                 )
             except Exception:
@@ -417,7 +417,7 @@ class AttendanceService:
             # Send parent notifications asynchronously (deferred to Celery)
             AttendanceService._send_checkout_notifications(student, timestamp, parent_name, entry_id=entry.id)
             
-            # Broadcast real-time event (deferred to Celery — avoids blocking response)
+            # Broadcast real-time event (deferred to Celery  avoids blocking response)
             try:
                 from attendance.tasks import broadcast_checkout_event_task, broadcast_statistics_update_task, audit_log_task
                 broadcast_checkout_event_task.delay(
@@ -436,7 +436,7 @@ class AttendanceService:
             if not has_checkin:
                 checkout_msg += ' (check-out only: no prior check-in recorded today)'
 
-            # Audit log (deferred to Celery — avoids sync DB write blocking response)
+            # Audit log (deferred to Celery  avoids sync DB write blocking response)
             try:
                 audit_log_task.delay(
                     actor_id=user.id,
@@ -816,7 +816,7 @@ def correct_attendance(actor, entry, status, reason):
     """
     Correct an attendance entry with authorization and reason.
 
-    FR-ATT-010: Correction audit trail — original status is retained in the
+    FR-ATT-010: Correction audit trail  original status is retained in the
     attendance entry (corrected_by, corrected_at, correction_reason) and a
     full audit log entry is created.
 
@@ -857,7 +857,7 @@ def correct_attendance(actor, entry, status, reason):
         "marked_at": entry.marked_at.isoformat() if entry.marked_at else None,
     }
 
-    # Update entry with correction — preserve original_status for audit trail
+    # Update entry with correction  preserve original_status for audit trail
     entry.status = status
     entry.original_status = original_status
     entry.corrected_by = actor
@@ -1397,7 +1397,7 @@ class QRCodeService:
             except (ValueError, TypeError):
                 ts = timezone.now()
         
-        # Process based on scan type — pass pre-resolved student and cached lookups
+        # Process based on scan type  pass pre-resolved student and cached lookups
         if scan_type == 'IN':
             result = AttendanceService.checkin_student(
                 student_id=qr_code,
@@ -1462,10 +1462,10 @@ class QRCodeService:
 
         # --- Shared lookups (fixed cost, independent of batch size) ---
 
-        # 1. is_school_day — 1 query
+        # 1. is_school_day  1 query
         school_day = _is_school_day(today)
 
-        # 2. GradeClass ECD map — 1 query
+        # 2. GradeClass ECD map  1 query
         ecd_cache = {gc.name: (gc.department == Department.ECD) for gc in GradeClass.objects.all()}
 
         # 3. Unsign all QR codes and collect resolved student IDs
@@ -1478,7 +1478,7 @@ class QRCodeService:
                     resolved = resolved[3:]
                 qr_to_raw[resolved] = qr_raw
 
-        # 4. Bulk-fetch students — 2 queries (laravel_student_id + admission_no)
+        # 4. Bulk-fetch students  2 queries (laravel_student_id + admission_no)
         resolved_ids = list(qr_to_raw.keys())
         students_by_laravel = {
             s.laravel_student_id: s

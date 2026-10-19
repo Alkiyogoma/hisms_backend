@@ -1,6 +1,6 @@
 """
 
-RBAC mixins for class-based views — FRD NFR-SEC-004.
+RBAC mixins for class-based views  FRD NFR-SEC-004.
 
 Usage:
 
@@ -56,7 +56,7 @@ class RoleRequiredMixin(LoginRequiredMixin):
 
     Set `required_permission` on the view class.
 
-    Roles are never hardcoded — access is determined by Django permissions
+    Roles are never hardcoded  access is determined by Django permissions
 
     configured via the Role Management UI by the admin.
 
@@ -122,7 +122,7 @@ class RoleRequiredMixin(LoginRequiredMixin):
 
                             f"User {request.user} (role={request.user.role}) denied access to "
 
-                            f"{request.method} {request.path} — missing one of: "
+                            f"{request.method} {request.path}  missing one of: "
 
                             f"{', '.join(self.required_permissions_any)}"
 
@@ -156,7 +156,7 @@ class RoleRequiredMixin(LoginRequiredMixin):
 
                         f"User {request.user} (role={request.user.role}) denied access to "
 
-                        f"{request.method} {request.path} — missing perm: {self.required_permission}"
+                        f"{request.method} {request.path}  missing perm: {self.required_permission}"
 
                     ),
 
@@ -270,11 +270,11 @@ def assert_role(user, *allowed_roles: str) -> None:
 
 
 
-#  DRF Permission Classes — FRD NFR-SEC-004
+#  DRF Permission Classes  FRD NFR-SEC-004
 
 # These enforce permission-based access on REST API endpoints.
 
-# Roles are never hardcoded — access is determined by Django permissions
+# Roles are never hardcoded  access is determined by Django permissions
 
 # configured via the Role Management UI by the admin.
 
@@ -284,7 +284,7 @@ from rest_framework.permissions import BasePermission
 
 class IsAdminOrSuperAdmin(BasePermission):
 
-    """Allow users with applicant management permission — FRD Section 5, 12."""
+    """Allow users with applicant management permission  FRD Section 5, 12."""
 
     def has_permission(self, request, view):
 
@@ -300,7 +300,7 @@ class IsAdminOrSuperAdmin(BasePermission):
 
 class IsFinanceOfficer(BasePermission):
 
-    """Allow users with invoice permission — FRD Section 10."""
+    """Allow users with invoice permission  FRD Section 10."""
 
     def has_permission(self, request, view):
 
@@ -316,7 +316,7 @@ class IsFinanceOfficer(BasePermission):
 
 class IsTeacherOrAbove(BasePermission):
 
-    """Allow users with lesson plan permission — FRD Sections 6, 8, 9."""
+    """Allow users with lesson plan permission  FRD Sections 6, 8, 9."""
 
     def has_permission(self, request, view):
 
@@ -332,7 +332,7 @@ class IsTeacherOrAbove(BasePermission):
 
 class IsHODOrAbove(BasePermission):
 
-    """Allow users with lesson plan review permission — FRD Sections 8.2, 9.6."""
+    """Allow users with lesson plan review permission  FRD Sections 8.2, 9.6."""
 
     def has_permission(self, request, view):
 
@@ -348,7 +348,7 @@ class IsHODOrAbove(BasePermission):
 
 class IsHOSOrAbove(BasePermission):
 
-    """Allow users with report card sign-off permission — FRD Sections 5.6, 9.5, 14.1."""
+    """Allow users with report card sign-off permission  FRD Sections 5.6, 9.5, 14.1."""
 
     def has_permission(self, request, view):
 
@@ -364,7 +364,7 @@ class IsHOSOrAbove(BasePermission):
 
 class IsSuperAdminOnly(BasePermission):
 
-    """Allow superuser only — FRD Section 14.8."""
+    """Allow superuser only  FRD Section 14.8."""
 
     def has_permission(self, request, view):
 
@@ -374,7 +374,7 @@ class IsSuperAdminOnly(BasePermission):
 
 class IsECDTeacherOrAbove(BasePermission):
 
-    """Allow users with ECD evaluation permission — FRD Section 13."""
+    """Allow users with ECD evaluation permission  FRD Section 13."""
 
     def has_permission(self, request, view):
 
@@ -390,7 +390,7 @@ class IsECDTeacherOrAbove(BasePermission):
 
 class IsParentUser(BasePermission):
 
-    """Allow users with view student permission (parent portal scope) — FRD Section 14.7."""
+    """Allow users with view student permission (parent portal scope)  FRD Section 14.7."""
 
     def has_permission(self, request, view):
 
@@ -400,7 +400,7 @@ class IsParentUser(BasePermission):
 
 class IsAttendanceOperator(BasePermission):
 
-    """Allow users with attendance entry permission — FRD Section 6."""
+    """Allow users with attendance entry permission  FRD Section 6."""
 
     def has_permission(self, request, view):
 

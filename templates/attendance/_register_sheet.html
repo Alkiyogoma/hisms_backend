@@ -13,7 +13,7 @@
   {% if not learners %}
     <div class="at-empty" style="padding:20px;text-align:center;color:#6B7385">No students on roll in {{ class_name|default:"this class" }} for this period.</div>
   {% elif not period.days %}
-    <div class="at-empty" style="padding:20px;text-align:center;color:#6B7385">No school days in this period{% if notes %} — {{ notes|join:" " }}{% endif %}.</div>
+    <div class="at-empty" style="padding:20px;text-align:center;color:#6B7385">No school days in this period{% if notes %}  {{ notes|join:" " }}{% endif %}.</div>
   {% else %}
   {% for ch in chunks %}
     {% if multi %}<div class="rs-month">{{ ch.label }}</div>{% endif %}
@@ -42,7 +42,7 @@
   {% endfor %}
 
   {% if multi %}
-    <div class="rs-month">Whole period — {{ period.label }}</div>
+    <div class="rs-month">Whole period  {{ period.label }}</div>
     <div class="rs-grid"><table>
       <thead><tr><th class="no">#</th><th class="nm">Student</th><th>Days on roll</th><th>Marked</th><th class="tot first">P</th><th class="tot">A</th><th class="tot">L</th><th class="tot">E</th><th class="tot">Not marked</th><th class="tot">%</th></tr></thead>
       <tbody>
@@ -70,7 +70,7 @@
   {% endif %}
 
   <div class="rs-sign">
-    <div><b>Class teacher</b>{% if class_teacher %}{{ class_teacher }} — s{% else %}S{% endif %}ignature and date</div>
+    <div><b>Class teacher</b>{% if class_teacher %}{{ class_teacher }}  s{% else %}S{% endif %}ignature and date</div>
     <div><b>Head of School</b>Signature and date</div>
     <div><b>Quality assurance officer</b>Signature and date</div>
   </div>

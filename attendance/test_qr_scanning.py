@@ -2,7 +2,7 @@
 Comprehensive tests for task 5.2: Implement attendance marking via QR codes.
 Tests QR code validation, student lookup, and attendance marking with edge cases.
 
-KNOWN ISSUE — timezone-dependent test failures (midnight divergence)
+KNOWN ISSUE  timezone-dependent test failures (midnight divergence)
 --------------------------------------------------------------------
 Several tests (test_qr_checkin_creates_attendance_entry,
 test_qr_scan_records_operator) compare the entry date using

@@ -6,7 +6,7 @@ from academics.models import Department, LessonPlan, LessonPlanStatus, Subject, 
 
 
 class LessonPlanForm(forms.ModelForm):
-    """Term is auto-set from the active academic year configuration — not user-selectable."""
+    """Term is auto-set from the active academic year configuration  not user-selectable."""
 
     class Meta:
         model = LessonPlan
@@ -35,7 +35,7 @@ class LessonPlanForm(forms.ModelForm):
         from users.models import UserRole
         from academics.utils import get_current_term
 
-        # Resolve current term (read-only — not selectable by user)
+        # Resolve current term (read-only  not selectable by user)
         current_term = get_current_term()
         self._current_term = current_term
         if self.instance.pk and self.instance.term_id:
@@ -196,7 +196,7 @@ class SubjectForm(forms.ModelForm):
             mismatched = [gc.name for gc in classes if gc.department not in departments]
             if mismatched:
                 raise forms.ValidationError(
-                    f"The selected class(es) — {', '.join(mismatched)} — belong to a different department "
+                    f"The selected class(es)  {', '.join(mismatched)}  belong to a different department "
                     f"than the selected subject departments."
                 )
         return cleaned_data

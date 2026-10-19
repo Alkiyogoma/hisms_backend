@@ -33,7 +33,7 @@ class DepartmentScopedMixin:
         from academics.models import Department
         dept = self.department
         if dept == "all":
-            return None  # unified mode — no department filtering
+            return None  # unified mode  no department filtering
         if dept == "primary":
             return Department.PRIMARY
         if dept == "ecd":
@@ -82,7 +82,7 @@ class DepartmentScopedMixin:
     def _get_all_welfare_classes(self):
         """Return sorted list of every class the school runs (ECD, Primary and
         Lower Secondary). Welfare applies to all learners, so no department
-        may be left out here — Grade 7–9 were previously missing."""
+        may be left out here  Grade 7–9 were previously missing."""
         from academics.models import GradeClass
         return sorted(
             GradeClass.objects.values_list("name", flat=True).distinct()
@@ -94,7 +94,7 @@ class DepartmentScopedMixin:
         user = self.request.user
         if user.role != UserRole.TEACHER:
             return
-        # Teachers have access to unified views — no department restriction
+        # Teachers have access to unified views  no department restriction
         if self._is_unified():
             return
         from core.teacher_context import is_ecd_teacher

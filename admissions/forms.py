@@ -167,7 +167,7 @@ class ApplicantCreateForm(forms.ModelForm):
         self.fields["parent_relationship"].error_messages["required"] = "Please select the parent's relationship to the student."
         self.fields["sibling_details"].widget.attrs["placeholder"] = "Name and class of any siblings (if applicable)"
         self.fields["notes"].widget.attrs["placeholder"] = (
-            "Any relevant context from this inquiry — special requirements, how they heard about us, urgency, etc."
+            "Any relevant context from this inquiry  special requirements, how they heard about us, urgency, etc."
         )
 
         for name, field in self.fields.items():

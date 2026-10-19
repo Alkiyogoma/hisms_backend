@@ -170,7 +170,7 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
         ctx["comment_window_endterm_end"] = endterm_end
         ctx["comment_window_grading_deadline"] = grading_dl
         
-        # Filter classes based on role — comments are class-teacher only
+        # Filter classes based on role  comments are class-teacher only
         if self.request.user.role == UserRole.TEACHER:
             from core.teacher_context import get_teacher_assigned_classes_from_tca
             teacher_tca = get_teacher_assigned_classes_from_tca(self.request.user)
@@ -248,7 +248,7 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
                 import logging
                 logging.getLogger(__name__).exception("Comment autosave failed for report %s", rc.pk)
                 return JsonResponse(
-                    {"error": "Not saved: the system could not save this comment. Your text is still in the box — try again."},
+                    {"error": "Not saved: the system could not save this comment. Your text is still in the box  try again."},
                     status=500,
                 )
             try:
@@ -352,7 +352,7 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
                     dispatch_notification(
                         user=rec,
                         title="Comments Ready for Review",
-                        message=f"Teacher {request.user.get_full_name()} has submitted comments for {class_name} — {len(rc_ids)} student(s) ready for HOD/HOS review.",
+                        message=f"Teacher {request.user.get_full_name()} has submitted comments for {class_name}  {len(rc_ids)} student(s) ready for HOD/HOS review.",
                         link="/academics/reports/review-queue/",
                         actor=request.user
                     )
@@ -764,7 +764,7 @@ class PrimaryScoreAPIView(ScoreEntryAccessMixin, RoleRequiredMixin, View):
                 except (ValueError, DecimalException, KeyError):
                     continue
 
-                # Check for existing individual lock (skip returned scores — teacher must be able to correct them)
+                # Check for existing individual lock (skip returned scores  teacher must be able to correct them)
                 existing = ExamScore.objects.filter(
                     student=student, 
                     term=term, 
@@ -830,7 +830,7 @@ class PrimaryScoreAPIView(ScoreEntryAccessMixin, RoleRequiredMixin, View):
                         request=request,
                     )
                 elif existing and existing.score != score_val:
-                    # Correction tracking — don't auto-lock; HOD approval handles locking
+                    # Correction tracking  don't auto-lock; HOD approval handles locking
                     score_obj.previous_score = existing.score
                     score_obj.corrected_by = request.user
                     score_obj.correction_reason = "Corrected via primary assessment"
@@ -905,7 +905,7 @@ class PrimaryBulkSubmissionAPIView(RoleRequiredMixin, View):
         students = Student.objects.filter(class_name=class_name, is_archived=False)
 
         # Hard-gate: reject submission if any score's exam window hasn't opened.
-        # Skip quiz — quiz scores are saved with a warning at save time; the
+        # Skip quiz  quiz scores are saved with a warning at save time; the
         # submit should not re-block them.
         from academics.utils import check_score_entry_allowed
         from academics.models import ExamScore, ScoreStatus
@@ -949,7 +949,7 @@ class PrimaryBulkSubmissionAPIView(RoleRequiredMixin, View):
                     tca = get_teacher_assigned_classes_from_tca(request.user)
                     class_info = tca.get(class_name, {})
                     allowed_subjects = class_info.get("subjects", set())
-                    # Only the teacher's own subjects — never other teachers' drafts.
+                    # Only the teacher's own subjects  never other teachers' drafts.
                     score_qs = score_qs.filter(subject_name__in=allowed_subjects)
                 if subject:
                     score_qs = score_qs.filter(subject_name=subject)
@@ -966,12 +966,12 @@ class PrimaryBulkSubmissionAPIView(RoleRequiredMixin, View):
                         action_type="EXAM_SCORE_SUBMITTED",
                         model_name="ExamScore",
                         object_id=sid,
-                        description=f"Score submitted for {student.admission_no} via primary assessment — {class_name}",
+                        description=f"Score submitted for {student.admission_no} via primary assessment  {class_name}",
                         request=request,
                     )
 
                 # The report is pending sign-off only once every subject is
-                # submitted or approved — one subject's submission is not enough.
+                # submitted or approved  one subject's submission is not enough.
                 from academics.score_progress import sync_report_status
                 sync_report_status(student, term)
         
@@ -1509,7 +1509,7 @@ class LowerSecondaryBulkSubmissionAPIView(RoleRequiredMixin, View):
                     tca = get_teacher_assigned_classes_from_tca(request.user)
                     class_info = tca.get(class_name, {})
                     allowed_subjects = class_info.get("subjects", set())
-                    # Only the teacher's own subjects — never other teachers' drafts.
+                    # Only the teacher's own subjects  never other teachers' drafts.
                     score_qs = score_qs.filter(subject_name__in=allowed_subjects)
                 if subject:
                     score_qs = score_qs.filter(subject_name=subject)
@@ -1521,12 +1521,12 @@ class LowerSecondaryBulkSubmissionAPIView(RoleRequiredMixin, View):
                     log_event(
                         actor=request.user, action_type="EXAM_SCORE_SUBMITTED",
                         model_name="ExamScore", object_id=sid,
-                        description=f"Score submitted for {student.admission_no} via lower secondary assessment — {class_name}",
+                        description=f"Score submitted for {student.admission_no} via lower secondary assessment  {class_name}",
                         request=request,
                     )
 
                 # The report is pending sign-off only once every subject is
-                # submitted or approved — one subject's submission is not enough.
+                # submitted or approved  one subject's submission is not enough.
                 from academics.score_progress import sync_report_status
                 sync_report_status(student, term)
 

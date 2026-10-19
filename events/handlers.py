@@ -185,7 +185,7 @@ def create_term_calendar_events(sender, instance, **kwargs):
             auto_generated=True,
         ).delete()
 
-    # Legacy term_exam events — clean up if deprecated fields are empty
+    # Legacy term_exam events  clean up if deprecated fields are empty
     if instance.exam_start_date and instance.exam_end_date:
         CalendarEvent.objects.update_or_create(
             source_model="term_exam",

@@ -147,7 +147,7 @@ class MediaSettings(TimeStampedModel):
 
 class SchoolSettings(TimeStampedModel):
     """
-    Centralized school settings — FRD Section 14 (HOS/Admin).
+    Centralized school settings  FRD Section 14 (HOS/Admin).
     Stores thresholds, API keys, and notification triggers.
     """
     # General
@@ -514,7 +514,7 @@ class ArchiveRetentionPolicy(TimeStampedModel):
         verbose_name_plural = "Archive Retention Policies"
 
     def __str__(self) -> str:
-        return f"{self.get_category_display()} — {self.retention_years}yr retention"
+        return f"{self.get_category_display()}  {self.retention_years}yr retention"
 
     @classmethod
     def get_for_category(cls, category):

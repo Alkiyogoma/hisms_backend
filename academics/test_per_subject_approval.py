@@ -159,7 +159,7 @@ class PerSubjectApprovalTests(TestCase):
         self._submit("English")
         self._approve("English")
         self._save("Bible Studies", 81)
-        self._submit("Bible Studies")  # submitted, not approved — excluded
+        self._submit("Bible Studies")  # submitted, not approved  excluded
 
         p = self._progress()
         self.assertEqual(p["grand_average"], 67.0)

@@ -29,7 +29,7 @@ def resolve_delivery():
 
     Returns (connection, from_email, info) where info has:
       mode: "smtp" | "env" | "test" | "off"
-      delivering: bool — False means messages would be printed/discarded
+      delivering: bool  False means messages would be printed/discarded
       detail: human-readable description for the settings page / logs
       host, port, security, user, from_email: SMTP summary (never the password)
     """

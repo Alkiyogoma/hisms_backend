@@ -9,7 +9,7 @@
 
    The same attributes work for drawers (class="drawer").
 
-   DYNAMIC (htmx) modals — fetch a form/detail from the server into a modal:
+   DYNAMIC (htmx) modals  fetch a form/detail from the server into a modal:
      <button hx-get="/finance/invoice/5/edit/"
              hx-target="#hui-modal-root" hx-swap="innerHTML">Edit</button>
    The server returns a <c-modal> fragment; it auto-opens on swap.

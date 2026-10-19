@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Onboarding: {{ staff.full_name }} — {{ brand.school_name }}{% endblock %}
+{% block title %}Onboarding: {{ staff.full_name }}  {{ brand.school_name }}{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -147,7 +147,7 @@
   .step-info .info-text { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
   .step-info .info-text strong { color: var(--text-primary); }
 
-  /* Step 7 — Assignment cards */
+  /* Step 7  Assignment cards */
   .assign-card { background: #F8FAFC; border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; margin-bottom: 12px; display: flex; align-items: center; gap: 16px; transition: border-color .2s; }
   .assign-card:hover { border-color: var(--hodari-blue); }
   .assign-card .class-badge { width: 44px; height: 44px; border-radius: 10px; background: var(--hodari-blue-light); color: var(--hodari-blue); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0; }

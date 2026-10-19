@@ -17,12 +17,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # =============================================================================
 # CACHING - Redis-backed caching for production
 # Redis DB allocation: broker=0, result=1, channels=2, cache=5, sessions=3, templates=4
-# Note: DB 0 was previously shared with Celery broker — moved to DB 5 to avoid
+# Note: DB 0 was previously shared with Celery broker  moved to DB 5 to avoid
 # key eviction contention between cache writes and Celery message pub/sub.
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": os.getenv("REDIS_URL", "redis://localhost:6379/5"),  # DB 5 — separate from Celery broker (0)
+        "LOCATION": os.getenv("REDIS_URL", "redis://localhost:6379/5"),  # DB 5  separate from Celery broker (0)
         "TIMEOUT": 300,  # 5 minutes default
         "KEY_PREFIX": "hodari",
         "VERSION": 1,

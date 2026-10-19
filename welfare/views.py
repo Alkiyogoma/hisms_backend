@@ -1,5 +1,5 @@
 """
-Welfare views — FRD Section 13.
+Welfare views  FRD Section 13.
 """
 from datetime import date
 
@@ -182,7 +182,7 @@ class WelfareStudentIncidentsView(DepartmentScopedMixin, RoleRequiredMixin, Temp
         # Concern type breakdown
         concern_data = dict(Counter(qs.values_list('concern_type', flat=True)))
 
-        # Monthly trend (last 6 months) — from full department scope for context
+        # Monthly trend (last 6 months)  from full department scope for context
         base_qs = visible_observations(
             request.user, WelfareObservation.objects.filter(student__class_name__in=dept_class_names)
         )
@@ -799,7 +799,7 @@ def _safeguarding_recipients():
 
 def _escalate_severity(obs: WelfareObservation, request, severity):
     """Send in-app notifications and emails to relevant roles according to FRD escalation rules.
-    Safeguarding notes go only to users with the safeguarding permission — never the HOD —
+    Safeguarding notes go only to users with the safeguarding permission  never the HOD —
     and the notification carries no note content."""
     from communications.email_service import dispatch_notification
     from communications.models import Notification, NotificationCategory
@@ -1095,8 +1095,8 @@ class WelfareEditView(RoleRequiredMixin, View):
 class WelfareFollowUpView(RoleRequiredMixin, View):
     """Add a follow-up (correction) to a submitted safeguarding note.
 
-    Safeguarding notes are locked, so any correction — by the author or the
-    Safeguarding Lead — is recorded as a separate note linked to the original,
+    Safeguarding notes are locked, so any correction  by the author or the
+    Safeguarding Lead  is recorded as a separate note linked to the original,
     visible only to users with the safeguarding permission.
     """
     required_permissions_any = ["welfare.add_welfareobservation", "welfare.view_safeguarding_note"]

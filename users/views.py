@@ -538,7 +538,7 @@ class HISMSLoginAPIView(View):
 
 class StartImpersonationView(RoleRequiredMixin, View):
 
-    """FR-DASH-008: Super Admin 'View As' — start impersonation.
+    """FR-DASH-008: Super Admin 'View As'  start impersonation.
 
     NOTE: The ImpersonationMiddleware swaps request.user to the target user
 
@@ -993,7 +993,7 @@ class UserProfileView(RoleRequiredMixin, TemplateView):
 
 
 
-                # Duplicate photo detection — compare hash with other users
+                # Duplicate photo detection  compare hash with other users
 
                 pic.seek(0)
 
@@ -2261,7 +2261,7 @@ class ForceLogoutView(RoleRequiredMixin, View):
 
     SA-only: terminate another user's active sessions.
 
-    FRD NFR-SEC-005 — SA can force any user to re-login.
+    FRD NFR-SEC-005  SA can force any user to re-login.
 
     """
 

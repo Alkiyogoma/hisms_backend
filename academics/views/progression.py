@@ -1285,7 +1285,7 @@ class ProgressionExecutePromotionView(RoleRequiredMixin, View):
             )
             return redirect(reverse("academics:progression_bulk_promotion") + f"?config_id={config_id}")
 
-        # FR-ACAD-006: Sign-off gate — all report cards for the source academic year's
+        # FR-ACAD-006: Sign-off gate  all report cards for the source academic year's
         # terms must be published before progression can execute.
         from academics.models import ReportCard, ReportCardStatus, Term
         student_ids = ProgressionCase.objects.filter(

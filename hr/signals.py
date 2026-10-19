@@ -5,7 +5,7 @@ When a new Term is created, all TeacherClassAssignment records marked
 repeat_across_terms=True from the most recent prior term are copied to
 the new term. Conflicts (inactive teachers, missing classes, subject
 duplicates, contract expiry) are surfaced as RolloverConflict records
-for admin review — never silently dropped or forced through.
+for admin review  never silently dropped or forced through.
 """
 
 import logging
@@ -42,7 +42,7 @@ def _rollover_assignments(new_term):
 
     prev_term = _find_previous_term(new_term)
     if not prev_term:
-        logger.info("No previous term found for %s — skipping rollover.", new_term.name)
+        logger.info("No previous term found for %s  skipping rollover.", new_term.name)
         return
 
     source_assignments = TeacherClassAssignment.objects.filter(
@@ -51,7 +51,7 @@ def _rollover_assignments(new_term):
     ).select_related("teacher", "grade_class")
 
     if not source_assignments.exists():
-        logger.info("No repeat assignments in %s — skipping rollover.", prev_term.name)
+        logger.info("No repeat assignments in %s  skipping rollover.", prev_term.name)
         return
 
     created_count = 0

@@ -3,7 +3,7 @@ Celery tasks for the Academics app.
 
 FR-CAL-004: Auto-advance terms when their end_date passes.
 FR-LP-004: Auto-mark lesson plans as MISSING after deadline.
-Scheduled via Celery Beat — see config/celery.py.
+Scheduled via Celery Beat  see config/celery.py.
 """
 
 from celery import shared_task
@@ -42,7 +42,7 @@ def mark_missing_lesson_plans_task():
     MISSING records for teachers who never created a plan.
 
     Runs hourly during school hours (Mon-Fri 08:00-17:00 EAT).
-    The command itself is idempotent — it checks if the deadline has
+    The command itself is idempotent  it checks if the deadline has
     passed before taking action.
     """
     out = io.StringIO()

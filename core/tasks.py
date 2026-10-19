@@ -133,7 +133,7 @@ def _send_retention_warnings():
             Notification.objects.create(
                 recipient=admin,
                 category=NotificationCategory.SYSTEM,
-                title=f"Archive Retention Warning — {policy.get_category_display()}",
+                title=f"Archive Retention Warning  {policy.get_category_display()}",
                 body=body,
                 link="/audit/retention/",
             )

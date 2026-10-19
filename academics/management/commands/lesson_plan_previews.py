@@ -38,7 +38,7 @@ class Command(BaseCommand):
             self.stdout.write(ok(f"LibreOffice: {binary} ({version or 'no version output'})"))
         else:
             self.stdout.write(bad(
-                "LibreOffice: NOT FOUND — Word/PowerPoint/Excel files cannot be converted on the server.\n"
+                "LibreOffice: NOT FOUND  Word/PowerPoint/Excel files cannot be converted on the server.\n"
                 "  Install: sudo apt install -y libreoffice-writer-nogui libreoffice-impress-nogui "
                 "libreoffice-calc-nogui fonts-dejavu-core\n"
                 "  (Word and Excel files still show in the browser's own renderer meanwhile.)"))

@@ -51,7 +51,7 @@ def _notify_finance_officers_sibling_detected(
     This fires from the ``auto_detect_siblings`` signal when new
     ``StudentSibling`` records are created.  If ``notify_sibling_confirmation``
     in ``students/views.py`` also runs later (explicit admin confirmation),
-    the Finance Officer may receive a second notification — which is acceptable
+    the Finance Officer may receive a second notification  which is acceptable
     for this compliance requirement.
     """
     from communications.email_service import dispatch_notification

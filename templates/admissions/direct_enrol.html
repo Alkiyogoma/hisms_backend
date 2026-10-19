@@ -30,7 +30,7 @@
         {% for e in form.non_field_errors %}{{ e }}{% endfor %}
         {% if duplicate_warning and user.role == 'super_admin' %}
           <label style="display:flex;gap:8px;align-items:center;margin-top:8px;color:var(--text-primary)">
-            <input type="checkbox" name="override_duplicate" value="on"> This is a different child — enrol anyway (Super Admin override)
+            <input type="checkbox" name="override_duplicate" value="on"> This is a different child  enrol anyway (Super Admin override)
           </label>
         {% endif %}
       </div>

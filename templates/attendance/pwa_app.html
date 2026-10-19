@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<title>Attendance — {{ brand.school_name }}</title>
+<title>Attendance  {{ brand.school_name }}</title>
 <style>
 :root {
   --blue:#2563EB; --blue-dark:#1D4ED8;
@@ -719,10 +719,10 @@ body{
     // Swipe-to-delete (stronger pulse)
     swipeDelete:function(){_haptic(70);_tone(300,0.08,0.1)},
 
-    // Submit batch — success
+    // Submit batch  success
     submitSuccess:function(){_haptic([30,40,30]);_tone(660,0.12,0.15,0);_tone(880,0.12,0.15,0.12)},
 
-    // Submit batch — fail
+    // Submit batch  fail
     submitFail:function(){_haptic([100,50,100]);_tone(440,0.15,0.15,0);_tone(330,0.2,0.15,0.15)},
 
     // Manual entry saved
@@ -763,7 +763,7 @@ body{
   function apiFetch(url,opts){
     return fetch(url,opts).then(function(r){
       if(r.ok)return r.json();
-      if(r.status===403||r.status===401){showToast('Session expired — redirecting...',true);setTimeout(function(){window.location.href=API+'/accounts/login/'},1500);throw new Error('auth_redirect')}
+      if(r.status===403||r.status===401){showToast('Session expired  redirecting...',true);setTimeout(function(){window.location.href=API+'/accounts/login/'},1500);throw new Error('auth_redirect')}
       return r.json().then(function(d){
         console.error('API error',r.status,url,d);
         throw new Error(d.detail||d.message||JSON.stringify(d)||r.statusText);
@@ -933,7 +933,7 @@ body{
 
   // ── Swipe gestures (industry-standard physics) ──
   var SWIPE_COMMIT_RATIO=0.4;   // 40% of card width to commit
-  var SWIPE_FLING_VELOCITY=1000; // px/s — fast fling triggers even below threshold
+  var SWIPE_FLING_VELOCITY=1000; // px/s  fast fling triggers even below threshold
   var SWIPE_MAX_DRAG=250;        // max px card can travel
   var SWIPE_RUBBER_BAND=0.3;     // resistance past max
   var SWIPE_UNDO_WINDOW=3500;    // ms to show undo toast before permanent delete
@@ -999,12 +999,12 @@ body{
         var icon=card.parentElement.querySelector('.swipe-action');
         if(icon)icon.style.transform='';
         if(isCommitLeft){
-          // DELETE — swipe left
+          // DELETE  swipe left
           fb.swipeDelete();
           card.style.transition='transform .22s cubic-bezier(.4,0,.2,1),opacity .22s ease';
           card.style.transform='translateX(-110%)';
           card.style.opacity='0';
-          // Undo window — hold before permanent delete
+          // Undo window  hold before permanent delete
           var undoId='_undo_'+idx+'_'+Date.now();
           showToast('Removed: '+(s.name||s.id)+'. <span id="'+undoId+'" style="color:#fff;text-decoration:underline;cursor:pointer;margin-left:8px">UNDO</span>','error');
           setTimeout(function(){
@@ -1017,7 +1017,7 @@ body{
             };
           },100);
           setTimeout(function(){
-            // Check if user clicked undo — if s still at same position, delete permanently
+            // Check if user clicked undo  if s still at same position, delete permanently
             var curIdx=pendingScans.indexOf(s);
             if(curIdx!==-1){
               pendingScans.splice(curIdx,1);
@@ -1025,11 +1025,11 @@ body{
             }
           },SWIPE_UNDO_WINDOW);
         } else if(isCommitRight){
-          // SAVE — swipe right
+          // SAVE  swipe right
           fb.swipeSave();
           swipeSave(idx,card);
         } else {
-          // Snap back — below commit threshold
+          // Snap back  below commit threshold
           card.style.transition='transform .25s cubic-bezier(.4,0,.2,1)';
           card.style.transform='';
         }
@@ -1135,7 +1135,7 @@ body{
   }
   window.confirmMode=function(mode){
     if(qrLookupPending){showToast('Please wait, looking up student...',true);return}
-    if(qrLookupFailed||!pendingStudentData){showToast('Cannot proceed — student not found',true);return}
+    if(qrLookupFailed||!pendingStudentData){showToast('Cannot proceed  student not found',true);return}
     document.getElementById('confirmOverlay').classList.remove('show');
     var resolvedId=pendingStudentData?pendingStudentData.id:pendingStudentId;
     var name=pendingStudentData?pendingStudentData.name:'Unknown';
@@ -1228,7 +1228,7 @@ body{
           }).catch(function(){});
         }
       }).catch(function(){
-        showToast('Failed to queue — try again',true);
+        showToast('Failed to queue  try again',true);
       });
       return;
     }

@@ -875,7 +875,7 @@ class ReportingService:
                 end_date=date_to,
             )
 
-        # No specific class — build a class-level summary
+        # No specific class  build a class-level summary
         try:
             if not date_from:
                 date_from = timezone.now().date()

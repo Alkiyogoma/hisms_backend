@@ -2778,10 +2778,10 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   SHARED UI COMPONENTS — Canonical patterns for the whole app
+   SHARED UI COMPONENTS  Canonical patterns for the whole app
    ═══════════════════════════════════════════════════════════════ */
 
-/* ── STAT CARD (canonical — based on Finance dashboard) ── */
+/* ── STAT CARD (canonical  based on Finance dashboard) ── */
 .sc {
   display: flex;
   flex-direction: column;

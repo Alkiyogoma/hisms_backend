@@ -28,7 +28,7 @@ class FeeStructureStatus(models.TextChoices):
 
 class FeeStructure(TimeStampedModel):
     """
-    Fee structure per class per term — FR-FIN-001…003.
+    Fee structure per class per term  FR-FIN-001…003.
     Admin creates these; invoice generation reads from them.
     Status lifecycle: Draft → Published → Locked
     """
@@ -37,7 +37,7 @@ class FeeStructure(TimeStampedModel):
     class_name = models.CharField(max_length=64, db_index=True)
     is_active = models.BooleanField(default=True)
 
-    # A1.2 — Publish/Lock workflow status
+    # A1.2  Publish/Lock workflow status
     status = models.CharField(
         max_length=12,
         choices=FeeStructureStatus.choices,
@@ -58,7 +58,7 @@ class FeeStructure(TimeStampedModel):
         max_length=12, choices=SiblingDiscountMode.choices, default=SiblingDiscountMode.PERCENTAGE
     )
     sibling_discount_value = models.DecimalField(max_digits=10, decimal_places=2, default=0,
-        help_text="Discount amount — interpret as percentage or fixed TZS based on mode")
+        help_text="Discount amount  interpret as percentage or fixed TZS based on mode")
     assessment_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0,
         help_text="Assessment fee used by Admissions pipeline (TZS)")
 
@@ -104,7 +104,7 @@ class FeeStructureItem(TimeStampedModel):
 
 class FinancePeriod(TimeStampedModel):
     """
-    A6 — Finance period management.
+    A6  Finance period management.
     Represents a fiscal period (month, quarter, term) for financial tracking.
     Reconciled periods become read-only for invoices and payments.
     """
@@ -166,7 +166,7 @@ class OpeningBalanceType(models.TextChoices):
 
 class OpeningBalance(TimeStampedModel):
     """
-    A6 — Opening balance for a finance period.
+    A6  Opening balance for a finance period.
     Allows setting initial account balances when opening a new period.
     """
     period = models.ForeignKey(
@@ -285,8 +285,8 @@ class PaymentMethod(models.TextChoices):
 
 class FinanceConfig(TimeStampedModel):
     """
-    A6 — System-wide finance configuration settings.
-    Singleton model — only one configuration record should exist.
+    A6  System-wide finance configuration settings.
+    Singleton model  only one configuration record should exist.
     """
     # General settings
     school_currency = models.CharField(max_length=10, default="TZS", help_text="Default currency code")
@@ -481,7 +481,7 @@ class Budget(TimeStampedModel):
 
 class RecurringExpense(TimeStampedModel):
     """
-    Recurring expense template — generates Expense entries on schedule.
+    Recurring expense template  generates Expense entries on schedule.
     """
     FREQUENCY_CHOICES = [
         ("monthly", "Monthly"),
@@ -570,7 +570,7 @@ class Expense(TimeStampedModel):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="expenses")
     is_reimbursement = models.BooleanField(default=False, help_text="Is this a reimbursement to staff?")
 
-    # A3 — Approval workflow
+    # A3  Approval workflow
     term = models.ForeignKey("academics.Term", on_delete=models.SET_NULL, null=True, blank=True, related_name="expenses")
     status = models.CharField(max_length=12, choices=ExpenseStatus.choices, default=ExpenseStatus.PENDING, db_index=True)
     approved_by = models.ForeignKey(
@@ -617,7 +617,7 @@ class ConcessionStatus(models.TextChoices):
 
 class ReminderConfiguration(TimeStampedModel):
     """
-    A4.3 — Auto-reminder configuration for overdue fee accounts.
+    A4.3  Auto-reminder configuration for overdue fee accounts.
     Defines when and how reminders are sent.
     """
     FREQUENCY_CHOICES = [
@@ -675,7 +675,7 @@ class ReminderConfiguration(TimeStampedModel):
 
 class Concession(TimeStampedModel):
     """
-    A5 — Fee concession / discount / scholarship award.
+    A5  Fee concession / discount / scholarship award.
     Grants a reduction on a student's fees for a given term.
     Approved concessions are applied during invoice generation.
     """
@@ -684,7 +684,7 @@ class Concession(TimeStampedModel):
     concession_type = models.CharField(max_length=20, choices=ConcessionType.choices, db_index=True)
     reason = models.CharField(max_length=255, blank=True, help_text="Reason or description for the concession")
 
-    # Discount value — either percentage (e.g. 25 = 25%) or fixed TZS amount
+    # Discount value  either percentage (e.g. 25 = 25%) or fixed TZS amount
     discount_mode = models.CharField(
         max_length=12, choices=SiblingDiscountMode.choices, default=SiblingDiscountMode.PERCENTAGE
     )

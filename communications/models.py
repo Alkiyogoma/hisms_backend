@@ -1,5 +1,5 @@
 """
-Communications app models — FRD Section 11.
+Communications app models  FRD Section 11.
 Handles in-app notifications and broadcast messages.
 """
 from django.conf import settings
@@ -72,7 +72,7 @@ class BroadcastStatus(models.TextChoices):
 
 class Broadcast(TimeStampedModel):
     """
-    Admin-composed broadcast message — FRD FR-COM-001…006.
+    Admin-composed broadcast message  FRD FR-COM-001…006.
     """
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="broadcasts"
@@ -112,7 +112,7 @@ class WeeklyFocusStatus(models.TextChoices):
 
 class WeeklyFocus(TimeStampedModel):
     """
-    ECD teacher's weekly communication to parents — FRD FR-COM-007…010.
+    ECD teacher's weekly communication to parents  FRD FR-COM-007…010.
     Workflow: Draft → Submitted → (Approved / Rejected).
     Only approved entries are published as notifications to class parents.
     """
@@ -169,7 +169,7 @@ class PhoneOTP(TimeStampedModel):
 
 
 class EmailSendLogQuerySet(models.QuerySet):
-    """Immutable queryset — no delete or update allowed."""
+    """Immutable queryset  no delete or update allowed."""
     def delete(self):
         raise RuntimeError("Email send logs are immutable and cannot be deleted.")
     def update(self, **kwargs):

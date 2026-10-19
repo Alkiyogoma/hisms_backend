@@ -118,7 +118,7 @@ def pdf_for(attachment) -> Path:
     if ext not in PDF_EXTENSIONS and ext not in OFFICE_EXTENSIONS:
         raise PreviewUnavailable(f".{ext} files are not shown as PDF", reason="unsupported")
     if not file_exists(attachment):
-        raise PreviewUnavailable("The file is missing from the server — ask the teacher to upload it again",
+        raise PreviewUnavailable("The file is missing from the server  ask the teacher to upload it again",
                                  reason="file_missing")
     if ext in PDF_EXTENSIONS:
         try:

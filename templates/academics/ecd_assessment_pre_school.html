@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
-{% block title %}ECD Reports — Pre-School (RR){% endblock %}
-{% block topbar_greeting %}ECD Reports — Pre-School (RR){% endblock %}
+{% block title %}ECD Reports  Pre-School (RR){% endblock %}
+{% block topbar_greeting %}ECD Reports  Pre-School (RR){% endblock %}
 {% block topbar_date %}{% if current_term %}{{ current_term.name }} &middot; {{ current_term.academic_year.name }} &middot; assessment entry{% else %}Assessment entry{% endif %} &middot; {{ brand.school_name }}{% endblock %}
 {% block topbar_badges %}<div class="topbar-badge badge-amber" id="topbar-progress-badge"><span class="badge-dot"></span><span id="topbar-badge-text">Loading...</span></div>{% endblock %}
 {% block extra_head %}
@@ -157,7 +157,7 @@ function applyTermGating() {
   });
 }
 
-// Override save functions when in Term 2 — client-side guard
+// Override save functions when in Term 2  client-side guard
 async function saveDraft() {
   if (isLocked) return;
   if (CURRENT_TERM === 2) { if(typeof showToast==='function')showToast("Assessment is blocked in Term 2","error"); return; }

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Tasks & Todo — {{ brand.school_name }}{% endblock %}
+{% block title %}Tasks & Todo  {{ brand.school_name }}{% endblock %}
 
 {% block topbar_greeting %}Tasks & Todo{% endblock %}
 {% block topbar_date %}{{ today_date }} • {{ stats.total_pending }} pending task{{ stats.total_pending|pluralize }}{% endblock %}
@@ -150,7 +150,7 @@
       <div class="qi-body">
         <div class="qi-label">{{ task.title }}</div>
         <div class="qi-sub">{{ task.get_task_type_display }} &middot; {{ task.get_priority_display }}</div>
-        <div class="qi-meta">Due: {{ task.due_date|date:"d M" }}{% if task.is_overdue %} — overdue{% endif %}</div>
+        <div class="qi-meta">Due: {{ task.due_date|date:"d M" }}{% if task.is_overdue %}  overdue{% endif %}</div>
         <div class="qi-actions">
           {% if task.task_type == 'assessment_report' %}
           {% for pk_val, pct_val in task_progress.items %}{% if pk_val == task.pk %}

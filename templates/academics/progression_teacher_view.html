@@ -12,7 +12,7 @@
 
 <form method="get" style="display:flex;gap:16px;align-items:center;margin-bottom:20px">
     <select name="config_id" style="padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:250px">
-        <option value="">— Choose Cycle —</option>
+        <option value=""> Choose Cycle —</option>
         {% for c in configs %}
         <option value="{{ c.pk }}" {% if selected_config_id|stringformat:"s" == c.pk|stringformat:"s" %}selected{% endif %}>
             {{ c.academic_year_from }} → {{ c.academic_year_to }}
@@ -24,7 +24,7 @@
 
 {% if config %}
 <div class="card">
-    <div class="card-title">Your Students — {{ config.academic_year_from }} → {{ config.academic_year_to }}</div>
+    <div class="card-title">Your Students  {{ config.academic_year_from }} → {{ config.academic_year_to }}</div>
     {% if cases_data %}
     <div class="trow" style="background:var(--bg-page);border-radius:8px;margin-bottom:12px;font-weight:700;color:var(--text-secondary);font-size:11px;text-transform:uppercase;letter-spacing:0.05em">
         <div style="flex:3">Student</div>

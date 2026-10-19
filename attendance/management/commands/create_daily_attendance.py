@@ -21,7 +21,7 @@ from students.models import Student, StudentStatus
 class Command(BaseCommand):
     help = (
         "Pre-create UNCONFIRMED attendance entries for all active students today.\n"
-        "Idempotent — skips if entries already exist for the given date.\n"
+        "Idempotent  skips if entries already exist for the given date.\n"
         "Schedule daily at 7:00 AM via cron / Task Scheduler."
     )
 

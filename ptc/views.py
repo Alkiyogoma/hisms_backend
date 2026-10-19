@@ -1,4 +1,4 @@
-# PTC Views — Learner Progress Report module.
+# PTC Views  Learner Progress Report module.
 #
 # Adjustment note: All teachers share the UserRole.TEACHER role.
 # Access differentiation is done via TeacherClassAssignment checks
@@ -96,7 +96,7 @@ def _get_academic_years():
 
 
 # ===========================================================================
-# CLASS TEACHER — Student Picker
+# CLASS TEACHER  Student Picker
 # ===========================================================================
 
 class PTCStudentPickerView(RoleRequiredMixin, TemplateView):
@@ -113,7 +113,7 @@ class PTCStudentPickerView(RoleRequiredMixin, TemplateView):
 
         students = _get_ptc_eligible_students(user)
 
-        # Build class list from GradeClass model (excluding ECD) — not just from student data
+        # Build class list from GradeClass model (excluding ECD)  not just from student data
         from academics.models import GradeClass, Department
         is_admin = user.role in {
             UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD,
@@ -209,7 +209,7 @@ class PTCStudentPickerView(RoleRequiredMixin, TemplateView):
 
 
 # ===========================================================================
-# CLASS TEACHER — PTC Screen (FR-PTC-025, FR-PTC-026)
+# CLASS TEACHER  PTC Screen (FR-PTC-025, FR-PTC-026)
 # ===========================================================================
 
 class PTCScreenView(RoleRequiredMixin, TemplateView):
@@ -270,7 +270,7 @@ class PTCScreenView(RoleRequiredMixin, TemplateView):
         student = get_object_or_404(Student, pk=self.kwargs["student_pk"])
         user = self.request.user
 
-        # Log PTC generation (FR-PTC-030) — only class teachers trigger generation logs
+        # Log PTC generation (FR-PTC-030)  only class teachers trigger generation logs
         # Deduplicate: skip if same teacher viewed same student in same window within 5 minutes
         from datetime import timedelta
         ptc_window = _current_ptc_window()
@@ -401,7 +401,7 @@ class PTCScreenView(RoleRequiredMixin, TemplateView):
 
 
 # ===========================================================================
-# SUBJECT TEACHER — Comment Entry (FR-PTC-012 to FR-PTC-017)
+# SUBJECT TEACHER  Comment Entry (FR-PTC-012 to FR-PTC-017)
 # ===========================================================================
 
 class PTCCommentEntryView(RoleRequiredMixin, TemplateView):
@@ -566,7 +566,7 @@ class PTCCommentEntryView(RoleRequiredMixin, TemplateView):
                 action_type="PTC_COMMENT_SAVED",
                 model_name="PTCSubjectComment",
                 object_id=student.pk,
-                description=f"PTC comment saved for {student.admission_no} — {subject_name}",
+                description=f"PTC comment saved for {student.admission_no}  {subject_name}",
                 request=request
             )
 
@@ -575,7 +575,7 @@ class PTCCommentEntryView(RoleRequiredMixin, TemplateView):
 
 
 # ===========================================================================
-# CLASS TEACHER — Learner Attributes Entry Grid (FR-PTC-018 to FR-PTC-022)
+# CLASS TEACHER  Learner Attributes Entry Grid (FR-PTC-018 to FR-PTC-022)
 # ===========================================================================
 
 class PTCAttributeEntryView(RoleRequiredMixin, TemplateView):
@@ -732,7 +732,7 @@ class PTCAttributeEntryView(RoleRequiredMixin, TemplateView):
 
 
 # ===========================================================================
-# SPECIALIST TEACHER — Enrichment Grade Entry (FR-PTC-006 to FR-PTC-010)
+# SPECIALIST TEACHER  Enrichment Grade Entry (FR-PTC-006 to FR-PTC-010)
 # ===========================================================================
 
 class PTCEnrichmentGradeEntryView(RoleRequiredMixin, TemplateView):
@@ -864,7 +864,7 @@ class PTCEnrichmentGradeEntryView(RoleRequiredMixin, TemplateView):
 
 
 # ===========================================================================
-# PRIMARY HOD — Compliance Dashboard (FR-PTC-011, FR-PTC-016, FR-PTC-024)
+# PRIMARY HOD  Compliance Dashboard (FR-PTC-011, FR-PTC-016, FR-PTC-024)
 # ===========================================================================
 
 class PTCComplianceDashboardView(RoleRequiredMixin, TemplateView):
@@ -892,7 +892,7 @@ class PTCComplianceDashboardView(RoleRequiredMixin, TemplateView):
 
 
 # ===========================================================================
-# HOS — PTC Generation Log (FR-PTC-030)
+# HOS  PTC Generation Log (FR-PTC-030)
 # ===========================================================================
 
 class PTCGenerationLogView(RoleRequiredMixin, TemplateView):
@@ -927,7 +927,7 @@ class PTCGenerationLogView(RoleRequiredMixin, TemplateView):
 
 
 # ===========================================================================
-# ADMIN OFFICER — PTC Calendar Configuration (FR-PTC-001, FR-PTC-002)
+# ADMIN OFFICER  PTC Calendar Configuration (FR-PTC-001, FR-PTC-002)
 # ===========================================================================
 
 class PTCCalendarConfigView(RoleRequiredMixin, TemplateView):
@@ -960,7 +960,7 @@ class PTCCalendarConfigView(RoleRequiredMixin, TemplateView):
                 object_id=0,
                 description=(
                     f"User {user} (role={user.role}) denied PTC window mutation ({action}) "
-                    f"on {request.path} — missing perm: ptc.change_ptcwindow"
+                    f"on {request.path}  missing perm: ptc.change_ptcwindow"
                 ),
                 request=request,
             )
@@ -1071,7 +1071,7 @@ class PTCCalendarConfigView(RoleRequiredMixin, TemplateView):
 
 
 # ===========================================================================
-# ENRICHMENT SUBJECT CONFIGURATION — Create / Update (OP 9.4)
+# ENRICHMENT SUBJECT CONFIGURATION  Create / Update (OP 9.4)
 # ===========================================================================
 
 class PTCEnrichmentConfigView(RoleRequiredMixin, TemplateView):

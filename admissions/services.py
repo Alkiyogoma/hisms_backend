@@ -260,7 +260,7 @@ def transition_applicant_status(
         after_value=to_status,
     )
 
-    # NOTIF-09: Space available — notify Admin when enrolled/admitted/conditional student withdraws
+    # NOTIF-09: Space available  notify Admin when enrolled/admitted/conditional student withdraws
     if to_status == ApplicantStatus.WITHDRAWN and from_status in (
         ApplicantStatus.ENROLLED, ApplicantStatus.ADMITTED, ApplicantStatus.CONDITIONAL,
     ):
@@ -413,7 +413,7 @@ def schedule_assessment(
                 )
                 dispatch_notification(
                     user=tu,
-                    title=f"Assessment Assigned — {applicant.child_full_name}",
+                    title=f"Assessment Assigned  {applicant.child_full_name}",
                     message=msg,
                     link=f"/admissions/applicant/{applicant.pk}/",
                     actor=actor,
@@ -459,7 +459,7 @@ def confirm_assessment_fee_paid(*, applicant: Applicant, actor, payment_method: 
                 applicant=applicant,
                 to_status=ApplicantStatus.ASSESSMENT_COMPLETED,
                 actor=actor,
-                reason="Assessment fee confirmed. Assessment already completed — skipping ahead.",
+                reason="Assessment fee confirmed. Assessment already completed  skipping ahead.",
             )
         else:
             # Skip straight to assessment_confirmed (fee_paid column removed from pipeline)
@@ -951,7 +951,7 @@ def complete_enrolment(*, applicant: Applicant, actor, override_duplicate: bool 
             update_fields.append("updated_at")
             guardian.save(update_fields=update_fields)
     
-    # Save PDPA consent — FR-PDPA-004: never overwrite in place; append a
+    # Save PDPA consent  FR-PDPA-004: never overwrite in place; append a
     # versioned record (who/when/version) and preserve the previous version.
     old_version = guardian.pdpa_consent_version or ""
     old_method = guardian.pdpa_consent_method or ""
@@ -1037,7 +1037,7 @@ def complete_enrolment(*, applicant: Applicant, actor, override_duplicate: bool 
         parent_first = name_parts[0] if name_parts else ""
         parent_last = name_parts[1] if len(name_parts) > 1 else ""
 
-        # DEF-10: Never collide on users_user.email UNIQUE — generate a unique
+        # DEF-10: Never collide on users_user.email UNIQUE  generate a unique
         # fallback for parents without an email instead of saving an empty string.
         email = (guardian.email or "").strip().lower()
         if not email:
@@ -1211,7 +1211,7 @@ def complete_enrolment(*, applicant: Applicant, actor, override_duplicate: bool 
                 "portal_link": "/parent/admission-form/",
                 "admissions_phone": _contact.get("phone", ""),
                 "uniform_notes": "Ensure correct uniform is worn from day one.",
-                "meals": "School meals available — see fee schedule.",
+                "meals": "School meals available  see fee schedule.",
                 "transport_notes": "Transport available for qualifying zones.",
             },
         )
@@ -1466,7 +1466,7 @@ def revert_applicant_from_enrolled(*, applicant: Applicant, to_status: str, acto
             action_type="STUDENT_ARCHIVED",
             model_name="Student",
             object_id=student.pk,
-            description=f"Student {student.admission_no} ({student.first_name} {student.last_name}) archived — applicant {applicant.child_full_name} reverted from enrolled to {to_status}",
+            description=f"Student {student.admission_no} ({student.first_name} {student.last_name}) archived  applicant {applicant.child_full_name} reverted from enrolled to {to_status}",
         )
 
         from students.models import EnrollmentHistory

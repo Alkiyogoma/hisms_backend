@@ -112,7 +112,7 @@ class PerformanceReportView(RoleRequiredMixin, TemplateView):
         sort = params.get("sort") if group == "learner" and params.get("sort") in SORTS else "average"
         query = params.get("q", "").strip()
 
-        # View 1 — who needs help, worst first.
+        # View 1  who needs help, worst first.
         # Learner rows feed both the list and (by default) the distribution;
         # build them once.
         learners = performance.learner_summary(filtered) if "learner" in (group, params.get("dist")) else None
@@ -135,7 +135,7 @@ class PerformanceReportView(RoleRequiredMixin, TemplateView):
         dist_by = params.get("dist") if params.get("dist") in GROUPS else "result"
         dist_rows = learners if dist_by == "learner" else filtered
 
-        # View 2 — one subject across classes (ignores the class filter, since
+        # View 2  one subject across classes (ignores the class filter, since
         # the point is to compare classes), every subject ranked within the
         # class filter, and the class x subject heatmap.
         ranking = performance.subject_ranking(in_class)

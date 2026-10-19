@@ -295,7 +295,7 @@ def check_unconfirmed_attendance_9am():
     from datetime import date as _date
 
     if not is_school_day(_date.today()):
-        logger.info("check_unconfirmed_attendance_9am: skipped — not a school day")
+        logger.info("check_unconfirmed_attendance_9am: skipped  not a school day")
         return "Skipped: not a school day"
 
     from django.core.management import call_command
@@ -339,7 +339,7 @@ def check_overdue_invoices_task():
 @shared_task
 def broadcast_statistics_update_task(class_id=None):
     """
-    Async statistics broadcast — runs outside the scan hot path.
+    Async statistics broadcast  runs outside the scan hot path.
     Avoids 2 DB queries per scan in the synchronous request cycle.
     """
     try:
@@ -353,7 +353,7 @@ def broadcast_statistics_update_task(class_id=None):
 @shared_task
 def broadcast_checkin_event_task(student_id, timestamp_iso, marked_by_id=None):
     """
-    Async check-in event broadcast — runs outside the scan hot path.
+    Async check-in event broadcast  runs outside the scan hot path.
     Avoids 2x async_to_sync(group_send) blocking the response (~1-2s).
     """
     try:
@@ -372,7 +372,7 @@ def broadcast_checkin_event_task(student_id, timestamp_iso, marked_by_id=None):
 @shared_task
 def broadcast_checkout_event_task(student_id, timestamp_iso, marked_by_id=None):
     """
-    Async check-out event broadcast — runs outside the scan hot path.
+    Async check-out event broadcast  runs outside the scan hot path.
     Avoids 2x async_to_sync(group_send) blocking the response (~1-2s).
     """
     try:
@@ -391,7 +391,7 @@ def broadcast_checkout_event_task(student_id, timestamp_iso, marked_by_id=None):
 @shared_task
 def audit_log_task(actor_id, action_type, model_name, object_id="", description="", after=None):
     """
-    Async audit log write — runs outside the scan hot path.
+    Async audit log write  runs outside the scan hot path.
     Avoids synchronous DB write blocking the response.
     """
     try:
@@ -436,7 +436,7 @@ def _collect_parent_contacts(student):
 @shared_task(bind=True, max_retries=3)
 def send_checkin_notification_task(self, student_id, entry_id, timestamp_iso):
     """
-    Async check-in notification — runs outside the scan hot path.
+    Async check-in notification  runs outside the scan hot path.
     Queues SMS messages and logs notifications for all parent contacts.
     """
     try:
@@ -472,7 +472,7 @@ def send_checkin_notification_task(self, student_id, entry_id, timestamp_iso):
 @shared_task(bind=True, max_retries=3)
 def send_checkout_notification_task(self, student_id, entry_id, timestamp_iso, parent_name=""):
     """
-    Async check-out notification — runs outside the scan hot path.
+    Async check-out notification  runs outside the scan hot path.
     Queues SMS messages and logs notifications for all parent contacts.
     """
     try:

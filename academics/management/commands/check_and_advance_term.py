@@ -38,7 +38,7 @@ class Command(BaseCommand):
             self.stdout.write("No active (unlocked, in-range) term found. Nothing to advance.")
             return
 
-        # The term is still in its date range — nothing to do.
+        # The term is still in its date range  nothing to do.
         if active_term.end_date >= today:
             self.stdout.write(
                 f"Term '{active_term.name}' is still active (ends {active_term.end_date}). "
@@ -46,7 +46,7 @@ class Command(BaseCommand):
             )
             return
 
-        # ── Term end-date has passed — advance ──────────────────────────
+        # ── Term end-date has passed  advance ──────────────────────────
         self.stdout.write(
             self.style.WARNING(
                 f"Term '{active_term.name}' ended on {active_term.end_date}. "
@@ -177,7 +177,7 @@ class Command(BaseCommand):
         for admin in admins:
             dispatch_notification(
                 user=admin,
-                title="Term Transition — New Term Started",
+                title="Term Transition  New Term Started",
                 message=msg,
                 link=link,
                 actor=None,

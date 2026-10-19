@@ -30,7 +30,7 @@ def _get_api_allowed_classes(user) -> set[str] | None:
     """
     if getattr(user, "role", None) != UserRole.TEACHER:
         return None  # None means no filter (show all)
-    return get_teacher_assigned_classes(user)  # may be set() — empty means no students visible
+    return get_teacher_assigned_classes(user)  # may be set()  empty means no students visible
 
 
 @api_view(['POST'])

@@ -1,4 +1,4 @@
-"""Validators for file attachments — reads limits from MediaSettings."""
+"""Validators for file attachments  reads limits from MediaSettings."""
 import os
 import hashlib
 from django.core.exceptions import ValidationError
@@ -170,7 +170,7 @@ def check_duplicate_file(file, existing_queryset, area="lesson_plans"):
 
     duplicates = []
     for existing in existing_queryset:
-        # existing.file is a Django FieldFile — access via .path or .read()
+        # existing.file is a Django FieldFile  access via .path or .read()
         existing_file = existing.file if hasattr(existing, "file") else existing
         try:
             existing_path = existing_file.path

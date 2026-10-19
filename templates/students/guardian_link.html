@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Link Parent — {{ student.first_name }}{% endblock %}
+{% block title %}Link Parent  {{ student.first_name }}{% endblock %}
 
 {% block topbar_greeting %}Add Parent{% endblock %}
 
@@ -50,7 +50,7 @@
           </div>
           <button type="button" class="btn-secondary btn-sm" onclick="clearSelection()">Change</button>
         </div>
-        {# Sibling match alert banner — shown when siblings detected #}
+        {# Sibling match alert banner  shown when siblings detected #}
         <div id="siblingAlertLink" style="display:none; margin-top:12px; padding:12px; background:#FEF3C7; border:1px solid #FCD34D; border-radius:8px; font-size:12px">
           <div style="display:flex; justify-content:space-between; align-items:flex-start;">
             <p style="font-weight:600; color:#92550A; margin:0">Possible sibling match found</p>
@@ -213,7 +213,7 @@
     }
   });
 
-  // Show toast for URL error params — wait for showToast to be defined
+  // Show toast for URL error params  wait for showToast to be defined
   function _checkUrlParams() {
     if (typeof showToast !== 'function') { setTimeout(_checkUrlParams, 100); return; }
     const params = new URLSearchParams(window.location.search);

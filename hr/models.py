@@ -40,7 +40,7 @@ class StaffProfile(TimeStampedModel):
     # Core user link
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="staff_profile")
 
-    # B2 — Personal Information
+    # B2  Personal Information
     full_name = models.CharField(max_length=150)
     date_of_birth = models.DateField(null=True, blank=True)
     gender = models.CharField(max_length=10, choices=Gender.choices, blank=True, default="")
@@ -48,7 +48,7 @@ class StaffProfile(TimeStampedModel):
     marital_status = models.CharField(max_length=12, choices=MaritalStatus.choices, blank=True, default="")
     residential_address = models.TextField(blank=True, default="")
 
-    # B2 — Emergency Contact
+    # B2  Emergency Contact
     emergency_contact_name = models.CharField(max_length=150, blank=True, default="")
     emergency_contact_phone = models.CharField(max_length=32, blank=True, default="")
     emergency_contact_relationship = models.CharField(max_length=50, blank=True, default="")
@@ -78,11 +78,11 @@ class StaffProfile(TimeStampedModel):
     years_of_experience = models.PositiveIntegerField(default=0, help_text="Total years of professional experience")
     highest_qualification = models.CharField(max_length=100, blank=True, default="")
 
-    # B2 — Contact Information
+    # B2  Contact Information
     contact_phone = models.CharField(max_length=32, blank=True, default="")
     contact_email = models.EmailField()
 
-    # B2 — Salary & Banking
+    # B2  Salary & Banking
     basic_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text="Monthly basic salary (TZS)")
     housing_allowance = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text="Monthly housing allowance (TZS)")
     transport_allowance = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text="Monthly transport allowance (TZS)")
@@ -96,15 +96,15 @@ class StaffProfile(TimeStampedModel):
     def gross_salary(self):
         return self.basic_salary + self.housing_allowance + self.transport_allowance + self.medical_allowance + self.other_allowances
 
-    # B2 — Official Identification
+    # B2  Official Identification
     national_id_number = models.CharField(max_length=50, blank=True, default="", help_text="NIDA or Passport number")
 
-    # B2 — Statutory Information
+    # B2  Statutory Information
     nssf_number = models.CharField(max_length=50, blank=True, default="", help_text="NSSF membership number")
     tin_number = models.CharField(max_length=50, blank=True, default="", help_text="Tax Identification Number (TIN)")
     paye_code = models.CharField(max_length=20, blank=True, default="", help_text="PAYE tax code")
     heslb_loan_number = models.CharField(max_length=50, blank=True, default="", help_text="HESLB loan reference number")
-    # B3 — HESLB Deduction Details (for payroll auto-calculation)
+    # B3  HESLB Deduction Details (for payroll auto-calculation)
     heslb_has_loan = models.BooleanField(default=False, help_text="Does this employee have an active HESLB loan?")
     heslb_deduction_type = models.CharField(
         max_length=12,
@@ -122,7 +122,7 @@ class StaffProfile(TimeStampedModel):
         help_text="Date HESLB deductions should start")
     nhif_number = models.CharField(max_length=50, blank=True, default="", help_text="NHIF membership number")
 
-    # B3 — Onboarding Status
+    # B3  Onboarding Status
     onboarding_step = models.PositiveSmallIntegerField(
         default=0, help_text="0=not started, 1-5=in progress, 6=completed"
     )
@@ -295,7 +295,7 @@ class TeacherClassAssignment(TimeStampedModel):
 
 
 # 
-# B3 — ONBOARDING WORKFLOW
+# B3  ONBOARDING WORKFLOW
 # 
 
 class OnboardingChecklistItem(TimeStampedModel):
@@ -370,7 +370,7 @@ class InductionChecklistCompletion(TimeStampedModel):
 
 
 # 
-# B4 — PAYROLL MODULE
+# B4  PAYROLL MODULE
 # 
 
 class PayrollStatus(models.TextChoices):
@@ -588,7 +588,7 @@ class PayrollEntry(TimeStampedModel):
 
 
 # 
-# B5 — STATUTORY FILING
+# B5  STATUTORY FILING
 # 
 
 class StatutoryFilingStatus(models.TextChoices):
@@ -642,7 +642,7 @@ class StatutoryFiling(TimeStampedModel):
 
 
 # 
-# B4b — PAYROLL CONFIGURATION & STATUTORY SETTINGS
+# B4b  PAYROLL CONFIGURATION & STATUTORY SETTINGS
 # 
 
 
@@ -720,7 +720,7 @@ class PAYETaxBand(TimeStampedModel):
         upper = f"{self.band_to:,.0f}" if self.band_to else "∞"
         return f"PAYE {self.version}: TZS {self.band_from:,.0f} to {upper} @ {self.rate_percentage}%%"
 # 
-# B6 — LEAVE MANAGEMENT
+# B6  LEAVE MANAGEMENT
 # 
 
 class LeaveType(models.TextChoices):
@@ -818,7 +818,7 @@ class LeaveRequest(TimeStampedModel):
 
 
 # 
-# B7 — OFFBOARDING
+# B7  OFFBOARDING
 # 
 
 class OffboardingStatus(models.TextChoices):

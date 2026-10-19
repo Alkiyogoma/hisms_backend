@@ -1,5 +1,5 @@
 """
-Step 7 — Seed welfare observations for ECD students
+Step 7  Seed welfare observations for ECD students
 Run: python manage.py seed_welfare
 """
 import random

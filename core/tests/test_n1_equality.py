@@ -418,13 +418,13 @@ class FinanceOpenInvoicesTermScopeTest(TestCase):
                 student=self.student, amount_due=Decimal("1000"),
                 status=InvoiceStatus.UNPAID, term=self.term,
             )
-        # Create 5 UNPAID invoices in a DIFFERENT term — these must NOT be counted
+        # Create 5 UNPAID invoices in a DIFFERENT term  these must NOT be counted
         for i in range(5):
             Invoice.objects.create(
                 student=self.student, amount_due=Decimal("2000"),
                 status=InvoiceStatus.UNPAID, term=self.other_term,
             )
-        # Create 1 PAID invoice in current term — must NOT be counted
+        # Create 1 PAID invoice in current term  must NOT be counted
         Invoice.objects.create(
             student=self.student, amount_due=Decimal("500"),
             status=InvoiceStatus.PAID, term=self.term,
@@ -435,7 +435,7 @@ class FinanceOpenInvoicesTermScopeTest(TestCase):
         Dashboard open_invoices must equal term-scoped count, not global count.
 
         If this fails, open_invoices has reverted to a global
-        Invoice.objects.exclude(PAID).count() — the exact bug from the
+        Invoice.objects.exclude(PAID).count()  the exact bug from the
         original finding. The fix is at finance/views.py line 246:
             open_invoices = term_invoices.exclude(status=InvoiceStatus.PAID).count()
         where term_invoices is Invoice.objects.filter(term_q) scoped to the
@@ -460,7 +460,7 @@ class FinanceOpenInvoicesTermScopeTest(TestCase):
         term_invoices = Invoice.objects.filter(term=self.term)
         ref_open = term_invoices.exclude(status=InvoiceStatus.PAID).count()
 
-        # Global count — this is what the BUG would have produced
+        # Global count  this is what the BUG would have produced
         global_open = Invoice.objects.exclude(status=InvoiceStatus.PAID).count()
 
         self.assertEqual(
@@ -470,7 +470,7 @@ class FinanceOpenInvoicesTermScopeTest(TestCase):
         )
         self.assertNotEqual(
             dashboard_open, global_open,
-            f"open_invoices={dashboard_open} equals global count {global_open} — "
+            f"open_invoices={dashboard_open} equals global count {global_open}  "
             f"the term-scoping fix is NOT applied",
         )
 

@@ -1,4 +1,4 @@
-{# _user_roles_panel.html — Slide-out panel for assigning extra roles to a user #}
+{# _user_roles_panel.html  Slide-out panel for assigning extra roles to a user #}
 
 <div id="userRolesPanel" style="display:none; position:fixed; top:0; right:0; width:420px; height:100vh; background:#fff; box-shadow:-8px 0 30px rgba(0,0,0,0.12); z-index:1000; overflow-y:auto; transition:transform 0.3s ease">
   <!-- Header -->
@@ -38,7 +38,7 @@
 {# Backdrop #}
 <div id="rolesBackdrop" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.3); z-index:999" onclick="closeRolesPanel()"></div>
 
-{# CSRF token from template tag — works even when Tracking Prevention blocks cookies #}
+{# CSRF token from template tag  works even when Tracking Prevention blocks cookies #}
 <input type="hidden" id="rolesPanelCsrf" value="{{ csrf_token }}">
 
 <script>
@@ -112,7 +112,7 @@ function saveRolesPanel() {
     body: JSON.stringify({role_ids: roleIds})
   }).then(r => r.json().then(d => ({ok: r.ok, data: d}))).then(({ok, data}) => {
     if (!ok) {
-      btn.textContent = data.error || 'Error — try again';
+      btn.textContent = data.error || 'Error  try again';
       btn.style.background = '#DC2626';
       setTimeout(() => {
         btn.textContent = 'Save Roles';
@@ -131,7 +131,7 @@ function saveRolesPanel() {
       window.location.reload();
     }, 800);
   }).catch(err => {
-    btn.textContent = 'Error — try again';
+    btn.textContent = 'Error  try again';
     btn.style.background = '#DC2626';
     setTimeout(() => {
       btn.textContent = 'Save Roles';

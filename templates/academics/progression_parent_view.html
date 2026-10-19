@@ -19,7 +19,7 @@
 <div class="card" style="padding:16px 20px;margin-bottom:20px">
   <form method="get" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
     <select name="config_id" class="hf2-select" style="min-width:220px;flex:1">
-      <option value="">— Choose Transition —</option>
+      <option value=""> Choose Transition —</option>
       {% for c in configs %}
       <option value="{{ c.pk }}" {% if selected_config_id|stringformat:"s" == c.pk|stringformat:"s" %}selected{% endif %}>
         {{ c.academic_year_from }} → {{ c.academic_year_to }}

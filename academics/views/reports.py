@@ -469,7 +469,7 @@ def _build_report_card_context(report):
     ctx["remark_rows"] = _remark_rows(report.student, report.term)
 
     # ACADEMIC PROGRESS table: approved, mark-bearing subjects only. The exam
-    # average and grade appear only once the term is fully assessed — never
+    # average and grade appear only once the term is fully assessed  never
     # the stored average, which may predate later scores.
     from academics.score_progress import exam_summary
     ctx["exam"] = exam_summary(report.student, report.term)
@@ -578,7 +578,7 @@ class HOSSignOffActionView(AllowedRolesEnforcedMixin, RoleRequiredMixin, View):
                     sign_off_report(report, request.user)
                     messages.success(request, f"Report for {report.student.first_name} signed off and published.")
             except ReportCard.DoesNotExist:
-                messages.error(request, "That report no longer exists — it may have been deleted. Refresh the page.")
+                messages.error(request, "That report no longer exists  it may have been deleted. Refresh the page.")
             except Exception as e:
                 messages.error(request, f"Nothing was changed: {_action_error(e)}")
         elif class_name and term_id:

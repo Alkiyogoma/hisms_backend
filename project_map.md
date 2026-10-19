@@ -1,4 +1,4 @@
-# HODARI SMS — Complete Project Map
+# HODARI SMS  Complete Project Map
 
 > **Generated:** 2026-07-06
 > **Stack:** Django 5.2 + SQLite (dev) / PostgreSQL (prod)
@@ -407,7 +407,7 @@ CALCULATED → PENDING_HOD_REVIEW
 PENDING_HOD_REVIEW → PENDING_HOS_DECISION
 PENDING_HOS_DECISION → FINALIZED
 PENDING_HOS_DECISION → PENDING_HOD_REVIEW (return path)
-FINALIZED → (none — terminal)
+FINALIZED → (none  terminal)
 ```
 
 #### `PromotionRun`
@@ -640,7 +640,7 @@ FINALIZED → (none — terminal)
 
 **Models:** `AttendanceEntry`, `StaffAttendanceEntry`, `OtpCode`, `Message`, `NotificationLog`
 
-*(Full field tables omitted — these follow standard TimeStampedModel + status tracking patterns)*
+*(Full field tables omitted  these follow standard TimeStampedModel + status tracking patterns)*
 
 ---
 
@@ -899,7 +899,7 @@ FINALIZED → (none — terminal)
 | `amount` | DecimalField | `max_digits=12`, `decimal_places=2` |
 | `is_discount` | BooleanField | `default=False` |
 
-#### `FinanceConfig` (extends TimestampedModel — singleton)
+#### `FinanceConfig` (extends TimestampedModel  singleton)
 | Field | Type | Options |
 |-------|------|---------|
 | `school_currency` | CharField | `max_length=10`, `default="TZS"` |
@@ -974,7 +974,7 @@ FINALIZED → (none — terminal)
 | `last_generated_date` | DateField | `null=True`, `blank=True` |
 | `created_by` | ForeignKey | `to=User`, `on_delete=PROTECT` |
 
-**Method:** `process_due(actor)` — creates actual Expense entry and advances due date
+**Method:** `process_due(actor)`  creates actual Expense entry and advances due date
 
 #### `Expense` (extends TimeStampedModel)
 | Field | Type | Options |
@@ -1185,7 +1185,7 @@ FINALIZED → (none — terminal)
 | `approved_at` | DateTimeField | `null=True`, `blank=True` |
 | `processed_by` | ForeignKey | `to=User`, `null=True`, `blank=True` |
 
-**Method:** `calculate_summary()` — recalculates totals from payroll entries
+**Method:** `calculate_summary()`  recalculates totals from payroll entries
 
 #### `PayrollEntry` (extends TimeStampedModel)
 | Field | Type | Options |
@@ -1216,7 +1216,7 @@ FINALIZED → (none — terminal)
 | `paid_at` | DateTimeField | `null=True`, `blank=True` |
 
 **Meta:** `unique_together = ("payroll_run", "staff")`
-**Methods:** `calculate()`, `auto_calculate_from_profile()` — populates from StaffProfile + PAYE bands + statutory config
+**Methods:** `calculate()`, `auto_calculate_from_profile()`  populates from StaffProfile + PAYE bands + statutory config
 
 #### `StatutoryFiling` (extends TimeStampedModel)
 | Field | Type | Options |
@@ -1236,7 +1236,7 @@ FINALIZED → (none — terminal)
 
 **Meta:** `unique_together = ("filing_type", "payroll_run")`
 
-#### `PayrollConfig` (extends TimeStampedModel — singleton)
+#### `PayrollConfig` (extends TimeStampedModel  singleton)
 | Field | Type | Options |
 |-------|------|---------|
 | `nssf_employee_rate` | DecimalField | `max_digits=5`, `decimal_places=2`, `default=10.00` |
@@ -1351,7 +1351,7 @@ FINALIZED → (none — terminal)
 | `assigned_class` | ForeignKey | `to=GradeClass`, `null=True`, `blank=True` |
 | `is_active` | BooleanField | `default=True` |
 
-**Fixed subjects:** Bible, ICT, Global Perspective, PE, Swimming, French, Music (7 total — FR-PTC-006)
+**Fixed subjects:** Bible, ICT, Global Perspective, PE, Swimming, French, Music (7 total  FR-PTC-006)
 
 #### `EnrichmentGrade` (extends TimeStampedModel)
 | Field | Type | Options |
@@ -1579,7 +1579,7 @@ FINALIZED → (none — terminal)
 |--------|-----|----------|
 | `/` | core | `""` → dashboard, `settings/`, `seed-db/`, `api/session/check/`, `api/session/extend/` |
 | `/users/` | users | `login/`, `logout/`, `list/`, `create/`, `edit/<pk>/`, `profile/`, `password-change/`, `impersonate/*`, `password-reset/*` |
-| `/academics/` | academics | 55 patterns — lesson plans, exam scores, terms, years, rooms, classes, subjects, ECD, reports, progression, analytics |
+| `/academics/` | academics | 55 patterns  lesson plans, exam scores, terms, years, rooms, classes, subjects, ECD, reports, progression, analytics |
 | `/students/` | students | student CRUD, detail, guardian management |
 | `/admissions/` | admissions | pipeline, inquiry, assessment, waitlist, offer letters |
 | `/attendance/` | attendance | today, staff, parent, PWA, API endpoints |

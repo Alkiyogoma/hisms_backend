@@ -7,17 +7,17 @@ Gunicorn behind Nginx**.
 This document is self-contained. It documents the **database configuration and
 migration** in detail and then walks through the full server setup.
 
-> ⚠️ **SINGLE-SITE ASSUMPTIONS — READ THIS IF THE VPS ALREADY HOSTS ANOTHER SITE.**
+> ⚠️ **SINGLE-SITE ASSUMPTIONS  READ THIS IF THE VPS ALREADY HOSTS ANOTHER SITE.**
 > This guide assumes it is the **only** deployment on the box. Several steps will
 > **break a co-hosted site** if run blindly, because they reuse global names/paths:
 > - systemd units `hodari.service` / `hodari-celery.service` / `hodari-celery-beat.service`
 >   (copying these **overwrites** another site's units of the same name),
 > - the `hodari` system user and `/var/www/hodari` paths,
 > - `sudo rm -f /etc/nginx/sites-enabled/default` (removes whatever the other site used),
-> - `sudo ufw enable` **without** `443/tcp` (drops the other site's HTTPS — see §9.4).
+> - `sudo ufw enable` **without** `443/tcp` (drops the other site's HTTPS  see §9.4).
 >
 > To run a **second** site alongside an existing one (e.g. `testing.hodari.ac.tz`
-> next to `connect.hodari.ac.tz`), do **not** follow this guide as-is — use
+> next to `connect.hodari.ac.tz`), do **not** follow this guide as-is  use
 > [`SECOND_SITE_NGUZO.md`](SECOND_SITE_NGUZO.md), which uses isolated unit names,
 > a separate port, and an `server_name`-scoped nginx block so the two never collide.
 
@@ -148,11 +148,11 @@ sudo apt install -y python3 python3-venv python3-dev build-essential \
 # PostgreSQL, Redis, Nginx
 sudo apt install -y postgresql postgresql-contrib redis-server nginx
 
-# WeasyPrint (PDF rendering) system libraries — required, see requirements.txt
+# WeasyPrint (PDF rendering) system libraries  required, see requirements.txt
 sudo apt install -y libpango-1.0-0 libpangocairo-1.0-0 libcairo2 \
     libgdk-pixbuf-2.0-0 libffi-dev shared-mime-info fonts-liberation
 
-# LibreOffice (headless) — lesson plan previews: Word / PowerPoint / Excel
+# LibreOffice (headless)  lesson plan previews: Word / PowerPoint / Excel
 # attachments are converted to PDF so reviewers see them exactly as written.
 # Without it those files can only be downloaded, not previewed.
 sudo apt install -y libreoffice-writer-nogui libreoffice-impress-nogui \
@@ -209,7 +209,7 @@ PGPASSWORD='Hodari20SCHOOL26' psql -h 127.0.0.1 -U hodari_user -d hodari -c '\co
 
 > **Local development shortcut:** on your own machine it's fine to use the
 > built-in `postgres` superuser (`POSTGRES_USER=postgres`), but never on a
-> public server — live must use a dedicated role like `hodari_user` above.
+> public server  live must use a dedicated role like `hodari_user` above.
 
 ---
 
@@ -222,7 +222,7 @@ cd /var/www/hodari
 # Clone (or rsync/scp your project) so the app lives at:
 #   /var/www/hodari/hisms_backend
 git clone <YOUR_REPO_URL> hisms_backend
-# — or — copy an existing checkout up with: rsync -av ./ hodari@server:/var/www/hodari/hisms_backend/
+#  or  copy an existing checkout up with: rsync -av ./ hodari@server:/var/www/hodari/hisms_backend/
 
 python3 -m venv /var/www/hodari/venv
 source /var/www/hodari/venv/bin/activate
@@ -245,7 +245,7 @@ python -c "from django.core.management.utils import get_random_secret_key; print
 DJANGO_SECRET_KEY=<paste-generated-key>
 DJANGO_DEBUG=0
 DJANGO_ALLOWED_HOSTS=testing.hodari.ac.tz,127.0.0.1,localhost
-# App is served on :8443 (shipped Nginx config) — include the port on the origin
+# App is served on :8443 (shipped Nginx config)  include the port on the origin
 CSRF_TRUSTED_ORIGINS=https://testing.hodari.ac.tz:8443
 
 # --- Database (PostgreSQL) ---
@@ -307,7 +307,7 @@ python manage.py check --deploy
 # 2. Show the migration plan (optional, read-only)
 python manage.py showmigrations
 
-# 3. Apply all migrations — creates every table in PostgreSQL
+# 3. Apply all migrations  creates every table in PostgreSQL
 python manage.py migrate --noinput
 
 # 4. Create the first admin user
@@ -391,7 +391,7 @@ sudo sed -i 's/connect\.hodari\.ac\.tz/testing.hodari.ac.tz/g' \
 ```
 
 Make sure `DJANGO_ALLOWED_HOSTS` and `CSRF_TRUSTED_ORIGINS` in `.env`
-(Section 6) match this domain — including the `:8443` port on the CSRF origin,
+(Section 6) match this domain  including the `:8443` port on the CSRF origin,
 e.g. `CSRF_TRUSTED_ORIGINS=https://testing.hodari.ac.tz:8443`.
 
 ### 9.2 Enable HTTP first (ports 80 + 8070)
@@ -442,14 +442,14 @@ HTTPS is now live at `https://testing.hodari.ac.tz:8443/`.
 ```bash
 sudo ufw allow OpenSSH
 sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp     # standard HTTPS — required for any co-hosted site (e.g. connect.hodari.ac.tz)
+sudo ufw allow 443/tcp     # standard HTTPS  required for any co-hosted site (e.g. connect.hodari.ac.tz)
 sudo ufw allow 8070/tcp
 sudo ufw allow 8443/tcp
 sudo ufw enable
 ```
 
 > Certbot's timer auto-renews the cert. Because the shipped config uses the
-> webroot challenge on port 80, no renewal hook changes are needed — just keep
+> webroot challenge on port 80, no renewal hook changes are needed  just keep
 > port 80 open.
 
 ---
@@ -512,7 +512,7 @@ Automate a nightly dump with cron (as the `hodari` user):
 0 2 * * * pg_dump -h 127.0.0.1 -U hodari_user -Fc hodari > /var/backups/hodari/hodari_$(date +\%F).dump && find /var/backups/hodari -name '*.dump' -mtime +30 -delete
 ```
 
-(Put the DB password in `~/.pgpass` — `chmod 600` — so cron runs
+(Put the DB password in `~/.pgpass`  `chmod 600`  so cron runs
 non-interactively.)
 
 ---
@@ -523,19 +523,19 @@ non-interactively.)
 |---------|--------------------|
 | App uses SQLite, not Postgres | `POSTGRES_PASSWORD` empty or `POSTGRES_HOST` is `localhost` with no password → set both; keep `DJANGO_USE_SQLITE=0`. |
 | Infinite HTTPS redirect loop | Nginx not sending `X-Forwarded-Proto https`; add it to the proxy block. |
-| `502 Bad Gateway` | Gunicorn down or wrong bind — `journalctl -u hodari`; confirm it listens on `127.0.0.1:8008`. |
+| `502 Bad Gateway` | Gunicorn down or wrong bind  `journalctl -u hodari`; confirm it listens on `127.0.0.1:8008`. |
 | CSRF verification failed | Add the domain to `CSRF_TRUSTED_ORIGINS` (with `https://`) in `.env`. |
 | Static files 404 | Run `collectstatic`; check Nginx `alias` path matches `STATIC_ROOT` (`/var/www/hodari/hisms_backend/staticfiles/`). |
 | WeasyPrint / PDF errors | Install the Pango/Cairo libs from Section 3. |
-| Lesson plan Word files say "Preview not available" | LibreOffice missing — install the `libreoffice-*-nogui` packages from Section 3 (`which soffice` must find it; or set `LIBREOFFICE_BINARY` in settings). |
-| Celery tasks never run | Worker/beat not started, or Redis broker URL wrong — `celery -A config inspect ping`. |
+| Lesson plan Word files say "Preview not available" | LibreOffice missing  install the `libreoffice-*-nogui` packages from Section 3 (`which soffice` must find it; or set `LIBREOFFICE_BINARY` in settings). |
+| Celery tasks never run | Worker/beat not started, or Redis broker URL wrong  `celery -A config inspect ping`. |
 | `permission denied for schema public` | Run the PG15+ `GRANT ALL ON SCHEMA public` from Section 4. |
 
 ---
 
 ### File reference (in `deployment/`)
 
-- `gunicorn_config.py` — Gunicorn worker/logging config
-- `hodari.service`, `hodari-celery.service`, `hodari-celery-beat.service` — systemd units
-- `nginx_hodari.conf` — the Nginx config used in Section 9 (ports 80 / 8070 / 8443)
-- `production_settings.py` — **reference only**, not auto-loaded
+- `gunicorn_config.py`  Gunicorn worker/logging config
+- `hodari.service`, `hodari-celery.service`, `hodari-celery-beat.service`  systemd units
+- `nginx_hodari.conf`  the Nginx config used in Section 9 (ports 80 / 8070 / 8443)
+- `production_settings.py`  **reference only**, not auto-loaded

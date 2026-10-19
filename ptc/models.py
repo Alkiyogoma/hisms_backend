@@ -39,7 +39,7 @@ class LearnerAttributeRating(models.TextChoices):
 
 
 # ---------------------------------------------------------------------------
-# Fixed reference data — 12 learner attributes (FR-PTC-019)
+# Fixed reference data  12 learner attributes (FR-PTC-019)
 # ---------------------------------------------------------------------------
 
 LEARNER_ATTRIBUTES = [
@@ -60,7 +60,7 @@ LEARNER_ATTRIBUTES = [
 
 
 # ---------------------------------------------------------------------------
-# PTC Window — one per academic year per term slot
+# PTC Window  one per academic year per term slot
 # ---------------------------------------------------------------------------
 
 class PTCWindow(TimeStampedModel):
@@ -173,7 +173,7 @@ class PTCWindow(TimeStampedModel):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"PTC {self.get_term_slot_display()} — {self.academic_year.name} ({self.ptc_date})"
+        return f"PTC {self.get_term_slot_display()}  {self.academic_year.name} ({self.ptc_date})"
 
     # --- Convenience properties ---
 
@@ -201,9 +201,9 @@ class PTCWindow(TimeStampedModel):
 
 
 # ---------------------------------------------------------------------------
-# Enrichment Subjects — linked to academics.Subject with is_enrichment=True (FR-PTC-006)
+# Enrichment Subjects  linked to academics.Subject with is_enrichment=True (FR-PTC-006)
 # EnrichmentSubject stores the PTC-specific config (teacher, class, weight).
-# The subject itself lives in academics.Subject — no duplicate data.
+# The subject itself lives in academics.Subject  no duplicate data.
 # ---------------------------------------------------------------------------
 
 
@@ -254,11 +254,11 @@ class EnrichmentSubject(TimeStampedModel):
 
     def __str__(self):
         teacher = self.assigned_teacher.get_full_name() if self.assigned_teacher else "Unassigned"
-        return f"{self.subject.name} — {teacher}"
+        return f"{self.subject.name}  {teacher}"
 
 
 # ---------------------------------------------------------------------------
-# Enrichment Grades — one row per student per enrichment subject per term
+# Enrichment Grades  one row per student per enrichment subject per term
 # ---------------------------------------------------------------------------
 
 class EnrichmentGrade(TimeStampedModel):
@@ -316,7 +316,7 @@ class EnrichmentGrade(TimeStampedModel):
 
 
 # ---------------------------------------------------------------------------
-# PTC Subject Comments — one per student, per core subject, per PTC window
+# PTC Subject Comments  one per student, per core subject, per PTC window
 # ---------------------------------------------------------------------------
 
 class PTCSubjectComment(TimeStampedModel):
@@ -366,7 +366,7 @@ class PTCSubjectComment(TimeStampedModel):
 
 
 # ---------------------------------------------------------------------------
-# Learner Attribute Rating — one per student, per attribute, per PTC window
+# Learner Attribute Rating  one per student, per attribute, per PTC window
 # ---------------------------------------------------------------------------
 
 class LearnerAttributeRatingEntry(TimeStampedModel):
@@ -428,7 +428,7 @@ class LearnerAttributeRatingEntry(TimeStampedModel):
 
 
 # ---------------------------------------------------------------------------
-# PTC Generation Log — every time a class teacher opens a PTC screen (FR-PTC-030)
+# PTC Generation Log  every time a class teacher opens a PTC screen (FR-PTC-030)
 # ---------------------------------------------------------------------------
 
 class PTCGenerationLog(TimeStampedModel):
@@ -467,7 +467,7 @@ class PTCGenerationLog(TimeStampedModel):
 
 
 # ---------------------------------------------------------------------------
-# PTC Progress Trend Override — class teacher can override auto-derived trend (FR-PTC-029)
+# PTC Progress Trend Override  class teacher can override auto-derived trend (FR-PTC-029)
 # ---------------------------------------------------------------------------
 
 class PTCProgressTrendOverride(TimeStampedModel):
@@ -511,7 +511,7 @@ class PTCProgressTrendOverride(TimeStampedModel):
 
 
 # ---------------------------------------------------------------------------
-# PTC Date Change Audit Log — triggered when a published window's date is changed
+# PTC Date Change Audit Log  triggered when a published window's date is changed
 # ---------------------------------------------------------------------------
 
 class PTCDateChangeLog(TimeStampedModel):

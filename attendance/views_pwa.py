@@ -1,4 +1,4 @@
-"""Attendance PWA views — manifest, config, service worker, download page, and app shell."""
+"""Attendance PWA views  manifest, config, service worker, download page, and app shell."""
 from __future__ import annotations
 
 import os
@@ -25,13 +25,13 @@ class ServiceWorkerView(View):
     The browser restricts a service worker's scope to the directory it is
     served from.  By serving sw.js at ``/attendance/pwa/sw.js`` (inside the
     ``/attendance/pwa/`` scope) the worker can control the PWA app shell.
-    No auth is required — the SW runs in the browser without cookies.
+    No auth is required  the SW runs in the browser without cookies.
     """
 
     def get(self, request):
         sw_path = os.path.join(_PWA_STATIC_DIR, "sw.js")
         response = FileResponse(open(sw_path, "rb"), content_type="application/javascript")
-        # Never cache the service worker — browsers check byte-equality for updates
+        # Never cache the service worker  browsers check byte-equality for updates
         response["Cache-Control"] = "no-cache, no-store, must-revalidate"
         response["Pragma"] = "no-cache"
         response["Expires"] = "0"
@@ -87,7 +87,7 @@ class PWAManifestView(View):
 
 class PWAConfigView(View):
     """Returns PWA config for the service worker to read.
-    No auth required — the SW runs without cookies during install/update.
+    No auth required  the SW runs without cookies during install/update.
     Only exposes base_url, version, and school_name (no sensitive data).
     """
 
@@ -101,7 +101,7 @@ class PWAConfigView(View):
 
 
 class PWADownloadView(LoginRequiredMixin, TemplateView):
-    """Hidden download page — only accessible via direct URL or footer link.
+    """Hidden download page  only accessible via direct URL or footer link.
     Not linked in the main navigation. Requires attendance.view_attendanceentry.
     """
     template_name = "attendance/pwa_download.html"
@@ -130,7 +130,7 @@ class PWADownloadView(LoginRequiredMixin, TemplateView):
 
 
 class PWAAttendanceShellView(LoginRequiredMixin, TemplateView):
-    """The standalone PWA app shell — full-screen, mobile-first, no sidebar.
+    """The standalone PWA app shell  full-screen, mobile-first, no sidebar.
     Uses the existing attendance API for real-time data.
     """
     template_name = "attendance/pwa_app.html"

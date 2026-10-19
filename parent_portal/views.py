@@ -197,7 +197,7 @@ class ParentDashboardView(RoleRequiredMixin, TemplateView):
             scores = ExamScore.objects.filter(
                 student=child, status="approved",
             ).mark_bearing().select_related("term").order_by("-term__start_date", "subject_name")
-            # Deduplicate by subject — keep latest score per subject
+            # Deduplicate by subject  keep latest score per subject
             seen_subjects = set()
             deduped = []
             for s in scores:
@@ -924,7 +924,7 @@ class ParentChildrenListView(ParentOnlyMixin, TemplateView):
 
 
 class ParentStudentDetailView(ParentOnlyMixin, TemplateView):
-    """Student detail for parents — same layout as teacher detail, filtered to own children."""
+    """Student detail for parents  same layout as teacher detail, filtered to own children."""
     allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
     template_name = "parent_portal/child_detail_full.html"
 
@@ -1312,7 +1312,7 @@ class ParentGenerateInvoiceView(ParentOnlyMixin, View):
             if not send_dynamic_email(template_type="invoice_generated", to_email=fo.email, context=e18_context):
                 send_email_safe(
                     to_email=fo.email,
-                    subject=f"Invoice raised: {applicant.child_full_name} — {applicant.reference_number}",
+                    subject=f"Invoice raised: {applicant.child_full_name}  {applicant.reference_number}",
                     body=(
                         f"An admission invoice has been generated and payment is expected.\n\n"
                         f"Student: {applicant.child_full_name}\n"

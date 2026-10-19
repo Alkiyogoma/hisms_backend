@@ -86,7 +86,7 @@ def build_ecd_report_context(report):
     """Build the ``ecd`` context dict expected by ``ecd_report_preview.html``.
 
     Returns a dict with keys ``template_type``, ``class_label``, ``domain_groups``,
-    ``teacher_comments`` — or raises ``ReportCard.DoesNotExist`` if ``report``
+    ``teacher_comments``  or raises ``ReportCard.DoesNotExist`` if ``report``
     is not an ECD report.
     """
     from academics.models import ECDEvaluation, ABCPaceProgress, ABCScripture, ABCReadingProgramme, ABCGeneralAssignment, ABCInternalExam

@@ -316,7 +316,7 @@ class EventDeleteView(RoleRequiredMixin, DeleteView):
 
 
 class AcknowledgeEventView(LoginRequiredMixin, View):
-    """Record a parent's acknowledgement of an event — FR-CAL-001.
+    """Record a parent's acknowledgement of an event  FR-CAL-001.
     Permission-driven: requires the parent role AND events.view_calendarevent,
     so stripping that permission in the role-assignment UI revokes acknowledgement.
     """

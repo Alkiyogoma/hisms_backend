@@ -132,14 +132,14 @@ class Command(BaseCommand):
             current_idx = grade_index.get(current_class)
 
             if current_idx is None:
-                # Student's class_name is not in GradeClass registry — skip
-                self.stdout.write(f"  WARNING: {student.admission_no} {student.get_full_name()} — class '{current_class}' not in GradeClass, skipped")
+                # Student's class_name is not in GradeClass registry  skip
+                self.stdout.write(f"  WARNING: {student.admission_no} {student.get_full_name()}  class '{current_class}' not in GradeClass, skipped")
                 skipped += 1
                 continue
 
             if meets_criteria:
                 if is_final_grade.get(current_class, False):
-                    # Final grade — graduate
+                    # Final grade  graduate
                     action = "GRADUATED"
                     if commit:
                         student.status = StudentStatus.GRADUATED
@@ -223,7 +223,7 @@ class Command(BaseCommand):
                 if float(report.overall_average) < min_avg:
                     return False
             elif min_avg > 0:
-                # No report card found — can't verify average
+                # No report card found  can't verify average
                 return False
 
         if min_att > 0:

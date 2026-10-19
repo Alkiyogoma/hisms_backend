@@ -115,7 +115,7 @@ def _recent_audit():
     return AuditLog.objects.all().select_related("actor")[:6]
 
 
-from core.utils import is_school_day  # noqa: F401 — re-exported for callers within this module
+from core.utils import is_school_day  # noqa: F401  re-exported for callers within this module
 
 
 def _unconfirmed_students_qs(today, limit=50):
@@ -172,7 +172,7 @@ class DashboardRouterView(RoleRequiredMixin, TemplateView):
         UserRole.PARENT,
     ]
     """
-    Smart dashboard router — shows role-specific view.
+    Smart dashboard router  shows role-specific view.
     Acceptance criterion #1: 8 roles → correct dashboards.
     """
     login_url = "/accounts/login/"
@@ -229,7 +229,7 @@ class SeedDatabaseView(RoleRequiredMixin, TemplateView):
 # --------------------------------------------------------------------------- #
 
 class SuperAdminDashboardView(RoleRequiredMixin, TemplateView):
-    """System Administration Panel — FRD Section 2."""
+    """System Administration Panel  FRD Section 2."""
     template_name = "dashboards/superadmin.html"
     allowed_roles = [UserRole.SUPER_ADMIN]
 
@@ -288,7 +288,7 @@ def _at_risk_cards(scope, term):
 
 
 class HOSDashboardView(RoleRequiredMixin, TemplateView):
-    """Head of School Dashboard — FRD Section 14."""
+    """Head of School Dashboard  FRD Section 14."""
     template_name = "dashboards/hos.html"
     allowed_roles = [UserRole.HEAD_OF_SCHOOL]
 
@@ -297,7 +297,7 @@ class HOSDashboardView(RoleRequiredMixin, TemplateView):
         today = date.today()
         user = self.request.user
         
-        # 1. School overview metrics — batch into fewer queries
+        # 1. School overview metrics  batch into fewer queries
         from django.db.models import Count, Q, Case, When, Value, IntegerField
         active_count = Student.objects.filter(status=StudentStatus.ACTIVE).count()
         present_today = AttendanceEntry.objects.filter(date=today, status__in=PRESENT_STATUSES).count()
@@ -343,7 +343,7 @@ class HOSDashboardView(RoleRequiredMixin, TemplateView):
         except Exception:
             upcoming_events = []
 
-        # 3. Staff presence — real StaffAttendanceEntry queries
+        # 3. Staff presence  real StaffAttendanceEntry queries
         from attendance.models import StaffAttendanceEntry
         all_staff = User.objects.exclude(role__in=[UserRole.PARENT, UserRole.SUPER_ADMIN])
         expected_staff = all_staff.count()
@@ -366,7 +366,7 @@ class HOSDashboardView(RoleRequiredMixin, TemplateView):
         if unconfirmed_staff < 0:
             unconfirmed_staff = 0
         
-        # 4. Attendance by class — single query with annotation (eliminates N+1)
+        # 4. Attendance by class  single query with annotation (eliminates N+1)
         class_active_counts = dict(
             Student.objects.filter(status=StudentStatus.ACTIVE)
             .values('class_name')
@@ -392,7 +392,7 @@ class HOSDashboardView(RoleRequiredMixin, TemplateView):
                 c_pct = round((c_checked_in / c_total) * 100)
                 class_attendance.append({"name": cname, "pct": c_pct})
 
-        # 5. Lesson plan compliance by department — single annotated query
+        # 5. Lesson plan compliance by department  single annotated query
         dept_plan_stats = (
             LessonPlan.objects.filter(
                 class_name__in=GradeClass.objects.values_list('name', flat=True)
@@ -446,7 +446,7 @@ class HOSDashboardView(RoleRequiredMixin, TemplateView):
         admission_actions = get_critical_actions()
         critical_admission_actions = [a for a in admission_actions if a["severity"] == "high"]
 
-        # FR-ADM-018: HOS decision queue — applicants awaiting HOS decision
+        # FR-ADM-018: HOS decision queue  applicants awaiting HOS decision
         hos_decision_qs = Applicant.objects.filter(
             status=ApplicantStatus.HOS_DECISION,
         ).select_related("assessment")[:10]
@@ -758,7 +758,7 @@ class HOSDashboardView(RoleRequiredMixin, TemplateView):
 
 class PrimaryHODDashboardView(RoleRequiredMixin, TemplateView):
     allowed_roles = [UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD]
-    """Primary Head of Department Dashboard — High Fidelity."""
+    """Primary Head of Department Dashboard  High Fidelity."""
     template_name = "dashboards/primary_hod.html"
 
     def get_context_data(self, **kwargs):
@@ -831,7 +831,7 @@ class PrimaryHODDashboardView(RoleRequiredMixin, TemplateView):
             "student_count": Student.objects.filter(class_name__in=dept_classes, is_archived=False).count()
         }
 
-        # Flagged Class — find class with lowest average in current term
+        # Flagged Class  find class with lowest average in current term
         class_avgs = []
         for gc_name in dept_classes:
             avg = ExamScore.objects.filter(
@@ -848,7 +848,7 @@ class PrimaryHODDashboardView(RoleRequiredMixin, TemplateView):
         else:
             ctx["flagged_class"] = None
         
-        # 5. Staff Presence — from StaffAttendanceEntry
+        # 5. Staff Presence  from StaffAttendanceEntry
         from attendance.models import StaffAttendanceEntry
         from timetable.models import TimetableSlot
         from hr.models import StaffProfile
@@ -910,7 +910,7 @@ class PrimaryHODDashboardView(RoleRequiredMixin, TemplateView):
         # 6. Lesson Plan Queue
         ctx["plans_queue"] = plans_to_review.order_by('-updated_at')[:3]
         
-        # 7. Compliance List (Staff Submission Status) — batched query
+        # 7. Compliance List (Staff Submission Status)  batched query
         teacher_pks = list(dept_staff.values_list('pk', flat=True))
         approved_teachers = set(
             LessonPlan.objects.filter(
@@ -955,7 +955,7 @@ class PrimaryHODDashboardView(RoleRequiredMixin, TemplateView):
                 relevant_actions.append(a)
         ctx["admission_actions"] = relevant_actions[:5]
 
-        # FR-ADM-018: HOS review queue — applicants awaiting HOS review in this department
+        # FR-ADM-018: HOS review queue  applicants awaiting HOS review in this department
         hos_review_qs = Applicant.objects.filter(
             status=ApplicantStatus.HOS_REVIEW,
             grade_applying_for__in=list(dept_grade_names),
@@ -980,7 +980,7 @@ class PrimaryHODDashboardView(RoleRequiredMixin, TemplateView):
             "missing": len([c for c in compliance if c["status"] == "Missing"]),
         }
 
-        # 8. Class Attendance Today — real data from AttendanceEntry
+        # 8. Class Attendance Today  real data from AttendanceEntry
         class_att = []
         class_active_counts = dict(
             Student.objects.filter(class_name__in=dept_classes, status=StudentStatus.ACTIVE)
@@ -1083,7 +1083,7 @@ class PrimaryHODDashboardView(RoleRequiredMixin, TemplateView):
 
 class ECDHODDashboardView(RoleRequiredMixin, TemplateView):
     allowed_roles = [UserRole.ECD_HOD]
-    """ECD Head of Department Dashboard — High Fidelity."""
+    """ECD Head of Department Dashboard  High Fidelity."""
     template_name = "dashboards/ecd_hod.html"
 
     def get_context_data(self, **kwargs):
@@ -1120,7 +1120,7 @@ class ECDHODDashboardView(RoleRequiredMixin, TemplateView):
         ).select_related("student").order_by("-created_at")[:5]
         ctx["flagged_children"] = flagged_children
 
-        # Parent comms needed — high/critical observations where parent not yet contacted
+        # Parent comms needed  high/critical observations where parent not yet contacted
         parent_comms = WelfareObservation.objects.filter(
             student__class_name__in=ecd_classes,
             severity__in=[WelfareSeverity.HIGH, WelfareSeverity.CRITICAL],
@@ -1130,7 +1130,7 @@ class ECDHODDashboardView(RoleRequiredMixin, TemplateView):
         ctx["parent_comms_needed"] = parent_comms
         ctx["comms_needed_count"] = parent_comms.count()
         
-        # 2. Staff Presence — from StaffAttendanceEntry
+        # 2. Staff Presence  from StaffAttendanceEntry
         from attendance.models import StaffAttendanceEntry
         from timetable.models import TimetableSlot
         from hr.models import StaffProfile
@@ -1194,7 +1194,7 @@ class ECDHODDashboardView(RoleRequiredMixin, TemplateView):
         # 3. Welfare List
         ctx["welfare_review_list"] = welfare_pending.order_by("-created_at")[:4]
         
-        # 4. Attendance — real data from AttendanceEntry
+        # 4. Attendance  real data from AttendanceEntry
         class_att = []
         class_active_counts = dict(
             Student.objects.filter(class_name__in=ecd_classes, status=StudentStatus.ACTIVE)
@@ -1225,7 +1225,7 @@ class ECDHODDashboardView(RoleRequiredMixin, TemplateView):
                 class_att.append({"name": c, "pct": pct, "status": status})
         ctx["class_attendance"] = class_att[:5]
         
-        # 5. Progression Status — computed from ECD evaluations (E/G/S/N ratings) for current term
+        # 5. Progression Status  computed from ECD evaluations (E/G/S/N ratings) for current term
         from academics.utils import get_current_term
         current_term = get_current_term()
         rating_map = {"E": 4, "G": 3, "S": 2, "N": 1}
@@ -1289,7 +1289,7 @@ class ECDHODDashboardView(RoleRequiredMixin, TemplateView):
                 relevant_actions.append(a)
         ctx["admission_actions"] = relevant_actions[:5]
 
-        # FR-ADM-018: ECD HOS review queue — applicants awaiting HOS review in ECD department
+        # FR-ADM-018: ECD HOS review queue  applicants awaiting HOS review in ECD department
         hos_review_qs = Applicant.objects.filter(
             status=ApplicantStatus.HOS_REVIEW,
             grade_applying_for__in=list(ecd_grade_names),
@@ -1416,7 +1416,7 @@ class FinanceDashboardProxyView(RoleRequiredMixin, TemplateView):
 
 class TeacherDashboardView(RoleRequiredMixin, TemplateView):
     allowed_roles = [UserRole.TEACHER]
-    """Teacher Dashboard — Academic focus."""
+    """Teacher Dashboard  Academic focus."""
     template_name = "dashboards/teacher.html"
 
     def get_context_data(self, **kwargs):
@@ -1497,7 +1497,7 @@ class TeacherDashboardView(RoleRequiredMixin, TemplateView):
         # 5. Attendance Alert - per-class status for reminders (batched queries)
         # FR-ATT-006: Name-list of unconfirmed students by 9:00 AM
         unconfirmed_alert = 0
-        unconfirmed_students = []  # [{student, class_name}] — shown as name list on dashboard
+        unconfirmed_students = []  # [{student, class_name}]  shown as name list on dashboard
         class_attendance_status = []
         if att_classes:
             # Batch: get all active student counts per class in one query
@@ -2016,7 +2016,7 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
                 if is_current and other_current:
                     messages.error(
                         request,
-                        f"Cannot create '{name}' as the current academic year — "
+                        f"Cannot create '{name}' as the current academic year  "
                         f"'{other_current.name}' is already the current year. "
                         f"Clear its current flag first."
                     )
@@ -2061,7 +2061,7 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
                 from django.utils import timezone
                 today = timezone.now().date()
                 if ay.end_date and ay.end_date < today:
-                    messages.error(request, f"Cannot edit '{ay.name}' — it ended on {ay.end_date}. Past academic years are read-only.")
+                    messages.error(request, f"Cannot edit '{ay.name}'  it ended on {ay.end_date}. Past academic years are read-only.")
                     return redirect(f"{reverse_lazy('core:school_settings')}?tab=academic_year")
                 name = request.POST.get("name", "").strip()
                 start_date_str = request.POST.get("start_date", "").strip()
@@ -2092,7 +2092,7 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
                     if other_current:
                         messages.error(
                             request,
-                            f"Cannot set '{name}' as the current academic year — "
+                            f"Cannot set '{name}' as the current academic year  "
                             f"'{other_current.name}' is already the current year. "
                             f"Clear its current flag first."
                         )
@@ -2115,7 +2115,7 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
                 name = ay.name
                 term_count = ay.terms.count()
                 if term_count > 0:
-                    messages.error(request, f"Cannot delete '{name}' — it has {term_count} term(s). Delete all terms first.")
+                    messages.error(request, f"Cannot delete '{name}'  it has {term_count} term(s). Delete all terms first.")
                     return redirect(f"{reverse_lazy('core:school_settings')}?tab=academic_year")
                 try:
                     ay.delete()
@@ -2123,13 +2123,13 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
                 except ProtectedError as e:
                     blocked = str(e)
                     if "CambridgeCheckpointScore" in blocked:
-                        messages.error(request, f"Cannot delete '{name}' — it has Cambridge Checkpoint scores. Remove those first.")
+                        messages.error(request, f"Cannot delete '{name}'  it has Cambridge Checkpoint scores. Remove those first.")
                     elif "ReportCard" in blocked:
-                        messages.error(request, f"Cannot delete '{name}' — it has report cards. Remove those first.")
+                        messages.error(request, f"Cannot delete '{name}'  it has report cards. Remove those first.")
                     elif "ExamScore" in blocked:
-                        messages.error(request, f"Cannot delete '{name}' — it has exam scores. Remove those first.")
+                        messages.error(request, f"Cannot delete '{name}'  it has exam scores. Remove those first.")
                     else:
-                        messages.error(request, f"Cannot delete '{name}' — it has associated records that must be removed first.")
+                        messages.error(request, f"Cannot delete '{name}'  it has associated records that must be removed first.")
                 return redirect(f"{reverse_lazy('core:school_settings')}?tab=academic_year")
 
             if action == "add_term":
@@ -2447,7 +2447,7 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
                 if tpl:
                     tpl.is_enabled = request.POST.get("is_enabled") == "on"
                     tpl.save(update_fields=["is_enabled", "updated_at"])
-                    state = "on — it will be sent" if tpl.is_enabled else "off — it will not be sent"
+                    state = "on  it will be sent" if tpl.is_enabled else "off  it will not be sent"
                     messages.success(request, f"'{tpl.name}' email is now {state}.")
                 return redirect(f"{reverse_lazy('core:school_settings')}?tab=email_templates")
 
@@ -2988,7 +2988,7 @@ class SessionCheckView(RoleRequiredMixin, View):
         remaining = max(0, int(idle_timeout - idle_seconds))
         # Touch the session so the cache backend resets its TTL (prevents Redis
         # from evicting the session data while the user is still active), but
-        # do NOT update _last_activity — that would defeat the idle timer.
+        # do NOT update _last_activity  that would defeat the idle timer.
         request.session.modified = True
         return JsonResponse({"seconds_remaining": remaining, "idle_timeout": idle_timeout})
 

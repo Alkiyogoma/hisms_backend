@@ -89,7 +89,7 @@ class Command(BaseCommand):
 
         #  Phase 2: Mark Absent 
         if current_time >= ABSENT_CUTOFF:
-            # Re-query — some may have been updated to Late above
+            # Re-query  some may have been updated to Late above
             still_unconfirmed = AttendanceEntry.objects.filter(
                 date=today,
                 status=AttendanceStatus.UNCONFIRMED,

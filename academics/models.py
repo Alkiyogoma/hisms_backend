@@ -30,10 +30,10 @@ class ProgressionOutcome(models.TextChoices):
 
 
 class CalculationBasis(models.TextChoices):
-    COMPLETE = "complete", "Complete — all assessments present"
-    ZERO_SCORED = "zero_scored", "Zero-scored — one or more absences recorded as zero"
-    REDISTRIBUTED = "redistributed", "Redistributed — excused absence, remaining components scaled"
-    INCOMPLETE = "incomplete", "Incomplete — missing grade data, cannot calculate"
+    COMPLETE = "complete", "Complete  all assessments present"
+    ZERO_SCORED = "zero_scored", "Zero-scored  one or more absences recorded as zero"
+    REDISTRIBUTED = "redistributed", "Redistributed  excused absence, remaining components scaled"
+    INCOMPLETE = "incomplete", "Incomplete  missing grade data, cannot calculate"
 
 
 class AcademicYear(TimeStampedModel):
@@ -68,13 +68,13 @@ class AcademicYear(TimeStampedModel):
         # Cannot set is_current on a year that has already ended
         if self.is_current and self.end_date and self.end_date < today:
             raise ValidationError(
-                f"Cannot set '{self.name}' as current — it ended on {self.end_date}. "
+                f"Cannot set '{self.name}' as current  it ended on {self.end_date}. "
                 f"Choose a current or future academic year."
             )
         # Cannot publish a year that has already ended
         if self.is_published and self.end_date and self.end_date < today:
             raise ValidationError(
-                f"Cannot publish '{self.name}' — it ended on {self.end_date}. "
+                f"Cannot publish '{self.name}'  it ended on {self.end_date}. "
                 f"Past academic years cannot be published."
             )
         if self.start_date and self.end_date:
@@ -95,7 +95,7 @@ class AcademicYear(TimeStampedModel):
         if self.is_published and self.pk:
             existing = AcademicYear.objects.filter(pk=self.pk).first()
             if existing and not existing.is_published:
-                # FR-CAL-002: Publishing — all terms must have start and end dates.
+                # FR-CAL-002: Publishing  all terms must have start and end dates.
                 terms = self.terms.all()
                 if not terms.exists():
                     raise ValidationError(
@@ -160,7 +160,7 @@ class GradeClass(TimeStampedModel):
     sort_order = models.PositiveIntegerField(default=0, help_text="Numeric order for grade progression/promotion")
     is_exit_grade = models.BooleanField(default=False, help_text="True for the highest grade (e.g. Grade 9)")
 
-    # Allowed class names — FRD 2.3: exactly these classes, no parallel streams
+    # Allowed class names  FRD 2.3: exactly these classes, no parallel streams
     ALLOWED_CLASS_NAMES = {
         Department.ECD: {"Pre-K", "KG", "Pre-School", "ABC"},
         Department.PRIMARY: {f"Grade {i}" for i in range(1, 7)},
@@ -307,7 +307,7 @@ class TimetableEntry(TimeStampedModel):
         related_name="timetable_entries",
         null=True,
         blank=True,
-        help_text="Term this timetable belongs to — FR-TT-002",
+        help_text="Term this timetable belongs to  FR-TT-002",
     )
     class_name = models.CharField(max_length=64, db_index=True)
     day_of_week = models.CharField(max_length=10, choices=WeekDay.choices)
@@ -388,8 +388,8 @@ class Term(TimeStampedModel):
         help_text="Working days after quiz period for teachers to enter grades (excludes weekends).",
     )
     # Deprecated: kept temporarily for backward compat; use endterm fields above.
-    exam_start_date = models.DateField(null=True, blank=True, help_text="DEPRECATED — use endterm_exam_start_date.")
-    exam_end_date = models.DateField(null=True, blank=True, help_text="DEPRECATED — use endterm_exam_end_date.")
+    exam_start_date = models.DateField(null=True, blank=True, help_text="DEPRECATED  use endterm_exam_start_date.")
+    exam_end_date = models.DateField(null=True, blank=True, help_text="DEPRECATED  use endterm_exam_end_date.")
 
     class Meta:
         unique_together = ("academic_year", "name")
@@ -512,7 +512,7 @@ class Term(TimeStampedModel):
         from django.utils import timezone
         today = timezone.now().date()
 
-        # 1 — In-progress term
+        # 1  In-progress term
         term = cls.objects.filter(
             start_date__lte=today,
             end_date__gte=today,
@@ -521,7 +521,7 @@ class Term(TimeStampedModel):
         if term is not None:
             return term
 
-        # 2 — Most recently ended term (bridges gaps between terms)
+        # 2  Most recently ended term (bridges gaps between terms)
         term = cls.objects.filter(
             end_date__lte=today,
             is_locked=False,
@@ -630,7 +630,7 @@ class LessonPlanComment(TimeStampedModel):
 
 
 # --------------------------------------------------------------------------- #
-# Academic Assessments — FRD Section 9 (FR-ACAD-001…013)                       #
+# Academic Assessments  FRD Section 9 (FR-ACAD-001…013)                       #
 # --------------------------------------------------------------------------- #
 
 class ExamTypeConfiguration(TimeStampedModel):
@@ -795,7 +795,7 @@ class ExamScore(TimeStampedModel):
     correction_reason = models.TextField(blank=True)
     previous_score = models.DecimalField(
         max_digits=5, decimal_places=2, null=True, blank=True,
-        help_text="Original score before correction — retained for audit trail (FR-ACAD-008).",
+        help_text="Original score before correction  retained for audit trail (FR-ACAD-008).",
     )
 
     class Meta:
@@ -903,7 +903,7 @@ class ReportCardStatus(models.TextChoices):
 class ReportCard(TimeStampedModel):
     """
     Per-student report card for a term.
-    Published only after HOS sign-off — FR-ACAD-016/017.
+    Published only after HOS sign-off  FR-ACAD-016/017.
     """
     student = models.ForeignKey("students.Student", on_delete=models.PROTECT, related_name="report_cards")
     term = models.ForeignKey(Term, on_delete=models.PROTECT, related_name="report_cards")
@@ -1059,7 +1059,7 @@ class ECDDomainConfig(TimeStampedModel):
         unique_together = ("class_type", "domain_name")
 
     def __str__(self) -> str:
-        return f"{self.get_class_type_display()} — {self.domain_name}"
+        return f"{self.get_class_type_display()}  {self.domain_name}"
 
 
 class ECDEvaluation(TimeStampedModel):
@@ -1163,7 +1163,7 @@ class ABCGeneralAssignment(TimeStampedModel):
 
 
 class ABCInternalExam(TimeStampedModel):
-    """ABC Class Term 3 internal exam — FR-ACAD-013.
+    """ABC Class Term 3 internal exam  FR-ACAD-013.
     
     School-run internal exam for ABC Class students who sit the Term 3 exam.
     Uses the same 4-level ECD grading scheme (E/G/S/N).
@@ -1235,7 +1235,7 @@ class ProgressionConfig(TimeStampedModel):
 class ProgressionCase(TimeStampedModel):
     """One student's progression record for a given configuration cycle.
 
-    This is the core review object — HOD annotates, HOS decides, then the
+    This is the core review object  HOD annotates, HOS decides, then the
     promotion engine bulk-executes only finalized cases.
     """
     student = models.ForeignKey(
@@ -1298,12 +1298,12 @@ class ProgressionCase(TimeStampedModel):
         ]
 
     def __str__(self) -> str:
-        return f"{self.student} — {self.get_status_display()}"
+        return f"{self.student}  {self.get_status_display()}"
 
     def clean(self):
         """Enforce status transition rules at the model layer."""
         if self.pk is None:
-            # New case — only 'calculated' is permitted as entry point
+            # New case  only 'calculated' is permitted as entry point
             if self.status != ProgressionStatus.CALCULATED:
                 raise ValidationError(
                     f"New ProgressionCase may only be created with status 'calculated', "

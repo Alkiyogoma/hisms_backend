@@ -264,7 +264,7 @@ setup_django() {
 setup_nginx() {
     step "Configuring Nginx..."
 
-    # Copy nginx config — isolated site name/config so a co-hosted site
+    # Copy nginx config  isolated site name/config so a co-hosted site
     # (e.g. connect.hodari.ac.tz) is never overwritten. Do NOT remove other sites.
     cp "${BACKEND_DIR}/deployment/nguzo/nginx_nguzo.conf" /etc/nginx/sites-available/nguzo
 
@@ -286,7 +286,7 @@ setup_nginx() {
 setup_services() {
     step "Configuring systemd services..."
 
-    # Copy service files — isolated unit names (hodari-nguzo*) so connect's
+    # Copy service files  isolated unit names (hodari-nguzo*) so connect's
     # hodari* units are never overwritten.
     cp "${BACKEND_DIR}/deployment/nguzo/hodari-nguzo.service" /etc/systemd/system/
     cp "${BACKEND_DIR}/deployment/nguzo/hodari-nguzo-celery.service" /etc/systemd/system/

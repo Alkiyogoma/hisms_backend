@@ -1,5 +1,5 @@
 """
-ECD Break Time Configuration — FR-TT-007.
+ECD Break Time Configuration  FR-TT-007.
 Model-backed CRUD views for managing ECD class break/nap schedules.
 """
 from __future__ import annotations

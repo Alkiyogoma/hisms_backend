@@ -25,7 +25,7 @@ urlpatterns = [
     path("invoices/<int:pk>/email/", SendInvoiceEmailView.as_view(), name="send_invoice_email"),
     path("fee-structures/copy/", views.CopyFeeStructureView.as_view(), name="fee_structure_copy"),
 
-    # Expenses (Phase 2) — A3 Deep
+    # Expenses (Phase 2)  A3 Deep
     path("expenses/", views.ExpenseListView.as_view(), name="expense_list"),
     path("expenses/create/", views.ExpenseCreateView.as_view(), name="expense_create"),
     path("expenses/<int:pk>/", views.ExpenseDetailView.as_view(), name="expense_detail"),
@@ -38,10 +38,10 @@ urlpatterns = [
     path("budgets/<int:pk>/edit/", views.BudgetCreateView.as_view(), name="budget_edit"),
     path("budgets/<int:pk>/", views.BudgetDetailView.as_view(), name="budget_detail"),
 
-    # A7 — Budget vs Actual report
+    # A7  Budget vs Actual report
     path("reports/budget-vs-actual/", views.BudgetVsActualReportView.as_view(), name="budget_vs_actual"),
 
-    # A7 — Batch expense approval
+    # A7  Batch expense approval
     path("expenses/batch-approval/", views.ExpenseBatchApprovalView.as_view(), name="expense_batch_approval"),
 
     # Recurring expenses
@@ -56,28 +56,28 @@ urlpatterns = [
     # Financial Reports (Phase 3)
     path("reports/", views.FinancialReportsView.as_view(), name="financial_reports"),
 
-    # A2 — Batch payment recording
+    # A2  Batch payment recording
     path("payments/batch/", views.BatchPaymentView.as_view(), name="batch_payment"),
 
-    # A2 — Payment receipts list
+    # A2  Payment receipts list
     path("payments/", views.PaymentReceiptListView.as_view(), name="payment_list"),
 
-    # A2 — Bank statement upload / reconciliation
+    # A2  Bank statement upload / reconciliation
     path("bank-statement/", views.BankStatementUploadView.as_view(), name="bank_statement_upload"),
 
-    # A4 — Bulk invoice print
+    # A4  Bulk invoice print
     path("invoices/bulk-print/", views.BulkInvoicePrintView.as_view(), name="bulk_invoice_print"),
 
-    # A4 — Invoice correction
+    # A4  Invoice correction
     path("invoices/<int:pk>/correct/", views.InvoiceCorrectionView.as_view(), name="invoice_correction"),
 
-    # A2.3 — Manual/Misc Invoice creation
+    # A2.3  Manual/Misc Invoice creation
     path("invoices/manual/", views.ManualInvoiceCreateView.as_view(), name="manual_invoice_create"),
 
-    # A5.3 — CSV Export for reports
+    # A5.3  CSV Export for reports
     path("reports/export/csv/", views.ReportCSVExportView.as_view(), name="report_csv_export"),
 
-    # A5.1 — Student Account Statement
+    # A5.1  Student Account Statement
     path("statements/<int:student_id>/", views.StudentAccountStatementView.as_view(), name="student_statement"),
 
     # Fee Structure Publish/Lock
@@ -85,30 +85,30 @@ urlpatterns = [
     path("fee-structures/<int:pk>/lock/", views.FeeStructureLockView.as_view(), name="fee_structure_lock"),
     path("fee-structures/<int:pk>/unlock/", views.FeeStructureUnlockView.as_view(), name="fee_structure_unlock"),
 
-    # A4 — Overdue Accounts
+    # A4  Overdue Accounts
     path("overdue/", views.OverdueAccountsListView.as_view(), name="overdue_accounts"),
     path("overdue/send-reminder/", views.SendBulkReminderView.as_view(), name="send_bulk_reminder"),
 
-    # A4.3 — Reminder Configuration
+    # A4.3  Reminder Configuration
     path("reminder-configuration/", views.ReminderConfigurationView.as_view(), name="reminder_configuration"),
 
-    # A2.2 — Assessment Fee Invoice (from admissions pipeline)
+    # A2.2  Assessment Fee Invoice (from admissions pipeline)
     path("assessment/<int:applicant_id>/", views.AssessmentFeeInvoiceView.as_view(), name="assessment_fee_invoice"),
 
-    # A6 — Finance Period Management
+    # A6  Finance Period Management
     path("periods/", views.FinancePeriodListView.as_view(), name="period_list"),
     path("periods/create/", views.FinancePeriodCreateView.as_view(), name="period_create"),
     path("periods/<int:pk>/edit/", views.FinancePeriodCreateView.as_view(), name="period_edit"),
     path("periods/<int:pk>/", views.FinancePeriodDetailView.as_view(), name="period_detail"),
     path("periods/<int:pk>/reconcile/", views.FinancePeriodReconcileView.as_view(), name="period_reconcile"),
 
-    # A6 — Opening Balances
+    # A6  Opening Balances
     path("periods/<int:pk>/opening-balances/", views.OpeningBalanceSetupView.as_view(), name="opening_balance"),
 
-    # A6 — Finance Configuration
+    # A6  Finance Configuration
     path("config/", views.FinanceConfigView.as_view(), name="finance_config"),
 
-    # A5 — Concession management
+    # A5  Concession management
     path("concessions/", views.ConcessionListView.as_view(), name="concession_list"),
     path("concessions/create/", views.ConcessionCreateView.as_view(), name="concession_create"),
     path("concessions/<int:pk>/approve/", views.ConcessionApproveView.as_view(), name="concession_approve"),

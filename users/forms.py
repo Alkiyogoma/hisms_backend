@@ -655,7 +655,7 @@ class UserUpdateForm(StaffAssignmentFieldsMixin, forms.ModelForm):
             if pic.size > 5 * 1024 * 1024:
                 raise forms.ValidationError("Image must be under 5 MB.")
 
-            # Duplicate photo detection — skip the current user
+            # Duplicate photo detection  skip the current user
             pic.seek(0)
             new_hash = _compute_file_hash(pic)
             pic.seek(0)
@@ -692,7 +692,7 @@ class UserUpdateForm(StaffAssignmentFieldsMixin, forms.ModelForm):
             self._load_staff_assignment_initial(self.instance)
         # Staff details are optional on edit too (mirrors UserCreateForm):
         # national_id_number has no rendered input, and users created before
-        # onboarding may have empty staff fields — a required constraint here
+        # onboarding may have empty staff fields  a required constraint here
         # would block unrelated edits (role change, deactivation) from saving.
         for fname in ("departments", "job_title", "employee_id", "contact_phone", "national_id_number"):
             if fname in self.fields:

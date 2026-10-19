@@ -178,7 +178,7 @@ urlpatterns = [
     path("progression/config/<int:pk>/delete/", ProgressionConfigDeleteView.as_view(), name="progression_config_delete"),
     path("progression/config/<int:config_id>/calculate/", ProgressionCaseCalculateView.as_view(), name="progression_config_calculate"),
 
-    # Phase Three — HOD Review & HOS Decision
+    # Phase Three  HOD Review & HOS Decision
     path("progression/hod-review/", ProgressionHODReviewListView.as_view(), name="progression_hod_review"),
     path("progression/hod-review/bulk-approve/", ProgressionHODBulkApproveView.as_view(), name="progression_hod_bulk_approve"),
     path("progression/hod-review/<int:case_id>/action/", ProgressionHODReviewActionView.as_view(), name="progression_hod_review_action"),
@@ -186,13 +186,13 @@ urlpatterns = [
     path("progression/hos-decision/<int:case_id>/action/", ProgressionHOSDecisionActionView.as_view(), name="progression_hos_decision_action"),
     path("progression/hos-decision/bulk-decide/", ProgressionHOSBulkDecideView.as_view(), name="progression_hos_bulk_decide"),
 
-    # Item 2 — Teacher read-only view
+    # Item 2  Teacher read-only view
     path("progression/teacher/", ProgressionTeacherView.as_view(), name="progression_teacher_view"),
 
-    # Item 3 — Parent finalized-outcome view
+    # Item 3  Parent finalized-outcome view
     path("progression/parent/", ProgressionParentView.as_view(), name="progression_parent_view"),
 
-    # Phase Four — Bulk Promotion Execution
+    # Phase Four  Bulk Promotion Execution
     path("progression/bulk-promotion/", ProgressionBulkPromotionView.as_view(), name="progression_bulk_promotion"),
     path("progression/bulk-promotion/<int:config_id>/execute/", ProgressionExecutePromotionView.as_view(), name="progression_execute_promotion"),
     path("progression/letter/", PrintProgressionOutcomeView.as_view(), name="progression_letter"),

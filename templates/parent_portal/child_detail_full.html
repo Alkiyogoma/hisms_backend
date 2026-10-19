@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ student.first_name }} {{ student.last_name }} — Parent Portal{% endblock %}
+{% block title %}{{ student.first_name }} {{ student.last_name }}  Parent Portal{% endblock %}
 {% block content %}
 
 {% if error %}
@@ -102,7 +102,7 @@
     <!-- Academic Scores -->
     {% if grouped_scores %}
     <div class="card" style="padding:24px">
-      <h3 style="margin:0 0 16px;font-size:16px;font-weight:700">Academic Scores{% if active_term %} — {{ active_term.name }}{% endif %}</h3>
+      <h3 style="margin:0 0 16px;font-size:16px;font-weight:700">Academic Scores{% if active_term %}  {{ active_term.name }}{% endif %}</h3>
       <table class="h-table">
         <thead>
           <tr>

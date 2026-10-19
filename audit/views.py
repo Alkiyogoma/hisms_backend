@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 class CspReportView(View):
     """
-    CSP violation report collector — FRD NFR-SEC-001.
+    CSP violation report collector  FRD NFR-SEC-001.
 
     Receives POST reports from browsers when Content-Security-Policy is
     violated. Logs them for security monitoring without blocking the user.
@@ -66,7 +66,7 @@ class CspReportView(View):
         except Exception as exc:
             logger.error("CSP report processing error: %s", exc)
 
-        # Always return 204 No Content — browsers don't expect a response
+        # Always return 204 No Content  browsers don't expect a response
         return HttpResponse(status=204)
 
 
@@ -87,7 +87,7 @@ class CspReportsListView(RoleRequiredMixin, TemplateView):
 
 
 class AuditLogsListView(RoleRequiredMixin, TemplateView):
-    """Full audit log view with filtering — FRD NFR-PDPA-006.
+    """Full audit log view with filtering  FRD NFR-PDPA-006.
     
     Supports:
     - Date range filtering (date_from, date_to)
@@ -190,7 +190,7 @@ class AuditLogsListView(RoleRequiredMixin, TemplateView):
         ctx["filter_model_name"] = self.request.GET.get("model_name", "")
         ctx["audit_tab"] = "logs"
 
-        # Dropdown options — scoped to role
+        # Dropdown options  scoped to role
         role_key = user.role.lower() if user.role else ""
         scoped_models = self.ROLE_MODEL_SCOPES.get(role_key)
         is_unrestricted = role_key in ("super_admin", "head_of_school")
@@ -217,7 +217,7 @@ class AuditLogsListView(RoleRequiredMixin, TemplateView):
         return ctx
 
     def _export_csv(self, logs, user):
-        """Export filtered audit logs as CSV — FR-AUD-005."""
+        """Export filtered audit logs as CSV  FR-AUD-005."""
         log_event(
             actor=user,
             action_type="AUDIT_EXPORT",
@@ -242,7 +242,7 @@ class AuditLogsListView(RoleRequiredMixin, TemplateView):
         return response
 
     def _export_pdf(self, logs, user):
-        """Export filtered audit logs as PDF — FR-AUD-005."""
+        """Export filtered audit logs as PDF  FR-AUD-005."""
         log_event(
             actor=user,
             action_type="AUDIT_EXPORT",
@@ -388,7 +388,7 @@ class PersonalDataExportView(RoleRequiredMixin, TemplateView):
             data = [
                 {
                     "id": g.id,
-                    "label": f"{g.full_name} — {g.phone}",
+                    "label": f"{g.full_name}  {g.phone}",
                     "detail": g.email or "",
                     "type": "guardian",
                 }
@@ -400,7 +400,7 @@ class PersonalDataExportView(RoleRequiredMixin, TemplateView):
                 {
                     "id": s.id,
                     "label": f"{s.first_name} {s.last_name} ({s.admission_no})",
-                    "detail": f"{s.class_name} — {s.status}",
+                    "detail": f"{s.class_name}  {s.status}",
                     "type": "student",
                 }
                 for s in results

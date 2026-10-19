@@ -38,7 +38,7 @@ elif settings.DEBUG:
     WEBHOOK_API_TOKEN = "hodari-webhook-token-2026"
 else:
     WEBHOOK_API_TOKEN = None
-    logger.warning("WEBHOOK_API_TOKEN not set — webhook endpoints will reject all requests")
+    logger.warning("WEBHOOK_API_TOKEN not set  webhook endpoints will reject all requests")
 
 
 def _verify_webhook_token(request) -> bool:
@@ -219,7 +219,7 @@ def webhook_attendance_push(request):
                     entry_data["status"] = AttendanceService._derive_checkin_status(ts, student=student)
                     entry_data["check_in_time"] = ts.time()
                 else:
-                    # Checkout without a prior checkin record — set only check_out_time.
+                    # Checkout without a prior checkin record  set only check_out_time.
                     # The check_in_time will be filled by the DB poll fallback sync.
                     entry_data["status"] = AttendanceStatus.PRESENT
                     entry_data["check_out_time"] = ts.time()

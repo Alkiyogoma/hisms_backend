@@ -55,7 +55,7 @@
     <a href="{% url 'ptc:student_picker' %}" style="padding:8px 16px;border-radius:7px;font-size:13px;font-weight:600;background:#fff;color:var(--hodari-blue);border:1.5px solid var(--hodari-blue);text-decoration:none">Back</a>
   </div>
 
-  <!-- 1. Header — Student Information -->
+  <!-- 1. Header  Student Information -->
   <div style="background:#fff;border:1px solid var(--border);border-radius:12px 12px 0 0;padding:24px 28px">
     {% include "includes/hodari_print_header.html" %}
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
@@ -201,7 +201,7 @@
       {% endif %}
     </div>
 
-    <!-- Progress Trend Override (FR-PTC-029) — placed adjacent to trend section -->
+    <!-- Progress Trend Override (FR-PTC-029)  placed adjacent to trend section -->
     {% if can_edit_attributes %}
     <div class="no-print" style="margin-top:10px;padding:10px 16px;background:#F7F9FC;border-radius:8px;border:1px solid var(--border)">
       <form method="post" action="{% url 'ptc:ptc_screen' student_pk=student.pk %}" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">

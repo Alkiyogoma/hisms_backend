@@ -160,7 +160,7 @@ class StudentListView(RoleRequiredMixin, ListView):
         ctx = super().get_context_data(**kwargs)
         qs = self.get_queryset()
         
-        # Summary Statistics — single aggregated query instead of multiple
+        # Summary Statistics  single aggregated query instead of multiple
         from django.db.models import Count
         stats = qs.aggregate(
             total=Count('id'),
@@ -247,7 +247,7 @@ class StudentDetailView(RoleRequiredMixin, DetailView):
             is_archived=False
         ).exclude(id=student.id).distinct()
         
-        # Welfare notes — same visibility rules as the welfare module:
+        # Welfare notes  same visibility rules as the welfare module:
         # concerns/health only for class teacher, HOD and leadership;
         # safeguarding never on the profile.
         from welfare.models import WelfareObservation, WelfareNoteType
@@ -411,7 +411,7 @@ class StudentDetailView(RoleRequiredMixin, DetailView):
                 academic_summary['trend'] = '--'
 
         # Approved marks only, for the selected term (default: the current term,
-        # else the latest term with marks) — the same figures as the
+        # else the latest term with marks)  the same figures as the
         # Performance Report. ECD is rating-based and keeps its own summary.
         from academics import performance
         from attendance import analytics
@@ -435,7 +435,7 @@ class StudentDetailView(RoleRequiredMixin, DetailView):
         perf_has_att = bool(attendance["row"] and attendance["row"]["marked"])
         perf_has_acad = bool(record and record["average"] is not None) or bool(is_ecd and academic_summary.get("eval_count"))
 
-        # Financial information — visible to roles with finance view permission
+        # Financial information  visible to roles with finance view permission
         financial_info = {}
         if self.request.user.has_perm("finance.view_invoice"):
             from finance.models import Invoice, Payment
@@ -496,7 +496,7 @@ class StudentDetailView(RoleRequiredMixin, DetailView):
             }
             financial_info['has_data'] = bool(total_billed or admission_billed or invoices_list or last_pay)
         
-        # Evaluate stats BEFORE slicing the queryset — single aggregated query
+        # Evaluate stats BEFORE slicing the queryset  single aggregated query
         welfare_stats = welfare_incidents.aggregate(
             total=Count('id'),
             positive=Count('id', filter=Q(note_type=WelfareNoteType.POSITIVE)),
@@ -535,7 +535,7 @@ class StudentDetailView(RoleRequiredMixin, DetailView):
             department=Department.ECD
         ).values_list("name", flat=True))
 
-        # Admissions documents — visible to users with admissions permission
+        # Admissions documents  visible to users with admissions permission
         admission_docs = []
         if self.request.user.has_perm("admissions.view_applicant"):
             from admissions.models import Applicant
@@ -1217,7 +1217,7 @@ class GuardianCreateView(RoleRequiredMixin, TemplateView):
             try:
                 student = Student.objects.get(pk=student_id)
             except (Student.DoesNotExist, ValueError):
-                messages.warning(request, "Selected student not found — parent created without link.")
+                messages.warning(request, "Selected student not found  parent created without link.")
 
 
         try:
@@ -1275,7 +1275,7 @@ class GuardianCreateView(RoleRequiredMixin, TemplateView):
         if portal_access:
             messages.success(
                 request,
-                f"Parent {guardian.full_name} created — portal account created. Credentials sent via notification."
+                f"Parent {guardian.full_name} created  portal account created. Credentials sent via notification."
             )
         else:
             messages.success(request, f"Parent {guardian.full_name} created.")
@@ -1378,7 +1378,7 @@ class StudentDataExportView(RoleRequiredMixin, View):
     def get(self, request, pk):
         student = get_object_or_404(Student, pk=pk)
 
-        # NFR-PDPA-003: Enforce 30-minute SLA — log start and warn if exceeded
+        # NFR-PDPA-003: Enforce 30-minute SLA  log start and warn if exceeded
         started_at = time.time()
 
         guardians = list(
@@ -1479,7 +1479,7 @@ class StudentDataExportView(RoleRequiredMixin, View):
             "exported_by": request.user.username,
         }
 
-        # NFR-PDPA-003: SLA enforcement — check if export exceeded 30 minutes
+        # NFR-PDPA-003: SLA enforcement  check if export exceeded 30 minutes
         duration_seconds = time.time() - started_at
         sla_breached = duration_seconds > self.DSAR_SLA_TIMEOUT_SECONDS
         if sla_breached:
@@ -1559,7 +1559,7 @@ class StudentGuardianLinkView(RoleRequiredMixin, TemplateView):
             else:
                 messages.success(
                     request,
-                    f"{guardian.full_name} was already linked — relationship and primary contact updated.",
+                    f"{guardian.full_name} was already linked  relationship and primary contact updated.",
                 )
 
             # FR-STU-005: Notify Finance Officer if sibling relationship confirmed
@@ -1622,7 +1622,7 @@ class StudentGuardianLinkView(RoleRequiredMixin, TemplateView):
         if portal_access:
             messages.success(
                 request,
-                f"Created and linked new parent: {guardian.full_name} — portal account created. Credentials sent via notification."
+                f"Created and linked new parent: {guardian.full_name}  portal account created. Credentials sent via notification."
             )
         else:
             messages.success(request, f"Created and linked new parent: {guardian.full_name}")
@@ -1806,7 +1806,7 @@ class GuardianEditView(RoleRequiredMixin, TemplateView):
         full_name = values["full_name"]
         phone = values["phone"]
 
-        # FR-PAR-001: Sibling scope — users without school-wide student access
+        # FR-PAR-001: Sibling scope  users without school-wide student access
         # can only edit guardians linked to students they have access to
         user = self.request.user
         from users.role_models import RoleConfig
@@ -2172,7 +2172,7 @@ class PrintClassIDView(RoleRequiredMixin, TemplateView):
 
 
 class PrintClassIDBulkView(RoleRequiredMixin, TemplateView):
-    """Print pickup cards for all students in a class — A4 portrait, 10 per page (5+5)."""
+    """Print pickup cards for all students in a class  A4 portrait, 10 per page (5+5)."""
     template_name = "students/id_card_print_bulk.html"
     required_permission = "students.view_student"
 

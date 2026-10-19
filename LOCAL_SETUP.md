@@ -14,10 +14,10 @@ Step-by-step guide to run the school management system on your own computer
 |---|---|---|---|
 | Python | 3.12 | Everything | `brew install python@3.12` |
 | Git | any | Getting the code | `brew install git` |
-| PostgreSQL | 14+ | *Optional* — same DB engine as live | `brew install postgresql@16` |
-| Redis | 6+ | *Optional* — Celery tasks, live attendance updates | `brew install redis` |
-| Pango / Cairo | — | PDF generation (report cards, ID cards) | `brew install pango` |
-| LibreOffice | any | *Optional* — previews of Word / PowerPoint / Excel lesson plan files | `brew install --cask libreoffice` |
+| PostgreSQL | 14+ | *Optional*  same DB engine as live | `brew install postgresql@16` |
+| Redis | 6+ | *Optional*  Celery tasks, live attendance updates | `brew install redis` |
+| Pango / Cairo |  | PDF generation (report cards, ID cards) | `brew install pango` |
+| LibreOffice | any | *Optional*  previews of Word / PowerPoint / Excel lesson plan files | `brew install --cask libreoffice` |
 
 On Ubuntu/Debian use `apt` instead:
 
@@ -53,7 +53,7 @@ python3.12 -m venv venv
 source venv/bin/activate
 ```
 
-Confirm the venv is active — this must print a path inside this project's
+Confirm the venv is active  this must print a path inside this project's
 `venv/` folder and Python 3.12:
 
 ```bash
@@ -85,7 +85,7 @@ python -c "from django.core.management.utils import get_random_secret_key; print
 
 Then edit `.env` using **one** of the options below.
 
-### Option A — SQLite (quickest, no database server)
+### Option A  SQLite (quickest, no database server)
 
 ```ini
 DJANGO_SECRET_KEY=<paste generated key>
@@ -100,7 +100,7 @@ then uses an in-memory cache).
 
 The database file is created at `db.sqlite3` in the project folder.
 
-### Option B — PostgreSQL (same as live)
+### Option B  PostgreSQL (same as live)
 
 Start PostgreSQL and create a database and user:
 
@@ -143,7 +143,7 @@ POSTGRES_SSLMODE=disable
 | `WEBHOOK_API_TOKEN`, `ATTENDANCE_WEBHOOK_SECRET` | any value | Attendance hardware/Laravel webhooks reject all requests when empty |
 | `REDIS_URL` | only if Redis is running | Enables the Redis cache |
 
-**Never copy the live server's `.env` to your computer's project** — it
+**Never copy the live server's `.env` to your computer's project**  it
 points at production and contains production secrets.
 
 ---
@@ -165,13 +165,13 @@ python manage.py makemigrations --check --dry-run
 
 ## 6. Create roles and users
 
-Create the roles and permissions (required — menus and pages depend on them):
+Create the roles and permissions (required  menus and pages depend on them):
 
 ```bash
 python manage.py seed_roles
 ```
 
-Then **either** create test users for every role (local/demo only — they use
+Then **either** create test users for every role (local/demo only  they use
 known passwords):
 
 ```bash
@@ -213,7 +213,7 @@ background jobs, live updates and testing with real data.
 
 ---
 
-## 8. Background tasks (optional — needs Redis)
+## 8. Background tasks (optional  needs Redis)
 
 Attendance notifications, reminders, scheduled reports and live dashboard
 updates run through Celery. Start Redis:
@@ -253,7 +253,7 @@ daphne -b 127.0.0.1 -p 8000 config.asgi:application
 
 Useful before deploying migrations. Requires Option B (PostgreSQL).
 
-1. Take a backup on the server and copy it to your computer — see the backup
+1. Take a backup on the server and copy it to your computer  see the backup
    section of `deployment/LIVE_UPDATE_RUNBOOK.md`. Keep backups **outside** the
    project folder (e.g. `~/hodari/backups/`) so they're never committed; they
    contain real student and parent data.
@@ -326,7 +326,7 @@ python -m pip install pytest hypothesis
 | `CSRF verification failed` on login | Add your URL (e.g. `http://127.0.0.1:8000`) to `CSRF_TRUSTED_ORIGINS` in `.env` |
 | `DisallowedHost` error | Add the host to `DJANGO_ALLOWED_HOSTS` |
 | Pages have no styling with `DJANGO_DEBUG=0` | Run `collectstatic`, or use `DJANGO_DEBUG=1` locally |
-| `Error 61 connecting to localhost:6379` | Redis isn't running — start it, or remove the Redis lines from `.env` |
+| `Error 61 connecting to localhost:6379` | Redis isn't running  start it, or remove the Redis lines from `.env` |
 | Data seems to vanish / wrong DB used | `POSTGRES_PASSWORD` empty → app fell back to SQLite. Set the password or set `DJANGO_USE_SQLITE=1` explicitly |
 | Menus empty or "403 Forbidden" after login | Run `python manage.py seed_roles`, and make sure your user has a role (superusers created with `createsuperuser` may need a role set in `/admin/`) |
 | `relation … does not exist` | Run `python manage.py migrate` |

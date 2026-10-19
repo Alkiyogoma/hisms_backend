@@ -199,7 +199,7 @@ def can_see_module(role: str | None, module: str, user=None) -> bool:
 
     If a user object is provided, checks whether the user holds ANY of the
     permissions listed in MODULE_PERMISSIONS for the module.  This makes
-    sidebar visibility fully dynamic — admin configures permissions via the
+    sidebar visibility fully dynamic  admin configures permissions via the
     Role Management UI and the nav updates automatically.
 
     Falls back to the legacy FRD_ROLE_MODULE_VISIBILITY mapping when no user
@@ -207,7 +207,7 @@ def can_see_module(role: str | None, module: str, user=None) -> bool:
     """
     if not role:
         return False
-    # Custom roles: always visible — permission-based check at view level gates access
+    # Custom roles: always visible  permission-based check at view level gates access
     if role.startswith("custom_"):
         return True
     # Permission-driven path (preferred)

@@ -68,7 +68,7 @@ class _AttendanceTestBase(TestCase):
 
 
 # ===================================================================
-# FR-ATT-003 — mark_auto_absent management command
+# FR-ATT-003  mark_auto_absent management command
 # ===================================================================
 
 class MarkAutoAbsentAuditNotificationTest(_AttendanceTestBase):
@@ -170,7 +170,7 @@ class MarkAutoAbsentAuditNotificationTest(_AttendanceTestBase):
 
 
 # ===================================================================
-# FR-ATT-003 — mark_auto_absent management command (basic)
+# FR-ATT-003  mark_auto_absent management command (basic)
 # ===================================================================
 
 class MarkAutoAbsentCommandTest(_AttendanceTestBase):
@@ -188,7 +188,7 @@ class MarkAutoAbsentCommandTest(_AttendanceTestBase):
 
     def test_marks_unconfirmed_as_absent(self):
         """Students with NO entry on the date get auto-marked absent."""
-        # student3 has a PRESENT entry — should NOT be auto-marked
+        # student3 has a PRESENT entry  should NOT be auto-marked
         AttendanceEntry.objects.create(
             student=self.student3, date=self.today,
             status=AttendanceStatus.PRESENT,
@@ -252,7 +252,7 @@ class MarkAutoAbsentCommandTest(_AttendanceTestBase):
 
 
 # ===================================================================
-# FR-ATT-003 — mark_auto_absent Celery task
+# FR-ATT-003  mark_auto_absent Celery task
 # ===================================================================
 
 class MarkAutoAbsentTaskTest(_AttendanceTestBase):
@@ -270,7 +270,7 @@ class MarkAutoAbsentTaskTest(_AttendanceTestBase):
 
 
 # ===================================================================
-# FR-ATT-006 — _unconfirmed_students_qs() helper
+# FR-ATT-006  _unconfirmed_students_qs() helper
 # ===================================================================
 
 class UnconfirmedStudentsQueryTest(_AttendanceTestBase):
@@ -372,7 +372,7 @@ class UnconfirmedStudentsQueryTest(_AttendanceTestBase):
 
 
 # ===================================================================
-# FR-ATT-006 — Teacher dashboard unconfirmed query logic
+# FR-ATT-006  Teacher dashboard unconfirmed query logic
 # ===================================================================
 
 class TeacherDashboardUnconfirmedTest(_AttendanceTestBase):

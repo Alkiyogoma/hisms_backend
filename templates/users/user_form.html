@@ -721,7 +721,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    /*  User type (teaching/non-teaching) — always visible  */
+    /*  User type (teaching/non-teaching)  always visible  */
     const staffCategoryWrap = document.getElementById('staff-category-wrap');
     if (staffCategoryWrap) staffCategoryWrap.style.display = 'block';
 
@@ -834,7 +834,7 @@ document.addEventListener('DOMContentLoaded', function() {
     /*  Re-run visibility now that dept data is available  */
     updateTeachingVisibility();
 
-    /*  Department pills — init state + click handlers  */
+    /*  Department pills  init state + click handlers  */
     (function initPills() {
         var sel = document.getElementById('dept-multi-select');
         if (!sel) return;
@@ -884,7 +884,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     })();
 
-    /*  Class pills — init state + click handlers  */
+    /*  Class pills  init state + click handlers  */
     (function initClassPills() {
         var sel = document.getElementById('class-multi-select');
         if (!sel) return;
@@ -925,7 +925,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     })();
 
-    /*  Term pills — init state + click handlers  */
+    /*  Term pills  init state + click handlers  */
     (function initTermPills() {
         var sel = document.getElementById('term-multi-select');
         if (!sel) return;
@@ -1018,7 +1018,7 @@ document.addEventListener('DOMContentLoaded', function() {
         allPills.forEach(function(pill) {
             var tid = pill.getAttribute('data-term-id');
 
-            /* Skip "repeat" pill — handled separately */
+            /* Skip "repeat" pill  handled separately */
             if (tid === 'repeat') return;
 
             /* Init active state from select */
@@ -1128,7 +1128,7 @@ document.addEventListener('DOMContentLoaded', function() {
         syncTermsToHidden();
     })();
 
-    /*  Conflict checking — debounced AJAX call  */
+    /*  Conflict checking  debounced AJAX call  */
     var conflictCheckTimer = null;
     function scheduleConflictCheck() {
         if (conflictCheckTimer) clearTimeout(conflictCheckTimer);
@@ -1207,7 +1207,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    /*  Subjects grid — builds a table with classes as rows, subjects as columns  */
+    /*  Subjects grid  builds a table with classes as rows, subjects as columns  */
     function buildSubjectsGrid() {
         var classSel = document.getElementById('class-multi-select');
         var wrap = document.getElementById('subjects-grid-wrap');
@@ -1268,7 +1268,7 @@ document.addEventListener('DOMContentLoaded', function() {
         headHtml += '</tr>';
         head.innerHTML = headHtml;
 
-        /* Build body rows — one per selected class */
+        /* Build body rows  one per selected class */
         var bodyHtml = '';
         for (var c = 0; c < selectedClasses.length; c++) {
             var cid = selectedClasses[c];
