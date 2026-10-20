@@ -7,6 +7,7 @@ Custom login view implementing FRD NFR-SEC-005:
 """
 
 from django.conf import settings
+from django.db import transaction
 
 from django.contrib import messages
 
@@ -730,7 +731,7 @@ class UserListView(RoleRequiredMixin, ListView):
 
         dept = self.request.GET.get("department", "")
 
-        status = self.request.GET.get("status", "")
+        status = self.request.GET.get("status", "active")
 
         staff_cat = self.request.GET.get("staff_category", "")
 
@@ -791,11 +792,13 @@ class UserListView(RoleRequiredMixin, ListView):
 
         if status == "active":
 
-            qs = qs.filter(is_active=True)
+            from django.db.models import Q
+            qs = qs.filter(Q(staff_profile__is_active=True) | Q(staff_profile__isnull=True), is_active=True)
 
         elif status == "inactive":
 
-            qs = qs.filter(is_active=False)
+            from django.db.models import Q
+            qs = qs.filter(Q(is_active=False) | Q(staff_profile__is_active=False))
 
         elif status == "expiring":
 
@@ -2348,11 +2351,50 @@ class ForceLogoutView(RoleRequiredMixin, View):
 
 
 
+class ArchiveUserView(RoleRequiredMixin, View):
+    required_permission = "users.change_user"
+
+    def post(self, request, user_id):
+        from django.db import transaction
+        from hr.models import StaffProfile
+        from users.lifecycle import check_staff_scope, invalidate_user_sessions
+        from audit.models import log_event
+
+        reason = request.POST.get("reason", "").strip()
+        if not reason:
+            messages.error(request, "A reason is required to archive a staff member.")
+            return redirect("users:user_list")
+        with transaction.atomic():
+            target = get_object_or_404(User.objects.select_for_update(), pk=user_id)
+            check_staff_scope(request.user, target)
+            if target.pk == request.user.pk:
+                messages.error(request, "You cannot archive your own account.")
+                return redirect("users:user_list")
+            target.is_active = False
+            target.departure_date = timezone.localdate()
+            target.departure_reason = reason
+            target.save(update_fields=["is_active", "departure_date", "departure_reason"])
+            profile = StaffProfile.objects.filter(user=target).first()
+            if profile:
+                profile.is_active = False
+                profile.departure_date = target.departure_date
+                profile.departure_reason = reason
+                profile.save(update_fields=["is_active", "departure_date", "departure_reason", "updated_at"])
+            invalidate_user_sessions(target.pk)
+            log_event(
+                actor=request.user, action_type="STAFF_ARCHIVED", model_name="User", object_id=target.pk,
+                description=f"Staff {target.get_full_name() or target.username} archived. Reason: {reason}", request=request,
+            )
+        messages.success(request, "Staff member archived. Their records are available under Archived staff.")
+        from django.urls import reverse
+        return redirect(reverse("users:user_list") + "?status=inactive")
+
+
 class ReactivateUserView(RoleRequiredMixin, View):
 
     """
 
-    SA-only: reactivate a deactivated user account.
+    Restore a staff account and profile together.
 
     Requires a reason for audit trail (FRD: "Reactivation without logging reason" must be prevented).
 
@@ -2364,11 +2406,16 @@ class ReactivateUserView(RoleRequiredMixin, View):
 
 
 
+    @transaction.atomic
     def post(self, request, user_id):
 
-        target_user = get_object_or_404(User, pk=user_id)
+        target_user = get_object_or_404(User.objects.select_for_update(), pk=user_id)
+        from users.lifecycle import check_staff_scope
+        check_staff_scope(request.user, target_user)
+        from hr.models import StaffProfile
+        profile = StaffProfile.objects.filter(user=target_user).first()
 
-        if target_user.is_active:
+        if target_user.is_active and (profile is None or profile.is_active):
 
             messages.info(request, "This account is already active.")
 
@@ -2393,6 +2440,11 @@ class ReactivateUserView(RoleRequiredMixin, View):
         target_user.departure_reason = ""
 
         target_user.save(update_fields=["is_active", "departure_date", "departure_reason"])
+        if profile:
+            profile.is_active = True
+            profile.departure_date = None
+            profile.departure_reason = ""
+            profile.save(update_fields=["is_active", "departure_date", "departure_reason", "updated_at"])
 
 
 

@@ -234,8 +234,14 @@ class StaffDepartureView(RoleRequiredMixin, View):
     allowed_roles = [UserRole.SUPER_ADMIN]
     required_permission = "hr.change_staffprofile"
 
+    @transaction.atomic
     def post(self, request, pk):
         staff = get_object_or_404(StaffProfile.objects.select_related("user"), pk=pk)
+        from users.lifecycle import check_staff_scope
+        check_staff_scope(request.user, staff.user)
+        if staff.user_id == request.user.pk:
+            messages.error(request, "You cannot archive your own account.")
+            return redirect("hr:staff_detail", pk=pk)
         form = StaffDepartureForm(request.POST)
         if form.is_valid():
             departure_date = form.cleaned_data["departure_date"]

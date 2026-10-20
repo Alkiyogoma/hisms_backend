@@ -1,0 +1,7 @@
+{% if perms.users.change_user and account.pk != user.pk %}
+<form method="post" action="{% if not account.is_active or account.staff_profile and not account.staff_profile.is_active %}{% url 'users:reactivate_user' account.pk %}{% else %}{% url 'users:archive_user' account.pk %}{% endif %}" style="display:inline;margin:0" data-name="{{ account.get_full_name|default:account.username }}" onsubmit="var reason=prompt('Reason for changing the archive status of '+this.dataset.name+':');if(!reason || !reason.trim()){return false;}this.elements.reason.value=reason;">
+  {% csrf_token %}
+  <input type="hidden" name="reason" value="">
+  <button type="submit" class="hf-btn hf-btn-secondary">{% if not account.is_active or account.staff_profile and not account.staff_profile.is_active %}Restore Staff{% else %}Archive Staff{% endif %}</button>
+</form>
+{% endif %}

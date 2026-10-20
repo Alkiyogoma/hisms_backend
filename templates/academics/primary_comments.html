@@ -199,7 +199,7 @@
 
 <div class="class-tabs-container">
     {% for cls in classes %}
-    <a href="?class_name={{ cls }}" class="class-tab {% if selected_class == cls %}active{% endif %}">{{ cls }}</a>
+    <a href="?class_name={{ cls|urlencode }}" class="class-tab {% if selected_class == cls %}active{% endif %}">{{ cls }}</a>
     {% endfor %}
 </div>
 
@@ -264,7 +264,7 @@
             <div style="background:#fff;border:1px solid #E2E8F0;border-radius:16px;padding:24px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center">
                 <div>
                     <h2 style="margin:0;font-size:26px;color:#1E293B">{{ selected_class }}</h2>
-                    <div style="color:#64748B;font-size:14px;margin-top:4px">Primary Department &middot; Narrative Comments &middot; {{ current_term.name }}</div>
+                    <div style="color:#64748B;font-size:14px;margin-top:4px">{{ selected_department_label }} Department &middot; Narrative Comments &middot; {{ current_term.name }}</div>
                 </div>
                 <div style="background:#1E293B;border-radius:12px;padding:12px 24px;text-align:center;color:#fff;min-width:140px">
                     <div style="font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;margin-bottom:2px">Complete</div>

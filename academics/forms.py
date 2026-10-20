@@ -128,9 +128,9 @@ class ExamScoreFilterForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        from academics.models import GradeClass, Subject, get_active_exam_types
+        from academics.models import AssessmentMode, GradeClass, Subject, get_active_exam_types
         class_choices = [("", "Select Class")] + [(c.name, c.name) for c in GradeClass.objects.all().order_by("name")]
-        subject_choices = [("", "Select Subject")] + [(s.name, s.name) for s in Subject.objects.filter(is_active=True).order_by("name")]
+        subject_choices = [("", "Select Subject")] + [(s.name, s.name) for s in Subject.objects.filter(is_active=True, assessment_mode=AssessmentMode.MARKS).order_by("name")]
         exam_type_choices = [("", "Select Exam Type")] + get_active_exam_types()
         
         self.fields["class_name"].choices = class_choices

@@ -352,7 +352,7 @@
       {% endif %}
         {% has_perm user "students.delete_student" as can_delete %}
         {% if can_delete %}
-        <button type="button" class="hf-btn hf-btn-secondary" style="color:#dc2626; border-color:#FECACA" onclick="confirmDeleteModal({title:'Delete Student?',body:'Are you sure you want to permanently delete <strong>{{ student.first_name }} {{ student.last_name }}</strong>?',detail:'All associated records (attendance, grades, reports) will also be deleted. This action cannot be undone.',confirmText:'Delete Student',url:'{% url 'students:delete' student.pk %}'})">
+        <button type="button" class="hf-btn hf-btn-secondary" style="color:#dc2626; border-color:#FECACA" onclick="confirmDeleteModal({title:'Delete Student?',body:'Are you sure you want to permanently delete <strong>{{ student.first_name }} {{ student.last_name }}</strong>?',detail:'Permanent deletion is only allowed when there are no protected records and retention rules allow it. Use Archive to keep history and allow restoration.',confirmText:'Delete Student',url:'{% url 'students:delete' student.pk %}'})">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
             Delete
           </button>

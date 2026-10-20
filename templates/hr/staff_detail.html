@@ -544,6 +544,8 @@
       <div style="font-size:12px; font-weight:800; color:#94A3B8; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:16px">Quick Actions</div>
       <div style="display:flex; flex-direction:column; gap:10px">
         <a href="{% url 'hr:staff_list' %}" class="hf-btn hf-btn-secondary" style="text-align:center; font-size:12px">View All Staff</a>
+        {% include "users/_staff_archive_action.html" with account=staff.user %}
+        <a href="{% url 'users:user_list' %}?status=inactive" class="hf-btn hf-btn-secondary">Archived staff</a>
         {% has_perm user "hr.change_staffprofile" as can_manage_staff %}
         {% if can_manage_staff and staff.is_active %}
         <button onclick="document.getElementById('departureModal').style.display='flex'" class="hf-btn hf-btn-secondary" style="color:#EF4444; font-size:12px; border-color:#FEE2E2">Mark Departure</button>

@@ -1,0 +1,8 @@
+{% load role_tags %}
+{% has_perm user "students.change_parentguardian" as can_archive_guardian %}
+{% if can_archive_guardian %}
+<form method="post" action="{% if guardian.is_archived %}{% url 'students:guardian_restore' guardian.pk %}{% else %}{% url 'students:guardian_archive' guardian.pk %}{% endif %}" style="display:inline" onsubmit="return confirm('{% if guardian.is_archived %}Restore this parent and their portal access?{% else %}Archive this parent? Portal access will be disabled. Student links and history will be kept for restoration.{% endif %}')">
+  {% csrf_token %}
+  <button class="hf-btn hf-btn-secondary" type="submit">{% if guardian.is_archived %}Restore Parent{% else %}Archive Parent{% endif %}</button>
+</form>
+{% endif %}
