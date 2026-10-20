@@ -227,15 +227,21 @@ class StaffCreateView(RoleRequiredMixin, View):
 # 
 
 #
-# B7 — STAFF DEPARTURE / OFFBOARDING
+# B7  STAFF DEPARTURE / OFFBOARDING
 #
 
 class StaffDepartureView(RoleRequiredMixin, View):
     allowed_roles = [UserRole.SUPER_ADMIN]
     required_permission = "hr.change_staffprofile"
 
+    @transaction.atomic
     def post(self, request, pk):
         staff = get_object_or_404(StaffProfile.objects.select_related("user"), pk=pk)
+        from users.lifecycle import check_staff_scope
+        check_staff_scope(request.user, staff.user)
+        if staff.user_id == request.user.pk:
+            messages.error(request, "You cannot archive your own account.")
+            return redirect("hr:staff_detail", pk=pk)
         form = StaffDepartureForm(request.POST)
         if form.is_valid():
             departure_date = form.cleaned_data["departure_date"]
@@ -337,7 +343,7 @@ class StaffDepartureView(RoleRequiredMixin, View):
 
 
 # 
-# B3 — ONBOARDING WORKFLOW
+# B3  ONBOARDING WORKFLOW
 # 
 
 class OnboardingSetupView(RoleRequiredMixin, TemplateView):
@@ -391,7 +397,7 @@ def _try_auto_complete_onboarding(staff, onboarding):
     """Auto-detect if all onboarding steps are done and mark as completed.
 
     Checks the key boolean flags on StaffOnboardingProgress. If every critical
-    flag is True, marks onboarding as complete — no manual confirmation needed.
+    flag is True, marks onboarding as complete  no manual confirmation needed.
     Sends a summary email to the staff member on completion.
     """
     critical_flags = [
@@ -562,7 +568,7 @@ def _get_step_statuses(staff, viewing_step):
 class StaffDocumentDownloadView(RoleRequiredMixin, View):
     allowed_roles = [
         UserRole.SUPER_ADMIN, UserRole.ADMIN_OFFICER, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.TEACHER, UserRole.FINANCE_OFFICER]
-    """Serve staff documents gracefully — shows a user-friendly page if the file is missing."""
+    """Serve staff documents gracefully  shows a user-friendly page if the file is missing."""
     required_permission = "hr.view_staffdocument"
     login_url = "/accounts/login/"
 
@@ -1133,7 +1139,7 @@ class OnboardingTabbedView(RoleRequiredMixin, TemplateView):
 
 
 # 
-# B6 — LEAVE MANAGEMENT
+# B6  LEAVE MANAGEMENT
 # 
 
 class LeaveRequestListView(RoleRequiredMixin, ListView):
@@ -1354,7 +1360,7 @@ class LeaveRequestApproveView(RoleRequiredMixin, View):
 
 
 # 
-# B4 — PAYROLL MODULE
+# B4  PAYROLL MODULE
 # 
 
 class PayrollRunListView(RoleRequiredMixin, ListView):
@@ -1583,7 +1589,7 @@ class PayrollPayslipView(RoleRequiredMixin, DetailView):
 
 
 # 
-# B5 — STATUTORY FILING
+# B5  STATUTORY FILING
 # 
 
 class StatutoryFilingListView(RoleRequiredMixin, ListView):
@@ -1605,7 +1611,7 @@ class StatutoryFilingListView(RoleRequiredMixin, ListView):
         ctx["filing_types"] = StatutoryFiling.FILING_TYPE_CHOICES
         ctx["selected_type"] = self.request.GET.get("type", "")
 
-        # Summary by type — single aggregated query instead of N*2
+        # Summary by type  single aggregated query instead of N*2
         filing_stats = StatutoryFiling.objects.values('filing_type').annotate(
             total=Count('id'),
             pending=Count('id', filter=Q(status=StatutoryFilingStatus.DRAFT)),
@@ -1710,7 +1716,7 @@ class StatutoryFilingSubmitView(RoleRequiredMixin, View):
 
 
 # 
-# B7 — OFFBOARDING DETAIL
+# B7  OFFBOARDING DETAIL
 # 
 
 class OffboardingDetailView(RoleRequiredMixin, DetailView):
@@ -1796,7 +1802,7 @@ class OffboardingDetailView(RoleRequiredMixin, DetailView):
 
 
 # 
-# B8 — DASHBOARD WIDGETS
+# B8  DASHBOARD WIDGETS
 # 
 
 class HRDashboardView(RoleRequiredMixin, TemplateView):
@@ -1811,7 +1817,7 @@ class HRDashboardView(RoleRequiredMixin, TemplateView):
 
         today = date.today()
 
-        # Staff Overview — single aggregated query instead of 4
+        # Staff Overview  single aggregated query instead of 4
         staff_stats = StaffProfile.objects.aggregate(
             total=Count('id'),
             active=Count('id', filter=Q(is_active=True)),
@@ -1823,7 +1829,7 @@ class HRDashboardView(RoleRequiredMixin, TemplateView):
         ctx["teaching_staff"] = staff_stats['teaching']
         ctx["non_teaching_staff"] = staff_stats['non_teaching']
 
-        # Department breakdown — always show all departments
+        # Department breakdown  always show all departments
         dept_counts = StaffProfile.objects.filter(is_active=True).values("department").annotate(count=Count("id"))
         dept_map = {d["department"]: d["count"] for d in dept_counts}
         ctx["dept_breakdown"] = {
@@ -2037,7 +2043,7 @@ class PAYETaxBandDeleteView(RoleRequiredMixin, View):
 
 
 class PayrollLockView(RoleRequiredMixin, View):
-    """Lock a payroll run — makes it read-only after payment is confirmed."""
+    """Lock a payroll run  makes it read-only after payment is confirmed."""
     allowed_roles = [UserRole.HEAD_OF_SCHOOL, UserRole.FINANCE_OFFICER, UserRole.SUPER_ADMIN]
     required_permission = "hr.change_payrollrun"
 
@@ -2063,7 +2069,7 @@ class PayrollLockView(RoleRequiredMixin, View):
 
 
 # ──────────────────────────────────────────────
-# Teacher Assignment — Edit & Delete
+# Teacher Assignment  Edit & Delete
 # ──────────────────────────────────────────────
 
 class TeacherAssignmentEditView(RoleRequiredMixin, View):

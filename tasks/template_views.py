@@ -1,5 +1,5 @@
 """
-Task Module — Template-based HTML views (Django class-based views).
+Task Module  Template-based HTML views (Django class-based views).
 Complements the existing DRF API views with server-rendered pages.
 """
 
@@ -134,7 +134,7 @@ def _user_tasks_qs(user):
 #  Main Dashboard 
 
 class TaskDashboardView(RoleRequiredMixin, TemplateView):
-    """Main tasks dashboard — the 'Tasks & Todo' page."""
+    """Main tasks dashboard  the 'Tasks & Todo' page."""
     template_name = "tasks/dashboard.html"
     allowed_roles = [
         UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD,
@@ -535,7 +535,7 @@ class TaskDetailView(RoleRequiredMixin, View):
 
 class SeedTasksView(RoleRequiredMixin, View):
     """
-    One-click task seeder — scans all modules and creates tasks
+    One-click task seeder  scans all modules and creates tasks
     for existing pending items. Safe to run multiple times (dedup).
     Only accessible to super admin.
     """

@@ -69,7 +69,7 @@ class Command(BaseCommand):
                 action_type="LESSON_PLAN_MARKED_MISSING",
                 model_name="LessonPlan",
                 object_id=plan.pk,
-                description=f"Lesson plan {plan.class_name} — {plan.subject_name} ({plan.week_start_date}) auto-marked MISSING after deadline",
+                description=f"Lesson plan {plan.class_name}  {plan.subject_name} ({plan.week_start_date}) auto-marked MISSING after deadline",
             )
 
         # 2. Create MISSING records for teachers with no plan at all for this week

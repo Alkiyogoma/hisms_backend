@@ -76,7 +76,7 @@ class TeacherAssignmentForm(forms.Form):
 
 
 class TeacherAssignmentEditForm(forms.Form):
-    """Edit an existing TeacherClassAssignment — subjects and class teacher flag only."""
+    """Edit an existing TeacherClassAssignment  subjects and class teacher flag only."""
     subjects_taught = forms.MultipleChoiceField(
         choices=[],
         widget=forms.CheckboxSelectMultiple(),

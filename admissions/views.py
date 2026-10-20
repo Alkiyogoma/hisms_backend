@@ -167,7 +167,7 @@ class AdmissionsPipelineView(AdmissionsCountsMixin, PermissionCacheMixin, Admiss
         from datetime import timedelta
         today = timezone.now().date()
         
-        # All individual statuses as separate columns — BDD S1
+        # All individual statuses as separate columns  BDD S1
         stages = [
             ("inquiry_received", "Inquiry Received", {ApplicantStatus.INQUIRY_RECEIVED}),
             ("meeting_scheduled", "Meeting Scheduled", {ApplicantStatus.MEETING_SCHEDULED}),
@@ -574,7 +574,7 @@ class InquiryCreateView(AdmissionsCountsMixin, PermissionCacheMixin, AdmissionsR
                     )
                     send_email_safe(
                         to_email=admissions_email,
-                        subject=f"New inquiry: {child_name}, Grade {grade} — {ref_number}",
+                        subject=f"New inquiry: {child_name}, Grade {grade}  {ref_number}",
                         body=e01_body,
                     )
                 # Also send to Head of School directly
@@ -588,7 +588,7 @@ class InquiryCreateView(AdmissionsCountsMixin, PermissionCacheMixin, AdmissionsR
                             context=e01_context,
                         ) if db_sent else send_email_safe(
                             to_email=hos.email,
-                            subject=f"New inquiry: {child_name}, Grade {grade} — {ref_number}",
+                            subject=f"New inquiry: {child_name}, Grade {grade}  {ref_number}",
                             body=e01_body,
                         )
             except Exception:
@@ -663,7 +663,7 @@ class InquiryEditView(PermissionCacheMixin, AdmissionsRoleRequiredMixin, UpdateV
         import json
         from admissions.services import _parse_inquiry_notes
         # Preserve structured fields (gender/current_grade/submitted_via) from the
-        # stored JSON — read from the DB before the form overwrites `notes`.
+        # stored JSON  read from the DB before the form overwrites `notes`.
         original = _parse_inquiry_notes(Applicant.objects.get(pk=self.object.pk))
         typed_notes = (form.cleaned_data.get("notes") or "").strip()
         additional_parents = _collect_additional_parents(self.request.POST)
@@ -968,7 +968,7 @@ class WaitlistView(AdmissionsCountsMixin, PermissionCacheMixin, AdmissionsRoleRe
         from django.db.models import Count as DbCount
         waitlist_qs = Applicant.objects.filter(status=ApplicantStatus.WAITLISTED).order_by("created_at")
         ctx["items"] = waitlist_qs[:200]
-        # Per-grade waitlist counts — BDD S3
+        # Per-grade waitlist counts  BDD S3
         grade_counts_raw = (
             waitlist_qs.values("grade_applying_for")
             .annotate(cnt=DbCount("id"))
@@ -1198,7 +1198,7 @@ class ApplicantTransitionView(HtmxRequiredMixin, PermissionCacheMixin, Admission
                     label = "admitted" if to_status == "admitted" else "conditionally admitted"
                     # S05: Offer sent SMS (spec copy)
                     sms_msg = (
-                        f"Hodari: Good news — {applicant.child_full_name} has been offered a place. "
+                        f"Hodari: Good news  {applicant.child_full_name} has been offered a place. "
                         f"Check your email for portal login details. Ref {applicant.reference_number}."
                     )
                     dispatch_notification(
@@ -1208,7 +1208,7 @@ class ApplicantTransitionView(HtmxRequiredMixin, PermissionCacheMixin, Admission
                     )
                     # S05: Dedicated offer-sent SMS (spec copy)
                     offer_sms = (
-                        f"Good news — {applicant.child_full_name} has been offered a place in Grade {applicant.grade_applying_for}. "
+                        f"Good news  {applicant.child_full_name} has been offered a place in Grade {applicant.grade_applying_for}. "
                         f"Please complete the form and pay the fee within 14 days to secure the spot."
                     )
                     dispatch_notification(
@@ -1355,7 +1355,7 @@ class AssessmentScheduleView(HtmxRequiredMixin, PermissionCacheMixin, Admissions
             assessment.submitted_at = None
             assessment.save(update_fields=["result", "teacher_comments", "hod_comments", "submitted_by", "submitted_at", "updated_at"])
             messages.warning(request, "Previous assessment result has been cleared and will need to be resubmitted.")
-        # FR-ADM-011: Logistics auto-resend guard — warn and reset logistics_sent_at if date/time changed
+        # FR-ADM-011: Logistics auto-resend guard  warn and reset logistics_sent_at if date/time changed
         if assessment and assessment.logistics_sent_at:
             new_date = request.POST.get("scheduled_date")
             new_time = request.POST.get("scheduled_time")
@@ -1364,7 +1364,7 @@ class AssessmentScheduleView(HtmxRequiredMixin, PermissionCacheMixin, Admissions
                 # Reset logistics so AO must re-send with updated details
                 assessment.logistics_sent_at = None
                 assessment.save(update_fields=["logistics_sent_at", "updated_at"])
-                messages.warning(request, "Assessment date/time changed after logistics were sent. Logistics have been reset — please re-send updated logistics to the parent.")
+                messages.warning(request, "Assessment date/time changed after logistics were sent. Logistics have been reset  please re-send updated logistics to the parent.")
         form = AssessmentScheduleForm(request.POST, instance=assessment)
         if form.is_valid():
             try:
@@ -2206,7 +2206,7 @@ class ToggleDocumentView(HtmxRequiredMixin, PermissionCacheMixin, AdmissionsRole
                 )
             else:
                 # No email on file: SMS only. (With an email, the templated
-                # message above is the only one — this used to send a second,
+                # message above is the only one  this used to send a second,
                 # un-switchable copy.)
                 dispatch_notification(
                     user=None, title="Document Received",
@@ -3228,8 +3228,8 @@ class AdminGenerateInvoiceView(AdmissionsRoleRequiredMixin, View):
 
 
 class DirectEnrolmentView(AdmissionsCountsMixin, PermissionCacheMixin, AdmissionsRoleRequiredMixin, TemplateView):
-    """Enrol a learner directly — transfer, mid-year entry, staff child or
-    returning learner — skipping the inquiry, assessment and assessment fee.
+    """Enrol a learner directly  transfer, mid-year entry, staff child or
+    returning learner  skipping the inquiry, assessment and assessment fee.
     Needs the Students › "Can add student" permission."""
     template_name = "admissions/direct_enrol.html"
     required_permission = "students.add_student"
@@ -3332,7 +3332,7 @@ class SendParentFormView(AdmissionsCountsMixin, PermissionCacheMixin, Admissions
         try:
             validate_email(values["parent_email"])
         except ValidationError:
-            errors.append("Enter a valid email address — the form link is sent there.")
+            errors.append("Enter a valid email address  the form link is sent there.")
         if not values["parent_phone"]:
             errors.append("Enter the parent's phone number.")
         if values["grade"] and not GradeClass.objects.filter(name=values["grade"]).exists():

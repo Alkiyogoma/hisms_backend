@@ -6,7 +6,7 @@ from academics.models import Department, LessonPlan, LessonPlanStatus, Subject, 
 
 
 class LessonPlanForm(forms.ModelForm):
-    """Term is auto-set from the active academic year configuration — not user-selectable."""
+    """Term is auto-set from the active academic year configuration  not user-selectable."""
 
     class Meta:
         model = LessonPlan
@@ -35,7 +35,7 @@ class LessonPlanForm(forms.ModelForm):
         from users.models import UserRole
         from academics.utils import get_current_term
 
-        # Resolve current term (read-only — not selectable by user)
+        # Resolve current term (read-only  not selectable by user)
         current_term = get_current_term()
         self._current_term = current_term
         if self.instance.pk and self.instance.term_id:
@@ -128,9 +128,9 @@ class ExamScoreFilterForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        from academics.models import GradeClass, Subject, get_active_exam_types
+        from academics.models import AssessmentMode, GradeClass, Subject, get_active_exam_types
         class_choices = [("", "Select Class")] + [(c.name, c.name) for c in GradeClass.objects.all().order_by("name")]
-        subject_choices = [("", "Select Subject")] + [(s.name, s.name) for s in Subject.objects.filter(is_active=True).order_by("name")]
+        subject_choices = [("", "Select Subject")] + [(s.name, s.name) for s in Subject.objects.filter(is_active=True, assessment_mode=AssessmentMode.MARKS).order_by("name")]
         exam_type_choices = [("", "Select Exam Type")] + get_active_exam_types()
         
         self.fields["class_name"].choices = class_choices
@@ -196,7 +196,7 @@ class SubjectForm(forms.ModelForm):
             mismatched = [gc.name for gc in classes if gc.department not in departments]
             if mismatched:
                 raise forms.ValidationError(
-                    f"The selected class(es) — {', '.join(mismatched)} — belong to a different department "
+                    f"The selected class(es)  {', '.join(mismatched)}  belong to a different department "
                     f"than the selected subject departments."
                 )
         return cleaned_data

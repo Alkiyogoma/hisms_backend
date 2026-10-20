@@ -2,7 +2,7 @@
 {% load role_tags %}
 {% load static %}
 
-{% block title %}Fee Structure Setup — {{ brand.school_name }}{% endblock %}
+{% block title %}Fee Structure Setup  {{ brand.school_name }}{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -364,7 +364,7 @@
     pointer-events: none;
   }
 
-  /*  Copy from previous — now inline in term-bar */
+  /*  Copy from previous  now inline in term-bar */
 
   .btn-copy {
     padding: 7px 20px;
@@ -481,7 +481,7 @@
     <select id="term-select" onchange="switchTerm(this.value)">
       {% for term in terms %}
       <option value="{{ term.pk }}" {% if term.pk == selected_term.pk %}selected{% endif %}>
-        {{ term.academic_year.name }} — {{ term.name }}
+        {{ term.academic_year.name }}  {{ term.name }}
         ({{ term.start_date|date:"M j" }} – {{ term.end_date|date:"M j, Y"|default:"TBD" }})
       </option>
       {% endfor %}
@@ -497,7 +497,7 @@
         <select name="from_term" required class="term-select-copy">
           <option value="">Select source term</option>
           {% for st in source_terms %}
-          <option value="{{ st.pk }}">{{ st.academic_year.name }} — {{ st.name }}</option>
+          <option value="{{ st.pk }}">{{ st.academic_year.name }}  {{ st.name }}</option>
           {% endfor %}
         </select>
         {% has_perm user "finance.change_feestructure" as can_edit %}

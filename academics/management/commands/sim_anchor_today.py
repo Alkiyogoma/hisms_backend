@@ -174,7 +174,7 @@ class Command(BaseCommand):
                 password="Hodari@2026",
             )
             created_users[uname] = u
-            # Signal auto-creates StaffProfile for non-parents — update it with correct dept
+            # Signal auto-creates StaffProfile for non-parents  update it with correct dept
             if role != UserRole.PARENT:
                 from hr.models import StaffProfile
                 sp = StaffProfile.objects.get(user=u)
@@ -190,7 +190,7 @@ class Command(BaseCommand):
                 created_profiles[uname] = sp
             self.stdout.write(f"  User: {uname} ({role})")
 
-        # Department is a TextChoices enum, not a model — GradeClass.department is a CharField
+        # Department is a TextChoices enum, not a model  GradeClass.department is a CharField
         self.stdout.write(f"  Departments: Primary, ECD, Lower Secondary")
 
         # Create grade classes
@@ -229,7 +229,7 @@ class Command(BaseCommand):
             )
             self.stdout.write(f"  Class: {cls_name} ({dept_code}) -> {teacher_uname}")
 
-        # Create subjects — name is unique, so use department prefix for shared subjects
+        # Create subjects  name is unique, so use department prefix for shared subjects
         subjects_data = {
             "ECD": ["Literacy", "Numeracy", "Creative Arts", "Physical Development", "Social Studies"],
             "PRIMARY": ["English", "Mathematics", "Science", "Social Studies", "Kiswahili", "Religious Education", "Art", "Music", "Physical Education"],

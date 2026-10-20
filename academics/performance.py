@@ -1,19 +1,19 @@
 """
-Performance Report — role-scoped learner and subject performance.
+Performance Report  role-scoped learner and subject performance.
 
 One report, filterable by academic year, term (or all terms), class, subject
 and assessment type, with two views:
 
-* "Who needs help" — learner/subject results sorted worst-first.
-* "Subject performance across classes" — one subject compared class by class,
+* "Who needs help"  learner/subject results sorted worst-first.
+* "Subject performance across classes"  one subject compared class by class,
   plus every subject ranked within the current class filter.
 
 What a user can see is bounded by their role (see ``resolve_scope``):
 
-* Head of School / Super Admin — the whole school.
-* Head of Department — every class in the section(s) they head.
-* Class teacher — their class, all subjects.
-* Subject teacher — their subject(s), in the classes they teach them.
+* Head of School / Super Admin  the whole school.
+* Head of Department  every class in the section(s) they head.
+* Class teacher  their class, all subjects.
+* Subject teacher  their subject(s), in the classes they teach them.
 
 Only marks that were entered *and approved* count. Assessments that have not
 been marked are left out, never counted as zero.
@@ -166,7 +166,7 @@ BAND_LABELS = {
 
 def _mark_band(mark):
     """critical (E) / support (D) need help; pass (C) and strong (B and
-    above) are on track — split so comparisons above the pass mark still
+    above) are on track  split so comparisons above the pass mark still
     show a difference."""
     if mark < CRITICAL_MARK:
         return "critical"
@@ -282,7 +282,7 @@ GRADE_BANDS = {"A+": "strong", "A": "strong", "B": "strong", "C": "pass", "D": "
 def grade_distribution(rows):
     """How many of ``rows`` fall in each grade, best first. ``rows`` are
     either subject results or learner rows (``learner_summary``), so the
-    caller decides — and labels — what is being counted."""
+    caller decides  and labels  what is being counted."""
     total = len(rows)
     counts = {g: 0 for g in GRADES}
     for r in rows:
@@ -402,7 +402,7 @@ def at_risk_results(scope, term, results=None):
 
 def at_risk_learners(scope, term):
     """Active learners whose average in ``term`` is below the pass mark,
-    lowest first — the By student list's status rule — each with the
+    lowest first  the By student list's status rule  each with the
     subjects they are below the pass mark in."""
     from students.models import Student, StudentStatus
 

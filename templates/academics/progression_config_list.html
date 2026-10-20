@@ -17,7 +17,7 @@
         <div style="flex:1;min-width:180px">
             <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:4px">From Academic Year</label>
             <select name="academic_year_from" required style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px">
-                <option value="">— Select —</option>
+                <option value=""> Select —</option>
                 {% for y in years %}
                 <option value="{{ y.pk }}">{{ y.name }}</option>
                 {% endfor %}
@@ -26,7 +26,7 @@
         <div style="flex:1;min-width:180px">
             <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:4px">To Academic Year</label>
             <select name="academic_year_to" required style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px">
-                <option value="">— Select —</option>
+                <option value=""> Select —</option>
                 {% for y in years %}
                 <option value="{{ y.pk }}">{{ y.name }}</option>
                 {% endfor %}

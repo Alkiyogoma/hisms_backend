@@ -14,7 +14,7 @@ from users.models import User, UserRole
 # SQLite FK-check workaround: When AUDIT_LOG_DB_CONSTRAINT is False (i.e. running
 # on SQLite), Django's TestCase._fixture_teardown calls PRAGMA foreign_key_check
 # which reports false positives because migration 0004 (on_delete=SET_NULL) is a
-# no-op on SQLite — the FK constraint in the table schema is still RESTRICT and
+# no-op on SQLite  the FK constraint in the table schema is still RESTRICT and
 # cannot be altered in place. The check_constraints() call in _fixture_teardown
 # fires before per-test atomics are rolled back, and the FK violation it detects
 # is an artifact of SQLite's inability to reflect the SET_NULL policy. We simply
@@ -228,7 +228,7 @@ class ReportPreviewAccessTests(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Year-End Progression Module — Remediation Tests
+# Year-End Progression Module  Remediation Tests
 # ---------------------------------------------------------------------------
 
 class ProgressionBaseSetup(TestCase):
@@ -334,7 +334,7 @@ class ProgressionBaseSetup(TestCase):
             start_date=date(2026, 1, 15), end_date=date(2026, 4, 11),
         )
 
-        # GradeClasses with department mapping — Item 4
+        # GradeClasses with department mapping  Item 4
         cls.grade_ecd = GradeClass.objects.create(
             name="Pre-School", department=Department.ECD, sort_order=1
         )
@@ -602,7 +602,7 @@ class Item1AtomicTransactionTests(ProgressionBaseSetup):
         run = PromotionRun.objects.filter(academic_year_from=self.year_from).first()
         self.assertIsNotNone(run)
 
-        # — Assertions —
+        #  Assertions —
         # 1. Students 0-13 (positions 1-14) committed EnrollmentHistory
         for i in range(14):
             s = students[i]
@@ -837,7 +837,7 @@ class Item13StatusTransitionTests(ProgressionBaseSetup):
         self.assertEqual(case.status, ProgressionStatus.PENDING_HOD_REVIEW)
 
     def test_finalized_rejects_any_earlier_status(self):
-        """Item 13: finalized is terminal — moving back to any earlier status is rejected."""
+        """Item 13: finalized is terminal  moving back to any earlier status is rejected."""
         case = self._create_case(
             self.student_primary, status=ProgressionStatus.FINALIZED,
         )
@@ -1311,10 +1311,10 @@ class Item8RecalculationScopingTests(ProgressionBaseSetup):
         self.assertRedirects(resp, reverse("academics:progression_config_list"))
         calc_case.refresh_from_db()
         hod_case.refresh_from_db()
-        # Calculated case was recalculated — average updated from 30.0 to report card value
+        # Calculated case was recalculated  average updated from 30.0 to report card value
         self.assertEqual(calc_case.status, ProgressionStatus.CALCULATED)
         self.assertEqual(calc_case.calculated_average, 75.0)
-        # PENDING_HOD_REVIEW case untouched — status, average, and suggestion unchanged
+        # PENDING_HOD_REVIEW case untouched  status, average, and suggestion unchanged
         self.assertEqual(hod_case.status, ProgressionStatus.PENDING_HOD_REVIEW)
         self.assertEqual(hod_case.calculated_average, 65.0)
         self.assertEqual(hod_case.system_suggested_outcome, ProgressionOutcome.RETAIN)
@@ -1358,7 +1358,7 @@ class ProgressionItems9And10Tests(ProgressionBaseSetup):
         self._setup_report_card(self.student_primary)
         self._setup_attendance(self.student_primary)
         self.client.force_login(self.super_admin)
-        # Mock delay() so it doesn't run the task synchronously — we only
+        # Mock delay() so it doesn't run the task synchronously  we only
         # test the HTTP view, not the Celery execution.
         with patch.object(calculate_progression_cases_task, "delay") as mock_delay:
             mock_delay.return_value.id = "mock-task-id"
@@ -1455,7 +1455,7 @@ class ProgressionItems9And10Tests(ProgressionBaseSetup):
         self.assertEqual(case.system_suggested_outcome, original_outcome)
 
     def test_read_queries_do_not_scale_with_batch_size(self):
-        """Item 10: Read queries are constant — only writes scale with N."""
+        """Item 10: Read queries are constant  only writes scale with N."""
         from academics.services import calculate_progression_cases
         # Baseline: 3 students from base setup = 8 total after creation below
         students = []
@@ -1478,7 +1478,7 @@ class ProgressionItems9And10Tests(ProgressionBaseSetup):
     def test_reads_constant_with_fewer_students(self):
         """Item 10: With 3 students (no extras), reads are still 6, writes are 3×3 = 9."""
         from academics.services import calculate_progression_cases
-        # Only the 3 base-setup students — no extras
+        # Only the 3 base-setup students  no extras
         for s in [self.student_ecd, self.student_primary, self.student_lower]:
             self._setup_report_card(s, average=75.0)
             self._setup_attendance(s, total=10, present=8)
@@ -1560,7 +1560,7 @@ class Item17TermBoundaryTests(ProgressionBaseSetup):
         result = calculate_progression_cases(cfg, triggered_by=self.super_admin)
         self.assertEqual(result["created"], 1)
         case = ProgressionCase.objects.get(student=student)
-        # 9 present / 10 total = 90.0% — Jan 1 entry excluded from boundary
+        # 9 present / 10 total = 90.0%  Jan 1 entry excluded from boundary
         self.assertEqual(case.calculated_attendance_rate, 90.0)
         self.assertEqual(case.calculation_basis, "complete")
 
@@ -1697,7 +1697,7 @@ class AcademicYearDatesTests(ProgressionBaseSetup):
             name="AY-YrPref", is_current=False,
             start_date=date(2025, 2, 1), end_date=date(2025, 11, 30),
         )
-        # Term dates extend BEYOND year range — progression should use year range
+        # Term dates extend BEYOND year range  progression should use year range
         term1 = Term.objects.create(
             academic_year=ay, name="T1",
             start_date=date(2025, 1, 1), end_date=date(2025, 4, 30),
@@ -1719,14 +1719,14 @@ class AcademicYearDatesTests(ProgressionBaseSetup):
             class_name="Grade 1", academic_year=ay, status=StudentStatus.ACTIVE,
         )
         self._setup_report_card(student, average=75.0, term=term1)
-        # Entries on Jan 15 (inside T1 term range but BEFORE year start_date) — excluded
+        # Entries on Jan 15 (inside T1 term range but BEFORE year start_date)  excluded
         for i in range(5):
             AttendanceEntry.objects.create(
                 student=student, date=date(2025, 1, 15) + __import__('datetime').timedelta(days=i),
                 status=AttendanceStatus.PRESENT,
                 marked_by=self.super_admin, class_name=student.class_name,
             )
-        # Entries inside year range (Feb-Nov) — counted
+        # Entries inside year range (Feb-Nov)  counted
         for i in range(10):
             AttendanceEntry.objects.create(
                 student=student, date=date(2025, 3, 1) + __import__('datetime').timedelta(days=i),
@@ -1797,7 +1797,7 @@ class TermLockedRejectionTests(TestCase):
             }),
             content_type="application/json",
         )
-        # Should succeed (or fail with other validation) — NOT 403
+        # Should succeed (or fail with other validation)  NOT 403
         self.assertNotEqual(resp.status_code, 403)
 
     # ── PrimaryBulkSubmissionAPIView ─────────────────────────────────
@@ -1991,7 +1991,7 @@ class CurrentTermResolutionTests(TestCase):
             academic_year=self.year, name="Term 2", is_locked=False,
             start_date=self.today - timedelta(days=10), end_date=self.today + timedelta(days=80),
         )
-        # Term 3 starts later — must NOT win despite a more recent start_date
+        # Term 3 starts later  must NOT win despite a more recent start_date
         Term.objects.create(
             academic_year=self.year, name="Term 3", is_locked=False,
             start_date=self.today + timedelta(days=120), end_date=self.today + timedelta(days=180),

@@ -20,7 +20,9 @@ TimeoutStopSec=30
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/var/www/hodari/hisms_backend /var/log/hodari /var/run/hodari
+ReadWritePaths=/var/www/hodari/hisms_backend /var/log/hodari
+# systemd creates /run/hodari (owned by User=) on every start; /run is wiped at boot
+RuntimeDirectory=hodari
 PrivateTmp=yes
 
 Environment="DJANGO_SETTINGS_MODULE=config.settings"

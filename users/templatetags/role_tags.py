@@ -27,7 +27,7 @@ register = template.Library()
 
 
 def _build_user_perms(user):
-    """Build the full permission set for a user (expensive — DB queries).
+    """Build the full permission set for a user (expensive  DB queries).
     Result is cached on user._hodari_perms so subsequent calls are free."""
     cache_attr = "_hodari_perms"
     cached = getattr(user, cache_attr, None)

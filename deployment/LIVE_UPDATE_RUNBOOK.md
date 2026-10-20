@@ -1,4 +1,4 @@
-# Live update runbook — switch production to the `hodari` database
+# Live update runbook  switch production to the `hodari` database
 
 Run these on the **VPS** (as a sudo user). This keeps `DB=hodari` but uses a
 **dedicated non-superuser role** (`hodari_user`) with a strong password —
@@ -41,7 +41,7 @@ PGPASSWORD='wPDUA3bTLJvLMrLgWfWuL5KT36XU' psql -h 127.0.0.1 -U hodari_user -d ho
 ## 2. Point the app's `.env` at the new database
 
 Edit `/var/www/hodari/hisms_backend/.env` and set exactly these (keep everything
-else — allowed hosts, Redis, email — as it already is):
+else  allowed hosts, Redis, email  as it already is):
 
 ```ini
 DJANGO_DEBUG=0
@@ -103,7 +103,7 @@ Then log in at `https://connect.hodari.ac.tz:8443/admin/`.
 
 ---
 
-## Appendix A — Migrate existing data from `hisms_prod` to `hodari`
+## Appendix A  Migrate existing data from `hisms_prod` to `hodari`
 
 Run on the VPS. Replaces step 1 (DB creation) when you need to keep prod data.
 
@@ -156,4 +156,4 @@ sudo -u postgres psql -d hodari     -tAc "SELECT count(*) FROM users_user;"
 - Rotate the generated password if it has ever been shared in plaintext.
 - Optional but recommended: also rotate `DJANGO_SECRET_KEY` on live to a fresh
   value (a new one was generated for you): `9eqjqkple^i20*^9k43-yh1vibvd$*wuup0-jtvfw3w!#!+aoz`
-  (note: rotating the secret key invalidates existing sessions — users re-login).
+  (note: rotating the secret key invalidates existing sessions  users re-login).

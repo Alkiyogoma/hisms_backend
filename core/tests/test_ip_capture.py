@@ -513,7 +513,7 @@ class ThreadedCallerIPTest(TestCase):
         with patch("tasks.services.generate_assessment_scheduling_task"):
             with patch("communications.email_service.send_email_safe"):
                 with patch("communications.email_service.dispatch_notification"):
-                    # Call form_valid directly — bypasses dispatch & form validation
+                    # Call form_valid directly  bypasses dispatch & form validation
                     # but verifies the log_event code path
                     response = view.form_valid(form)
 
@@ -564,7 +564,7 @@ class ThreadedCallerIPTest(TestCase):
         ).order_by("-created_at").first()
         # The password reset may not actually execute if the form doesn't validate.
         # If the form rejected the data, no AuditLog entry is created, and that's
-        # acceptable — the important thing is that IF the code path executes,
+        # acceptable  the important thing is that IF the code path executes,
         # it passes request through.  If no AuditLog entry was created, the form
         # validations didn't pass, which is a separate concern from IP capture.
         if alog is not None:

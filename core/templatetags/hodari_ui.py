@@ -1,6 +1,6 @@
 """Template helpers for the Hodari component kit.
 
-Currently provides ``elided_pages`` — a thin wrapper over Django's
+Currently provides ``elided_pages``  a thin wrapper over Django's
 ``Paginator.get_elided_page_range`` so the canonical <c-pagination> component
 can render a compact ``1 2 … 77`` page list without the view having to
 precompute anything.

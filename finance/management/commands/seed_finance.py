@@ -1,5 +1,5 @@
 """
-Step 6 — Finance: Fee Structures, Invoices & Payments
+Step 6  Finance: Fee Structures, Invoices & Payments
 Run: python manage.py seed_finance
 """
 import json

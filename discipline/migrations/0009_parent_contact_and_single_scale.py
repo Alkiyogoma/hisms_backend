@@ -50,7 +50,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='disciplineincident',
             name='severity',
-            field=models.CharField(choices=[('low', 'Level 1 — Minor'), ('medium', 'Level 2 — Moderate'), ('high', 'Level 3 — Serious'), ('critical', 'Level 4 — Severe')], max_length=20),
+            field=models.CharField(choices=[('low', 'Level 1  Minor'), ('medium', 'Level 2  Moderate'), ('high', 'Level 3  Serious'), ('critical', 'Level 4  Severe')], max_length=20),
         ),
         migrations.RunPython(carry_over, migrations.RunPython.noop),
         migrations.RemoveField(

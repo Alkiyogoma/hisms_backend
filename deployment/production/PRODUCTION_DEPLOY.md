@@ -89,7 +89,7 @@ grep -n "proxy_pass\|upstream\|server 127" /etc/nginx/sites-enabled/* | grep -v 
 Write down:
 
 - that `WorkingDirectory=` is `/opt/hodari/hisms_backend`
-- `APPUSER` — the `User=` (may be `root` if not set)
+- `APPUSER`  the `User=` (may be `root` if not set)
 - whether `ExecStart=` uses `--config <path>/gunicorn_config.py`, and which path
 - that nginx proxies to `127.0.0.1:8007`
 - the owner of the venv: `stat -c %U /opt/hodari/venv`
@@ -97,7 +97,7 @@ Write down:
 > If `WorkingDirectory=` is anything other than `/opt/hodari/hisms_backend`,
 > stop here and adjust `LIVE` below before continuing.
 
-The commands below use shell variables — set them once per SSH session with
+The commands below use shell variables  set them once per SSH session with
 your app user (from `User=` above):
 
 ```bash
@@ -220,7 +220,7 @@ Copy any files uploaded since step 3.6:
 rsync -a $LIVE/media/ $NEW/media/ && chown -R $APPUSER: $NEW/media
 ```
 
-Swap folders — the live path now holds the git checkout, so systemd and nginx
+Swap folders  the live path now holds the git checkout, so systemd and nginx
 paths stay valid:
 
 ```bash
@@ -238,7 +238,7 @@ not edited:
 mkdir -p /etc/systemd/system/hodari.service.d && printf '[Service]\nExecStart=\nExecStart=/opt/hodari/venv/bin/gunicorn config.wsgi:application --config /opt/hodari/hisms_backend/deployment/production/gunicorn_config.py\n' > /etc/systemd/system/hodari.service.d/production-gunicorn.conf
 ```
 
-Check it took effect — the last `ExecStart` must show `deployment/production/`:
+Check it took effect  the last `ExecStart` must show `deployment/production/`:
 
 ```bash
 systemctl daemon-reload && systemctl cat hodari | grep -A1 ExecStart
@@ -347,7 +347,7 @@ replaces that folder (a folder swap like section 3, a fresh clone, a restore
 from a code backup) takes the uploads with it: five early lesson plan files
 were lost this way. Move them to a folder that no deploy touches.
 
-Check first — this is the folder the app writes to today (`MEDIA_ROOT`, if
+Check first  this is the folder the app writes to today (`MEDIA_ROOT`, if
 `.env` has none, is `media/` in the code folder):
 
 ```bash

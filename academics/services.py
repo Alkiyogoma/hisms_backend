@@ -48,12 +48,12 @@ def generate_class_reports(term_id, class_name, user):
                 status__in=[ScoreStatus.SUBMITTED, ScoreStatus.RETURNED]
             ).mark_bearing()
             if pending_scores.exists():
-                # Skip this student — scores not yet approved by HOD
+                # Skip this student  scores not yet approved by HOD
                 continue
 
             # FR-ACAD-014: Check that teacher comment is complete (min 50 chars)
             if len((report.teacher_comments or "").strip()) < 50:
-                # Skip this student — comment not yet entered
+                # Skip this student  comment not yet entered
                 continue
 
             # Exam average: approved, mark-bearing subjects only, and only once
@@ -159,7 +159,7 @@ def sign_off_report(report_card, user):
             gaps.append(f"no term remark yet for: {', '.join(missing_remarks)}")
         if gaps:
             raise ValidationError(
-                f"Cannot sign off: {report_card.student.first_name}'s report is incomplete — "
+                f"Cannot sign off: {report_card.student.first_name}'s report is incomplete  "
                 + "; ".join(gaps) + "."
             )
 
@@ -352,7 +352,7 @@ def calculate_progression_cases(config: ProgressionConfig, triggered_by, recalcu
 
     Uses batch queries (Item 10) to avoid N+1 patterns.
     Attendance and report card data fetched via two GROUP BY aggregate queries
-    and a Subquery annotation respectively — no per-student method calls.
+    and a Subquery annotation respectively  no per-student method calls.
     Academic year boundary (Item 17) derived from actual term dates, not guessed
     Jan–Dec; raises ProgressionConfigBlockedError if no term has usable dates.
 
@@ -465,7 +465,7 @@ def calculate_progression_cases(config: ProgressionConfig, triggered_by, recalcu
         present_att = present_entries.get(student.pk, 0)
         att_rate = round((present_att / total_att) * 100, 1) if total_att > 0 else None
 
-        # 3. Calculation basis — missing grade or attendance data = INCOMPLETE
+        # 3. Calculation basis  missing grade or attendance data = INCOMPLETE
         if avg is None or att_rate is None:
             calc_basis = CalculationBasis.INCOMPLETE
         else:
@@ -494,7 +494,7 @@ def calculate_progression_cases(config: ProgressionConfig, triggered_by, recalcu
             "status": ProgressionStatus.CALCULATED,
         }
 
-        # Item 9: Per-student failure isolation — one student's DB error doesn't
+        # Item 9: Per-student failure isolation  one student's DB error doesn't
         # crash the batch; failure recorded in recalc_failed_details.
         # Item 10: Direct create/update (not update_or_create) to eliminate the
         # extra SELECT + extra SAVEPOINT that update_or_create always emits.

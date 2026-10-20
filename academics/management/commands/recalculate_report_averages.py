@@ -43,7 +43,7 @@ class Command(BaseCommand):
             changed += 1
             self.stdout.write(
                 f"{rc.student.admission_no} {rc.term}: {old if old is not None else '—'} -> "
-                f"{new if new is not None else '— (awaiting end of term)'}"
+                f"{new if new is not None else ' (awaiting end of term)'}"
             )
             if not options["dry_run"]:
                 rc.overall_average = new

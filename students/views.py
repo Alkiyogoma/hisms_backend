@@ -104,8 +104,11 @@ class StudentListView(RoleRequiredMixin, ListView):
         from core.teacher_context import get_teacher_assigned_classes
 
         include_archived = self.request.GET.get("include_archived", "") == "1"
+        archive_status = self.request.GET.get("archive_status", "all" if include_archived else "active")
         qs = Student.objects.all()
-        if not include_archived:
+        if archive_status == "archived":
+            qs = qs.filter(is_archived=True)
+        elif archive_status != "all":
             qs = qs.filter(is_archived=False)
         if self.request.user.role == UserRole.TEACHER:
             my_classes = get_teacher_assigned_classes(self.request.user)
@@ -159,8 +162,11 @@ class StudentListView(RoleRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         qs = self.get_queryset()
+        ctx["archive_status"] = self.request.GET.get(
+            "archive_status", "all" if self.request.GET.get("include_archived") == "1" else "active",
+        )
         
-        # Summary Statistics — single aggregated query instead of multiple
+        # Summary Statistics  single aggregated query instead of multiple
         from django.db.models import Count
         stats = qs.aggregate(
             total=Count('id'),
@@ -247,7 +253,7 @@ class StudentDetailView(RoleRequiredMixin, DetailView):
             is_archived=False
         ).exclude(id=student.id).distinct()
         
-        # Welfare notes — same visibility rules as the welfare module:
+        # Welfare notes  same visibility rules as the welfare module:
         # concerns/health only for class teacher, HOD and leadership;
         # safeguarding never on the profile.
         from welfare.models import WelfareObservation, WelfareNoteType
@@ -411,7 +417,7 @@ class StudentDetailView(RoleRequiredMixin, DetailView):
                 academic_summary['trend'] = '--'
 
         # Approved marks only, for the selected term (default: the current term,
-        # else the latest term with marks) — the same figures as the
+        # else the latest term with marks)  the same figures as the
         # Performance Report. ECD is rating-based and keeps its own summary.
         from academics import performance
         from attendance import analytics
@@ -435,7 +441,7 @@ class StudentDetailView(RoleRequiredMixin, DetailView):
         perf_has_att = bool(attendance["row"] and attendance["row"]["marked"])
         perf_has_acad = bool(record and record["average"] is not None) or bool(is_ecd and academic_summary.get("eval_count"))
 
-        # Financial information — visible to roles with finance view permission
+        # Financial information  visible to roles with finance view permission
         financial_info = {}
         if self.request.user.has_perm("finance.view_invoice"):
             from finance.models import Invoice, Payment
@@ -496,7 +502,7 @@ class StudentDetailView(RoleRequiredMixin, DetailView):
             }
             financial_info['has_data'] = bool(total_billed or admission_billed or invoices_list or last_pay)
         
-        # Evaluate stats BEFORE slicing the queryset — single aggregated query
+        # Evaluate stats BEFORE slicing the queryset  single aggregated query
         welfare_stats = welfare_incidents.aggregate(
             total=Count('id'),
             positive=Count('id', filter=Q(note_type=WelfareNoteType.POSITIVE)),
@@ -535,7 +541,7 @@ class StudentDetailView(RoleRequiredMixin, DetailView):
             department=Department.ECD
         ).values_list("name", flat=True))
 
-        # Admissions documents — visible to users with admissions permission
+        # Admissions documents  visible to users with admissions permission
         admission_docs = []
         if self.request.user.has_perm("admissions.view_applicant"):
             from admissions.models import Applicant
@@ -897,11 +903,24 @@ def _form_error_summary(form):
     return "The student's record was not saved: " + "; ".join(parts) + "."
 
 
-class StudentArchiveView(RoleRequiredMixin, View):
+class StudentLifecycleMixin:
+    def get_student(self, request, pk):
+        qs = Student.objects.all()
+        if request.user.role == UserRole.TEACHER:
+            from core.teacher_context import get_teacher_assigned_classes
+            qs = qs.filter(class_name__in=get_teacher_assigned_classes(request.user))
+        from core.scoping import hod_class_names
+        names = hod_class_names(request.user)
+        if names is not None:
+            qs = qs.filter(class_name__in=names)
+        return get_object_or_404(qs, pk=pk)
+
+
+class StudentArchiveView(StudentLifecycleMixin, RoleRequiredMixin, View):
     required_permission = "students.change_student"
 
     def post(self, request, pk):
-        student = get_object_or_404(Student, pk=pk)
+        student = self.get_student(request, pk)
         if student.is_archived:
             messages.warning(request, "Student is already archived.")
         else:
@@ -909,7 +928,7 @@ class StudentArchiveView(RoleRequiredMixin, View):
             student.archived_at = timezone.now()
             student.archived_by = request.user
             student.status = StudentStatus.WITHDRAWN
-            student.save(update_fields=["is_archived", "archived_at", "archived_by", "status"])
+            student.save(update_fields=["is_archived", "archived_at", "archived_by", "status", "updated_at"])
 
             from audit.models import log_event
             log_event(
@@ -948,12 +967,12 @@ class StudentArchiveView(RoleRequiredMixin, View):
         return redirect("students:detail", pk=pk)
 
 
-class StudentRestoreView(RoleRequiredMixin, View):
+class StudentRestoreView(StudentLifecycleMixin, RoleRequiredMixin, View):
     """Restore an archived student back to active status."""
     required_permission = "students.change_student"
 
     def post(self, request, pk):
-        student = get_object_or_404(Student, pk=pk)
+        student = self.get_student(request, pk)
 
         if not student.is_archived:
             messages.warning(request, "Student is not archived.")
@@ -1020,41 +1039,68 @@ class GuardianListView(RoleRequiredMixin, ListView):
     required_permission = "students.view_parentguardian"
 
     def get_queryset(self):
-        qs = ParentGuardian.objects.filter(is_archived=False).order_by("full_name")
+        qs = ParentGuardian.objects.all().order_by("full_name")
+        archive_status = self.request.GET.get("archive_status", "active")
+        if archive_status != "all" and not getattr(self, "include_all_archives", False):
+            qs = qs.filter(is_archived=archive_status == "archived")
         q = self.request.GET.get("q", "").strip()
         if q:
-            qs = qs.filter(Q(full_name__icontains=q) | Q(phone__icontains=q))
-        # Dynamic scoping: teachers see only guardians linked to their class students
+            qs = qs.filter(Q(full_name__icontains=q) | Q(phone__icontains=q) | Q(email__icontains=q))
         user = self.request.user
-        from users.role_models import RoleConfig
-        rc = RoleConfig.objects.filter(role=user.role, is_active=True).first()
-        depts = rc.departments if rc and rc.departments else []
-        is_teacher_role = not depts and user.role not in (
-            UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL,
-            UserRole.ADMIN_OFFICER, UserRole.FINANCE_OFFICER,
-        )
-        if is_teacher_role or user.role == UserRole.TEACHER:
-            from core.teacher_context import get_teacher_assigned_classes
-            my_classes = get_teacher_assigned_classes(user)
-            if my_classes:
-                my_student_ids = Student.objects.filter(
-                    class_name__in=my_classes, is_archived=False
-                ).values_list("pk", flat=True)
-                qs = qs.filter(studentguardian__student_id__in=my_student_ids).distinct()
+        if not user.is_school_wide and user.role not in (UserRole.ADMIN_OFFICER, UserRole.FINANCE_OFFICER):
+            from users.role_models import RoleConfig
+            rc = RoleConfig.objects.filter(role=user.role, is_active=True).first()
+            depts = user.section_departments or (rc.departments if rc else [])
+            if user.role == UserRole.TEACHER or not depts:
+                from core.teacher_context import get_teacher_assigned_classes
+                class_names = get_teacher_assigned_classes(user)
             else:
-                qs = qs.none()
-        elif user.has_role(UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD):
-            my_depts = _hod_departments(user)
-            if my_depts:
                 from academics.models import GradeClass
-                dept_class_names = GradeClass.objects.filter(
-                    department__in=my_depts
-                ).values_list("name", flat=True)
-                dept_student_ids = Student.objects.filter(
-                    class_name__in=dept_class_names, is_archived=False
-                ).values_list("pk", flat=True)
-                qs = qs.filter(studentguardian__student_id__in=dept_student_ids).distinct()
+                class_names = GradeClass.objects.filter(department__in=depts).values_list("name", flat=True)
+            qs = qs.filter(studentguardian__student__class_name__in=class_names).distinct()
         return qs.select_related('user').prefetch_related('studentguardian_set__student')
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["archive_status"] = self.request.GET.get("archive_status", "active")
+        return ctx
+
+
+class GuardianArchiveView(RoleRequiredMixin, View):
+    required_permission = "students.change_parentguardian"
+    restore = False
+
+    @transaction.atomic
+    def post(self, request, pk):
+        # Reuse directory visibility so knowing an ID cannot bypass its scope.
+        directory = GuardianListView()
+        directory.request = request
+        directory.include_all_archives = True
+        guardian = get_object_or_404(directory.get_queryset(), pk=pk)
+        if guardian.is_archived == (not self.restore):
+            messages.info(request, "Parent is already in the requested state.")
+            return redirect("students:guardian_detail", pk=pk)
+        if guardian.user_id and guardian.user.role != UserRole.PARENT:
+            messages.error(request, "This parent record is linked to a staff account. Correct the account link first.")
+            return redirect("students:guardian_detail", pk=pk)
+        guardian.is_archived = not self.restore
+        guardian.archived_at = None if self.restore else timezone.now()
+        guardian.archived_by = None if self.restore else request.user
+        guardian.save(update_fields=["is_archived", "archived_at", "archived_by", "updated_at"])
+        if guardian.user_id:
+            guardian.user.is_active = self.restore
+            guardian.user.save(update_fields=["is_active"])
+            if not self.restore:
+                from users.lifecycle import invalidate_user_sessions
+                invalidate_user_sessions(guardian.user_id)
+        from audit.models import log_event
+        log_event(
+            actor=request.user, action_type="GUARDIAN_RESTORED" if self.restore else "GUARDIAN_ARCHIVED",
+            model_name="ParentGuardian", object_id=guardian.pk,
+            description=f"Parent {guardian.full_name} {'restored' if self.restore else 'archived'}.", request=request,
+        )
+        messages.success(request, f"Parent {guardian.full_name} has been {'restored' if self.restore else 'archived'}.")
+        return redirect("students:guardian_detail", pk=pk)
 
 
 class GuardianDetailView(RoleRequiredMixin, DetailView):
@@ -1217,7 +1263,7 @@ class GuardianCreateView(RoleRequiredMixin, TemplateView):
             try:
                 student = Student.objects.get(pk=student_id)
             except (Student.DoesNotExist, ValueError):
-                messages.warning(request, "Selected student not found — parent created without link.")
+                messages.warning(request, "Selected student not found  parent created without link.")
 
 
         try:
@@ -1275,7 +1321,7 @@ class GuardianCreateView(RoleRequiredMixin, TemplateView):
         if portal_access:
             messages.success(
                 request,
-                f"Parent {guardian.full_name} created — portal account created. Credentials sent via notification."
+                f"Parent {guardian.full_name} created  portal account created. Credentials sent via notification."
             )
         else:
             messages.success(request, f"Parent {guardian.full_name} created.")
@@ -1378,7 +1424,7 @@ class StudentDataExportView(RoleRequiredMixin, View):
     def get(self, request, pk):
         student = get_object_or_404(Student, pk=pk)
 
-        # NFR-PDPA-003: Enforce 30-minute SLA — log start and warn if exceeded
+        # NFR-PDPA-003: Enforce 30-minute SLA  log start and warn if exceeded
         started_at = time.time()
 
         guardians = list(
@@ -1479,7 +1525,7 @@ class StudentDataExportView(RoleRequiredMixin, View):
             "exported_by": request.user.username,
         }
 
-        # NFR-PDPA-003: SLA enforcement — check if export exceeded 30 minutes
+        # NFR-PDPA-003: SLA enforcement  check if export exceeded 30 minutes
         duration_seconds = time.time() - started_at
         sla_breached = duration_seconds > self.DSAR_SLA_TIMEOUT_SECONDS
         if sla_breached:
@@ -1559,7 +1605,7 @@ class StudentGuardianLinkView(RoleRequiredMixin, TemplateView):
             else:
                 messages.success(
                     request,
-                    f"{guardian.full_name} was already linked — relationship and primary contact updated.",
+                    f"{guardian.full_name} was already linked  relationship and primary contact updated.",
                 )
 
             # FR-STU-005: Notify Finance Officer if sibling relationship confirmed
@@ -1622,7 +1668,7 @@ class StudentGuardianLinkView(RoleRequiredMixin, TemplateView):
         if portal_access:
             messages.success(
                 request,
-                f"Created and linked new parent: {guardian.full_name} — portal account created. Credentials sent via notification."
+                f"Created and linked new parent: {guardian.full_name}  portal account created. Credentials sent via notification."
             )
         else:
             messages.success(request, f"Created and linked new parent: {guardian.full_name}")
@@ -1806,7 +1852,7 @@ class GuardianEditView(RoleRequiredMixin, TemplateView):
         full_name = values["full_name"]
         phone = values["phone"]
 
-        # FR-PAR-001: Sibling scope — users without school-wide student access
+        # FR-PAR-001: Sibling scope  users without school-wide student access
         # can only edit guardians linked to students they have access to
         user = self.request.user
         from users.role_models import RoleConfig
@@ -1898,22 +1944,7 @@ class GuardianDeleteView(RoleRequiredMixin, View):
             )
             return redirect("students:guardian_detail", pk=pk)
 
-        name = guardian.full_name
-        guardian.is_archived = True
-        guardian.archived_at = timezone.now()
-        guardian.archived_by = request.user
-        guardian.save(update_fields=["is_archived", "archived_at", "archived_by", "updated_at"])
-
-        from audit.models import log_event
-        log_event(
-            actor=request.user,
-            action_type="GUARDIAN_DELETED",
-            model_name="ParentGuardian",
-            object_id=guardian.pk,
-            description=f"Parent {name} archived by {request.user.username}",
-            request=request,
-        )
-        messages.success(request, f"Parent {name} has been removed.")
+        GuardianArchiveView().post(request, pk)
         return redirect("students:guardian_list")
 
 
@@ -1952,26 +1983,15 @@ class StudentSearchAPIView(RoleRequiredMixin, View):
     required_permission = "students.view_student"
 
     def get(self, request):
-        from core.teacher_context import get_teacher_assigned_classes
+        from django.urls import reverse
 
         q = request.GET.get("q", "").strip()
-        include_archived = request.GET.get("include_archived", "") == "1"
         if len(q) < 2:
             return JsonResponse({"students": [], "count": 0})
-
-        filters = Q(first_name__icontains=q) | Q(last_name__icontains=q) | Q(admission_no__icontains=q)
-        if not include_archived:
-            filters = filters & Q(is_archived=False)
-
-        base_qs = Student.objects.filter(filters)
-        if request.user.role == UserRole.TEACHER:
-            my_classes = get_teacher_assigned_classes(request.user)
-            if my_classes:
-                base_qs = base_qs.filter(class_name__in=my_classes)
-            else:
-                return JsonResponse({"students": [], "count": 0})
-
-        students = base_qs.select_related("academic_year").order_by("class_name", "last_name")[:50]
+        directory = StudentListView()
+        directory.request = request
+        students = directory.get_queryset()[:50]
+        can_manage_archive = request.user.has_perm("students.change_student")
 
         data = []
         for s in students:
@@ -1990,6 +2010,7 @@ class StudentSearchAPIView(RoleRequiredMixin, View):
                 "preferred_name": s.preferred_name or "",
                 "academic_year_name": s.academic_year.name if s.academic_year else "",
                 "is_archived": s.is_archived,
+                "archive_url": reverse("students:restore" if s.is_archived else "students:archive", args=[s.pk]) if can_manage_archive else "",
             })
 
         return JsonResponse({"students": data, "count": len(data)})
@@ -2172,7 +2193,7 @@ class PrintClassIDView(RoleRequiredMixin, TemplateView):
 
 
 class PrintClassIDBulkView(RoleRequiredMixin, TemplateView):
-    """Print pickup cards for all students in a class — A4 portrait, 10 per page (5+5)."""
+    """Print pickup cards for all students in a class  A4 portrait, 10 per page (5+5)."""
     template_name = "students/id_card_print_bulk.html"
     required_permission = "students.view_student"
 
@@ -2233,7 +2254,7 @@ class PrintClassIDBulkView(RoleRequiredMixin, TemplateView):
         return ctx
 
 
-class StudentDeleteView(RoleRequiredMixin, View):
+class StudentDeleteView(StudentLifecycleMixin, RoleRequiredMixin, View):
     """
     Attempt to delete a student. If the student has associated attendance, grade,
     or financial records, the system prevents deletion and displays an error
@@ -2242,7 +2263,7 @@ class StudentDeleteView(RoleRequiredMixin, View):
     required_permission = "students.delete_student"
 
     def post(self, request, pk):
-        student = get_object_or_404(Student, pk=pk)
+        student = self.get_student(request, pk)
 
         if student.has_protected_records():
             messages.error(

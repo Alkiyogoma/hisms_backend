@@ -52,7 +52,7 @@ def unsign_qr_data(payload: str) -> Optional[str]:
 
 
 def is_signed_qr(payload: str) -> bool:
-    """Quick check — does this look like a signed QR payload?"""
+    """Quick check  does this look like a signed QR payload?"""
     return payload.startswith(QR_PREFIX + "_")
 
 

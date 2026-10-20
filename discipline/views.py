@@ -114,7 +114,7 @@ def delete_incident(incident, user, reason, duplicate_of=None, request=None):
             action_type="discipline_incident_deleted",
             model_name="DisciplineIncident",
             object_id=incident.pk,
-            description=f"{incident.reference} for {incident.student} deleted — {why[:200]}",
+            description=f"{incident.reference} for {incident.student} deleted  {why[:200]}",
             before=snapshot,
             after={"deleted_at": now.isoformat(), "deleted_by": staff_name(user), "reason": reason,
                    "duplicate_of": duplicate_of.reference if duplicate_of else None},
@@ -309,7 +309,7 @@ class DisciplineSubmitView(DepartmentScopedMixin, RoleRequiredMixin, CreateView)
         ctx["locations"] = LOCATIONS
         ctx["shared_account"] = is_shared_account(self.request.user)
 
-        # FRD: Behaviour is PRIMARY + SECONDARY only — exclude ECD department
+        # FRD: Behaviour is PRIMARY + SECONDARY only  exclude ECD department
         non_ecd_classes = self._get_non_ecd_classes()
 
         role = self.request.user.role
@@ -344,7 +344,7 @@ class DisciplineSubmitView(DepartmentScopedMixin, RoleRequiredMixin, CreateView)
 
 
 class DisciplineListView(DepartmentScopedMixin, RoleRequiredMixin, ListView):
-    """List discipline incidents — teacher sees own, HOD sees department."""
+    """List discipline incidents  teacher sees own, HOD sees department."""
     model = DisciplineIncident
     template_name = "discipline/list.html"
     context_object_name = "incidents"
@@ -412,7 +412,7 @@ class DisciplineListView(DepartmentScopedMixin, RoleRequiredMixin, ListView):
         if ctx["can_delete"]:
             ctx["deleted_count"] = DisciplineIncident.all_objects.deleted().count()
 
-        # FRD: Behaviour list filter — Primary + Secondary only (no ECD)
+        # FRD: Behaviour list filter  Primary + Secondary only (no ECD)
         if _primary_only_head(self.request.user):
             ctx["available_classes"] = self._get_dept_classes(Department.PRIMARY)
         else:
@@ -495,7 +495,7 @@ class DisciplineDetailView(RoleRequiredMixin, DetailView):
 
 
 class DisciplineReviewView(DepartmentScopedMixin, RoleRequiredMixin, View):
-    """Review action — update status and add notes."""
+    """Review action  update status and add notes."""
     allowed_roles = [
         UserRole.PRIMARY_HOD,
         UserRole.ECD_HOD,
@@ -676,7 +676,7 @@ class DisciplineHODQueueView(DepartmentScopedMixin, RoleRequiredMixin, TemplateV
         ctx["discipline_tab"] = "queue"
         ctx["today_date"] = timezone.localdate().strftime("%d %B %Y")
 
-        # FRD: Behaviour is Primary + Secondary only — exclude ECD
+        # FRD: Behaviour is Primary + Secondary only  exclude ECD
         if _primary_only_head(self.request.user):
             classes = self._get_dept_classes(Department.PRIMARY)
         else:

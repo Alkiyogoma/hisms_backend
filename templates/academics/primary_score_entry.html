@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load role_tags %}
-{% block title %}Primary Assessment — {{ brand.school_name }}{% endblock %}
-{% block topbar_greeting %}Primary Assessment{% endblock %}
+{% block title %}Primary {% if assessment_is_remarks %}Term Remarks{% else %}Score Entry{% endif %}  {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}Primary {% if assessment_is_remarks %}Term Remarks{% else %}Score Entry{% endif %}{% endblock %}
 {% block topbar_date %}{{ today_display }}{% endblock %}
 
 {% block extra_head %}
@@ -224,6 +224,8 @@
     {% endfor %}
 </div>
 
+{% include "academics/_assessment_entry_tabs.html" %}
+
 <div class="progress-bar-container">
     <div style="flex: 1">
         <div style="display:flex; justify-content:space-between; margin-bottom:8px">
@@ -240,7 +242,7 @@
             <div style="font-size:14px; font-weight:700; color:#1E293B">{{ current_term.name }}</div>
         </div>
         {% has_perm user "academics.change_examscore" as can_submit %}
-        {% if can_submit %}
+        {% if can_submit and submit_subjects and not assessment_is_remarks %}
         {% if submit_subjects|length > 1 %}
         <select id="submit-subject" class="hf-select" title="Submit one subject or all of your subjects" style="min-width:160px">
             <option value="">All my subjects</option>
@@ -271,19 +273,21 @@
                 <h2 id="active-student-name" style="margin:0; font-size:26px; color:#1E293B">Select a student</h2>
                 <div style="color:#64748B; font-size:14px; margin-top:4px">Primary Department &middot; {{ selected_class }} &middot; {{ current_term.name }}</div>
             </div>
+            {% if not assessment_is_remarks %}
             <div id="total-avg-card" style="background:#1E293B; border-radius:12px; padding:12px 24px; text-align:center; color:#fff; min-width:140px">
                 <div style="font-size:10px; font-weight:700; color:#94A3B8; text-transform:uppercase; margin-bottom:2px">Grand Average</div>
                 <div id="grand-avg" style="font-size:24px; font-weight:800; font-family:'JetBrains Mono'">--%</div>
                 <div id="grand-avg-note" style="font-size:10px; color:#94A3B8; margin-top:2px">Approved scores only</div>
             </div>
+            {% endif %}
         </div>
 
         <div id="subjects-container">
             <!-- Subject Sections will be injected here -->
             {% for sub in subjects %}
-            <div class="subject-section" style="opacity:{% if editable_subjects and sub not in editable_subjects %}0.7{% else %}1{% endif %}">
+            <div class="subject-section" style="opacity:{% if sub not in editable_subjects %}0.7{% else %}1{% endif %}">
                 <div class="subject-header">
-                    <span>{{ sub }}{% if editable_subjects and sub not in editable_subjects %} <span style="font-size:10px;font-weight:400;color:#94A3B8;margin-left:6px">(read-only)</span>{% endif %}</span>
+                    <span>{{ sub }}{% if sub not in editable_subjects %} <span style="font-size:10px;font-weight:400;color:#94A3B8;margin-left:6px">(read-only)</span>{% endif %}</span>
                     {% if sub in remark_subjects %}
                     <span style="font-size:11px; font-weight:600; color:#64748B">Remark only &middot; once per term</span>
                     {% else %}
@@ -291,10 +295,10 @@
                     {% endif %}
                 </div>
                 {% if sub in remark_subjects %}
-                <div class="score-box" style="background:{% if editable_subjects and sub not in editable_subjects %}#F1F5F9{% else %}#F8FAFC{% endif %}; max-width:360px">
+                <div class="score-box" style="background:{% if sub not in editable_subjects %}#F1F5F9{% else %}#F8FAFC{% endif %}; max-width:360px">
                     <label for="remark-{{ sub|slugify }}" style="display:block; font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:6px">Term remark</label>
                     <select id="remark-{{ sub|slugify }}" class="hf-select remark-input-val" data-subject="{{ sub }}" style="width:100%"
-                            {% if editable_subjects and sub not in editable_subjects %}data-readonly="1" disabled{% endif %}>
+                            {% if sub not in editable_subjects %}data-readonly="1" disabled{% endif %}>
                         <option value="">Not entered</option>
                         {% for c in remark_choices %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
                     </select>
@@ -302,7 +306,7 @@
                 {% else %}
                 <div class="score-grid">
                     {% for et in exam_types %}
-                    <div class="score-box" style="background:{% if editable_subjects and sub not in editable_subjects %}#F1F5F9{% elif et.code in open_exam_codes %}#F8FAFC{% else %}#F1F5F9{% endif %}">
+                    <div class="score-box" style="background:{% if sub not in editable_subjects %}#F1F5F9{% elif et.code in open_exam_codes %}#F8FAFC{% else %}#F1F5F9{% endif %}">
                         <div style="display:flex; justify-content:space-between; align-items:center">
                             <span style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase">{{ et.name }}</span>
                             <span style="font-size:10px; font-weight:600; color:#94A3B8; background:#F1F5F9; padding:2px 6px; border-radius:4px">{{ et.weight_percentage|floatformat:0 }}%</span>
@@ -310,7 +314,7 @@
                         <input type="number" step="1" min="0" max="{{ et.max_score }}"
                                data-subject="{{ sub }}" data-type="{{ et.code }}" data-type-name="{{ et.name }}" data-weight="{{ et.weight_percentage }}" data-max_score="{{ et.max_score }}"
                                class="score-field score-input-val" placeholder="0" oninput="calcSubjectAverage('{{ sub|slugify }}')" onblur="validatePrimaryScore(this)"
-                               {% if editable_subjects and sub not in editable_subjects or et.code not in open_exam_codes %}readonly style="background:#F1F5F9;color:#94A3B8;cursor:not-allowed"{% endif %}>
+                               {% if sub not in editable_subjects or et.code not in open_exam_codes %}readonly style="background:#F1F5F9;color:#94A3B8;cursor:not-allowed"{% endif %}>
                         {% if et.code not in open_exam_codes %}
                         <div style="font-size:9px;color:{% if et.code in closed_exam_codes %}#EF4444{% else %}#F59E0B{% endif %};margin-top:3px;font-weight:500">{% if et.code in closed_exam_codes %}{{ et.name }} window has ended{% else %}Opens when {{ et.name }} window starts{% endif %}</div>
                         {% endif %}
@@ -322,19 +326,22 @@
                 </div>
                 {% endif %}
             </div>
+            {% empty %}
+            <p class="empty-state">{% if assessment_is_remarks %}No remark-only subjects are available for this class and your teaching assignment.{% else %}No mark-bearing subjects are available for this class and your teaching assignment.{% endif %}</p>
             {% endfor %}
         </div>
 
         <div style="background:#fff; border:1px solid #E2E8F0; border-radius:16px; padding:24px; display:flex; justify-content:space-between; align-items:center">
             <button onclick="movePrev()" class="btn" style="border:1px solid #E2E8F0; padding:12px 24px; font-weight:600; border-radius:10px">&larr; Previous Student</button>
             <div style="display:flex; gap:12px">
-                <button onclick="saveAllScores()" class="hf-btn hf-btn-primary">Save Student Assessment</button>
+                <button onclick="saveAllScores()" class="hf-btn hf-btn-primary">{% if assessment_is_remarks %}Save Term Remarks{% else %}Save Student Assessment{% endif %}</button>
                 <button onclick="saveAndNext()" class="hf-btn hf-btn-warning">Save &amp; Next &rarr;</button>
             </div>
         </div>
     </div>
 </div>
 
+{% if not assessment_is_remarks %}
 <div id="amendModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);align-items:center;justify-content:center" onclick="if(event.target===this)closeAmendModal()">
   <div style="background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.2);width:100%;max-width:480px;margin:16px">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border)">
@@ -360,6 +367,8 @@
     </div>
   </div>
 </div>
+
+{% endif %}
 
 <script>
 const CLASS_NAME = "{{ selected_class }}";
@@ -675,6 +684,7 @@ window.validatePrimaryScore = function(inp) {
 };
 
 function calcGrandAverage() {
+    if (!document.getElementById("grand-avg")) return;
     const subjects = {};
     document.querySelectorAll(".score-input-val").forEach(inp => {
         const sub = inp.getAttribute("data-subject");

@@ -1,5 +1,5 @@
 """
-Communications views — FRD Section 11.
+Communications views  FRD Section 11.
 """
 from datetime import date
 
@@ -82,7 +82,7 @@ class MarkAllReadView(RoleRequiredMixin, View):
 
 
 class BroadcastListView(RoleRequiredMixin, ListView):
-    """Broadcast inbox — all roles see relevant broadcasts scoped to their audience."""
+    """Broadcast inbox  all roles see relevant broadcasts scoped to their audience."""
     template_name = "communications/broadcast_list.html"
     context_object_name = "broadcasts"
     paginate_by = 20
@@ -176,7 +176,7 @@ class BroadcastDetailView(RoleRequiredMixin, DetailView):
 
 
 class BroadcastUpdateView(RoleRequiredMixin, TemplateView):
-    """Edit a draft broadcast — FR-COM-001."""
+    """Edit a draft broadcast  FR-COM-001."""
     template_name = "communications/broadcast_compose.html"
     allowed_roles = [UserRole.ADMIN_OFFICER, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
     required_permission = "communications.change_broadcast"
@@ -323,7 +323,7 @@ class BroadcastSendView(RoleRequiredMixin, View):
 
 
 # ---------------------------------------------------------------------------
-# ECD Weekly Focus — FRD FR-COM-007 … FR-COM-010
+# ECD Weekly Focus  FRD FR-COM-007 … FR-COM-010
 # ---------------------------------------------------------------------------
 
 class WeeklyFocusListView(RoleRequiredMixin, TemplateView):
@@ -364,7 +364,7 @@ class WeeklyFocusListView(RoleRequiredMixin, TemplateView):
 
 
 class WeeklyFocusSubmitView(RoleRequiredMixin, TemplateView):
-    """ECD teacher submits a Weekly Focus for the current week — FR-COM-007/008."""
+    """ECD teacher submits a Weekly Focus for the current week  FR-COM-007/008."""
     template_name = "communications/weekly_focus_submit.html"
     allowed_roles = [UserRole.TEACHER, UserRole.ECD_HOD, UserRole.SUPER_ADMIN]
     required_permission = "communications.add_weeklyfocus"
@@ -488,7 +488,7 @@ class WeeklyFocusSubmitView(RoleRequiredMixin, TemplateView):
                 Notification(
                     recipient=u,
                     category=NotificationCategory.BROADCAST,
-                    title=f"Week {week_number} Focus — {class_name}: {theme}",
+                    title=f"Week {week_number} Focus  {class_name}: {theme}",
                     body=f"Planned activities:\n{planned_activities}" + (
                         f"\n\nItems to bring:\n{items_to_bring}" if items_to_bring else ""
                     ),
@@ -518,7 +518,7 @@ class WeeklyFocusSubmitView(RoleRequiredMixin, TemplateView):
 
 
 class WeeklyFocusEditView(RoleRequiredMixin, TemplateView):
-    """ECD teacher edits an existing Weekly Focus entry — FR-COM-007/008."""
+    """ECD teacher edits an existing Weekly Focus entry  FR-COM-007/008."""
     template_name = "communications/weekly_focus_submit.html"
     allowed_roles = [UserRole.TEACHER, UserRole.ECD_HOD, UserRole.SUPER_ADMIN]
     required_permission = "communications.add_weeklyfocus"
@@ -611,7 +611,7 @@ class WeeklyFocusEditView(RoleRequiredMixin, TemplateView):
 
 
 class WeeklyFocusComplianceView(RoleRequiredMixin, TemplateView):
-    """ECD HOD compliance view — which teachers have submitted this week — FR-COM-010."""
+    """ECD HOD compliance view  which teachers have submitted this week  FR-COM-010."""
     template_name = "communications/weekly_focus_compliance.html"
     allowed_roles = [UserRole.ECD_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
     required_permission = "communications.view_weeklyfocus"
@@ -646,7 +646,7 @@ class WeeklyFocusComplianceView(RoleRequiredMixin, TemplateView):
 
 
 class WeeklyFocusReviewView(RoleRequiredMixin, View):
-    """ECD HOD/HOS approves or rejects a submitted Weekly Focus — FR-COM-010."""
+    """ECD HOD/HOS approves or rejects a submitted Weekly Focus  FR-COM-010."""
     allowed_roles = [UserRole.ECD_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
     required_permission = "communications.change_weeklyfocus"
 
@@ -683,7 +683,7 @@ class WeeklyFocusReviewView(RoleRequiredMixin, View):
                 Notification(
                     recipient=u,
                     category=NotificationCategory.BROADCAST,
-                    title=f"Week {entry.week_number} Focus — {entry.class_name}: {entry.theme}",
+                    title=f"Week {entry.week_number} Focus  {entry.class_name}: {entry.theme}",
                     body=f"Planned activities:\n{entry.planned_activities}" + (
                         f"\n\nItems to bring:\n{entry.items_to_bring}" if entry.items_to_bring else ""
                     ),
@@ -750,7 +750,7 @@ class WeeklyFocusDetailView(RoleRequiredMixin, RedirectView):
 
 
 class WeeklyFocusParentView(RoleRequiredMixin, TemplateView):
-    """Parent view: shows published Weekly Focus for their child's ECD class — FR-COM-007."""
+    """Parent view: shows published Weekly Focus for their child's ECD class  FR-COM-007."""
     template_name = "communications/weekly_focus_parent.html"
     allowed_roles = [UserRole.PARENT]
     required_permission = "communications.view_weeklyfocus"
@@ -790,7 +790,7 @@ class WeeklyFocusParentView(RoleRequiredMixin, TemplateView):
 
 
 class RequestOTPView(View):
-    """POST {phone} — send OTP for parent verification (USSD/SMS gateway)."""
+    """POST {phone}  send OTP for parent verification (USSD/SMS gateway)."""
 
     def post(self, request):
         import json
@@ -818,7 +818,7 @@ class RequestOTPView(View):
 
 
 class VerifyOTPView(View):
-    """POST {phone, code} — verify OTP."""
+    """POST {phone, code}  verify OTP."""
 
     def post(self, request):
         import json

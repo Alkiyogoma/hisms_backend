@@ -1,5 +1,5 @@
 /**
- * Admissions Detail Page — HTMX post-request refresh logic.
+ * Admissions Detail Page  HTMX post-request refresh logic.
  * After status-changing actions, reload the page so server-rendered
  * conditional sections ({% if status == '...' %}) re-render correctly.
  */

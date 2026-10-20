@@ -1,5 +1,5 @@
 """
-Welfare observations app models — FRD Section 13 (ECD).
+Welfare observations app models  FRD Section 13 (ECD).
 """
 from django.conf import settings
 from django.db import models

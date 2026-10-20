@@ -80,7 +80,7 @@ class Command(BaseCommand):
         self.stdout.write(f"Mode: {mode}")
         self.stdout.write(f"Since: {since_date.isoformat()}")
         if dry_run:
-            self.stdout.write(self.style.WARNING("DRY RUN — no changes will be made"))
+            self.stdout.write(self.style.WARNING("DRY RUN  no changes will be made"))
 
         if mode == "full":
             self._run_full_migration(dry_run)

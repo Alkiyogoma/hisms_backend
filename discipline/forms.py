@@ -122,7 +122,7 @@ class DisciplineIncidentForm(forms.ModelForm):
                 attrs={
                     "class": "form-input",
                     "rows": 4,
-                    "placeholder": "Describe what happened — what was observed, reported, or witnessed.",
+                    "placeholder": "Describe what happened  what was observed, reported, or witnessed.",
                 }
             ),
             "action_taken": forms.Textarea(
@@ -164,7 +164,7 @@ class DisciplineIncidentForm(forms.ModelForm):
                 is_archived=False
             ).order_by("class_name", "last_name", "first_name")
 
-        # Teachers cannot select Critical severity — must escalate from lower
+        # Teachers cannot select Critical severity  must escalate from lower
         if self.user and self.user.role == "teacher":
             self.fields["severity"].choices = [
                 (k, v) for k, v in IncidentSeverity.choices

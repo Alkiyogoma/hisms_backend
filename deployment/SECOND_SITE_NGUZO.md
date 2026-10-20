@@ -5,7 +5,7 @@
 standard **80/443**. This runbook stands up `testing.hodari.ac.tz` as a fully
 **isolated** second stack so the two never collide.
 
-**Isolation contract — the second site gets its own everything:**
+**Isolation contract  the second site gets its own everything:**
 
 | Thing            | connect.hodari.ac.tz | testing.hodari.ac.tz (this) |
 |------------------|----------------------|---------------------------|
@@ -19,12 +19,12 @@ standard **80/443**. This runbook stands up `testing.hodari.ac.tz` as a fully
 
 > Prereq: a DNS **A record** `testing.hodari.ac.tz → 187.7.21.133`, and the
 > firewall allows **80 + 443** (`sudo ufw allow 80/tcp && sudo ufw allow 443/tcp`).
-> Both sites share standard 443 — nginx picks the right one by `server_name`.
+> Both sites share standard 443  nginx picks the right one by `server_name`.
 > The old 8070/8443 scheme is **not** needed and should not be used here.
 
 ---
 
-## 0. First: stop/clean any half-deployed nguzo (safe — never touches connect)
+## 0. First: stop/clean any half-deployed nguzo (safe  never touches connect)
 
 connect runs from `/opt/hodari`; everything below targets `/var/www/hodari` only.
 
@@ -56,7 +56,7 @@ python3 -m venv /var/www/hodari/venv
 ## 2. Its own `.env`
 
 Create `/var/www/hodari/hisms_backend/.env` with **its own** secret key, hosts,
-and — unless the two sites intentionally share data — **its own database** and
+and  unless the two sites intentionally share data  **its own database** and
 **its own Redis DB numbers** so tasks/cache don't cross over:
 
 ```
@@ -100,7 +100,7 @@ sudo ss -tlnp | grep 8009     # gunicorn should be listening here
 ```bash
 sudo cp /var/www/hodari/hisms_backend/deployment/nguzo/nginx_nguzo.conf /etc/nginx/sites-available/nguzo
 sudo ln -sf /etc/nginx/sites-available/nguzo /etc/nginx/sites-enabled/nguzo
-# Do NOT remove other sites-enabled entries — connect's `hodari` symlink must stay.
+# Do NOT remove other sites-enabled entries  connect's `hodari` symlink must stay.
 sudo mkdir -p /var/www/certbot
 sudo nginx -t && sudo systemctl reload nginx
 
@@ -113,13 +113,13 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ```bash
 curl -sI https://testing.hodari.ac.tz/  | head -1   # expect 200/302
-curl -sI https://connect.hodari.ac.tz/ | head -1   # still 200/302 — untouched
+curl -sI https://connect.hodari.ac.tz/ | head -1   # still 200/302  untouched
 ```
 
 ---
 
 ### Never do these on a multi-site box
-- ❌ `sudo cp .../hodari.service /etc/systemd/system/` (overwrites connect's unit) — use the `hodari-nguzo*` units above.
-- ❌ `sudo rm -f /etc/nginx/sites-enabled/default` / removing other symlinks — only add your own.
-- ❌ `sudo ufw enable` without `443/tcp` — drops the co-hosted site's HTTPS.
-- ❌ pointing the nguzo deploy at `/opt/hodari` — that is connect's tree.
+- ❌ `sudo cp .../hodari.service /etc/systemd/system/` (overwrites connect's unit)  use the `hodari-nguzo*` units above.
+- ❌ `sudo rm -f /etc/nginx/sites-enabled/default` / removing other symlinks  only add your own.
+- ❌ `sudo ufw enable` without `443/tcp`  drops the co-hosted site's HTTPS.
+- ❌ pointing the nguzo deploy at `/opt/hodari`  that is connect's tree.

@@ -1,5 +1,5 @@
 """
-Automated parent fee reminder schedules — run via management command or cron.
+Automated parent fee reminder schedules  run via management command or cron.
 
 Schedules:
   - due_soon: 3 days before due date (unpaid/partial)

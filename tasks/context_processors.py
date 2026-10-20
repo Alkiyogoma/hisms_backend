@@ -1,5 +1,5 @@
 """
-Task context processor — injects task counts into every page template
+Task context processor  injects task counts into every page template
 so the topbar can show a task badge/bell icon.
 """
 

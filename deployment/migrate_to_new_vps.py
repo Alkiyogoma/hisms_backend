@@ -154,8 +154,8 @@ def setup_django(client):
 
 def setup_services(client):
     step("Configuring services...")
-    # nginx — isolated site name/config so a co-hosted site (e.g. connect.hodari.ac.tz)
-    # is never overwritten. NEVER `rm sites-enabled/default` here — only add our own.
+    # nginx  isolated site name/config so a co-hosted site (e.g. connect.hodari.ac.tz)
+    # is never overwritten. NEVER `rm sites-enabled/default` here  only add our own.
     run(client, f"cp {BACKEND_DIR}/deployment/nguzo/nginx_nguzo.conf /etc/nginx/sites-available/nguzo")
     run(client, "ln -sf /etc/nginx/sites-available/nguzo /etc/nginx/sites-enabled/nguzo")
     out, _, _ = run(client, "nginx -t 2>&1")
@@ -165,7 +165,7 @@ def setup_services(client):
     else:
         warn(f"Nginx issue: {out[:200]}")
 
-    # systemd — isolated unit names (hodari-nguzo*) so connect's hodari* units are untouched
+    # systemd  isolated unit names (hodari-nguzo*) so connect's hodari* units are untouched
     run(client, f"cp {BACKEND_DIR}/deployment/nguzo/hodari-nguzo.service /etc/systemd/system/")
     run(client, f"cp {BACKEND_DIR}/deployment/nguzo/hodari-nguzo-celery.service /etc/systemd/system/")
     run(client, f"cp {BACKEND_DIR}/deployment/nguzo/hodari-nguzo-celery-beat.service /etc/systemd/system/")

@@ -14,7 +14,7 @@ def get_teacher_assigned_classes(user) -> set[str]:
         if (name or "").strip()
     }
 
-    # Also include classes from TeacherClassAssignment (TCA) — teachers may
+    # Also include classes from TeacherClassAssignment (TCA)  teachers may
     # have class assignments without timetable slots yet. Using a union
     # so both sources contribute (not a fallback).
     from hr.models import TeacherClassAssignment
@@ -72,7 +72,7 @@ def get_teacher_assigned_classes_from_tca(user) -> dict[str, dict]:
         if result:
             return result
 
-    # 2. Current term had no TCA — try any term with assignments
+    # 2. Current term had no TCA  try any term with assignments
     assignments = TeacherClassAssignment.objects.filter(
         teacher__user=user,
     ).select_related("grade_class").order_by("-term__start_date")
@@ -80,7 +80,7 @@ def get_teacher_assigned_classes_from_tca(user) -> dict[str, dict]:
     if result:
         return result
 
-    # 3. No TCA at all — fall back to timetable slots (include subjects)
+    # 3. No TCA at all  fall back to timetable slots (include subjects)
     from collections import defaultdict
     slot_classes = TimetableSlot.objects.filter(
         teacher=user,

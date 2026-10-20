@@ -5,7 +5,7 @@ from users.views import (
     HISMSPasswordChangeDoneView, UserCreateView, UserUpdateView,
     PasswordResetRequestView, PasswordResetDoneView,
     PasswordResetConfirmView, PasswordResetCompleteView,
-    ForceLogoutView, ReactivateUserView, ParentProfileEditView,
+    ForceLogoutView, ReactivateUserView, ArchiveUserView, ParentProfileEditView,
     AssignmentConflictCheckView,
 )
 from users.assignment_meta import StaffAssignmentMetaView
@@ -36,6 +36,7 @@ urlpatterns = [
     path("staff-assignment-meta/", StaffAssignmentMetaView.as_view(), name="staff_assignment_meta"),
     path("force-logout/<int:user_id>/", ForceLogoutView.as_view(), name="force_logout"),
     path("reactivate/<int:user_id>/", ReactivateUserView.as_view(), name="reactivate_user"),
+    path("archive/<int:user_id>/", ArchiveUserView.as_view(), name="archive_user"),
 
     # FRD AUTH-RESET-001: Password Reset Flow
     path("password-reset/", PasswordResetRequestView.as_view(), name="password_reset_request"),

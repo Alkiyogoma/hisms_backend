@@ -12,7 +12,7 @@
 
 <form method="get" style="display:flex;gap:16px;align-items:center;margin-bottom:20px;flex-wrap:wrap">
     <select name="config_id" style="padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:200px">
-        <option value="">— Choose Cycle —</option>
+        <option value=""> Choose Cycle —</option>
         {% for c in configs %}
         <option value="{{ c.pk }}" {% if selected_config_id|stringformat:"s" == c.pk|stringformat:"s" %}selected{% endif %}>
             {{ c.academic_year_from }} → {{ c.academic_year_to }}

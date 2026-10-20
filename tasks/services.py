@@ -1,5 +1,5 @@
 """
-Task Generation Service — auto-creates role-based tasks from module events.
+Task Generation Service  auto-creates role-based tasks from module events.
 
 Each generate_* function checks for existing pending tasks to avoid duplicates.
 All tasks link back to their source object via GenericForeignKey (content_type + object_id).
@@ -128,7 +128,7 @@ def generate_lesson_plan_review_tasks(lesson_plan):
     for hod in hods:
         task = _create_task(
             task_type='lesson_plan_review',
-            title=f"Review: {lesson_plan.class_name} — {lesson_plan.subject_name}",
+            title=f"Review: {lesson_plan.class_name}  {lesson_plan.subject_name}",
             description=f"Lesson plan submitted by {lesson_plan.teacher.get_full_name() or lesson_plan.teacher.username} for Week of {lesson_plan.week_start_date}. Please review and approve/reject.",
             assigned_to=hod,
             created_by=lesson_plan.teacher,
@@ -192,7 +192,7 @@ def generate_report_signoff_tasks(report_card):
     for hos in hos_users:
         task = _create_task(
             task_type='report_signoff',
-            title=f"Sign off: {report_card.student.first_name} {report_card.student.last_name} — {report_card.student.class_name}",
+            title=f"Sign off: {report_card.student.first_name} {report_card.student.last_name}  {report_card.student.class_name}",
             description=f"Report card for {report_card.term.name} is ready for sign-off. Student: {report_card.student.admission_no}.",
             assigned_to=hos,
             due_date=_due_end_of_term(),
@@ -221,7 +221,7 @@ def generate_exam_score_submission_task(teacher):
 
     return _create_task(
         task_type='grade_submission',
-        title=f"Enter exam scores — {term.name}",
+        title=f"Enter exam scores  {term.name}",
         description=f"Exam scores for {term.name} are pending. Enter scores for your assigned classes.",
         assigned_to=teacher,
         due_date=_due_end_of_term(),
@@ -254,7 +254,7 @@ def generate_weekly_focus_task(teacher):
     """Remind ECD teachers to submit Weekly Focus."""
     return _create_task(
         task_type='weekly_focus_submission',
-        title=f"Submit Weekly Focus — Week {timezone.now().isocalendar()[1]}",
+        title=f"Submit Weekly Focus  Week {timezone.now().isocalendar()[1]}",
         description="Weekly focus for your ECD classes is due. Include theme, activities, and items to bring.",
         assigned_to=teacher,
         due_date=_due_tomorrow(),
@@ -401,7 +401,7 @@ def generate_payment_matching_task(unmatched_payment):
     for user in finance_users:
         task = _create_task(
             task_type='payment_matching',
-            title=f"Match payment: TZS {unmatched_payment.amount:,.0f} — {unmatched_payment.reference or 'No ref'}",
+            title=f"Match payment: TZS {unmatched_payment.amount:,.0f}  {unmatched_payment.reference or 'No ref'}",
             description=f"Bank statement entry of TZS {unmatched_payment.amount:,.0f} needs to be matched to an invoice.",
             assigned_to=user,
             due_date=_due_tomorrow(),
@@ -430,7 +430,7 @@ def generate_overdue_invoice_task(invoice):
     for user in finance_users:
         task = _create_task(
             task_type='overdue_collection',
-            title=f"Follow up: {invoice.student.first_name} {invoice.student.last_name} — overdue fees",
+            title=f"Follow up: {invoice.student.first_name} {invoice.student.last_name}  overdue fees",
             description=f"Invoice {invoice.invoice_number} is overdue. Balance: TZS {invoice.total_due:,.0f}. Contact parent.",
             assigned_to=user,
             due_date=_due_tomorrow(),
@@ -469,7 +469,7 @@ def generate_fee_structure_task():
     for user in finance_users:
         task = _create_task(
             task_type='fee_verification',
-            title=f"Set up fee structures — {current_term.name}",
+            title=f"Set up fee structures  {current_term.name}",
             description=f"No fee structures configured for {current_term.name}. Set up tuition, activity, and uniform fees for all classes.",
             assigned_to=user,
             due_date=_due_this_week(),
@@ -505,7 +505,7 @@ def generate_welfare_alert_task(observation):
     for hod in hods:
         task = _create_task(
             task_type='welfare_alert',
-            title=f"Welfare alert: {observation.student.first_name} — {observation.get_severity_display()}",
+            title=f"Welfare alert: {observation.student.first_name}  {observation.get_severity_display()}",
             description=f"{'CRITICAL' if observation.severity == 'critical' else 'HIGH'} welfare observation for {observation.student.first_name} {observation.student.last_name} ({observation.student.class_name}). Requires immediate review.",
             assigned_to=hod,
             created_by=observation.submitted_by,
@@ -585,7 +585,7 @@ def generate_attendance_alert_task(student, attendance_rate):
 
     task = _create_task(
         task_type='attendance_alert',
-        title=f"Attendance alert: {student.first_name} — {attendance_rate:.0f}%",
+        title=f"Attendance alert: {student.first_name}  {attendance_rate:.0f}%",
         description=f"{student.first_name} {student.last_name}'s attendance has dropped to {attendance_rate:.0f}%, below the 85% threshold. Follow up with parent.",
         assigned_to=teacher_user,
         due_date=_due_tomorrow(),

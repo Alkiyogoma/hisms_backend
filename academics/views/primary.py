@@ -16,6 +16,7 @@ from academics.forms import LessonPlanForm, LessonPlanReviewForm, ExamScoreFilte
 from academics.utils import get_current_term
 from academics.models import (
     AcademicYear,
+    AssessmentMode,
     Department,
     ECDEvaluation,
     ExamScore,
@@ -116,10 +117,26 @@ def _invalid_scores_response(problems):
 
 
 class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
-    """View for Primary teachers to enter narrative comments in bulk."""
+    """Narrative comments for configured Primary and Lower Secondary classes."""
     template_name = "academics/primary_comments.html"
-    allowed_roles = [UserRole.TEACHER, UserRole.PRIMARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
+    allowed_roles = [UserRole.TEACHER, UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
     required_permission = "academics.change_reportcard"
+
+    def _comment_classes(self):
+        classes = GradeClass.objects.filter(
+            department__in=[Department.PRIMARY, Department.LOWER_SECONDARY],
+        )
+        if self.request.user.role == UserRole.TEACHER:
+            teacher_tca = get_teacher_assigned_classes_from_tca(self.request.user)
+            classes = classes.filter(name__in=[
+                name for name, info in teacher_tca.items() if info.get("is_class_teacher")
+            ])
+        else:
+            from core.scoping import hod_class_names
+            section_classes = hod_class_names(self.request.user)
+            if section_classes is not None:
+                classes = classes.filter(name__in=section_classes)
+        return classes.order_by("sort_order", "name")
 
     WORK_HABITS = [
         {"key": "wh_follows_directions", "label": "Follows directions"},
@@ -170,15 +187,15 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
         ctx["comment_window_endterm_end"] = endterm_end
         ctx["comment_window_grading_deadline"] = grading_dl
         
-        # Filter classes based on role — comments are class-teacher only
-        if self.request.user.role == UserRole.TEACHER:
-            from core.teacher_context import get_teacher_assigned_classes_from_tca
-            teacher_tca = get_teacher_assigned_classes_from_tca(self.request.user)
-            ctx["classes"] = sorted(c for c, info in teacher_tca.items() if info.get("is_class_teacher"))
-        else:
-            ctx["classes"] = sorted(grade_class_names_for_department(Department.PRIMARY))
-            
+        classes = {grade.name: grade for grade in self._comment_classes()}
+        ctx["classes"] = list(classes)
+
         selected_class = self.request.GET.get("class_name")
+        if selected_class and selected_class not in classes:
+            raise PermissionDenied("You do not have access to narrative comments for this class.")
+        ctx["selected_class"] = selected_class
+        if selected_class:
+            ctx["selected_department_label"] = classes[selected_class].get_department_display()
         if selected_class and term:
             students = Student.objects.filter(class_name=selected_class, is_archived=False).order_by("last_name", "first_name")
             
@@ -223,13 +240,8 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
                 rc = ReportCard.objects.select_related("student").get(pk=report_id)
             except (ReportCard.DoesNotExist, Exception):
                 return JsonResponse({"error": "Report card not found"}, status=404)
-            # Enforce class-teacher-only for TEACHER role
-            if request.user.role == UserRole.TEACHER:
-                from core.teacher_context import get_teacher_assigned_classes_from_tca
-                teacher_tca = get_teacher_assigned_classes_from_tca(request.user)
-                class_info = teacher_tca.get(rc.student.class_name, {})
-                if not class_info or not class_info.get("is_class_teacher"):
-                    return JsonResponse({"error": "Only the class teacher can enter narrative comments"}, status=403)
+            if rc.is_ecd_report or not self._comment_classes().filter(name=rc.student.class_name).exists():
+                return JsonResponse({"error": "You do not have access to narrative comments for this class."}, status=403)
             locked = _comment_lock_reason(rc, request.user)
             if locked:
                 return JsonResponse({"error": locked}, status=409)
@@ -248,7 +260,7 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
                 import logging
                 logging.getLogger(__name__).exception("Comment autosave failed for report %s", rc.pk)
                 return JsonResponse(
-                    {"error": "Not saved: the system could not save this comment. Your text is still in the box — try again."},
+                    {"error": "Not saved: the system could not save this comment. Your text is still in the box  try again."},
                     status=500,
                 )
             try:
@@ -267,6 +279,9 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
         term_id = request.POST.get("term_id") or request.POST.get("term")
         class_name = request.POST.get("class_name")
         action = request.POST.get("action")
+        grade_class = self._comment_classes().filter(name=class_name).first()
+        if grade_class is None:
+            raise PermissionDenied("You do not have access to narrative comments for this class.")
         from urllib.parse import urlencode
         back = f"{request.path}?" + urlencode({k: v for k, v in (("class_name", class_name), ("term", term_id)) if v})
         
@@ -288,15 +303,6 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
             )
             action = "save"
         
-        # RBAC: TEACHER scoped to class-teacher-only assignments
-        if request.user.role == UserRole.TEACHER:
-            from core.teacher_context import get_teacher_assigned_classes_from_tca
-            teacher_tca = get_teacher_assigned_classes_from_tca(request.user)
-            class_info = teacher_tca.get(class_name, {})
-            if not class_info or not class_info.get("is_class_teacher"):
-                messages.error(request, "Access denied: Only the class teacher can enter narrative comments.")
-                return redirect("academics:primary_comments_entry")
-            
         students = Student.objects.filter(class_name=class_name, is_archived=False)
         report_cards = ReportCard.objects.filter(term_id=term_id, student__in=students, is_ecd_report=False)
         
@@ -344,15 +350,21 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
                 # Notify HOD/HOS
                 from users.models import User
                 from communications.email_service import dispatch_notification
-                from core.teacher_context import is_ecd_teacher
-                
-                hod_roles = [UserRole.PRIMARY_HOD, UserRole.HEAD_OF_SCHOOL]
-                recipients = User.objects.filter(role__in=hod_roles, is_active=True).distinct()
+                from django.db.models import Q
+
+                hod_role = (
+                    UserRole.LOWER_SECONDARY_HOD
+                    if grade_class.department == Department.LOWER_SECONDARY else UserRole.PRIMARY_HOD
+                )
+                hod_roles = [hod_role, UserRole.HEAD_OF_SCHOOL]
+                recipients = User.objects.filter(
+                    Q(role__in=hod_roles) | Q(extra_roles__role__in=hod_roles), is_active=True,
+                ).distinct()
                 for rec in recipients:
                     dispatch_notification(
                         user=rec,
                         title="Comments Ready for Review",
-                        message=f"Teacher {request.user.get_full_name()} has submitted comments for {class_name} — {len(rc_ids)} student(s) ready for HOD/HOS review.",
+                        message=f"Teacher {request.user.get_full_name()} has submitted comments for {class_name}  {len(rc_ids)} student(s) ready for HOD/HOS review.",
                         link="/academics/reports/review-queue/",
                         actor=request.user
                     )
@@ -398,9 +410,40 @@ class ScoreCorrectionHistoryView(RoleRequiredMixin, TemplateView):
         return ctx
 
 
-class PrimaryScoreEntryView(ScoreEntryAccessMixin, RoleRequiredMixin, TemplateView):
+class SubjectAssessmentEntryMixin:
+    """Keep score and term-remark entry separate using the Subjects setting."""
+
+    assessment_mode = AssessmentMode.MARKS
+    assessment_department = None
+
+    def assessment_context(self, ctx):
+        qs = Subject.objects.filter(
+            is_active=True,
+            assessment_mode=self.assessment_mode,
+        )
+        if self.request.user.role == UserRole.TEACHER:
+            qs = qs.filter(name__in=ctx.get("subjects", []))
+        else:
+            qs = qs.filter(classes__name=ctx.get("selected_class"))
+        subjects = set(qs.values_list("name", flat=True))
+        ctx["subjects"] = sorted(subjects)
+        ctx["remark_subjects"] = subjects if self.assessment_mode == AssessmentMode.REMARK else set()
+        ctx["editable_subjects"] = (
+            set(ctx.get("editable_subjects", [])) & subjects
+            if self.request.user.role == UserRole.TEACHER else subjects
+        )
+        ctx["submit_subjects"] = sorted(ctx["editable_subjects"]) if self.assessment_mode == AssessmentMode.MARKS else []
+        ctx["assessment_is_remarks"] = self.assessment_mode == AssessmentMode.REMARK
+        prefix = "primary" if self.assessment_department == Department.PRIMARY else "lower_secondary"
+        ctx["score_entry_url"] = f"academics:{prefix}_assessment"
+        ctx["remark_entry_url"] = f"academics:{prefix}_remarks"
+        return ctx
+
+
+class PrimaryScoreEntryView(SubjectAssessmentEntryMixin, ScoreEntryAccessMixin, RoleRequiredMixin, TemplateView):
     """New focused score entry view for Primary students matching ECD UI."""
     template_name = "academics/primary_score_entry.html"
+    assessment_department = Department.PRIMARY
     allowed_roles = [UserRole.TEACHER, UserRole.PRIMARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
     # Viewing needs either permission (Head of School holds view only, and
     # changes approved grades from this page); saving still needs change.
@@ -493,24 +536,12 @@ class PrimaryScoreEntryView(ScoreEntryAccessMixin, RoleRequiredMixin, TemplateVi
                     subjects = assigned_subjects
                 ctx["subjects"] = sorted(subjects)
                 ctx["editable_subjects"] = assigned_subjects
-            else:
-                # For HOD/Admin, show all subjects that have scores or are in timetable
-                from timetable.models import TimetableSlot
-                from academics.models import ExamScore
-                subs = set(TimetableSlot.objects.filter(class_name=selected_class).values_list("subject_name", flat=True))
-                subs.update(ExamScore.objects.filter(student__class_name=selected_class).values_list("subject_name", flat=True))
-                if not subs:
-                    from academics.models import Subject
-                    subs = set(Subject.objects.filter(department=Department.PRIMARY).values_list("name", flat=True))
-                ctx["subjects"] = sorted(list(subs))
-                ctx["editable_subjects"] = set(subs)
-        
         ctx["academics_tab"] = "primary_assessment"
-        from academics.remarks import REMARK_CHOICES, remark_subject_names
-        ctx["remark_subjects"] = remark_subject_names(ctx.get("subjects") or [])
+        from academics.remarks import REMARK_CHOICES
+        ctx = self.assessment_context(ctx)
         ctx["remark_choices"] = REMARK_CHOICES
 
-        if selected_class and ctx.get("current_term"):
+        if selected_class and ctx.get("current_term") and not ctx["assessment_is_remarks"]:
             from academics.models import ExamScore, ScoreStatus
             # Scoped to the subjects this user can edit: another teacher's
             # submission or approval must not mark this teacher's work as done.
@@ -764,7 +795,7 @@ class PrimaryScoreAPIView(ScoreEntryAccessMixin, RoleRequiredMixin, View):
                 except (ValueError, DecimalException, KeyError):
                     continue
 
-                # Check for existing individual lock (skip returned scores — teacher must be able to correct them)
+                # Check for existing individual lock (skip returned scores  teacher must be able to correct them)
                 existing = ExamScore.objects.filter(
                     student=student, 
                     term=term, 
@@ -830,7 +861,7 @@ class PrimaryScoreAPIView(ScoreEntryAccessMixin, RoleRequiredMixin, View):
                         request=request,
                     )
                 elif existing and existing.score != score_val:
-                    # Correction tracking — don't auto-lock; HOD approval handles locking
+                    # Correction tracking  don't auto-lock; HOD approval handles locking
                     score_obj.previous_score = existing.score
                     score_obj.corrected_by = request.user
                     score_obj.correction_reason = "Corrected via primary assessment"
@@ -905,7 +936,7 @@ class PrimaryBulkSubmissionAPIView(RoleRequiredMixin, View):
         students = Student.objects.filter(class_name=class_name, is_archived=False)
 
         # Hard-gate: reject submission if any score's exam window hasn't opened.
-        # Skip quiz — quiz scores are saved with a warning at save time; the
+        # Skip quiz  quiz scores are saved with a warning at save time; the
         # submit should not re-block them.
         from academics.utils import check_score_entry_allowed
         from academics.models import ExamScore, ScoreStatus
@@ -949,7 +980,7 @@ class PrimaryBulkSubmissionAPIView(RoleRequiredMixin, View):
                     tca = get_teacher_assigned_classes_from_tca(request.user)
                     class_info = tca.get(class_name, {})
                     allowed_subjects = class_info.get("subjects", set())
-                    # Only the teacher's own subjects — never other teachers' drafts.
+                    # Only the teacher's own subjects  never other teachers' drafts.
                     score_qs = score_qs.filter(subject_name__in=allowed_subjects)
                 if subject:
                     score_qs = score_qs.filter(subject_name=subject)
@@ -966,12 +997,12 @@ class PrimaryBulkSubmissionAPIView(RoleRequiredMixin, View):
                         action_type="EXAM_SCORE_SUBMITTED",
                         model_name="ExamScore",
                         object_id=sid,
-                        description=f"Score submitted for {student.admission_no} via primary assessment — {class_name}",
+                        description=f"Score submitted for {student.admission_no} via primary assessment  {class_name}",
                         request=request,
                     )
 
                 # The report is pending sign-off only once every subject is
-                # submitted or approved — one subject's submission is not enough.
+                # submitted or approved  one subject's submission is not enough.
                 from academics.score_progress import sync_report_status
                 sync_report_status(student, term)
         
@@ -1002,9 +1033,10 @@ class PrimaryBulkSubmissionAPIView(RoleRequiredMixin, View):
 # LOWER SECONDARY ASSESSMENT (Grade 7–9)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class LowerSecondaryScoreEntryView(ScoreEntryAccessMixin, RoleRequiredMixin, TemplateView):
+class LowerSecondaryScoreEntryView(SubjectAssessmentEntryMixin, ScoreEntryAccessMixin, RoleRequiredMixin, TemplateView):
     """Score entry view for Lower Secondary students (Grade 7–9)."""
     template_name = "academics/lower_secondary_score_entry.html"
+    assessment_department = Department.LOWER_SECONDARY
     allowed_roles = [UserRole.TEACHER, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
     # Viewing needs either permission (Head of School holds view only, and
     # changes approved grades from this page); saving still needs change.
@@ -1090,23 +1122,12 @@ class LowerSecondaryScoreEntryView(ScoreEntryAccessMixin, RoleRequiredMixin, Tem
                     subjects = assigned_subjects
                 ctx["subjects"] = sorted(subjects)
                 ctx["editable_subjects"] = assigned_subjects
-            else:
-                from timetable.models import TimetableSlot
-                from academics.models import ExamScore
-                subs = set(TimetableSlot.objects.filter(class_name=selected_class).values_list("subject_name", flat=True))
-                subs.update(ExamScore.objects.filter(student__class_name=selected_class).values_list("subject_name", flat=True))
-                if not subs:
-                    from academics.models import Subject
-                    subs = set(Subject.objects.filter(department=Department.LOWER_SECONDARY).values_list("name", flat=True))
-                ctx["subjects"] = sorted(list(subs))
-                ctx["editable_subjects"] = set(subs)
-
         ctx["academics_tab"] = "lower_secondary_assessment"
-        from academics.remarks import REMARK_CHOICES, remark_subject_names
-        ctx["remark_subjects"] = remark_subject_names(ctx.get("subjects") or [])
+        from academics.remarks import REMARK_CHOICES
+        ctx = self.assessment_context(ctx)
         ctx["remark_choices"] = REMARK_CHOICES
 
-        if selected_class and ctx.get("current_term"):
+        if selected_class and ctx.get("current_term") and not ctx["assessment_is_remarks"]:
             from academics.models import ExamScore, ScoreStatus
             # Scoped to the subjects this user can edit: another teacher's
             # submission or approval must not mark this teacher's work as done.
@@ -1509,7 +1530,7 @@ class LowerSecondaryBulkSubmissionAPIView(RoleRequiredMixin, View):
                     tca = get_teacher_assigned_classes_from_tca(request.user)
                     class_info = tca.get(class_name, {})
                     allowed_subjects = class_info.get("subjects", set())
-                    # Only the teacher's own subjects — never other teachers' drafts.
+                    # Only the teacher's own subjects  never other teachers' drafts.
                     score_qs = score_qs.filter(subject_name__in=allowed_subjects)
                 if subject:
                     score_qs = score_qs.filter(subject_name=subject)
@@ -1521,12 +1542,12 @@ class LowerSecondaryBulkSubmissionAPIView(RoleRequiredMixin, View):
                     log_event(
                         actor=request.user, action_type="EXAM_SCORE_SUBMITTED",
                         model_name="ExamScore", object_id=sid,
-                        description=f"Score submitted for {student.admission_no} via lower secondary assessment — {class_name}",
+                        description=f"Score submitted for {student.admission_no} via lower secondary assessment  {class_name}",
                         request=request,
                     )
 
                 # The report is pending sign-off only once every subject is
-                # submitted or approved — one subject's submission is not enough.
+                # submitted or approved  one subject's submission is not enough.
                 from academics.score_progress import sync_report_status
                 sync_report_status(student, term)
 

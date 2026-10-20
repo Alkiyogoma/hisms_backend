@@ -13,7 +13,7 @@ urlpatterns = [
     path("broadcasts/<int:pk>/edit/", views.BroadcastUpdateView.as_view(), name="broadcast_edit"),
     path("broadcasts/<int:pk>/delete/", views.BroadcastDeleteView.as_view(), name="broadcast_delete"),
     path("broadcasts/<int:pk>/send/", views.BroadcastSendView.as_view(), name="broadcast_send"),
-    # ECD Weekly Focus — FR-COM-007…010
+    # ECD Weekly Focus  FR-COM-007…010
     path("weekly-focus/", views.WeeklyFocusListView.as_view(), name="weekly_focus_list"),
     path("weekly-focus/submit/", views.WeeklyFocusSubmitView.as_view(), name="weekly_focus_submit"),
     path("weekly-focus/<int:pk>/edit/", views.WeeklyFocusEditView.as_view(), name="weekly_focus_edit"),

@@ -35,7 +35,7 @@
 .btn:disabled, .btn.is-disabled { opacity: .55; pointer-events: none; }
 .btn svg, .hf-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
 
-/* Variants — the single source of truth for button colour */
+/* Variants  the single source of truth for button colour */
 .btn-primary, .hf-btn-primary { background: var(--hodari-blue); color: #fff; border-color: var(--hodari-blue); }
 .btn-primary:hover, .hf-btn-primary:hover { background: var(--hodari-blue-dark); border-color: var(--hodari-blue-dark); box-shadow: 0 3px 10px rgba(2,58,165,.28); }
 

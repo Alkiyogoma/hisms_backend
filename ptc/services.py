@@ -1,4 +1,4 @@
-# PTC Service Layer — Business logic for Learner Progress Report module.
+# PTC Service Layer  Business logic for Learner Progress Report module.
 #
 # Adjustment notes vs FRD assumptions:
 # - Core subjects are read dynamically from the GradeClass subject M2M, not hardcoded.
@@ -33,11 +33,11 @@ PASS_THRESHOLD = 50  # FR-PTC-029: ≥ 50% = Yes for "Meets Academic Expectation
 IMPROVING_THRESHOLD = 3  # percentage points
 NEEDS_ATTENTION_THRESHOLD = -3
 
-# Feature flag: OI-PTC-01 — attendance summary on PTC screen.
+# Feature flag: OI-PTC-01  attendance summary on PTC screen.
 # Defaults to off; set PTC_SHOW_ATTENDANCE_SUMMARY=True in settings to enable.
 SHOW_ATTENDANCE = getattr(settings, "PTC_SHOW_ATTENDANCE_SUMMARY", False)
 
-# Hardcoded ECD fallback names — used when Department.ECD lookup is unavailable.
+# Hardcoded ECD fallback names  used when Department.ECD lookup is unavailable.
 ECD_FALLBACK_NAMES = {"Pre-Kindergarten", "Kindergarten", "Pre-School", "ABC Class"}
 
 
@@ -200,7 +200,7 @@ def get_academic_performance_grid(student, academic_year) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Weighted Average — reuses existing ExamTypeConfiguration weights
+# Weighted Average  reuses existing ExamTypeConfiguration weights
 # ---------------------------------------------------------------------------
 
 def calculate_weighted_average(
@@ -212,7 +212,7 @@ def calculate_weighted_average(
     """
     Calculate weighted average from exam scores using configured exam weights.
     Delegates to compute_grade_with_gaps() for redistribution logic.
-    Returns None if no scores available (case 7 — all missing).
+    Returns None if no scores available (case 7  all missing).
     Accepts optional weights dict to avoid repeated DB queries.
     """
     result = compute_grade_with_gaps(quiz, mid_term, end_term, weights=weights)
@@ -244,7 +244,7 @@ def _compare_baseline_term_to_term(
     all_terms_averages: list[float] | None = None,
 ) -> Optional[float]:
     """
-    OI-PTC-03: Default comparison baseline — term-to-term.
+    OI-PTC-03: Default comparison baseline  term-to-term.
     Compares current overall average to the previous term's overall average.
     Isolated in its own function so the comparison can be swapped to exam-to-exam
     later without touching the rest of the trend logic.
@@ -464,7 +464,7 @@ def _get_ptc_eligible_students(user, ptc_window=None):
     from students.models import Student
     from academics.models import GradeClass, Department
 
-    # Exclude ECD students — enforced at query level
+    # Exclude ECD students  enforced at query level
     ecd_class_names = set(
         GradeClass.objects.filter(department=Department.ECD).values_list("name", flat=True)
     )

@@ -2,7 +2,7 @@
 Exam average, total and grade on the printed progress report.
 
 Regression for: a learner with one approved mark (Mathematics, 83) was printed
-"Exam average 51.00, D, Basic — 2 of 16 subjects · incomplete": the average
+"Exam average 51.00, D, Basic  2 of 16 subjects · incomplete": the average
 was taken from partial marks, remark-only subjects were counted, and a stale
 stored average was preferred. The average, total and grade now come only from
 approved, mark-bearing subjects, and nothing is printed until the term's

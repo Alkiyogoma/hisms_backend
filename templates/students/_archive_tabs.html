@@ -1,0 +1,5 @@
+<nav class="sub-nav" aria-label="{{ directory_label }} archive">
+  <a href="{% url directory_url %}" class="sub-tab {% if archive_status == 'active' %}active{% endif %}">Active {{ directory_label }}</a>
+  <a href="{% url directory_url %}?archive_status=archived" class="sub-tab {% if archive_status == 'archived' %}active{% endif %}">Archived {{ directory_label }}</a>
+  <a href="{% url directory_url %}?archive_status=all" class="sub-tab {% if archive_status == 'all' %}active{% endif %}">All {{ directory_label }}</a>
+</nav>

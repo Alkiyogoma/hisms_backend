@@ -1,4 +1,4 @@
-// Hodari Attendance PWA — Service Worker
+// Hodari Attendance PWA  Service Worker
 // Version is fetched dynamically from the server config endpoint.
 // When pwa_version changes in admin settings, all users get the new version.
 

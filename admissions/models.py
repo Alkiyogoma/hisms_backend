@@ -59,7 +59,7 @@ class DirectEnrolmentReason(models.TextChoices):
     RETURNING = "returning", "Returning student"
 
 
-# Common schools in Dar es Salaam area — used by get_previous_school_choices()
+# Common schools in Dar es Salaam area  used by get_previous_school_choices()
 COMMON_SCHOOLS = [
     "Aga Khan Primary School",
     "Al Muntazir Primary School",
@@ -350,7 +350,7 @@ class Applicant(TimeStampedModel):
             last = Applicant.objects.order_by("-pk").first()
             next_num = (last.pk + 1) if last else 1
             self.reference_number = f"ADM-{next_num:04d}"
-        # Sanitize all text fields before persisting — prevents stored XSS
+        # Sanitize all text fields before persisting  prevents stored XSS
         # regardless of whether data enters via form, API, or admin.
         for field_name in self._SANITIZABLE_FIELDS:
             val = getattr(self, field_name, None)
@@ -475,7 +475,7 @@ class AssessmentSchedule(TimeStampedModel):
 
     # FR-ACAD-010 / FR-ACAD-011: Results and Sign-off
     teacher_comments = models.TextField(blank=True)
-    hod_comments = models.TextField(blank=True, help_text="Internal staff comments — never shown to parents")
+    hod_comments = models.TextField(blank=True, help_text="Internal staff comments  never shown to parents")
     parent_facing_comments = models.TextField(blank=True, help_text="Feedback visible to parents (e.g. in offer letter or denial email)")
     result = models.CharField(
         max_length=20,

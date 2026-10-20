@@ -33,7 +33,7 @@ from .models import (
 
 # Roles that may reach finance module pages when Role Config grants them the
 # matching finance.* permission. The per-view required_permission still gates
-# every page, so listing a role here only widens who can be admitted — never
+# every page, so listing a role here only widens who can be admitted  never
 # what they can see. Sensitive per-student views keep narrower lists.
 _FINANCE_MODULE_ROLES = [
     UserRole.FINANCE_OFFICER,
@@ -226,7 +226,7 @@ class FinanceDashboardView(RoleRequiredMixin, TemplateView):
             term_q = Q(term=current_term)
             if current_term.start_date and current_term.end_date:
                 if today < current_term.start_date:
-                    # Term hasn't started yet — include all termless invoices (e.g. assessments created before term)
+                    # Term hasn't started yet  include all termless invoices (e.g. assessments created before term)
                     term_q |= Q(term__isnull=True)
                 else:
                     term_q |= Q(term__isnull=True, created_at__date__gte=current_term.start_date, created_at__date__lte=current_term.end_date)
@@ -251,7 +251,7 @@ class FinanceDashboardView(RoleRequiredMixin, TemplateView):
                 "outstand_rate": round(outstand_rate, 1),
             })
             
-            # Collection by class for bar chart — batched to avoid N+1
+            # Collection by class for bar chart  batched to avoid N+1
             class_billed = dict(
                 term_invoices.values("student__class_name")
                 .annotate(t=Sum("total_due"))
@@ -277,11 +277,11 @@ class FinanceDashboardView(RoleRequiredMixin, TemplateView):
                 })
             ctx["collection_by_class"] = class_data
 
-            # Open invoices count — scoped to the same term as billed/received
+            # Open invoices count  scoped to the same term as billed/received
             open_invoices = term_invoices.exclude(status=InvoiceStatus.PAID).count()
             ctx["open_invoices"] = open_invoices
 
-            # Outstanding from prior terms — invoices on any other term
+            # Outstanding from prior terms  invoices on any other term
             prior_invoices = Invoice.objects.exclude(status=InvoiceStatus.PAID).exclude(term=current_term)
             ctx["prior_term_open_count"] = prior_invoices.count()
             ctx["prior_term_open_amount"] = prior_invoices.aggregate(t=Sum("total_due"))["t"] or 0
@@ -302,7 +302,7 @@ class FinanceDashboardView(RoleRequiredMixin, TemplateView):
             ctx["prior_term_open_count"] = 0
             ctx["prior_term_open_amount"] = 0
         
-        # FR-FIN-016: HOS sees summary only — no individual student payment data
+        # FR-FIN-016: HOS sees summary only  no individual student payment data
         is_hos = self.request.user.role == UserRole.HEAD_OF_SCHOOL
         
         # Alert Queues
@@ -310,7 +310,7 @@ class FinanceDashboardView(RoleRequiredMixin, TemplateView):
         ctx["overdue_count"] = overdue_invoices.count()
         if not is_hos:
             ctx["overdue_invoices"] = overdue_invoices.select_related("student").order_by("due_date")[:10]
-            # Overdue accounts with days calculation — batched to avoid N+1
+            # Overdue accounts with days calculation  batched to avoid N+1
             top10_ids = list(overdue_invoices.select_related("student").order_by("due_date")[:10].values_list("id", flat=True))
             paid_by_invoice = dict(
                 Payment.objects.filter(invoice_id__in=top10_ids, is_reversal=False)
@@ -528,7 +528,7 @@ class RecordPaymentView(RoleRequiredMixin, View):
             if amt <= 0:
                 raise ValueError("Amount must be positive")
 
-            # FR-FIN-009: Prevent overpayment — amount must not exceed remaining balance
+            # FR-FIN-009: Prevent overpayment  amount must not exceed remaining balance
             total_paid = invoice.payments.filter(is_reversal=False).aggregate(Sum("amount"))["amount__sum"] or 0
             remaining_balance = float(invoice.total_due) - float(total_paid)
             if amt > remaining_balance:
@@ -659,7 +659,7 @@ class PaymentCorrectionView(RoleRequiredMixin, View):
                     request=request,
                 )
                 
-                # 2. Corrected entry is mandatory — FR-FIN-011
+                # 2. Corrected entry is mandatory  FR-FIN-011
                 if not new_amount:
                     raise ValueError("A corrected amount is required. Reversal without correction is not allowed.")
                 amt = float(new_amount)
@@ -730,7 +730,7 @@ class PaymentCorrectionView(RoleRequiredMixin, View):
 
 class BatchPaymentView(RoleRequiredMixin, TemplateView):
     """
-    Batch payment recording — record payments for multiple students at once,
+    Batch payment recording  record payments for multiple students at once,
     grouped by term and class.
     """
     template_name = "finance/batch_payment.html"
@@ -1313,7 +1313,7 @@ class UnmatchedPaymentListView(RoleRequiredMixin, ListView):
 
 class FeeStructureSetupView(RoleRequiredMixin, TemplateView):
     """
-    Comprehensive fee structure setup screen — A1.1.
+    Comprehensive fee structure setup screen  A1.1.
     Shows: academic year / term selector → department tabs (ECD / Primary / Lower Secondary) →
     class-level fee cards with inline-editable fields, audit trail, and copy-from-previous.
     """
@@ -1605,7 +1605,7 @@ class SendInvoiceReminderView(RoleRequiredMixin, View):
 
 class InvoiceCorrectionView(RoleRequiredMixin, TemplateView):
     """
-    A4 — Correct a non-finalized invoice via reversal entry.
+    A4  Correct a non-finalized invoice via reversal entry.
     Only Super Admin and Finance Officer can perform invoice corrections.
     """
     template_name = "finance/invoice_correction.html"
@@ -1701,7 +1701,7 @@ class InvoiceCorrectionView(RoleRequiredMixin, TemplateView):
 
 class BulkInvoicePrintView(RoleRequiredMixin, View):
     """
-    A4 — Bulk print / PDF multiple invoices at once.
+    A4  Bulk print / PDF multiple invoices at once.
     Accepts comma-separated invoice IDs via GET param `ids`.
     """
     allowed_roles = _FINANCE_MODULE_ROLES
@@ -2340,7 +2340,7 @@ class RecurringExpenseCreateView(RoleRequiredMixin, TemplateView):
 
 
 class RecurringExpenseProcessView(RoleRequiredMixin, View):
-    """Process all due recurring expenses — creates actual Expense entries."""
+    """Process all due recurring expenses  creates actual Expense entries."""
     allowed_roles = [UserRole.FINANCE_OFFICER, UserRole.SUPER_ADMIN]
     required_permission = "finance.change_expense"
 
@@ -2586,7 +2586,7 @@ class FinancialReportsView(RoleRequiredMixin, TemplateView):
 
 class ClassCollectionDetailView(RoleRequiredMixin, TemplateView):
     """
-    Collection details for a specific class — drill-down from dashboard bar chart.
+    Collection details for a specific class  drill-down from dashboard bar chart.
     Shows class summary + per-student breakdown.
     """
     template_name = "finance/class_collection_detail.html"
@@ -2774,7 +2774,7 @@ class ManualInvoiceCreateView(RoleRequiredMixin, TemplateView):
 
 
 class ReportCSVExportView(RoleRequiredMixin, View):
-    """A5.3 — Export any report type as CSV."""
+    """A5.3  Export any report type as CSV."""
     allowed_roles = _FINANCE_MODULE_ROLES
     required_permission = "finance.view_invoice"
 
@@ -2903,7 +2903,7 @@ class FeeStructurePublishView(RoleRequiredMixin, View):
 
 
 class FeeStructureLockView(RoleRequiredMixin, View):
-    """A1.2 — Lock a published fee structure (Published → Locked). Only Super Admin and Finance Officer."""
+    """A1.2  Lock a published fee structure (Published → Locked). Only Super Admin and Finance Officer."""
     allowed_roles = [UserRole.SUPER_ADMIN, UserRole.FINANCE_OFFICER]
     required_permission = "finance.change_feestructure"
 
@@ -2928,7 +2928,7 @@ class FeeStructureLockView(RoleRequiredMixin, View):
 
 
 class FeeStructureUnlockView(RoleRequiredMixin, View):
-    """A1.2 — Unlock a locked fee structure (Locked → Published). Only Super Admin and Finance Officer."""
+    """A1.2  Unlock a locked fee structure (Locked → Published). Only Super Admin and Finance Officer."""
     allowed_roles = [UserRole.SUPER_ADMIN, UserRole.FINANCE_OFFICER]
     required_permission = "finance.change_feestructure"
 
@@ -3002,7 +3002,7 @@ class StudentAccountStatementView(RoleRequiredMixin, TemplateView):
 
 class OverdueAccountsListView(RoleRequiredMixin, TemplateView):
     """
-    A4.1 — Dedicated Overdue Accounts screen.
+    A4.1  Dedicated Overdue Accounts screen.
     Shows all overdue invoices with sorting, color-coding by days overdue,
     bulk selection, and direct reminder actions.
     """
@@ -3425,7 +3425,7 @@ class AssessmentFeeInvoiceView(RoleRequiredMixin, TemplateView):
                 )
 
                 # Status transition is handled by RecordPaymentView.confirm_assessment_fee_paid()
-                # when payment is actually received — not at invoice creation time
+                # when payment is actually received  not at invoice creation time
 
                 log_event(
                     actor=request.user,
@@ -3448,12 +3448,12 @@ class AssessmentFeeInvoiceView(RoleRequiredMixin, TemplateView):
 
 
 # =====================================================================
-# A6 — Finance Period Management, Opening Balances & System Config
+# A6  Finance Period Management, Opening Balances & System Config
 # =====================================================================
 
 class FinancePeriodListView(RoleRequiredMixin, ListView):
     """
-    A6 — List all finance periods with reconciliation status and summaries.
+    A6  List all finance periods with reconciliation status and summaries.
     """
     template_name = "finance/period_list.html"
     context_object_name = "periods"
@@ -3495,7 +3495,7 @@ class FinancePeriodListView(RoleRequiredMixin, ListView):
 
 class FinancePeriodCreateView(RoleRequiredMixin, TemplateView):
     """
-    A6 — Create or edit a finance period.
+    A6  Create or edit a finance period.
     """
     template_name = "finance/period_form.html"
     allowed_roles = [UserRole.FINANCE_OFFICER, UserRole.SUPER_ADMIN]
@@ -3569,7 +3569,7 @@ class FinancePeriodCreateView(RoleRequiredMixin, TemplateView):
 
 class FinancePeriodDetailView(RoleRequiredMixin, DetailView):
     """
-    A6 — View finance period details with reconciliation status,
+    A6  View finance period details with reconciliation status,
     opening balances, and financial summaries.
     """
     template_name = "finance/period_detail.html"
@@ -3598,7 +3598,7 @@ class FinancePeriodDetailView(RoleRequiredMixin, DetailView):
 
 class FinancePeriodReconcileView(RoleRequiredMixin, View):
     """
-    A6 — Reconcile (lock) a finance period.
+    A6  Reconcile (lock) a finance period.
     Once reconciled, invoices and payments in this period become read-only.
     """
     allowed_roles = [UserRole.FINANCE_OFFICER, UserRole.SUPER_ADMIN]
@@ -3635,7 +3635,7 @@ class FinancePeriodReconcileView(RoleRequiredMixin, View):
 
 class OpeningBalanceSetupView(RoleRequiredMixin, TemplateView):
     """
-    A6 — Set up opening balances for a finance period.
+    A6  Set up opening balances for a finance period.
     Allows adding multiple opening balance entries (receivables, payables, etc.).
     """
     template_name = "finance/opening_balance.html"
@@ -3720,7 +3720,7 @@ class OpeningBalanceSetupView(RoleRequiredMixin, TemplateView):
 
 class FinanceConfigView(RoleRequiredMixin, TemplateView):
     """
-    A6 — System-wide finance configuration settings.
+    A6  System-wide finance configuration settings.
     Manages defaults for invoices, payments, reminders, and late fees.
     """
     template_name = "finance/finance_config.html"
@@ -3782,12 +3782,12 @@ class FinanceConfigView(RoleRequiredMixin, TemplateView):
 
 
 # =====================================================================
-# A7 — Budget & Expense Enhancements
+# A7  Budget & Expense Enhancements
 # =====================================================================
 
 class BudgetDetailView(RoleRequiredMixin, DetailView):
     """
-    A7 — Budget detail showing allocation vs actual spending,
+    A7  Budget detail showing allocation vs actual spending,
     expense breakdown, and remaining budget analysis.
     """
     model = Budget
@@ -3815,7 +3815,7 @@ class BudgetDetailView(RoleRequiredMixin, DetailView):
             "is_low_buffer": remaining < allocated / 4 if allocated > 0 else False,
         })
 
-        # Expense breakdown — approved expenses against this budget
+        # Expense breakdown  approved expenses against this budget
         expenses = Expense.objects.filter(
             term=budget.term,
             category=budget.category,
@@ -3835,12 +3835,12 @@ class BudgetDetailView(RoleRequiredMixin, DetailView):
 
         ctx["monthly_breakdown"] = list(monthly)
 
-        # Related budgets — other categories for the same term
+        # Related budgets  other categories for the same term
         ctx["related_budgets"] = Budget.objects.filter(
             term=budget.term
         ).exclude(pk=budget.pk).order_by("category")
 
-        # Projection — if days elapsed in term > 50% and spending > 75% of budget, flag
+        # Projection  if days elapsed in term > 50% and spending > 75% of budget, flag
         if budget.term.start_date and budget.term.end_date:
             from datetime import date
             today = date.today()
@@ -3859,7 +3859,7 @@ class BudgetDetailView(RoleRequiredMixin, DetailView):
 
 class BudgetVsActualReportView(RoleRequiredMixin, TemplateView):
     """
-    A7 — Budget vs Actual comparison report.
+    A7  Budget vs Actual comparison report.
     Shows all budgets with allocation vs actual spending, variance, and utilization.
     Supports CSV export via ?format=csv.
     """
@@ -3964,7 +3964,7 @@ class BudgetVsActualReportView(RoleRequiredMixin, TemplateView):
 
 class ExpenseBatchApprovalView(RoleRequiredMixin, TemplateView):
     """
-    A7 — Batch approval view for pending expenses.
+    A7  Batch approval view for pending expenses.
     Lists all pending expenses grouped by category, with select-all and
     bulk approve/reject actions.
     """
@@ -4089,11 +4089,11 @@ class ExpenseBatchApprovalView(RoleRequiredMixin, TemplateView):
 
 
 # ========================================================================
-# A5 — Concession (fee discount / scholarship) management
+# A5  Concession (fee discount / scholarship) management
 # ========================================================================
 
 class ConcessionListView(RoleRequiredMixin, ListView):
-    """List concessions — FO sees own, SA sees all."""
+    """List concessions  FO sees own, SA sees all."""
     model = Concession
     template_name = "finance/concession_list.html"
     context_object_name = "concessions"
@@ -4140,7 +4140,7 @@ class ConcessionCreateView(RoleRequiredMixin, CreateView):
             object_id=self.object.pk,
             description=(
                 f"Concession created: {self.object.get_concession_type_display()} "
-                f"for {self.object.student} — "
+                f"for {self.object.student}  "
                 f"TZS {self.object.discount_value:,.0f}"
             ),
             request=self.request,
@@ -4177,7 +4177,7 @@ class ConcessionApproveView(RoleRequiredMixin, View):
                 object_id=concession.pk,
                 description=(
                     f"Concession approved: {concession.get_concession_type_display()} "
-                    f"for {concession.student} — TZS {concession.discount_value:,.0f}"
+                    f"for {concession.student}  TZS {concession.discount_value:,.0f}"
                 ),
                 request=request,
             )

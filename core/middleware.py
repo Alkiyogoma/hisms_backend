@@ -61,11 +61,11 @@ class SessionTimeoutMiddleware:
                     # FR-CAL-003: Use query param instead of messages framework
                     # to avoid stale messages persisting after re-login.
                     # Preserve the next param so user returns to their page after re-login,
-                    # except for PWA paths — session expiry should go to dashboard.
+                    # except for PWA paths  session expiry should go to dashboard.
                     next_param = "" if current_path.startswith("/attendance/pwa/") else f"&next={current_path}"
                     return redirect(f"{settings.LOGIN_URL}?session_expired=1{next_param}")
 
-                # Don't reset timestamp for the check API — otherwise the frontend
+                # Don't reset timestamp for the check API  otherwise the frontend
                 # poll always sees a fresh session and the warning modal never triggers.
                 if not request.path.startswith("/api/session/check/"):
                     request.session["_last_activity"] = now_ts
@@ -112,7 +112,7 @@ class ImpersonationMiddleware:
                             return HttpResponseForbidden(
                                 "Write actions are disabled in View-As mode."
                             )
-                        # Redirect back with warning param — base.html JS picks it up as a toast
+                        # Redirect back with warning param  base.html JS picks it up as a toast
                         referer = request.META.get("HTTP_REFERER", "/")
                         separator = "&" if "?" in referer else "?"
                         return HttpResponseRedirect(f"{referer}{separator}view_as_warning=1")
@@ -232,7 +232,7 @@ class ContentSecurityPolicyMiddleware:
     In production (DEBUG=False), switches to enforce mode.
     """
 
-    # Base CSP policy — permissive enough for Hodari's HTMX + Quill + Flatpickr stack
+    # Base CSP policy  permissive enough for Hodari's HTMX + Quill + Flatpickr stack
     CSP_DEFAULT = (
         "default-src 'self'; "
         "script-src 'self' https://unpkg.com https://cdn.jsdelivr.net https://cdn.quilljs.com https://cdnjs.cloudflare.com 'unsafe-inline' 'unsafe-eval'; "

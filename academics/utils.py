@@ -25,14 +25,14 @@ def get_current_term():
     """
     from academics.models import Term
 
-    # 1 — Date-range match
+    # 1  Date-range match
     term = Term.get_current()
     if term is not None:
         return term
 
     today = timezone.now().date()
 
-    # 2 — Current academic year, most recently **ended** (covers gaps between terms)
+    # 2  Current academic year, most recently **ended** (covers gaps between terms)
     term = (
         Term.objects.filter(
             academic_year__is_current=True,
@@ -45,7 +45,7 @@ def get_current_term():
     if term is not None:
         return term
 
-    # 3 — Current academic year, next upcoming term (e.g. before a term has begun)
+    # 3  Current academic year, next upcoming term (e.g. before a term has begun)
     term = (
         Term.objects.filter(
             academic_year__is_current=True,
@@ -58,7 +58,7 @@ def get_current_term():
     if term is not None:
         return term
 
-    # 3b — Current academic year, most recently started (fallback)
+    # 3b  Current academic year, most recently started (fallback)
     term = (
         Term.objects.filter(
             academic_year__is_current=True,
@@ -70,7 +70,7 @@ def get_current_term():
     if term is not None:
         return term
 
-    # 4 — Any unlocked term, most recently started
+    # 4  Any unlocked term, most recently started
     term = (
         Term.objects.filter(is_locked=False)
         .order_by("-start_date")
@@ -95,7 +95,7 @@ def get_current_academic_year():
 
 _EXAM_WINDOW_MAP = {
     "quiz": (None, None),                      # quiz: no exam window restriction
-    "QZ": (None, None),                        # alias — seed scripts may use abbreviation
+    "QZ": (None, None),                        # alias  seed scripts may use abbreviation
     "mid_term": ("midterm_exam_start_date", "midterm_exam_end_date"),
     "MT": ("midterm_exam_start_date", "midterm_exam_end_date"),
     "end_of_term": ("endterm_exam_start_date", "endterm_exam_end_date"),
@@ -119,8 +119,8 @@ def check_score_entry_allowed(term, exam_type, today=None):
       opens and past ``grading_deadline``.
 
     Returns:
-        (True, None)  — entry allowed.
-        (False, "…")  — entry blocked with a user-facing message.
+        (True, None)   entry allowed.
+        (False, "…")   entry blocked with a user-facing message.
     """
     if today is None:
         today = timezone.now().date()

@@ -277,7 +277,7 @@ class GuardianLinkDataTests(TestCase):
         })
         content = resp.content.decode()
         self.assertIn(f'value="{self.student.pk}"', content)
-        self.assertIn("Jasiel Kajeguka — HCS-L-001", content)
+        self.assertIn("Jasiel Kajeguka  HCS-L-001", content)
         self.assertIn('value="aunt" selected', content)
 
     def test_edit_page_updates_relationship_and_primary(self):

@@ -5,7 +5,7 @@ the other.
 
 - Safeguarding notes: only users holding ``welfare.view_safeguarding_note``
   ("Can view safeguarding notes", assigned in Role Management). No role —
-  not even Head of School or Super Admin — sees them without it. Not HODs, not class teachers, not the author once
+  not even Head of School or Super Admin  sees them without it. Not HODs, not class teachers, not the author once
   submitted (the author keeps a content-free view to add follow-ups).
 - Concerns, and any note tagged Health: the child's class teacher, the HOD of
   the child's department, and leadership (HOS / Super Admin). The author
@@ -93,7 +93,7 @@ def visible_observations(user, qs):
         return qs.filter(everyday | as_class_teacher | own | allowed_safeguarding)
 
     # Any other role granted welfare access (e.g. Admin Officer): everyday
-    # notes only — never concerns, health or safeguarding.
+    # notes only  never concerns, health or safeguarding.
     return qs.filter((not_safeguarding & ~sensitive) | own | allowed_safeguarding)
 
 

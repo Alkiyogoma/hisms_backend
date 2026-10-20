@@ -70,7 +70,7 @@ def append_review_comment(existing_notes, author, comment_text):
     """Append a timestamped comment to an incident's review notes."""
     stamp = timezone.localtime().strftime("%d %b %Y, %H:%M")
     name = author.get_full_name() or author.username
-    entry = f"[{stamp} — {name}]\n{comment_text.strip()}"
+    entry = f"[{stamp}  {name}]\n{comment_text.strip()}"
     if existing_notes and existing_notes.strip():
         return f"{existing_notes.rstrip()}\n\n{entry}"
     return entry

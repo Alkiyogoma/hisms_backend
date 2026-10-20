@@ -78,7 +78,7 @@ class Command(BaseCommand):
             to_add = target - existing
             to_remove = existing - target
 
-            # Unlink only — calling .delete() here used to delete the
+            # Unlink only  calling .delete() here used to delete the
             # Permission rows themselves, stripping them from every role/user.
             if to_remove and prune:
                 group.permissions.remove(*group.permissions.filter(codename__in=to_remove))

@@ -1,5 +1,5 @@
 /**
- * Admissions New Inquiry Page — channel selection, parent lookup,
+ * Admissions New Inquiry Page  channel selection, parent lookup,
  * sibling detection, grade cascade, and inline validation.
  * Extracted from inline <script> in new_inquiry.html.
  */

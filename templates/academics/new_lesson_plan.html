@@ -144,7 +144,7 @@
           {% if is_super_admin %}<input type="hidden" id="id_slot_teacher_id" name="slot_teacher_id" value="">{% endif %}
           <div id="subject-hint" class="subject-hint"></div>
           <div id="timetable-grid-wrap" class="timetable-pills-container">
-            <div class="timetable-pills-label">Timetable — tap a slot to select</div>
+            <div class="timetable-pills-label">Timetable  tap a slot to select</div>
             <div id="timetable-grid" style="display:grid;grid-template-columns:auto repeat(5,1fr);gap:4px;margin-top:6px"></div>
           </div>
           <!-- Slot detail panel (shown when a slot is clicked) -->
@@ -381,7 +381,7 @@ function renderTimetableGrid() {
           chip.style.background = dc + '12';
           chip.style.color = dc;
           chip.textContent = slot.subject_code;
-          chip.title = cls + ' — ' + slot.subject_name + ' (' + slot.start_time + '–' + slot.end_time + ')';
+          chip.title = cls + '  ' + slot.subject_name + ' (' + slot.start_time + '–' + slot.end_time + ')';
           chip.setAttribute('data-slot-idx', timetableSlotsJSON.indexOf(slot));
 
           /* Outline stroke for LP status */
@@ -390,7 +390,7 @@ function renderTimetableGrid() {
             if (oi) {
               chip.style.borderColor = oi.border;
               chip.style.background = oi.bg;
-              chip.title += ' — ' + oi.label;
+              chip.title += '  ' + oi.label;
             }
           }
 
@@ -457,7 +457,7 @@ function selectGridSlot(chipEl) {
   icon.style.background = dc + '18';
   icon.style.color = dc;
   icon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>';
-  titleEl.textContent = cls + ' — ' + subj;
+  titleEl.textContent = cls + '  ' + subj;
   var subText = DAY_LABELS[dayIdx] + ' · ' + slot.start_time + ' – ' + slot.end_time;
   if (slot.teacher_name) subText += '  ·  ' + slot.teacher_name;
   subEl.textContent = subText;
@@ -496,7 +496,7 @@ function selectGridSlot(chipEl) {
     body.innerHTML = html;
   } else {
     badgeEl.innerHTML = '';
-    body.innerHTML = '<span style="font-size:12px;color:#94A3B8;font-weight:500">No lesson plan yet — fill in the title below and save or submit.</span>';
+    body.innerHTML = '<span style="font-size:12px;color:#94A3B8;font-weight:500">No lesson plan yet  fill in the title below and save or submit.</span>';
   }
 }
 
@@ -592,7 +592,7 @@ function removeQueuedFile(name, size) {
   syncSubmitButton();
 }
 
-/* SHA-256 hash of first 64 KB — matches server-side _compute_file_hash */
+/* SHA-256 hash of first 64 KB  matches server-side _compute_file_hash */
 async function hashFileFirst64KB(file) {
   var CHUNK = 64 * 1024;
   var slice = file.slice(0, CHUNK);
@@ -711,7 +711,7 @@ function updateFileList(input) {
             }
           }
         });
-      }).catch(function() { /* silent — duplicates are advisory, not blocking */ });
+      }).catch(function() { /* silent  duplicates are advisory, not blocking */ });
     }
   } else {
     container.style.display = 'none';

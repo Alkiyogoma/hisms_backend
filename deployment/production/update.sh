@@ -12,7 +12,7 @@ APPUSER=hodari
 BACKUP_DIR=/var/backups/hodari
 
 # Uploaded files (lesson plans, photos …): MEDIA_ROOT from .env, else the
-# media/ folder inside the code. Keep them outside the code folder — see
+# media/ folder inside the code. Keep them outside the code folder  see
 # PRODUCTION_DEPLOY.md "Uploaded files".
 MEDIA="$(grep -E '^MEDIA_ROOT=' "$APP/.env" | tail -1 | cut -d= -f2- | tr -d '\r" ')"
 MEDIA="${MEDIA:-$APP/media}"

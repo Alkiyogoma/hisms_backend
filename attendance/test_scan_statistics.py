@@ -2,7 +2,7 @@
 Tests for scan statistics and reporting endpoints.
 Tests the /api/scans/today, /api/scans/statistics, and /api/scans/history endpoints.
 
-KNOWN ISSUE — timezone-dependent test failures (midnight divergence)
+KNOWN ISSUE  timezone-dependent test failures (midnight divergence)
 --------------------------------------------------------------------
 Several tests in ScansStatisticsAPITestCase use `timestamp.date()` (UTC
 date) in assertions where the service under test uses

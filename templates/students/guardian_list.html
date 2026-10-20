@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load role_tags %}
-{% block title %}Parents — {{ brand.school_name }}{% endblock %}
+{% block title %}Parents  {{ brand.school_name }}{% endblock %}
 {% block topbar_greeting %}Parent Directory{% endblock %}
 
 {% block extra_head %}
@@ -77,6 +77,7 @@
 
 {% block content %}
 {% include "students/_top_tabs.html" %}
+{% include "students/_archive_tabs.html" with directory_url="students:guardian_list" directory_label="parents" %}
 {% has_perm user "students.add_parentguardian" as can_add_guardian %}
 <!-- Print-only branded header -->
 <div class="print-only doc-container" style="max-width:900px;margin:0 auto 20px;background:#fff;padding:24px 28px;border:1px solid #DDE3EE;border-radius:12px">
@@ -112,6 +113,7 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2.5" style="position:absolute; left:12px; top:50%; transform:translateY(-50%)"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
       <input name="q" type="text" class="hf2-input" placeholder="Search by name, phone, or email…" value="{{ request.GET.q }}" style="padding-left:36px; height:38px">
     </div>
+    <input type="hidden" name="archive_status" value="{{ archive_status }}">
     <button type="submit" class="hf-btn hf-btn-primary" style="height:38px">Search</button>
     {% if request.GET.q %}
       <a href="{% url 'students:guardian_list' %}" class="hf-btn hf-btn-secondary" style="height:38px">Clear</a>
@@ -121,11 +123,13 @@
   <div class="guardian-grid">
     {% for guardian in guardians %}
     <div class="guardian-card" style="cursor:pointer" onclick="window.location='{% url 'students:guardian_detail' guardian.pk %}'">
+      <div onclick="event.stopPropagation()">{% include "students/_guardian_archive_action.html" %}</div>
       {# Header: avatar + name + PDPA badge #}
       <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px">
         <div class="gc-avatar">{{ guardian.full_name|slice:":1" }}</div>
         <div style="flex:1; min-width:0">
           <div class="gc-name">{{ guardian.full_name }}</div>
+          {% if guardian.is_archived %}<span class="chip">Archived</span>{% endif %}
           <div class="gc-phone">{{ guardian.phone }}</div>
         </div>
         {% if guardian.pdpa_consent_given %}
@@ -206,6 +210,7 @@
               </div>
               <div>
                 <div style="font-weight:600; color:var(--text-primary)">{{ guardian.full_name }}</div>
+                {% if guardian.is_archived %}<span class="chip">Archived</span>{% endif %}
                 {% if guardian.preferred_language %}<div style="font-size:11px; color:var(--text-muted)">{{ guardian.get_preferred_language_display }}</div>{% endif %}
               </div>
             </div>
@@ -227,6 +232,7 @@
           </td>
           <td style="text-align:right">
             <div style="display:flex;gap:6px;justify-content:flex-end">
+              {% include "students/_guardian_archive_action.html" %}
 {% has_perm user "students.view_parentguardian" as can_view_guardian %}
           {% if guardian.user and can_view_guardian %}
               <a href="{% url 'users:impersonate_start' guardian.user.pk %}" title="View as Parent" class="hf-btn hf-btn-secondary" style="padding:6px 10px;font-size:12px">
@@ -263,13 +269,13 @@
     </div>
     <div style="display:flex; gap:8px">
       {% if page_obj.has_previous %}
-        <a href="?page={{ page_obj.previous_page_number }}&q={{ request.GET.q }}" class="hf-btn hf-btn-secondary" style="font-size:12px">← Previous</a>
+        <a href="{% querystring page=page_obj.previous_page_number %}" class="hf-btn hf-btn-secondary" style="font-size:12px">← Previous</a>
       {% endif %}
       <div style="padding:6px 12px; font-size:13px; font-weight:700; background:var(--hodari-blue-light); color:var(--hodari-blue); border-radius:6px">
         {{ page_obj.number }} / {{ paginator.num_pages }}
       </div>
       {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}&q={{ request.GET.q }}" class="hf-btn hf-btn-secondary" style="font-size:12px">Next →</a>
+        <a href="{% querystring page=page_obj.next_page_number %}" class="hf-btn hf-btn-secondary" style="font-size:12px">Next →</a>
       {% endif %}
     </div>
   </div>

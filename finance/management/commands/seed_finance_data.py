@@ -176,7 +176,7 @@ Done. Finance test data summary:
         )
         from academics.models import Term
 
-        # Use Term 2 (2026) — current term
+        # Use Term 2 (2026)  current term
         term = Term.objects.filter(is_locked=False).order_by("-start_date").first()
         if not term:
             self.stdout.write(self.style.WARNING("No unlocked term found. Skipping invoice seeding."))
@@ -228,22 +228,22 @@ Done. Finance test data summary:
             # Determine status based on index
             status_cycle = idx % 10
             if status_cycle < 3:
-                # PAID — due date in past, full payment
+                # PAID  due date in past, full payment
                 inv_due_date = due_date - timedelta(days=60) if isinstance(due_date, date) else today - timedelta(days=30)
                 status = InvoiceStatus.PAID
                 is_finalized = True
             elif status_cycle < 5:
-                # PARTIAL — due date in past, partial payment
+                # PARTIAL  due date in past, partial payment
                 inv_due_date = due_date - timedelta(days=30) if isinstance(due_date, date) else today - timedelta(days=15)
                 status = InvoiceStatus.PARTIAL
                 is_finalized = False
             elif status_cycle < 8:
-                # UNPAID — due date in future
+                # UNPAID  due date in future
                 inv_due_date = today + timedelta(days=14 + idx)
                 status = InvoiceStatus.UNPAID
                 is_finalized = False
             else:
-                # OVERDUE — due date well in past
+                # OVERDUE  due date well in past
                 days_overdue = 7 + (idx * 3)
                 inv_due_date = today - timedelta(days=min(days_overdue, 90))
                 status = InvoiceStatus.OVERDUE

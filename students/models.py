@@ -136,12 +136,12 @@ class Student(TimeStampedModel):
 
         Accepts plain dates or Term objects.  When a Term is passed as
         *start_date*, both its start_date and end_date are extracted so the
-        calculation covers the full term — not just start-to-today.
+        calculation covers the full term  not just start-to-today.
         """
         from attendance.models import AttendanceEntry, AttendanceStatus
         from academics.models import Term
 
-        # Handle Term objects — extract the actual date range
+        # Handle Term objects  extract the actual date range
         if isinstance(start_date, Term):
             end_date = start_date.end_date
             start_date = start_date.start_date
@@ -267,15 +267,15 @@ class Student(TimeStampedModel):
           or queryset .delete() to bypass this guard for bulk pruning).
         """
         if self.has_protected_records():
-            # Check retention before raising — allow past-retention deletion
+            # Check retention before raising  allow past-retention deletion
             allowed, reason = self.can_be_permanently_deleted()
             if not allowed:
                 raise ValidationError(
                     "This student has associated records and cannot be deleted. Use Archive instead."
                 )
-            # Past retention — allow deletion (e.g. Super Admin action)
+            # Past retention  allow deletion (e.g. Super Admin action)
         elif self.is_archived and not self.is_retention_expired:
-            # Archived but within retention — never allow manual deletion
+            # Archived but within retention  never allow manual deletion
             years = getattr(settings, "ARCHIVE_RETENTION_YEARS", 7)
             raise ValidationError(
                 f"Record is within the {years}-year retention period and cannot be deleted."
@@ -532,7 +532,7 @@ class EnrollmentHistory(TimeStampedModel):
       - Year-end promotion
       - Mid-year class/stream transfer
 
-    The previous assignment is never overwritten — this provides a
+    The previous assignment is never overwritten  this provides a
     full audit trail of where each student was in any given term/year.
     """
     student = models.ForeignKey(
@@ -551,7 +551,7 @@ class EnrollmentHistory(TimeStampedModel):
     # Historical ambiguity: rows with action='promoted' created before the 'retained'
     # action value was introduced (prior to Items 1-12 rollout) may represent actual
     # promotions OR retentions recorded under the old CLI script's shared 'promoted'
-    # value. This was a deliberate decision, not an oversight — the old script recorded
+    # value. This was a deliberate decision, not an oversight  the old script recorded
     # both cases identically, so retroactively distinguishing them is impossible without
     # heuristics. Check the `notes` field for "Repeating" to identify retentions.
     action = models.CharField(
@@ -567,7 +567,7 @@ class EnrollmentHistory(TimeStampedModel):
         help_text=(
             "What triggered this enrollment record. "
             "NOTE: Historical rows where action='promoted' may represent retentions "
-            "from the old CLI script — the note field should be checked for 'Repeating' "
+            "from the old CLI script  the note field should be checked for 'Repeating' "
             "to distinguish actual promotions from retentions prior to this module's launch."
         ),
     )
@@ -622,4 +622,4 @@ class StudentDocument(TimeStampedModel):
         ]
 
     def __str__(self):
-        return f"{self.student.admission_no} — {self.title}"
+        return f"{self.student.admission_no}  {self.title}"

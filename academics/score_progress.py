@@ -14,7 +14,7 @@ from academics.models import ExamScore, GradeClass, ScoreStatus, get_exam_weight
 
 # Learner-level status, most urgent first.
 STATUS_RETURNED = "returned"
-STATUS_COMPLETE = "approved"      # every subject approved — the report is complete
+STATUS_COMPLETE = "approved"      # every subject approved  the report is complete
 STATUS_SUBMITTED = "submitted"    # something is waiting for HOD review
 STATUS_PARTIAL = "partial"        # some subjects approved, others still outstanding
 STATUS_DRAFT = "draft"            # scores saved but nothing submitted yet

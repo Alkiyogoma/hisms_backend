@@ -1,5 +1,5 @@
 """
-Broadcast message templates — FRD FR-COM-002/003.
+Broadcast message templates  FRD FR-COM-002/003.
 """
 
 MESSAGE_TEMPLATES = {

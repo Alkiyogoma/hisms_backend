@@ -1,5 +1,5 @@
 """
-RBAC tests for student views — permission-based, not role-hardcoded.
+RBAC tests for student views  permission-based, not role-hardcoded.
 Access is determined by Django permissions configured via the Role Management UI.
 """
 from django.test import TestCase, RequestFactory

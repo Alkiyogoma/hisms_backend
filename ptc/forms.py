@@ -1,4 +1,4 @@
-# PTC Forms — matching existing Hodari form conventions.
+# PTC Forms  matching existing Hodari form conventions.
 
 from django import forms
 

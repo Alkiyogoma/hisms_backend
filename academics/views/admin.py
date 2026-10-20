@@ -204,7 +204,7 @@ class DuplicateCheckView(RoleRequiredMixin, LoginRequiredMixin, View):
                 h = _compute_file_hash(att.file.path)
                 existing_hashes[h] = att.filename
             except (AttributeError, ValueError, OSError):
-                # Can't compute hash — skip
+                # Can't compute hash  skip
                 continue
 
         results = []
@@ -315,14 +315,14 @@ class GradeClassEditView(RoleRequiredMixin, View):
             if name != gc.name:
                 messages.error(
                     request,
-                    f'Cannot rename "{gc.name}" — it has enrolled students. '
+                    f'Cannot rename "{gc.name}"  it has enrolled students. '
                     f'Reassign students first.'
                 )
                 return redirect("academics:class_edit", pk=pk)
             if new_dept != gc.department:
                 messages.error(
                     request,
-                    f'Cannot change department of "{gc.name}" — it has enrolled students. '
+                    f'Cannot change department of "{gc.name}"  it has enrolled students. '
                     f'Reassign students first.'
                 )
                 return redirect("academics:class_edit", pk=pk)
@@ -402,7 +402,7 @@ class GradeClassDeleteView(RoleRequiredMixin, View):
         if reasons:
             messages.error(
                 request,
-                f'Cannot delete "{name}" — associated records exist: '
+                f'Cannot delete "{name}"  associated records exist: '
                 f'{"; ".join(reasons)}. Remove all linked records first.'
             )
         else:
@@ -556,7 +556,7 @@ class SubjectDeleteView(RoleRequiredMixin, View):
         if deps:
             messages.error(
                 request,
-                f'Cannot delete "{name}" — associated records exist: '
+                f'Cannot delete "{name}"  associated records exist: '
                 f'{"; ".join(deps)}. Remove all linked records first.'
             )
             return redirect("academics:subjects")

@@ -34,7 +34,7 @@
       <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600">Overall Average</div>
     </div>
     <div style="width:100%;display:grid;grid-template-columns:repeat(2,1fr);gap:12px">
-      {# dictsort:0 sorts dict.items tuples by index 0 (the key), NOT a dict key name — do not change to a string arg #}
+      {# dictsort:0 sorts dict.items tuples by index 0 (the key), NOT a dict key name  do not change to a string arg #}
       {% for subj, avg in subject_averages.items|dictsort:0 %}
       <div style="text-align:center">
         <div style="font-size:14px;font-weight:700;color:{% if avg >= 80 %}#16A34A{% elif avg >= 50 %}#CA8A04{% else %}#DC2626{% endif %}">{{ avg }}%</div>

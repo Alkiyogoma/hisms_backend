@@ -1,4 +1,4 @@
-# Generated manually — removes dead / unused fields from PromotionRun
+# Generated manually  removes dead / unused fields from PromotionRun
 # and renames repeated_count → retained_count for consistency with the codebase.
 
 from django.db import migrations, models

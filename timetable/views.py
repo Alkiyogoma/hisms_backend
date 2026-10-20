@@ -298,7 +298,7 @@ class TimetableSlotCreateView(RoleRequiredMixin, CreateView):
                 "full_name": full_name,
             })
 
-        # Only classes with actual TCAs get teachers — no fallback that
+        # Only classes with actual TCAs get teachers  no fallback that
         # silently adds unassigned teachers to the dropdown.
         data["teachers_by_class"] = teacher_map
 
@@ -520,7 +520,7 @@ class TimetableSlotDeleteView(RoleRequiredMixin, View):
 
 
 class BulkTimetableCreateView(RoleRequiredMixin, View):
-    """Bulk-create multiple timetable slots at once — UI for adding many slots with
+    """Bulk-create multiple timetable slots at once  UI for adding many slots with
     different subjects, departments, colors, and teachers."""
     login_url = "/accounts/login/"
     template_name = "timetable/bulk_create.html"
@@ -705,7 +705,7 @@ class BulkDeleteTimetableView(RoleRequiredMixin, View):
 
 
 class CloneTimetableView(RoleRequiredMixin, View):
-    """Clones timetable slots from one term to another — FR-TIME-002."""
+    """Clones timetable slots from one term to another  FR-TIME-002."""
     login_url = "/accounts/login/"
     allowed_roles = [UserRole.SUPER_ADMIN, UserRole.ADMIN_OFFICER]
     required_permission = "timetable.add_timetableslot"
@@ -786,7 +786,7 @@ class CloneTimetableView(RoleRequiredMixin, View):
 
 
 class PublishTimetableView(RoleRequiredMixin, View):
-    """Publish all unpublished timetable slots for the current term — FR-TT-009."""
+    """Publish all unpublished timetable slots for the current term  FR-TT-009."""
     login_url = "/accounts/login/"
     allowed_roles = [UserRole.SUPER_ADMIN, UserRole.ADMIN_OFFICER]
     required_permission = "timetable.change_timetableslot"
@@ -806,7 +806,7 @@ class PublishTimetableView(RoleRequiredMixin, View):
             messages.info(request, "All timetable slots are already published.")
             return redirect("timetable:index")
 
-        # Warn: classes with no slots (not blocking — partial publish is allowed)
+        # Warn: classes with no slots (not blocking  partial publish is allowed)
         from academics.models import GradeClass
         all_classes = set(GradeClass.objects.values_list("name", flat=True))
         published_classes = set(
@@ -864,7 +864,7 @@ class PublishTimetableView(RoleRequiredMixin, View):
 
 
 class UnpublishTimetableView(RoleRequiredMixin, View):
-    """Unpublish all timetable slots for the current term — SA override only."""
+    """Unpublish all timetable slots for the current term  SA override only."""
     login_url = "/accounts/login/"
     allowed_roles = [UserRole.SUPER_ADMIN]
     required_permission = "timetable.change_timetableslot"

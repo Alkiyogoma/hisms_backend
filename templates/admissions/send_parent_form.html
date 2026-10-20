@@ -33,7 +33,7 @@
       </div>
     </div>
     <div class="hf2-group" style="margin-top:14px">
-      <label class="hf2-label" for="pgrade">Grade <span class="muted" style="font-weight:400">(optional — the parent can choose)</span></label>
+      <label class="hf2-label" for="pgrade">Grade <span class="muted" style="font-weight:400">(optional  the parent can choose)</span></label>
       <select id="pgrade" name="grade" class="hf2-select">
         <option value="">Let the parent choose</option>
         {% for g in grades %}<option value="{{ g }}" {% if values.grade == g %}selected{% endif %}>{{ g }}</option>{% endfor %}

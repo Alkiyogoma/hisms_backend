@@ -436,7 +436,7 @@ class ECDEvaluationEntryView(RoleRequiredMixin, TemplateView):
                                 }
                             )
 
-                # 2. Scripture, Reading, Assignments (Terms 1-3 — FR-CAL-002)
+                # 2. Scripture, Reading, Assignments (Terms 1-3  FR-CAL-002)
                 for q in range(1, 4):
                     verse = request.POST.get(f"abc_verse_{rc.id}_{q}")
                     if verse is not None:
@@ -785,7 +785,7 @@ class ECDEvaluationAPIView(RoleRequiredMixin, View):
                     }
                 )
 
-            # FR-ACAD-013: ABC Class Term 3 internal exam — only save in Term 3
+            # FR-ACAD-013: ABC Class Term 3 internal exam  only save in Term 3
             internal_exam_data = data.get("abc_internal_exams", {})
             if internal_exam_data and term and "Term 3" in (term.name or ""):
                 for subject, rating in internal_exam_data.items():
@@ -985,7 +985,7 @@ class ECDAssessmentView(RoleRequiredMixin, TemplateView):
         ctx["ecd_class_name"] = class_name
         ctx["ecd_template_type"] = tpl
         ctx["ecd_class_label"] = class_name
-        ctx["page_title"] = f"ECD Reports — {class_name}"
+        ctx["page_title"] = f"ECD Reports  {class_name}"
         ctx["domain_groups"] = ECDEvaluationEntryView._load_domain_groups().get(tpl, [])
 
         # Pre-K field groups (label, field_id) matching Hodari_09a mockup
@@ -1060,7 +1060,7 @@ class ECDAssessmentView(RoleRequiredMixin, TemplateView):
             ]),
         ]
 
-        # Pre-School sections (Hodari_09c mockup labels) — 4-point scale
+        # Pre-School sections (Hodari_09c mockup labels)  4-point scale
         ctx["pre_school_sections"] = [
             ("Numeracy", [
                 ("Counting 1–10: counting", "ps_n1"),

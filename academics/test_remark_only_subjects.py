@@ -108,9 +108,91 @@ class RemarkOnlySubjectTests(TestCase):
     def test_entry_screen_asks_only_for_what_applies(self):
         self.client.force_login(self.teacher)
         page = self.client.get(reverse("academics:primary_assessment"), {"class_name": "Grade 3"}).content.decode()
-        self.assertIn('class="hf-select remark-input-val" data-subject="Choir"', page)
-        self.assertNotIn('data-subject="Choir" data-type=', page)
+        self.assertNotIn('data-subject="Choir"', page)
         self.assertIn('data-subject="Zoology" data-type="quiz"', page)
+
+        remarks_page = self.client.get(reverse("academics:primary_remarks"), {"class_name": "Grade 3"}).content.decode()
+        self.assertIn('class="hf-select remark-input-val" data-subject="Choir"', remarks_page)
+        self.assertNotIn('data-subject="Zoology"', remarks_page)
+        self.assertNotIn('type="number"', remarks_page)
+        self.assertNotIn('id="submit-hod-btn"', remarks_page)
+        self.assertNotIn('id="grand-avg"', remarks_page)
+        for remark in ("Outstanding", "High", "Good", "Aspiring", "Basic", "Needs Improvement"):
+            self.assertIn(f'<option value="{remark}">{remark}</option>', remarks_page)
+
+    def test_score_entry_lists_only_the_five_configured_mark_subjects(self):
+        marks = ["English", "Humanities", "Kiswahili", "Mathematics", "Science"]
+        remarks = ["French", "Physical Education"]
+        for name in marks + remarks:
+            subject, _ = Subject.objects.update_or_create(name=name, defaults={
+                "department": Department.PRIMARY, "is_active": True,
+                "assessment_mode": AssessmentMode.MARKS if name in marks else AssessmentMode.REMARK,
+            })
+            subject.classes.add(self.gc)
+        assignment = TeacherClassAssignment.objects.get(teacher__user=self.teacher)
+        assignment.subjects_taught = marks + remarks
+        assignment.save()
+        self.client.force_login(self.teacher)
+        scores = self.client.get(reverse("academics:primary_assessment"), {"class_name": self.gc.name})
+        self.assertEqual(scores.context["subjects"], marks)
+        self.assertEqual(scores.context["submit_subjects"], marks)
+        page = self.client.get(reverse("academics:primary_remarks"), {"class_name": self.gc.name})
+        self.assertEqual(page.context["subjects"], remarks)
+        self.assertNotContains(page, 'type="number"')
+
+    def test_type_change_moves_subject_between_screens(self):
+        self.client.force_login(self.admin)
+        for mode in (AssessmentMode.MARKS, AssessmentMode.REMARK, AssessmentMode.MARKS):
+            resp = self.client.post(
+                reverse("academics:subject_edit", args=[self.science.pk]),
+                {"name": "Zoology", "code": "ZOO", "color": "#023AA5", "departments": ["PRIMARY"],
+                 "classes": [self.gc.pk], "is_active": "on", "assessment_mode": mode},
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+            self.assertEqual(resp.status_code, 200, resp.content)
+            for user in (self.teacher, self.admin):
+                self.client.force_login(user)
+                scores = self.client.get(reverse("academics:primary_assessment"), {"class_name": self.gc.name})
+                remarks = self.client.get(reverse("academics:primary_remarks"), {"class_name": self.gc.name})
+                self.assertEqual("Zoology" in scores.context["subjects"], mode == AssessmentMode.MARKS)
+                self.assertEqual("Zoology" in remarks.context["subjects"], mode == AssessmentMode.REMARK)
+            self.client.force_login(self.admin)
+
+    def test_class_teacher_cannot_edit_other_teachers_remarks(self):
+        assignment = TeacherClassAssignment.objects.get(teacher__user=self.other_teacher)
+        assignment.is_class_teacher = True
+        assignment.save()
+        self.client.force_login(self.other_teacher)
+        page = self.client.get(reverse("academics:primary_remarks"), {"class_name": self.gc.name})
+        self.assertEqual(page.context["subjects"], ["Choir"])
+        self.assertEqual(page.context["editable_subjects"], set())
+        self.assertContains(page, 'data-readonly="1" disabled')
+
+    def test_lower_secondary_has_separate_entry_screens(self):
+        gc = GradeClass.objects.create(name="Grade 7", department=Department.LOWER_SECONDARY)
+        self.science.classes.add(gc)
+        self.music.classes.add(gc)
+        TeacherClassAssignment.objects.create(
+            teacher=StaffProfile.objects.get(user=self.teacher), term=self.term, grade_class=gc,
+            subjects_taught=["Choir", "Zoology"],
+        )
+        for user in (self.teacher, self.admin):
+            self.client.force_login(user)
+            scores = self.client.get(reverse("academics:lower_secondary_assessment"), {"class_name": gc.name})
+            remarks = self.client.get(reverse("academics:lower_secondary_remarks"), {"class_name": gc.name})
+            self.assertEqual(scores.context["subjects"], ["Zoology"])
+            self.assertEqual(remarks.context["subjects"], ["Choir"])
+            self.assertNotContains(scores, 'data-subject="Choir"')
+            self.assertNotContains(remarks, 'type="number"')
+
+    def test_legacy_score_entry_excludes_and_rejects_remark_subjects(self):
+        from academics.forms import ExamScoreFilterForm
+        form = ExamScoreFilterForm({
+            "term": self.term.pk, "class_name": self.gc.name, "subject_name": "Choir", "exam_type": "quiz",
+        })
+        self.assertNotIn(("Choir", "Choir"), form.fields["subject_name"].choices)
+        self.assertFalse(form.is_valid())
+        self.assertIn("subject_name", form.errors)
 
     def test_remark_saved_and_marks_ignored_for_remark_subject(self):
         resp = self._save(self.teacher, scores={"Choir": {"quiz": "80"}, "Zoology": {"quiz": "70"}},
@@ -199,6 +281,7 @@ class RemarkOnlySubjectTests(TestCase):
             self.assertTrue(user.has_perm("academics.view_examscore"), role)
             self.client.force_login(user)
             for url in (reverse("academics:primary_assessment"), reverse("academics:lower_secondary_assessment"),
+                        reverse("academics:primary_remarks"), reverse("academics:lower_secondary_remarks"),
                         reverse("academics:api_primary_scores", args=[self.student.id])):
                 self.assertNotEqual(self.client.get(url, {"term": self.term.id}).status_code, 200, (role, url))
         hos = User.objects.create_user(username="hos2", email="hos2@example.test", password="x",

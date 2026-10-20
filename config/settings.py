@@ -184,15 +184,15 @@ if os.getenv("REDIS_URL"):
     CACHES = {
         "default": {
             "BACKEND": "django.core.cache.backends.redis.RedisCache",
-            "LOCATION": REDIS_URL.replace("/0", "/3"),  # DB 3 — separate from Celery broker (0)
+            "LOCATION": REDIS_URL.replace("/0", "/3"),  # DB 3  separate from Celery broker (0)
             "TIMEOUT": 300,
             "KEY_PREFIX": "hodari",
         },
     }
-# else: Django default LocMemCache — fine for single-process dev/test,
+# else: Django default LocMemCache  fine for single-process dev/test,
 # but NOT safe for production multi-worker deployments. See warning above.
 
-# Security — FRD NFR-SEC-003 / NFR-SEC-005
+# Security  FRD NFR-SEC-003 / NFR-SEC-005
 SESSION_COOKIE_AGE = 28800  # 8 hours absolute max (idle timeout controls actual expiry)
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 SESSION_IDLE_TIMEOUT = int(os.getenv("SESSION_IDLE_TIMEOUT", "1800"))  # 30 min total; warning at 28 min via WARNING_BEFORE_SECONDS=120 (FRD NFR-SEC-003)
@@ -207,7 +207,7 @@ MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT") or BASE_DIR / "media")
 # LibreOffice binary for lesson plan previews (office files -> PDF); found on PATH when empty.
 LIBREOFFICE_BINARY = os.getenv("LIBREOFFICE_BINARY", "")
 
-# Lesson Plans — FRD FR-LP-003: Deadline is Monday 8:00 AM of the relevant week
+# Lesson Plans  FRD FR-LP-003: Deadline is Monday 8:00 AM of the relevant week
 LESSON_PLAN_SUBMISSION_DEADLINE_DAY = int(os.getenv("LP_DEADLINE_DAY", "0"))  # Monday (0=Mon, 6=Sun)
 LESSON_PLAN_SUBMISSION_DEADLINE_TIME = os.getenv("LP_DEADLINE_TIME", "08:00")  # 8 AM EAT
 
@@ -300,7 +300,7 @@ CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60  # 25 minutes soft limit
 CELERY_WORKER_PREFETCH_MULTIPLIER = 4
 CELERY_WORKER_MAX_TASKS_PER_CHILD = 1000
 
-# Email (SMTP) — configured only here, from environment variables (.env).
+# Email (SMTP)  configured only here, from environment variables (.env).
 # Locally (DEBUG) messages go to sent_emails.json; on the server they are sent
 # through SMTP. For Google Workspace use smtp.gmail.com, port 587 + TLS, the
 # full mailbox address as EMAIL_HOST_USER and a 16-character App Password.
@@ -351,7 +351,7 @@ SMS_MAX_AGE_MINUTES = int(os.getenv('SMS_MAX_AGE_MINUTES', '15'))
 # SMS Provider selection: 'darsms', 'cloudservice', 'hodari' or 'console' (log only)
 SMS_PROVIDER = os.getenv('SMS_PROVIDER', 'darsms')
 
-# Admissions contact details — stored in SchoolSettings model, env vars are fallback only
+# Admissions contact details  stored in SchoolSettings model, env vars are fallback only
 ADMISSIONS_PHONE = os.getenv('ADMISSIONS_PHONE', '')
 ADMISSIONS_EMAIL = os.getenv('ADMISSIONS_EMAIL', '')
 ADMISSIONS_WHATSAPP = os.getenv('ADMISSIONS_WHATSAPP', '')

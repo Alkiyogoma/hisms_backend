@@ -2,13 +2,13 @@
    Usage: {% include '_partials/empty_state.html' with title='No invoices found' desc='Create an invoice to get started.' icon='doc' action_url='/finance/invoice/create/' action_text='Create Invoice' %}
 
    Parameters:
-     title       — bold headline (required)
-     desc        — gray description text
-     icon        — icon type: doc, check, inbox, users, calendar, search, alert (default: inbox)
-     icon_color  — color variant: green (default), blue, amber, grey
-     action_url  — optional CTA link URL
-     action_text — optional CTA link text
-     action_btn  — if 'true' or omitted (when action_url is set), render as btn-primary button
+     title        bold headline (required)
+     desc         gray description text
+     icon         icon type: doc, check, inbox, users, calendar, search, alert (default: inbox)
+     icon_color   color variant: green (default), blue, amber, grey
+     action_url   optional CTA link URL
+     action_text  optional CTA link text
+     action_btn   if 'true' or omitted (when action_url is set), render as btn-primary button
 {% endcomment %}
 <div class="es">
     {% if icon == 'doc' %}

@@ -63,7 +63,7 @@ class TimetableSlotForm(forms.ModelForm):
 
         super().__init__(*args, **kwargs)
 
-        # Ensure day_of_week is never required — clean() handles it from repeat_days
+        # Ensure day_of_week is never required  clean() handles it from repeat_days
         self.fields["day_of_week"].required = False
         self.fields["term"].required = False
 
@@ -90,7 +90,7 @@ class TimetableSlotForm(forms.ModelForm):
             teacher_ids = {tca.teacher.user_id for tca in tcas}
 
         # Always include the currently-submitted teacher so ModelChoiceField
-        # validation passes — clean() handles the real assignment check.
+        # validation passes  clean() handles the real assignment check.
         submitted_teacher = self.data.get("teacher", "").strip()
         if submitted_teacher:
             try:

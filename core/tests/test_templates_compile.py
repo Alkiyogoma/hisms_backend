@@ -1,5 +1,5 @@
 """Every template must compile. Catches tags that an editor/formatter has
-split across lines (e.g. "{%\n endif %}"), which Django can't parse — that
+split across lines (e.g. "{%\n endif %}"), which Django can't parse  that
 took down the whole Settings page."""
 from pathlib import Path
 

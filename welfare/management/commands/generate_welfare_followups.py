@@ -170,7 +170,7 @@ class Command(BaseCommand):
         student_name = f"{obs.student.first_name} {obs.student.last_name}"
 
         if sev == WelfareSeverity.CRITICAL:
-            title = f"WARNING: WELFARE OVERDUE — {student_name} (Critical)"
+            title = f"WARNING: WELFARE OVERDUE  {student_name} (Critical)"
             message = (
                 f"CRITICAL welfare observation for {student_name} "
                 f"({obs.student.class_name}) requires follow-up.\n"
@@ -180,7 +180,7 @@ class Command(BaseCommand):
                 f"This requires immediate HOD + HOS acknowledgement."
             )
         elif sev == WelfareSeverity.HIGH:
-            title = f"Welfare follow-up overdue — {student_name} (High)"
+            title = f"Welfare follow-up overdue  {student_name} (High)"
             message = (
                 f"HIGH severity welfare observation for {student_name} "
                 f"({obs.student.class_name}) has an overdue follow-up.\n"
@@ -189,7 +189,7 @@ class Command(BaseCommand):
                 f"Parent contact should be prioritised."
             )
         elif sev == WelfareSeverity.MEDIUM:
-            title = f"Follow-up reminder — {student_name} (Medium)"
+            title = f"Follow-up reminder  {student_name} (Medium)"
             message = (
                 f"Welfare observation for {student_name} "
                 f"({obs.student.class_name}) has a pending follow-up.\n"
@@ -198,7 +198,7 @@ class Command(BaseCommand):
                 f"3-day parent contact deadline applies."
             )
         else:  # LOW
-            title = f"Follow-up reminder — {student_name} (Low)"
+            title = f"Follow-up reminder  {student_name} (Low)"
             message = (
                 f"Welfare observation for {student_name} "
                 f"({obs.student.class_name}) has a pending follow-up.\n"

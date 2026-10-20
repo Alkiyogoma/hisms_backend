@@ -268,9 +268,9 @@ ROLE_DEFAULT_PERMISSIONS = {
     # ── HEAD OF SCHOOL ───────────────────────────────────────
     # School-wide read + sign-off + status updates. No direct data creation.
     UserRole.HEAD_OF_SCHOOL: [
-        # Review approvals — HOD sign-off
+        # Review approvals  HOD sign-off
         "can_review_incident", "can_review_lessonplan", "can_review_observation",
-        # Academics — read all, sign off reports
+        # Academics  read all, sign off reports
         "view_academicyear", "view_term", "view_subject", "view_gradeclass",
         "view_lessonplan", "view_lessonplanattachment",
         "view_examscore", "view_examtypeconfiguration",
@@ -281,28 +281,28 @@ ROLE_DEFAULT_PERMISSIONS = {
         "view_progressioncase", "view_progressionconfig",
         "can_review_progression", "can_decide_progression",
         "view_room", "view_timetableentry",
-        # Students — full management
+        # Students  full management
         "view_student", "add_student", "change_student",
         "view_studentguardian", "view_studentsibling",
         "view_parentguardian", "add_parentguardian", "change_parentguardian",
         "view_laravelparent", "view_studentlaravelparent",
         "view_enrollmenthistory", "view_pdpaconsentlog",
-        # Attendance — read school-wide
+        # Attendance  read school-wide
         "view_attendanceentry", "view_staffattendanceentry",
         "view_message", "view_notificationlog",
-        # HR — read only
+        # HR  read only
         "view_staffprofile", "view_teacherclassassignment",
         "view_staffdocument", "view_staffonboardingprogress",
         "view_onboardingchecklistitem", "view_inductionchecklistcompletion",
         "view_offboardingrecord", "view_leaverequest", "view_leaveallocation",
         "view_statutoryfiling",
-        # Finance — read summaries
+        # Finance  read summaries
         "view_feestructure", "view_feestructureitem",
         "view_invoice", "view_invoicelineitem",
         "view_payment", "view_openingbalance",
         "view_financeconfig", "view_financeperiod",
         "view_budget", "view_expense",
-        # Admissions — read + add internal notes + transition status
+        # Admissions  read + add internal notes + transition status
         "view_applicant", "view_applicantdocumentreceipt",
         "add_applicantinternalnote", "change_applicantinternalnote", "view_applicantinternalnote",
         "view_applicanttimelineentry",
@@ -322,51 +322,51 @@ ROLE_DEFAULT_PERMISSIONS = {
         "submit_assessment_result",
         "submit_hos_review",
         "reverse_assessment_fee",
-        # Welfare — read + HOD notes + status; HOS reads safeguarding notes
+        # Welfare  read + HOD notes + status; HOS reads safeguarding notes
         "view_welfareobservation", "add_welfareobservation",
         "change_welfareobservation", "view_welfareacknowledgment",
         "view_safeguarding_note",
-        # Discipline — read + status
+        # Discipline  read + status
         "view_disciplineincident", "change_disciplineincident",
-        # Events — read
+        # Events  read
         "view_calendarevent", "view_eventacknowledgement",
-        # Tasks — read
+        # Tasks  read
         "view_task", "view_taskcomment", "view_taskhistory",
         "view_department_tasks",
-        # Communications — read
+        # Communications  read
         "view_broadcast", "view_notification",
         "view_emailsendlog", "add_weeklyfocus", "change_weeklyfocus", "view_weeklyfocus",
-        # PTC — read
+        # PTC  read
         "view_ptcwindow", "view_ptcsubjectcomment",
         "view_learnerattributeratingentry", "view_enrichmentgrade",
         "view_enrichmentsubject", "view_ptcgenerationlog",
-        # Timetable — read
+        # Timetable  read
         "view_timetableslot", "view_ecdbreakconfig",
-        # Core — read settings
+        # Core  read settings
         "view_schoolsettings", "change_schoolsettings", "view_mediasettings",
         "view_emailtemplate", "view_lessonplandeadline",
-        # Audit — read
+        # Audit  read
         "view_auditlog", "view_dsarrequest",
-        # Users — read
+        # Users  read
         "view_user", "view_group",
     ],
 
     # ── PRIMARY HOD ──────────────────────────────────────────
     # Department-scoped: Primary classes/teachers. Approve grades, lesson plans.
     UserRole.PRIMARY_HOD: [
-        # Review approvals — HOD sign-off
+        # Review approvals  HOD sign-off
         "can_review_incident", "can_review_lessonplan", "can_review_observation",
-        # Academics — read own dept, approve lesson plans + grades
+        # Academics  read own dept, approve lesson plans + grades
         "view_academicyear", "view_term", "view_subject", "view_gradeclass",
         "add_lessonplan", "change_lessonplan", "view_lessonplan", "view_lessonplanattachment",
         "view_examscore", "change_examscore", "view_examtypeconfiguration",
         "change_reportcard", "view_reportcard",
         "view_progressioncase", "can_review_progression",
         "view_room", "view_timetableentry",
-        # Students — read Primary only
+        # Students  read Primary only
         "view_student", "view_studentguardian", "view_studentsibling",
         "view_parentguardian", "view_enrollmenthistory",
-        # Admissions — read + HOD review + transition status
+        # Admissions  read + HOD review + transition status
         "view_applicant",
         "submit_hos_review",
         "edit_admission_note",
@@ -383,42 +383,42 @@ ROLE_DEFAULT_PERMISSIONS = {
         "toggle_admission_document",
         "complete_enrolment",
         "upload_applicant_photo",
-        # Attendance — read own dept
+        # Attendance  read own dept
         "view_attendanceentry", "view_staffattendanceentry",
-        # HR — read own dept
+        # HR  read own dept
         "view_staffprofile", "view_teacherclassassignment",
-        # Welfare — HOD welfare notes + status
+        # Welfare  HOD welfare notes + status
         "add_welfareobservation", "change_welfareobservation", "view_welfareobservation",
-        # Discipline — create + read + update (own dept)
+        # Discipline  create + read + update (own dept)
         "add_disciplineincident", "change_disciplineincident", "view_disciplineincident",
-        # Events — read
+        # Events  read
         "view_calendarevent",
-        # Tasks — read
+        # Tasks  read
         "view_task",
         "view_department_tasks",
-        # Communications — read + weekly focus submit/edit
+        # Communications  read + weekly focus submit/edit
         "view_broadcast", "view_weeklyfocus",
         "add_weeklyfocus", "change_weeklyfocus",
-        # PTC — read dept completion
+        # PTC  read dept completion
         "view_ptcsubjectcomment", "view_learnerattributeratingentry",
         "view_enrichmentgrade",
         "view_ptcwindow", "view_ptcgenerationlog",
-        # Timetable — read + create/edit slots
+        # Timetable  read + create/edit slots
         "view_timetableslot", "add_timetableslot", "change_timetableslot",
-        # Admissions — meeting schedule
+        # Admissions  meeting schedule
         "view_meetingschedule",
-        # Core — deadline config
+        # Core  deadline config
         "view_lessonplandeadline",
-        # Audit — read
+        # Audit  read
         "view_auditlog",
     ],
 
     # ── ECD HOD ──────────────────────────────────────────────
     # ECD-specific: ECD evaluations, welfare notes, behaviour.
     UserRole.ECD_HOD: [
-        # Review approvals — HOD sign-off
+        # Review approvals  HOD sign-off
         "can_review_incident", "can_review_lessonplan", "can_review_observation",
-        # Academics — ECD specific
+        # Academics  ECD specific
         "view_academicyear", "view_term", "view_subject", "view_gradeclass",
         "add_ecdevaluation", "change_ecdevaluation", "view_ecdevaluation",
         "view_ecdtemplateconfiguration",
@@ -430,12 +430,12 @@ ROLE_DEFAULT_PERMISSIONS = {
         "add_abcreadingprogramme", "change_abcreadingprogramme", "view_abcreadingprogramme",
         "add_abcscripture", "change_abcscripture", "view_abcscripture",
         "view_room", "view_timetableentry",
-        # Reports — read + ECD entry (FRD module visibility)
+        # Reports  read + ECD entry (FRD module visibility)
         "change_reportcard", "view_reportcard",
-        # Students — read ECD only
+        # Students  read ECD only
         "view_student", "view_studentguardian", "view_studentsibling",
         "view_parentguardian", "view_enrollmenthistory",
-        # Admissions — read + HOD review + transition status
+        # Admissions  read + HOD review + transition status
         "view_applicant",
         "submit_hos_review",
         "edit_admission_note",
@@ -452,42 +452,42 @@ ROLE_DEFAULT_PERMISSIONS = {
         "toggle_admission_document",
         "complete_enrolment",
         "upload_applicant_photo",
-        # Attendance — read own dept
+        # Attendance  read own dept
         "view_attendanceentry", "view_staffattendanceentry",
-        # HR — read own dept
+        # HR  read own dept
         "view_staffprofile", "view_teacherclassassignment",
-        # Welfare — HOD welfare notes + status
+        # Welfare  HOD welfare notes + status
         "add_welfareobservation", "change_welfareobservation", "view_welfareobservation",
-        # Discipline — create + read + update (own dept)
+        # Discipline  create + read + update (own dept)
         "add_disciplineincident", "change_disciplineincident", "view_disciplineincident",
-        # Events — read
+        # Events  read
         "view_calendarevent",
-        # Tasks — read
+        # Tasks  read
         "view_task",
         "view_department_tasks",
-        # Communications — read + weekly focus submit/edit
+        # Communications  read + weekly focus submit/edit
         "view_broadcast", "view_weeklyfocus",
         "add_weeklyfocus", "change_weeklyfocus",
-        # PTC — read dept completion
+        # PTC  read dept completion
         "view_learnerattributeratingentry", "view_enrichmentgrade",
-        # Timetable — read + create/edit slots + break config
+        # Timetable  read + create/edit slots + break config
         "view_timetableslot", "add_timetableslot", "change_timetableslot",
         "view_ecdbreakconfig", "change_ecdbreakconfig",
-        # Admissions — meeting schedule
+        # Admissions  meeting schedule
         "view_meetingschedule",
-        # Core — deadline config
+        # Core  deadline config
         "view_lessonplandeadline",
-        # Audit — read
+        # Audit  read
         "view_auditlog",
     ],
 
     # ── LOWER SECONDARY HOD ─────────────────────────────────
     # Department-scoped: Lower Secondary classes/teachers.
     UserRole.LOWER_SECONDARY_HOD: [
-        # Review approvals — HOD sign-off
+        # Review approvals  HOD sign-off
         "can_review_lessonplan", "can_review_observation",
         "can_review_incident",
-        # Academics — read own dept, approve lesson plans + grades
+        # Academics  read own dept, approve lesson plans + grades
         "view_academicyear", "view_term", "view_subject", "view_gradeclass",
         "add_lessonplan", "change_lessonplan", "view_lessonplan", "view_lessonplanattachment",
         "view_examscore", "change_examscore", "view_examtypeconfiguration",
@@ -495,10 +495,10 @@ ROLE_DEFAULT_PERMISSIONS = {
         "view_cambridgecheckpointscore",
         "view_progressioncase", "can_review_progression",
         "view_room", "view_timetableentry",
-        # Students — read Lower Secondary only
+        # Students  read Lower Secondary only
         "view_student", "view_studentguardian", "view_studentsibling",
         "view_parentguardian", "view_enrollmenthistory",
-        # Admissions — full HOD review pipeline
+        # Admissions  full HOD review pipeline
         "view_applicant",
         "submit_hos_review",
         "edit_admission_note",
@@ -515,46 +515,46 @@ ROLE_DEFAULT_PERMISSIONS = {
         "toggle_admission_document",
         "complete_enrolment",
         "upload_applicant_photo",
-        # Attendance — read own dept
+        # Attendance  read own dept
         "view_attendanceentry", "view_staffattendanceentry",
-        # HR — read own dept
+        # HR  read own dept
         "view_staffprofile", "view_teacherclassassignment",
-        # Welfare — read
+        # Welfare  read
         "view_welfareobservation",
-        # Discipline — create + read + update + review (own dept)
+        # Discipline  create + read + update + review (own dept)
         "add_disciplineincident", "change_disciplineincident", "view_disciplineincident",
-        # Events — read
+        # Events  read
         "view_calendarevent",
-        # Tasks — read
+        # Tasks  read
         "view_task",
         "view_department_tasks",
-        # Communications — read + weekly focus submit/edit
+        # Communications  read + weekly focus submit/edit
         "view_broadcast", "view_weeklyfocus",
         "add_weeklyfocus", "change_weeklyfocus",
-        # PTC — read dept completion
+        # PTC  read dept completion
         "view_ptcsubjectcomment", "view_learnerattributeratingentry",
         "view_enrichmentgrade",
         "view_ptcwindow", "view_ptcgenerationlog",
-        # Timetable — read + create/edit slots
+        # Timetable  read + create/edit slots
         "view_timetableslot", "add_timetableslot", "change_timetableslot",
-        # Admissions — meeting schedule
+        # Admissions  meeting schedule
         "view_meetingschedule",
-        # Core — deadline config
+        # Core  deadline config
         "view_lessonplandeadline",
-        # Audit — read
+        # Audit  read
         "view_auditlog",
     ],
 
     # ── ADMIN OFFICER ────────────────────────────────────────
     # Admissions, enrolment, staff records, comms, events, timetable.
     UserRole.ADMIN_OFFICER: [
-        # Academics — read
+        # Academics  read
         "view_academicyear", "view_term", "view_subject", "view_gradeclass",
         "view_examscore",
-        # Progression — execute promotion runs
+        # Progression  execute promotion runs
         "add_progressioncase", "change_progressioncase", "view_progressioncase",
         "view_progressionconfig",
-        # Students — full CRUD
+        # Students  full CRUD
         "add_student", "change_student", "view_student",
         "add_studentguardian", "change_studentguardian", "view_studentguardian",
         "add_studentsibling", "change_studentsibling", "view_studentsibling",
@@ -563,21 +563,21 @@ ROLE_DEFAULT_PERMISSIONS = {
         "add_studentlaravelparent", "change_studentlaravelparent", "view_studentlaravelparent",
         "add_enrollmenthistory", "change_enrollmenthistory", "view_enrollmenthistory",
         "add_pdpaconsentlog", "change_pdpaconsentlog", "view_pdpaconsentlog",
-        # Attendance — excused absences + corrections
+        # Attendance  excused absences + corrections
         "add_attendanceentry", "change_attendanceentry", "view_attendanceentry",
         "view_staffattendanceentry",
         "add_message", "view_message",
         "view_notificationlog",
-        # HR — staff records + assignments
+        # HR  staff records + assignments
         "view_staffprofile",
         "add_teacherclassassignment", "change_teacherclassassignment", "view_teacherclassassignment",
         "add_staffdocument", "change_staffdocument", "view_staffdocument",
         "add_staffonboardingprogress", "change_staffonboardingprogress", "view_staffonboardingprogress",
         "add_onboardingchecklistitem", "change_onboardingchecklistitem", "view_onboardingchecklistitem",
         "view_offboardingrecord", "view_leaverequest", "view_leaveallocation",
-        # Finance — read assessment fees only
+        # Finance  read assessment fees only
         "view_invoice", "view_invoicelineitem",
-        # Admissions — full CRUD + actions
+        # Admissions  full CRUD + actions
         "add_applicant", "change_applicant", "view_applicant",
         "add_applicantdocumentreceipt", "change_applicantdocumentreceipt", "view_applicantdocumentreceipt",
         "add_applicantinternalnote", "change_applicantinternalnote", "view_applicantinternalnote",
@@ -597,46 +597,46 @@ ROLE_DEFAULT_PERMISSIONS = {
         "submit_hos_review",
         "reverse_assessment_fee",
         "submit_assessment_result",
-        # Events — full CRUD
+        # Events  full CRUD
         "add_calendarevent", "change_calendarevent", "delete_calendarevent", "view_calendarevent",
         "add_eventacknowledgement", "change_eventacknowledgement", "view_eventacknowledgement",
-        # Communications — full CRUD
+        # Communications  full CRUD
         "add_broadcast", "change_broadcast", "view_broadcast",
         "add_notification", "change_notification", "view_notification",
         "add_emailsendlog", "view_emailsendlog",
         "add_weeklyfocus", "change_weeklyfocus", "view_weeklyfocus",
-        # Timetable — full CRUD
+        # Timetable  full CRUD
         "add_timetableslot", "change_timetableslot", "delete_timetableslot", "view_timetableslot",
         "add_ecdbreakconfig", "change_ecdbreakconfig", "view_ecdbreakconfig",
         "add_timetableentry", "change_timetableentry", "delete_timetableentry", "view_timetableentry",
         "view_room",
-        # Behaviour — create + read + update
+        # Behaviour  create + read + update
         "add_disciplineincident", "change_disciplineincident", "view_disciplineincident",
-        # Primary Welfare — read
+        # Primary Welfare  read
         "view_welfareobservation",
-        # Core — read + bulk import writes
+        # Core  read + bulk import writes
         "view_schoolsettings", "change_schoolsettings",
         "add_lessonplandeadline", "change_lessonplandeadline", "view_lessonplandeadline",
         # PTC dates
         "add_ptcwindow", "change_ptcwindow", "view_ptcwindow",
         "add_ptcdatechangelog", "view_ptcdatechangelog",
-        # Users — limited (read + create staff)
+        # Users  limited (read + create staff)
         "view_user",
-        # Tasks — read (FRD module visibility)
+        # Tasks  read (FRD module visibility)
         "view_task",
-        # Audit — read
+        # Audit  read
         "view_auditlog",
     ],
 
     # ── FINANCE OFFICER ──────────────────────────────────────
     # Finance module: fees, invoices, payments, reconciliation.
     UserRole.FINANCE_OFFICER: [
-        # Academics — read
+        # Academics  read
         "view_academicyear", "view_term",
-        # Students — read guardian financial info
+        # Students  read guardian financial info
         "view_student", "view_studentguardian", "view_studentsibling",
         "view_parentguardian",
-        # Finance — full CRUD
+        # Finance  full CRUD
         "add_feestructure", "change_feestructure", "view_feestructure",
         "add_feestructureitem", "change_feestructureitem", "view_feestructureitem",
         "add_invoice", "change_invoice", "view_invoice",
@@ -651,7 +651,7 @@ ROLE_DEFAULT_PERMISSIONS = {
         "add_recurringexpense", "change_recurringexpense", "view_recurringexpense",
         "add_reminderconfiguration", "change_reminderconfiguration", "view_reminderconfiguration",
         "add_concession", "change_concession", "view_concession",
-        # Admissions — read assessment fees + confirm fee
+        # Admissions  read assessment fees + confirm fee
         "view_applicant", "view_assessmentschedule", "view_meetingschedule",
         "confirm_assessment_fee",
         "reverse_assessment_fee",
@@ -666,7 +666,7 @@ ROLE_DEFAULT_PERMISSIONS = {
         "upload_applicant_photo",
         "change_applicant",
         "schedule_assessment",
-        # Tasks — read
+        # Tasks  read
         "view_task",
         # Shared read modules (FRD matrix visibility)
         "view_schoolsettings", "view_broadcast", "view_calendarevent", "view_auditlog",
@@ -675,7 +675,7 @@ ROLE_DEFAULT_PERMISSIONS = {
     # ── TEACHER ──────────────────────────────────────────────
     # Class/subject scoped: attendance, grades, lesson plans, behaviour, welfare.
     UserRole.TEACHER: [
-        # Academics — own class/subject
+        # Academics  own class/subject
         "view_academicyear", "view_term", "view_subject", "view_gradeclass",
         "view_progressioncase",
         "add_lessonplan", "change_lessonplan", "view_lessonplan",
@@ -690,33 +690,33 @@ ROLE_DEFAULT_PERMISSIONS = {
         "add_abcpaceprogress", "change_abcpaceprogress", "view_abcpaceprogress",
         "add_abcreadingprogramme", "change_abcreadingprogramme", "view_abcreadingprogramme",
         "add_abcscripture", "change_abcscripture", "view_abcscripture",
-        # Students — own class
+        # Students  own class
         "view_student", "view_studentguardian", "view_parentguardian",
         "view_studentsibling", "view_enrollmenthistory",
-        # Admissions — submit assessment result (facilitating teacher only)
+        # Admissions  submit assessment result (facilitating teacher only)
         "submit_assessment_result",
-        # Attendance — own class
+        # Attendance  own class
         "add_attendanceentry", "change_attendanceentry", "view_attendanceentry",
-        # Welfare — create observation (ECD) + view own
+        # Welfare  create observation (ECD) + view own
         "add_welfareobservation", "view_welfareobservation",
         "view_welfareacknowledgment",
-        # Discipline — create + read own
+        # Discipline  create + read own
         "add_disciplineincident", "change_disciplineincident", "view_disciplineincident",
-        # Events — read
+        # Events  read
         "view_calendarevent",
-        # Tasks — read
+        # Tasks  read
         "view_task", "view_taskcomment",
-        # Communications — read
+        # Communications  read
         "view_broadcast", "view_weeklyfocus",
         "add_weeklyfocus",
-        # PTC — own class/subject
+        # PTC  own class/subject
         "add_ptcsubjectcomment", "change_ptcsubjectcomment", "view_ptcsubjectcomment",
         "add_learnerattributeratingentry", "change_learnerattributeratingentry", "view_learnerattributeratingentry",
         "add_enrichmentgrade", "change_enrichmentgrade", "view_enrichmentgrade",
         "view_enrichmentsubject",
-        # Timetable — read own
+        # Timetable  read own
         "view_timetableentry", "view_timetableslot",
-        # Note: view_user intentionally excluded — Teachers should NOT access
+        # Note: view_user intentionally excluded  Teachers should NOT access
         # /accounts/list/ (User Management). Own-profile viewing is handled
         # separately via the profile endpoint.
     ],
@@ -724,35 +724,35 @@ ROLE_DEFAULT_PERMISSIONS = {
     # ── PARENT ───────────────────────────────────────────────
     # Read-only portal: own children's data. No write operations.
     UserRole.PARENT: [
-        # Students — own child (read only)
+        # Students  own child (read only)
         "view_student", "view_studentguardian", "view_studentsibling",
         "view_parentguardian",
         "change_studentguardian",
-        # Attendance — own child
+        # Attendance  own child
         "view_attendanceentry",
-        # Finance — own child invoices/payments
+        # Finance  own child invoices/payments
         "view_invoice", "view_invoicelineitem", "view_payment",
-        # Academics — own child reports
+        # Academics  own child reports
         "view_reportcard", "view_cambridgecheckpointscore",
         "view_progressioncase",
         "view_ecdevaluation", "view_examscore",
-        # Welfare — own child
+        # Welfare  own child
         "view_welfareobservation",
         "view_welfareacknowledgment", "change_welfareacknowledgment",
-        # Discipline — own child incident confirmation
+        # Discipline  own child incident confirmation
         "change_disciplineincident",
-        # Events — read
+        # Events  read
         "view_calendarevent",
-        # Communications — read
+        # Communications  read
         "view_weeklyfocus", "view_broadcast",
-        # Tasks — own child related
+        # Tasks  own child related
         "view_task",
-        # PTC — own child
+        # PTC  own child
         "view_ptcsubjectcomment", "view_learnerattributeratingentry",
         "view_enrichmentgrade",
         # PDPA consent
         "view_pdpaconsentlog",
-        # Note: view_user intentionally excluded — Parents should NOT access
+        # Note: view_user intentionally excluded  Parents should NOT access
         # /accounts/list/ (User Management). Own-profile viewing is handled
         # separately via the profile endpoint.
     ],

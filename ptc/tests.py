@@ -1,5 +1,5 @@
 """
-PTC Module Tests — FR-PTC-001 through FR-PTC-031 coverage.
+PTC Module Tests  FR-PTC-001 through FR-PTC-031 coverage.
 
 Tests models, services, views, and RBAC for the Learner Progress Report module.
 """
@@ -124,7 +124,7 @@ def _create_ptc_window(academic_year, term_slot=TermSlot.TERM_1, ptc_date=None):
 
 
 # ---------------------------------------------------------------------------
-# FR-PTC-001: PTC windows — only Term 1 and Term 3
+# FR-PTC-001: PTC windows  only Term 1 and Term 3
 # ---------------------------------------------------------------------------
 
 class PTCWindowTests(TestCase):
@@ -604,7 +604,7 @@ class CanEnterCommentTests(TestCase):
         window = _create_ptc_window(ay, ptc_date=ptc_date)
         teacher = _create_user("t")
         student = _create_student()
-        # Comment window opens 14 days before ptc_date — 60 days out is outside
+        # Comment window opens 14 days before ptc_date  60 days out is outside
         self.assertFalse(can_enter_comment(teacher, student, "Math", window))
 
     def test_inside_window_wrong_subject(self):

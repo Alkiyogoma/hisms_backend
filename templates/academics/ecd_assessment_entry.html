@@ -2,7 +2,7 @@
 {% load role_tags %}
 {% load static %}
 
-{% block title %}{{ page_title|default:brand.school_name }} — ECD Reports{% endblock %}
+{% block title %}{{ page_title|default:brand.school_name }}  ECD Reports{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -67,7 +67,7 @@
 
 <!-- Header / Status Banner -->
 <div style="background:#1A1A2E;border-radius:8px;padding:10px 16px;margin-bottom:14px;font-size:12.5px;display:flex;align-items:center;gap:10px">
-  <strong style="color:#FBBC05">{{ ecd_class_label }} — {% if ecd_template_type == 'abc' %}A.C.E. Curriculum{% else %}Early Years Foundation Stage{% endif %}</strong>
+  <strong style="color:#FBBC05">{{ ecd_class_label }}  {% if ecd_template_type == 'abc' %}A.C.E. Curriculum{% else %}Early Years Foundation Stage{% endif %}</strong>
   <span style="color:rgba(251,188,5,.4)">|</span>
   <span style="color:rgba(255,255,255,.7);font-size:12px">
     {% if ecd_template_type == 'abc' %}

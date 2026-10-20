@@ -1,4 +1,4 @@
-{# _user_perm_override.html — Slide-out panel for per-user permission overrides #}
+{# _user_perm_override.html  Slide-out panel for per-user permission overrides #}
 {# Included in role_detail.html when a user row is clicked #}
 
 <div id="userOverridePanel" style="display:none; position:fixed; top:0; right:0; width:560px; height:100vh; background:#fff; box-shadow:-8px 0 30px rgba(0,0,0,0.12); z-index:1000; overflow-y:auto; transition:transform 0.3s ease">
@@ -48,7 +48,7 @@
       <span id="overrideCount" style="font-size:11px; color:#94A3B8; font-weight:600">0 overrides</span>
     </div>
     <div id="overridePermList" style="max-height:400px; overflow-y:auto; border:1px solid #E8EDF5; border-radius:10px; padding:8px">
-      {# Populated by JS — grouped permission categories #}
+      {# Populated by JS  grouped permission categories #}
     </div>
   </div>
 
@@ -131,7 +131,7 @@ function renderOverridePerms(inheritedPerms, directPerms) {
   const grouped = {};
   const allPerms = [...new Set([...inheritedPerms, ...directPerms])].sort();
 
-  // We need all permissions to show checkboxes — fetch from the role's permission list
+  // We need all permissions to show checkboxes  fetch from the role's permission list
   // Use the existing permission categories from the page
   const permCategories = window._permCategories || [];
 
@@ -251,7 +251,7 @@ function saveUserOverrides() {
       window.location.reload();
     }, 800);
   }).catch(err => {
-    btn.textContent = 'Error — try again';
+    btn.textContent = 'Error  try again';
     btn.style.background = '#DC2626';
     setTimeout(() => {
       btn.textContent = 'Save Overrides';

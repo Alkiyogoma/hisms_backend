@@ -130,7 +130,7 @@
   {% endif %}
 </div>
 
-<!-- Approve/Reject — only for HOS or Super Admin viewing a pending expense -->
+<!-- Approve/Reject  only for HOS or Super Admin viewing a pending expense -->
 {% if expense.status == "pending" and perms.finance.change_expense %}
 <div class="card" style="margin-top:14px;max-width:600px;border-left:3px solid var(--amber)">
   <div class="card-title">Review this expense</div>

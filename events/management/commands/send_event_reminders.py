@@ -20,7 +20,7 @@ class Command(BaseCommand):
         
         count = 0
         for event in events:
-            # FR-CAL-006/007: Target audience — build queryset correctly
+            # FR-CAL-006/007: Target audience  build queryset correctly
             if event.notify_parents and event.notify_staff:
                 users = User.objects.filter(is_active=True)
             elif event.notify_parents:

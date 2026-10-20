@@ -105,7 +105,7 @@ def navigation(request):
     path = getattr(request, "path", "") or ""
     items: list[NavItem] = []
 
-    # ECD teacher flag (cached per-request) — used only for welfare link routing.
+    # ECD teacher flag (cached per-request)  used only for welfare link routing.
     is_ecd_teacher = False
     if user and user.is_authenticated and role == UserRole.TEACHER:
         is_ecd_teacher = bool(getattr(request, '_cached_is_ecd', None) or _is_ecd_teacher(user))
@@ -148,7 +148,7 @@ def navigation(request):
         if item.key not in granted_modules:
             return
 
-        # Dynamic routing (permission-gated) — ECD vs Primary vs Lower Secondary assessment
+        # Dynamic routing (permission-gated)  ECD vs Primary vs Lower Secondary assessment
         if item.key == ModuleKey.GRADING:
             if role == UserRole.TEACHER:
                 if is_ecd_teacher:
@@ -172,7 +172,7 @@ def navigation(request):
             else:
                 item = dataclasses.replace(item, href="/academics/primary-assessment/")
 
-        # Dynamic routing — parent/teacher/admin report entry points
+        # Dynamic routing  parent/teacher/admin report entry points
         if item.key == ModuleKey.REPORTS:
             if _is_parent:
                 item = dataclasses.replace(item, href="/academics/reports/parent/")
@@ -191,10 +191,10 @@ def navigation(request):
         add(NavItem(key="parent_children",      label="My Children",      href="/parent/children/",                                       section="MAIN",       icon="users",    enabled=True))
         add(NavItem(key="parent_grades",        label="Grades",           href="/parent/grades/",                                         section="ACADEMIC",   icon="report",   enabled=True))
         add(NavItem(key="parent_admission",     label="Admission Form",   href="/parent/admission-form/",                                 section="OPERATIONS",icon="doc",      enabled=True))
-    # Task badge — use task_pending_count from tasks.context_processors (runs first)
+    # Task badge  use task_pending_count from tasks.context_processors (runs first)
     _task_badge = str(request.task_pending_count) if getattr(request, 'task_pending_count', 0) else None
     add(NavItem(key=ModuleKey.TASKS,            label="Tasks",            href="/tasks/",                 section="MAIN",       icon="check",    enabled=True, badge=_task_badge))
-    # FR-ADM-007: Finance Officers are excluded from the admissions module — they only see fee status on individual applicants.
+    # FR-ADM-007: Finance Officers are excluded from the admissions module  they only see fee status on individual applicants.
     if role != UserRole.FINANCE_OFFICER and not _is_parent:
         add(NavItem(key=ModuleKey.ADMISSIONS,       label="Admissions",       href="/admissions/",            section="MAIN",       icon="user",     enabled=True))
     if not _is_parent:
@@ -203,7 +203,7 @@ def navigation(request):
         add(NavItem(key=ModuleKey.LESSON_PLANS,     label="Lesson plans",     href="/academics/lesson-plans/",section="ACADEMIC",   icon="doc",      enabled=True))
     add(NavItem(key=ModuleKey.BEHAVIOUR,        label="Discipline",        href="/behaviour/",             section="ACADEMIC",   icon="badge",    enabled=True))
 
-    # Welfare — unified module for ECD + Primary (single nav item)
+    # Welfare  unified module for ECD + Primary (single nav item)
     if ModuleKey.WELFARE in granted_modules:
         if _is_parent:
             add(NavItem(key=ModuleKey.WELFARE, label="Welfare", href="/parent/welfare/", section="ACADEMIC", icon="pin", enabled=True))
@@ -215,7 +215,7 @@ def navigation(request):
     add(NavItem(key=ModuleKey.GRADING,         label="Progress",       href="/academics/ecd-assessment/",               section="ACADEMIC",   icon="badge",    enabled=True))
     add(NavItem(key=ModuleKey.PTC,             label="PTC Reports",    href="/ptc/",                    section="ACADEMIC",   icon="report",   enabled=True))
     add(NavItem(key=ModuleKey.ATTENDANCE,       label="Attendance",       href="/parent/attendance/" if _is_parent else "/attendance/",            section="OPERATIONS", icon="check",    enabled=True))
-    # User Management — permission-driven: any role granted user-management
+    # User Management  permission-driven: any role granted user-management
     # permissions (e.g. users.view_user ticked in Role Management) sees the
     # full user list. TEACHER and PARENT hold users.view_user only for their
     # own account, so they never see this module.
@@ -225,7 +225,7 @@ def navigation(request):
     )
     if _show_user_mgmt:
         add(NavItem(key=ModuleKey.USER_MANAGEMENT, label="User Management", href="/accounts/list/", section="OPERATIONS", icon="users", enabled=True))
-    # Staff Attendance — shown for staff roles holding staff-attendance
+    # Staff Attendance  shown for staff roles holding staff-attendance
     # permission (HODs etc.). Roles already seeing User Management stay on the
     # user-list page, preserving the FRD HOS/Admin layout.
     if ModuleKey.STAFF_ATTENDANCE in granted_modules and not _show_user_mgmt and role not in {UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD}:

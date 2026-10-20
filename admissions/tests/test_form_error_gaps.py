@@ -1,6 +1,6 @@
 """
-Admission forms must show why a save failed — including errors that are not
-tied to one field — and keep what was typed.
+Admission forms must show why a save failed  including errors that are not
+tied to one field  and keep what was typed.
 """
 from django import forms
 from django.contrib.messages import get_messages

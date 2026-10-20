@@ -7,6 +7,6 @@
   {% for key, msg in errors.items %}
     <div><a href="#{% if key == 'pdpa' %}pdpa{% elif key == 'guardian_id' %}guardianSearch{% else %}id_{{ key }}{% endif %}" style="color:#991B1B; text-decoration:underline">{{ msg }}</a></div>
   {% endfor %}
-  <div style="margin-top:6px; color:#7F1D1D">Everything else you typed is still here{% if errors %} — fix the item{{ errors|length|pluralize }} above and save again{% endif %}.</div>
+  <div style="margin-top:6px; color:#7F1D1D">Everything else you typed is still here{% if errors %}  fix the item{{ errors|length|pluralize }} above and save again{% endif %}.</div>
 </div>
 {% endif %}

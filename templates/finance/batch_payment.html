@@ -21,7 +21,7 @@
         <label class="field-label">Academic Term</label>
         <select name="term" class="hf2-select" onchange="this.form.submit()" style="min-width:200px">
           {% for t in terms %}
-          <option value="{{ t.id }}" {% if t.id == selected_term.id %}selected{% endif %}>{{ t.academic_year.name }} — {{ t.name }}</option>
+          <option value="{{ t.id }}" {% if t.id == selected_term.id %}selected{% endif %}>{{ t.academic_year.name }}  {{ t.name }}</option>
           {% endfor %}
         </select>
       </div>

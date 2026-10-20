@@ -1,4 +1,4 @@
-/* Shared ECD Assessment Styles — imported by per-class templates */
+/* Shared ECD Assessment Styles  imported by per-class templates */
 .domain-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:0.5px solid var(--border,#DDE3EE);gap:12px}
 .domain-row:last-child{border-bottom:none}
 .domain-label{font-size:13px;color:var(--text-primary,#1A1A2E);flex:1}

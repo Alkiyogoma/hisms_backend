@@ -2,13 +2,13 @@
    Usage: {% include '_partials/stat_card.html' with label='Total Billed' value='0' badge='TZS' sub='Current term' variant='blue' %}
 
    Parameters:
-     label   — uppercase label text (required)
-     value   — the stat number (required)
-     unit    — optional unit suffix (e.g. '%', 'hrs')
-     badge   — optional corner badge text (e.g. 'TZS', 'pending')
-     sub     — optional subtitle line below the number
-     variant — color variant: blue (default), green, amber, red, grey
-     link    — optional URL to navigate on click
+     label    uppercase label text (required)
+     value    the stat number (required)
+     unit     optional unit suffix (e.g. '%', 'hrs')
+     badge    optional corner badge text (e.g. 'TZS', 'pending')
+     sub      optional subtitle line below the number
+     variant  color variant: blue (default), green, amber, red, grey
+     link     optional URL to navigate on click
 {% endcomment %}
 {% with v=variant|default:'blue' %}
 <div class="metric-compact" style="background:linear-gradient(135deg,{% if v == 'green' %}#EEF9F0{% elif v == 'amber' %}#FFF8ED{% elif v == 'red' %}#FFF0F0{% elif v == 'grey' %}#F9FAFB{% else %}#EEF4FF{% endif %},#fff)"{% if link %} onclick="location.href='{{ link }}'"{% endif %}>

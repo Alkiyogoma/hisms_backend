@@ -330,7 +330,7 @@ def setup_services(client, password):
     """Configure nginx, systemd, and start services."""
     step("Configuring Nginx...")
 
-    # Copy nginx config — isolated site name/config so a co-hosted site
+    # Copy nginx config  isolated site name/config so a co-hosted site
     # (e.g. connect.hodari.ac.tz) is never overwritten. NEVER `rm sites-enabled/default`.
     run_cmd(client, f"cp {REMOTE_BACKEND_DIR}/deployment/nguzo/nginx_nguzo.conf /etc/nginx/sites-available/nguzo", sudo=True)
     run_cmd(client, f"ln -sf /etc/nginx/sites-available/nguzo /etc/nginx/sites-enabled/nguzo", sudo=True)

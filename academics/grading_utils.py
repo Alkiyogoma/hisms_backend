@@ -83,12 +83,12 @@ def classify_assessment_gap(
     dynamic ``scores`` dict mapping exam codes to float|None values.
 
     Returns:
-        case: int — 0 (none missing) | 1–N as per edge-case table
+        case: int  0 (none missing) | 1–N as per edge-case table
         missing_exams: list[str]
         present_exams: list[str]
         missing_count: int
         makeup_required: bool
-        label: str — human-readable description
+        label: str  human-readable description
     """
     if scores is None:
         scores = {"quiz": quiz, "mid_term": mid_term, "end_of_term": end_term}
@@ -102,20 +102,20 @@ def classify_assessment_gap(
     if m == 0:
         return {"case": 0, "missing_exams": [], "present_exams": present,
                 "missing_count": 0, "makeup_required": False,
-                "label": "All assessments present — no redistribution"}
+                "label": "All assessments present  no redistribution"}
     if m == total:
         return {"case": 7, "missing_exams": missing, "present_exams": present,
                 "missing_count": m, "makeup_required": True,
-                "label": "Missed all assessments — grade cannot be calculated; make-up required"}
+                "label": "Missed all assessments  grade cannot be calculated; make-up required"}
     if m >= 2:
         return {"case": 6, "missing_exams": missing, "present_exams": present,
                 "missing_count": m, "makeup_required": False,
-                "label": f"Missed {m} assessments — remaining {total - m} redistributed proportionally"}
+                "label": f"Missed {m} assessments  remaining {total - m} redistributed proportionally"}
     # m == 1
     missing_name = missing[0]
     return {"case": 1, "missing_exams": missing, "present_exams": present,
             "missing_count": 1, "makeup_required": False,
-            "label": f"Missed {missing_name.replace('_', ' ').title()} — remaining assessments redistributed proportionally"}
+            "label": f"Missed {missing_name.replace('_', ' ').title()}  remaining assessments redistributed proportionally"}
 
 
 def compute_redistributed_weights(
@@ -150,11 +150,11 @@ def compute_grade_with_gaps(
     dynamic ``scores`` dict mapping exam codes to float|None values.
 
     Returns:
-        average: float | None — weighted average (None when makeup_required)
-        grade: str — letter grade ("N/A" when makeup_required)
-        full_grade: str — display string
-        gap: dict — output of classify_assessment_gap()
-        redistributed_weights: dict — per-exam percentages after redistribution
+        average: float | None  weighted average (None when makeup_required)
+        grade: str  letter grade ("N/A" when makeup_required)
+        full_grade: str  display string
+        gap: dict  output of classify_assessment_gap()
+        redistributed_weights: dict  per-exam percentages after redistribution
         makeup_required: bool
     """
     if scores is None:

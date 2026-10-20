@@ -1,13 +1,13 @@
 """
 Unit tests for waitlist BDD scenarios:
 
-  S2 — Space-available notification
+  S2  Space-available notification
     - ENROLLED→WITHDRAWN triggers notification to Admin with grade + count
     - ADMITTED→WITHDRAWN triggers notification to Admin with grade + count
     - DENIED→WITHDRAWN does NOT trigger notification
     - WITHDRAWN with no waitlisted applicants does NOT trigger notification
 
-  S3 — Per-grade waitlist counts
+  S3  Per-grade waitlist counts
     - WaitlistView returns grade_waitlist_counts aggregated correctly
     - Counts match actual DB state per grade
 """
@@ -63,7 +63,7 @@ def _create_applicant(grade="Grade 1", status=ApplicantStatus.INQUIRY_RECEIVED, 
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# S2 — Space-available notification on withdrawal
+# S2  Space-available notification on withdrawal
 # ═══════════════════════════════════════════════════════════════════════════
 
 @patch("communications.email_service.dispatch_notification")
@@ -229,7 +229,7 @@ class SpaceAvailableNotificationTests(TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# S3 — Per-grade waitlist counts
+# S3  Per-grade waitlist counts
 # ═══════════════════════════════════════════════════════════════════════════
 
 class WaitlistViewGradeCountsTests(TestCase):

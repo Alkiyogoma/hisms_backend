@@ -8,7 +8,7 @@ template tags, direct request.user.role reads) see the login-time role.
 
 Effect: When a Super Admin changes another user's role in the DB, the
 affected user's active session continues under the OLD role until they
-log out and log back in — matching the BDD requirement exactly.
+log out and log back in  matching the BDD requirement exactly.
 
 Django's Field.__get__ reads from instance.__dict__[attname] first, so
 writing to __dict__['role'] is sufficient to override the DB value for
@@ -46,7 +46,7 @@ class SessionRoleMiddleware:
         session_role = request.session.get(SESSION_ROLE_KEY)
         if not session_role:
             # First request after middleware was added (migration) or
-            # session was cleared — seed from the DB so subsequent
+            # session was cleared  seed from the DB so subsequent
             # requests don't break.
             request.session[SESSION_ROLE_KEY] = user.role
             return
@@ -59,7 +59,7 @@ class SessionRoleMiddleware:
             #   - RoleRequiredMixin.dispatch()
             #   - Template {% if request.user.role == "..." %} checks
             #   - Direct request.user.role reads in views
-            # The DB is NOT touched — the change is request-scoped.
+            # The DB is NOT touched  the change is request-scoped.
             user.__dict__["role"] = session_role
             logger.debug(
                 "Role override applied: user=%s db=%s session=%s",

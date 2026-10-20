@@ -33,7 +33,7 @@ def forwards(apps, schema_editor):
 
     ct = ContentType.objects.filter(app_label=APP_LABEL, model=MODEL_NAME).first()
     if ct is None:
-        # Content type not yet created; skip — a later migration will create it.
+        # Content type not yet created; skip  a later migration will create it.
         return
 
     perm, created = Permission.objects.get_or_create(

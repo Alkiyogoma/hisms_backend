@@ -340,7 +340,7 @@ class LessonPlanListView(RoleRequiredMixin, TemplateView):
             mine_page_numbers.append(display_total_pages)
         ctx["mine_page_numbers"] = mine_page_numbers
 
-        # Check if teacher has any timetable slots (for empty state — teachers only)
+        # Check if teacher has any timetable slots (for empty state  teachers only)
         from timetable.models import TimetableSlot
         if role == UserRole.TEACHER:
             has_timetable_slots = TimetableSlot.objects.filter(teacher=user).exists()
@@ -420,7 +420,7 @@ class LessonPlanContextMixin:
                 return True
             if ecd_template_type_from_class_name(cn):
                 return True
-            # Also check subject name — ECD subjects should be excluded
+            # Also check subject name  ECD subjects should be excluded
             sn = (slot.subject_name or "").strip().lower()
             if sn == "ecd":
                 return True
@@ -514,7 +514,7 @@ class LessonPlanContextMixin:
         ctx["timetable_slots_json"] = json.dumps(timetable_slots_flat)
         ctx["is_super_admin"] = can_view_all
 
-        # Check if teacher has any timetable slots (for empty state on list page — teachers only)
+        # Check if teacher has any timetable slots (for empty state on list page  teachers only)
         user_role = getattr(user, 'role', None)
         if user_role == UserRole.TEACHER:
             has_timetable_slots = len(slots) > 0
@@ -684,13 +684,13 @@ class QuickLessonPlanView(RoleRequiredMixin, View):
             action_type="LESSON_PLAN_QUICK_CREATED",
             model_name="LessonPlan",
             object_id=plan.pk,
-            description=f"Quick lesson plan created for {plan.class_name} — {plan.subject_name}",
+            description=f"Quick lesson plan created for {plan.class_name}  {plan.subject_name}",
             after=_lesson_plan_snapshot(plan),
         )
 
         status_label = "submitted" if action == "submit" else "draft"
         toast_color = "#059669" if action == "submit" else "#023AA5"
-        toast_msg = f"Lesson plan {status_label} for {slot.class_name} — {slot.subject_name}"
+        toast_msg = f"Lesson plan {status_label} for {slot.class_name}  {slot.subject_name}"
 
         # Return JS to close modal, show toast, and refresh timetable
         js = (
@@ -1016,7 +1016,7 @@ def _lesson_plan_form_processing(view_instance, form):
             messages.error(view_instance.request, "You cannot submit a lesson plan for a class/subject you are not assigned to in the timetable.")
             return view_instance.form_invalid(form)
 
-        # Duplicate — redirect to edit the existing plan instead of blocking
+        # Duplicate  redirect to edit the existing plan instead of blocking
         day_of_week = form.cleaned_data.get("day_of_week", "")
         existing_qs = LessonPlan.objects.filter(
             teacher=form.instance.teacher,
@@ -1049,7 +1049,7 @@ def _lesson_plan_form_processing(view_instance, form):
             messages.error(view_instance.request, LESSON_PLAN_FILE_REQUIRED)
             return view_instance.form_invalid(form)
         for name in skipped:
-            messages.warning(view_instance.request, f"File '{name}' appears to be a duplicate — skipped.")
+            messages.warning(view_instance.request, f"File '{name}' appears to be a duplicate  skipped.")
 
         if submitting:
             if is_late:
@@ -1087,7 +1087,7 @@ def _lesson_plan_form_processing(view_instance, form):
             action_type=action_type,
             model_name="LessonPlan",
             object_id=form.instance.pk,
-            description=f"Lesson plan {form.instance.class_name} — {form.instance.subject_name} ({form.instance.week_start_date}) saved as {dict(LessonPlanStatus.choices).get(form.instance.status, 'unknown')}",
+            description=f"Lesson plan {form.instance.class_name}  {form.instance.subject_name} ({form.instance.week_start_date}) saved as {dict(LessonPlanStatus.choices).get(form.instance.status, 'unknown')}",
             before=before_snapshot,
             after=_lesson_plan_snapshot(form.instance),
             request=view_instance.request,
@@ -1137,7 +1137,7 @@ class LessonPlanSubmitView(RoleRequiredMixin, LoginRequiredMixin, View):
             action_type="LESSON_PLAN_SUBMITTED",
             model_name="LessonPlan",
             object_id=plan.pk,
-            description=f"Lesson plan {plan.class_name} — {plan.subject_name} ({plan.week_start_date}) submitted for review",
+            description=f"Lesson plan {plan.class_name}  {plan.subject_name} ({plan.week_start_date}) submitted for review",
             before=before,
             after=_lesson_plan_snapshot(plan),
             request=request,
@@ -1177,7 +1177,7 @@ class LessonPlanWithdrawView(RoleRequiredMixin, LoginRequiredMixin, View):
             action_type="LESSON_PLAN_WITHDRAWN",
             model_name="LessonPlan",
             object_id=plan.pk,
-            description=f"Lesson plan {plan.class_name} — {plan.subject_name} ({plan.week_start_date}) withdrawn to draft",
+            description=f"Lesson plan {plan.class_name}  {plan.subject_name} ({plan.week_start_date}) withdrawn to draft",
             before=before,
             after=_lesson_plan_snapshot(plan),
             request=request,
@@ -1267,7 +1267,7 @@ class LessonPlanDeleteView(RoleRequiredMixin, LoginRequiredMixin, View):
             action_type="DELETE",
             model_name="LessonPlan",
             object_id=str(plan.pk),
-            description=f"Deleted lesson plan: {plan.class_name} — {plan.subject_name} ({plan.week_start_date})",
+            description=f"Deleted lesson plan: {plan.class_name}  {plan.subject_name} ({plan.week_start_date})",
             before=_lesson_plan_snapshot(plan),
             request=request,
         )
@@ -1308,7 +1308,7 @@ def _get_missing_plan_teachers():
     if now <= deadline_dt:
         return []
 
-    # Get all active teachers (excluding ECD — use is_ecd_teacher for consistency)
+    # Get all active teachers (excluding ECD  use is_ecd_teacher for consistency)
     # Only include teachers who have timetable slots this term (no slots = no LP expected)
     from timetable.models import TimetableSlot
     from academics.utils import get_current_term
@@ -1326,7 +1326,7 @@ def _get_missing_plan_teachers():
     all_teachers = [t for t in all_teachers if not is_ecd_teacher(t)]
 
     # Find teachers who HAVE submitted a plan for this week
-    # (exclude MISSING — those are persisted placeholders for non-submissions)
+    # (exclude MISSING  those are persisted placeholders for non-submissions)
     submitted_teacher_ids = set(
         LessonPlan.objects.filter(
             week_start_date=this_monday,
@@ -1380,7 +1380,7 @@ def _notify_hod_lesson_plan(plan, actor, event="submitted", detail=""):
     elif dept == Department.LOWER_SECONDARY:
         hod_roles = [UserRole.LOWER_SECONDARY_HOD]
     else:
-        # Unknown department — notify all HOD types as fallback
+        # Unknown department  notify all HOD types as fallback
         hod_roles = [UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD]
 
     # Always include HOS so they have school-wide visibility
@@ -1393,13 +1393,13 @@ def _notify_hod_lesson_plan(plan, actor, event="submitted", detail=""):
     for hod in hods:
         if event == "comment":
             title = "Teacher commented on a lesson plan"
-            message = f"{plan.teacher.get_full_name()} on {plan.class_name} — {plan.subject_name}:\n\n{detail}"
+            message = f"{plan.teacher.get_full_name()} on {plan.class_name}  {plan.subject_name}:\n\n{detail}"
         elif event == "withdrawn":
             title = "Lesson plan withdrawn"
-            message = f"Lesson plan withdrawn — {plan.teacher.get_full_name()}, {plan.class_name} — {plan.subject_name}"
+            message = f"Lesson plan withdrawn  {plan.teacher.get_full_name()}, {plan.class_name}  {plan.subject_name}"
         else:
             title = "New lesson plan submitted"
-            message = f"New lesson plan submitted — {plan.teacher.get_full_name()}, {plan.class_name} — {plan.subject_name}"
+            message = f"New lesson plan submitted  {plan.teacher.get_full_name()}, {plan.class_name}  {plan.subject_name}"
         dispatch_notification(
             user=hod,
             title=title,
@@ -1413,12 +1413,12 @@ def _build_heatmap(user, week_offset=0):
     """Build a subject×class coverage heatmap for the given role's department(s).
 
     Returns a dict with:
-      subjects  — list of Subject objects (row labels)
-      classes   — list of GradeClass objects (column labels)
-      grid      — list of dicts, each {subject, cells: [{class, status, teacher, exists}]}
-      week_start — the Monday of the selected week
-      week_offset — current offset for navigation
-      week_end — Sunday of the selected week
+      subjects   list of Subject objects (row labels)
+      classes    list of GradeClass objects (column labels)
+      grid       list of dicts, each {subject, cells: [{class, status, teacher, exists}]}
+      week_start  the Monday of the selected week
+      week_offset  current offset for navigation
+      week_end  Sunday of the selected week
     """
     from datetime import date, timedelta
 
@@ -1558,7 +1558,7 @@ class LessonPlanReviewView(RoleRequiredMixin, View):
             action_type=action_type,
             model_name="LessonPlan",
             object_id=plan.pk,
-            description=f"Lesson plan {plan.class_name} — {plan.subject_name} ({plan.term.name}) {plan.get_status_display().lower()}",
+            description=f"Lesson plan {plan.class_name}  {plan.subject_name} ({plan.term.name}) {plan.get_status_display().lower()}",
             before=before,
             after=_lesson_plan_snapshot(plan),
             request=request,
@@ -1568,7 +1568,7 @@ class LessonPlanReviewView(RoleRequiredMixin, View):
         from communications.email_service import dispatch_notification
         status_text = plan.get_status_display().lower()
         title = f"Lesson Plan {status_text.capitalize()}"
-        msg = f"Your lesson plan for {plan.class_name} — {plan.subject_name} ({plan.term.name}) was {status_text} by {request.user.get_full_name()}."
+        msg = f"Your lesson plan for {plan.class_name}  {plan.subject_name} ({plan.term.name}) was {status_text} by {request.user.get_full_name()}."
         if feedback:
             msg += f"\n\nFeedback: {feedback}"
         
@@ -1630,9 +1630,9 @@ class LessonPlanComplianceView(RoleRequiredMixin, TemplateView):
         ctx["weeks_elapsed"] = weeks_elapsed
 
         # Determine which teachers to show based on user role
-        # ECD teachers only do Weekly Focus — never show them in lesson plan compliance
+        # ECD teachers only do Weekly Focus  never show them in lesson plan compliance
         if user.is_school_wide or not user.section_departments:
-            # HOS / Super admin — Primary only (ECD excluded from lesson plans)
+            # HOS / Super admin  Primary only (ECD excluded from lesson plans)
             allowed_depts = [Department.PRIMARY]
         else:
             # ECD has no lesson plans, so an ECD-only head sees an empty list
@@ -1643,7 +1643,7 @@ class LessonPlanComplianceView(RoleRequiredMixin, TemplateView):
             if dept_filter == "primary":
                 allowed_depts = [Department.PRIMARY]
             else:
-                # ECD filter — no lesson plans exist for ECD
+                # ECD filter  no lesson plans exist for ECD
                 allowed_depts = []
 
         dept_class_names = list(
@@ -1667,7 +1667,7 @@ class LessonPlanComplianceView(RoleRequiredMixin, TemplateView):
             .order_by("last_name", "first_name")
         )
 
-        # All lesson plans for these teachers this term — single query
+        # All lesson plans for these teachers this term  single query
         plans = LessonPlan.objects.filter(
             teacher__in=teachers,
             term=term,
@@ -1688,7 +1688,7 @@ class LessonPlanComplianceView(RoleRequiredMixin, TemplateView):
             elif p["status"] == LessonPlanStatus.REJECTED:
                 t["rejected"].add(p["week_start_date"])
 
-        # Batch fetch latest submission date per teacher — single query instead of N
+        # Batch fetch latest submission date per teacher  single query instead of N
         from django.db.models import Max
         latest_dates = LessonPlan.objects.filter(
             teacher__in=teachers, term=term

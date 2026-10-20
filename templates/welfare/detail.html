@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load static hodari_forms %}
-{% block title %}Welfare note #{{ obs.id }} — {{ brand.school_name }}{% endblock %}
+{% block title %}Welfare note #{{ obs.id }}  {{ brand.school_name }}{% endblock %}
 
 {% block extra_head %}
 {% include "includes/hodari_print_styles.html" %}
@@ -262,7 +262,7 @@
     </div>
     {% endif %}
 
-    <!-- Administrative Review — FR-WEL-004: visible only to HOD/HOS/SA, not teachers -->
+    <!-- Administrative Review  FR-WEL-004: visible only to HOD/HOS/SA, not teachers -->
     {% if can_review %}
     {% if obs.hod_notes or obs.hod_status == 'resolved' %}
     <div class="form-section">

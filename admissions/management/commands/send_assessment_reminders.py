@@ -1,6 +1,6 @@
 """
 Management command: send_assessment_reminders
-FRD FR-ADM-015 — Send a reminder to the parent 2 days before the scheduled assessment date.
+FRD FR-ADM-015  Send a reminder to the parent 2 days before the scheduled assessment date.
 Run daily via cron/Celery beat.
 """
 from django.core.management.base import BaseCommand
@@ -72,7 +72,7 @@ class Command(BaseCommand):
 
             dispatch_notification(
                 user=None,
-                title=f"Assessment Reminder — {applicant.child_full_name} in 2 Days",
+                title=f"Assessment Reminder  {applicant.child_full_name} in 2 Days",
                 message=msg,
                 actor=None,
                 external_email=parent_email or None,

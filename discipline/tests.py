@@ -75,7 +75,7 @@ class SubmitTests(IncidentBase):
         self.client.force_login(self.hod)
         resp = self.client.get(reverse("discipline:submit"))
         self.assertContains(resp, "Do not name other learners.")
-        self.assertContains(resp, "Level 2 — Moderate")
+        self.assertContains(resp, "Level 2  Moderate")
         self.assertNotContains(resp, 'name="previous_incidents"')
         self.assertNotContains(resp, 'name="severity"')
 
@@ -169,7 +169,7 @@ class DetailTests(IncidentBase):
 
     def test_one_scale_one_reference(self):
         sheet = self.sheet(self.page(self.incident()))
-        self.assertIn("Level 2 — Moderate", sheet)
+        self.assertIn("Level 2  Moderate", sheet)
         self.assertNotIn(">Medium<", sheet)
         self.assertIn("DISC-", sheet)
         self.assertNotIn("Incident #", sheet)
@@ -205,14 +205,14 @@ class DetailTests(IncidentBase):
     def test_reviewer_role_from_user_record(self):
         inc = self.incident(reported_by=self.hod, reviewed_by=self.hos, reviewed_at=self._now())
         sheet = self.sheet(self.page(inc))
-        self.assertIn("Reviewed by — Julieth Mugishagwe, Head of School", sheet)
-        self.assertIn("Reported by — Esther Agango, Head of Primary", sheet)
+        self.assertIn("Reviewed by  Julieth Mugishagwe, Head of School", sheet)
+        self.assertIn("Reported by  Esther Agango, Head of Primary", sheet)
         self.assertNotIn("Head of Department", sheet)
 
     def test_same_reporter_and_reviewer_stated_once(self):
         inc = self.incident(reviewed_by=self.hos, reviewed_at=self._now())
         sheet = self.sheet(self.page(inc))
-        self.assertIn("Reported and reviewed by — Julieth Mugishagwe, Head of School", sheet)
+        self.assertIn("Reported and reviewed by  Julieth Mugishagwe, Head of School", sheet)
         self.assertNotIn("Reviewed by —", sheet)
 
     def test_contact_detail_printed(self):
@@ -222,7 +222,7 @@ class DetailTests(IncidentBase):
         sheet = self.sheet(self.page(inc))
         self.assertIn("by telephone", sheet)
         self.assertIn("With: Mother", sheet)
-        self.assertIn("Meeting arranged</b> — date to be confirmed", sheet)
+        self.assertIn("Meeting arranged</b>  date to be confirmed", sheet)
         self.assertIn("With the class teacher", sheet)
 
     def test_reporter_named_with_role(self):

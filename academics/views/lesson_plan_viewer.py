@@ -2,10 +2,10 @@
 Lesson plan viewer: a faithful preview of the attached plan beside a
 comment thread between the teacher and reviewers.
 
-* ``thread``  — JSON for the viewer: the plan's files (with how each is
+* ``thread``   JSON for the viewer: the plan's files (with how each is
   previewed) and its comments.
-* ``preview`` — an attachment as PDF (office files converted on the server).
-* ``comment`` — add a comment. Comments never change the plan's status.
+* ``preview``  an attachment as PDF (office files converted on the server).
+* ``comment``  add a comment. Comments never change the plan's status.
 """
 import logging
 
@@ -96,7 +96,7 @@ class LessonPlanThreadView(RoleRequiredMixin, View):
         return JsonResponse({
             "plan": {
                 "id": plan.pk,
-                "label": f"{plan.lesson_title or plan.subject_name} — {plan.class_name}",
+                "label": f"{plan.lesson_title or plan.subject_name}  {plan.class_name}",
                 "teacher": plan.teacher.get_full_name() or plan.teacher.username,
                 "status": plan.get_status_display(),
                 "feedback": plan.reviewer_feedback,
@@ -126,7 +126,7 @@ class LessonPlanAttachmentPreviewView(RoleRequiredMixin, View):
             elif kind in ("image", "text"):
                 if not lesson_plan_files.file_exists(att):
                     raise lesson_plan_files.PreviewUnavailable(
-                        "The file is missing from the server — ask the teacher to upload it again",
+                        "The file is missing from the server  ask the teacher to upload it again",
                         reason="file_missing")
                 response = FileResponse(att.file.open("rb"))
                 if kind == "text":
@@ -174,7 +174,7 @@ class LessonPlanCommentView(RoleRequiredMixin, View):
         from audit.models import log_event
         log_event(
             actor=request.user, action_type="LESSON_PLAN_COMMENT", model_name="LessonPlan", object_id=plan.pk,
-            description=f"Comment on lesson plan {plan.class_name} — {plan.subject_name}", request=request,
+            description=f"Comment on lesson plan {plan.class_name}  {plan.subject_name}", request=request,
         )
         _notify_comment(plan, comment)
         return JsonResponse({"comment": _comment_json(comment, request.user)}, status=201)
@@ -189,7 +189,7 @@ def _notify_comment(plan, comment):
 
     actor = comment.author
     name = actor.get_full_name() or actor.username
-    what = f"{plan.class_name} — {plan.subject_name} ({plan.term.name})"
+    what = f"{plan.class_name}  {plan.subject_name} ({plan.term.name})"
     excerpt = comment.body if len(comment.body) <= 300 else comment.body[:297] + "…"
     link = f"{reverse('academics:lesson_plans')}?plan={plan.pk}"
     if actor.pk != plan.teacher_id:
