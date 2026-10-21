@@ -395,6 +395,12 @@ CSRF_TRUSTED_ORIGINS = [
     if origin.strip()
 ]
 
+# Links and the logo in emails are built from SITE_URL. A live site whose
+# .env doesn't set it would send http://127.0.0.1:8000 links, so fall back to
+# the first address people log in on.
+if not DEBUG and not os.getenv("SITE_URL") and CSRF_TRUSTED_ORIGINS:
+    SITE_URL = CSRF_TRUSTED_ORIGINS[0].rstrip("/")
+
 # Browser security headers
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
