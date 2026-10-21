@@ -388,7 +388,7 @@ class PersonalDataExportView(RoleRequiredMixin, TemplateView):
             data = [
                 {
                     "id": g.id,
-                    "label": f"{g.full_name}  {g.phone}",
+                    "label": f"{g.full_name} - {g.phone}",
                     "detail": g.email or "",
                     "type": "guardian",
                 }
@@ -400,7 +400,7 @@ class PersonalDataExportView(RoleRequiredMixin, TemplateView):
                 {
                     "id": s.id,
                     "label": f"{s.first_name} {s.last_name} ({s.admission_no})",
-                    "detail": f"{s.class_name}  {s.status}",
+                    "detail": f"{s.class_name} - {s.status}",
                     "type": "student",
                 }
                 for s in results

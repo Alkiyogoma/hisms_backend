@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Attendance Reports  {{ brand.school_name }}{% endblock %}
+{% block title %}Attendance Reports | {{ brand.school_name }}{% endblock %}
 {% block topbar_greeting %}Attendance{% endblock %}
 {% block extra_head %}
 {% include "attendance/_styles.html" %}
@@ -49,7 +49,7 @@
     <div class="at-fg sm"><label for="f-start">Start date</label><input id="f-start" type="date" name="start" value="{{ start|date:'Y-m-d' }}"></div>
     <div class="at-fg sm"><label for="f-end">End date</label><input id="f-end" type="date" name="end" value="{{ end|date:'Y-m-d' }}"></div>
     <div class="at-fg at-student"><label for="f-student">Student</label>
-      <input id="f-student" list="f-students" placeholder="All students  type a name…" autocomplete="off" value="{% if student_row %}{{ student_row.name }} · {{ student_row.admission_no }}{% endif %}">
+      <input id="f-student" list="f-students" placeholder="All students: type a name…" autocomplete="off" value="{% if student_row %}{{ student_row.name }} · {{ student_row.admission_no }}{% endif %}">
       <input type="hidden" name="student" id="f-student-id" value="{% if student_row %}{{ student_row.id }}{% endif %}">
       {% if student_row %}<button type="button" class="clear" id="f-student-clear" title="All students">&times;</button>{% endif %}
       <datalist id="f-students">{% for r in roster %}<option value="{{ r.name }} · {{ r.admission_no }}" data-id="{{ r.id }}">{{ r.class_name }}</option>{% endfor %}</datalist>
@@ -75,7 +75,7 @@
 
   <div class="at-card">
     <div class="at-card-h">
-      <div><h2>Status comparison</h2><p class="hint" style="margin-bottom:0">{{ period.label }}, {% if chart.unit == 'week' %}students per school day, one point per week{% else %}students, one point per school day{% endif %}  {% if student_row %}{{ student_row.name }}{% elif class_name %}{{ class_name }}{% else %}all classes{% endif %}. Click a {{ chart.unit }} to report on it alone.</p></div>
+      <div><h2>Status comparison</h2><p class="hint" style="margin-bottom:0">{{ period.label }}, {% if chart.unit == 'week' %}students per school day, one point per week{% else %}students, one point per school day{% endif %} - {% if student_row %}{{ student_row.name }}{% elif class_name %}{{ class_name }}{% else %}all classes{% endif %}. Click a {{ chart.unit }} to report on it alone.</p></div>
       <div class="at-legend">
         <span><i style="background:var(--at-green)"></i>Present</span><span><i style="background:var(--at-amber)"></i>Late</span>
         <span><i style="background:var(--at-purple)"></i>Excused</span><span><i style="background:var(--at-red)"></i>Absent</span>
@@ -86,14 +86,14 @@
     <div class="at-scroll at-chart-wrap"><svg id="chart" class="at-chart" viewBox="0 0 980 240" preserveAspectRatio="none"></svg><div class="at-tip" id="chartTip"></div></div>
     {{ chart|json_script:"chart-data" }}
     {% else %}
-    <div class="at-empty">No school days in this range{% if notes %}  {{ notes|join:" " }}{% endif %}.</div>
+    <div class="at-empty">No school days in this range{% if notes %} - {{ notes|join:" " }}{% endif %}.</div>
     {% endif %}
   </div>
 
   {% if student_row %}
   <div class="at-card">
     {% with row=student_row %}
-    <div class="at-card-h"><div><h2>{{ row.name }}  day by day</h2><p class="hint" style="margin-bottom:0">{{ row.class_name }} · {{ row.admission_no }}{% if row.admitted_in_period %} · admitted {{ row.enrolment_date|date:"j M Y" }}{% endif %}</p></div>
+    <div class="at-card-h"><div><h2>{{ row.name }}: day by day</h2><p class="hint" style="margin-bottom:0">{{ row.class_name }} · {{ row.admission_no }}{% if row.admitted_in_period %} · admitted {{ row.enrolment_date|date:"j M Y" }}{% endif %}</p></div>
       <button type="button" class="hf-btn hf-btn-secondary" data-learner="{{ row.id }}" style="font-size:12px">Open full pattern</button></div>
     <div class="at-mini">
       <div><div class="k">Rate</div><div class="v c-{{ row.band }}">{% if row.rate is not None %}{{ row.rate }}%{% else %}—{% endif %}</div></div>
@@ -128,7 +128,7 @@
 
     {% elif show == 'unm' %}
       <h2>Unconfirmed registers</h2>
-      <p class="hint">Days where a register was never or only partly confirmed, and registers confirmed after 09:00  {{ issue_learner_days }} student-day{{ issue_learner_days|pluralize }} unmarked.</p>
+      <p class="hint">Days where a register was never or only partly confirmed, and registers confirmed after 09:00 - {{ issue_learner_days }} student-day{{ issue_learner_days|pluralize }} unmarked.</p>
       <div class="at-scroll"><table class="at-table">
         <thead><tr><th>Date</th><th>Class</th><th>Class teacher</th><th class="num">Students unconfirmed</th><th>Status</th><th></th></tr></thead>
         <tbody>
@@ -141,12 +141,12 @@
           <tr><td colspan="6"><div class="at-empty">Every register in this range was confirmed on time.</div></td></tr>
         {% endfor %}
         </tbody></table></div>
-      <div class="at-basis">Unconfirmed students are not absent students  they are excluded from every percentage. Past registers are corrected through a correction request.</div>
+      <div class="at-basis">Unconfirmed students are not absent students: they are excluded from every percentage. Past registers are corrected through a correction request.</div>
 
     {% else %}
       <div class="at-card-h">
         <div>
-          <h2>{% if show == 'flag' %}Flagged  below {{ flag }}%{% elif show == 'pers' %}Persistent absence  below {{ persistent }}%{% elif show == 'late' %}Habitually late{% else %}All students{% endif %} <span class="at-muted" style="font-weight:600">· {{ page_obj.paginator.count }}</span></h2>
+          <h2>{% if show == 'flag' %}Flagged: below {{ flag }}%{% elif show == 'pers' %}Persistent absence: below {{ persistent }}%{% elif show == 'late' %}Habitually late{% else %}All students{% endif %} <span class="at-muted" style="font-weight:600">· {{ page_obj.paginator.count }}</span></h2>
           <p class="hint" style="margin-bottom:0">{% if show == 'flag' %}Attendance below the {{ flag }}% flag but at or above {{ persistent }}%.{% elif show == 'pers' %}Below {{ persistent }}% attendance. Immediate follow-up with parents.{% elif show == 'late' %}{{ habitual_late }} or more late arrivals. Reported separately so punctuality stays visible.{% else %}Lowest attendance first over the selected range. Absent and excused both count as not in school; excused is shown separately.{% endif %}</p>
         </div>
         <form method="get" class="at-fg" style="min-width:200px">
@@ -177,7 +177,7 @@
             <td class="num"><span class="at-tag t-purple">{{ r.excused }}</span></td>
             <td class="num">{{ r.late }}</td>
             <td><span class="at-tag t-{{ r.tag.0 }}">{{ r.tag.1 }}</span></td></tr>
-        {% empty %}<tr><td colspan="8"><div class="at-empty">{% if query %}No students match “{{ query }}”.{% elif show == 'all' %}No students in this selection.{% else %}No students fall in this band  good news.{% endif %}</div></td></tr>{% endfor %}
+        {% empty %}<tr><td colspan="8"><div class="at-empty">{% if query %}No students match “{{ query }}”.{% elif show == 'all' %}No students in this selection.{% else %}No students fall in this band: good news.{% endif %}</div></td></tr>{% endfor %}
         </tbody>
         {% endif %}
       </table></div>

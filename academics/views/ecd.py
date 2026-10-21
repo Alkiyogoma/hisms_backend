@@ -985,7 +985,7 @@ class ECDAssessmentView(RoleRequiredMixin, TemplateView):
         ctx["ecd_class_name"] = class_name
         ctx["ecd_template_type"] = tpl
         ctx["ecd_class_label"] = class_name
-        ctx["page_title"] = f"ECD Reports  {class_name}"
+        ctx["page_title"] = f"ECD Reports - {class_name}"
         ctx["domain_groups"] = ECDEvaluationEntryView._load_domain_groups().get(tpl, [])
 
         # Pre-K field groups (label, field_id) matching Hodari_09a mockup

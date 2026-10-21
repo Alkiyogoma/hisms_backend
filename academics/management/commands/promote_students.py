@@ -133,7 +133,7 @@ class Command(BaseCommand):
 
             if current_idx is None:
                 # Student's class_name is not in GradeClass registry  skip
-                self.stdout.write(f"  WARNING: {student.admission_no} {student.get_full_name()}  class '{current_class}' not in GradeClass, skipped")
+                self.stdout.write(f"  WARNING: {student.admission_no} {student.get_full_name()}: class '{current_class}' not in GradeClass, skipped")
                 skipped += 1
                 continue
 

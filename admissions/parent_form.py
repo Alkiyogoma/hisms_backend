@@ -100,7 +100,7 @@ def _email_link(invite, token, *, intro):
     if applicant.parent_email:
         send_email_safe(
             to_email=applicant.parent_email,
-            subject=f"Admission form for your child  {_school_name()}",
+            subject=f"Admission form for your child - {_school_name()}",
             body=body,
         )
 

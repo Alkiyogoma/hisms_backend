@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Amend {{ incident.reference }}  {{ brand.school_name }}{% endblock %}
+{% block title %}Amend {{ incident.reference }} | {{ brand.school_name }}{% endblock %}
 {% block topbar_greeting %}Amend {{ incident.reference }}{% endblock %}
 {% block topbar_date %}{{ incident.student.first_name }} {{ incident.student.last_name }}{% endblock %}
 
@@ -80,10 +80,10 @@
       <div class="hf2-section" style="margin-top:20px">
         <div class="hf2-section-title">Type of incident</div>
         <div class="am-levels">
-          {% with f=form.incident_level_1 %}<div class="am-level"><div class="am-level-h" style="background:#16a34a">LEVEL 1  MINOR</div><div class="am-level-b">{% for cb in f %}<label>{{ cb.tag }} {{ cb.choice_label }}</label>{% endfor %}</div></div>{% endwith %}
-          {% with f=form.incident_level_2 %}<div class="am-level"><div class="am-level-h" style="background:#2563eb">LEVEL 2  MODERATE</div><div class="am-level-b">{% for cb in f %}<label>{{ cb.tag }} {{ cb.choice_label }}</label>{% endfor %}</div></div>{% endwith %}
-          {% with f=form.incident_level_3 %}<div class="am-level"><div class="am-level-h" style="background:#d97706">LEVEL 3  SERIOUS</div><div class="am-level-b">{% for cb in f %}<label>{{ cb.tag }} {{ cb.choice_label }}</label>{% endfor %}</div></div>{% endwith %}
-          {% with f=form.incident_level_4 %}<div class="am-level"><div class="am-level-h" style="background:#dc2626">LEVEL 4  SEVERE</div><div class="am-level-b">{% for cb in f %}<label>{{ cb.tag }} {{ cb.choice_label }}</label>{% endfor %}</div></div>{% endwith %}
+          {% with f=form.incident_level_1 %}<div class="am-level"><div class="am-level-h" style="background:#16a34a">LEVEL 1 - MINOR</div><div class="am-level-b">{% for cb in f %}<label>{{ cb.tag }} {{ cb.choice_label }}</label>{% endfor %}</div></div>{% endwith %}
+          {% with f=form.incident_level_2 %}<div class="am-level"><div class="am-level-h" style="background:#2563eb">LEVEL 2 - MODERATE</div><div class="am-level-b">{% for cb in f %}<label>{{ cb.tag }} {{ cb.choice_label }}</label>{% endfor %}</div></div>{% endwith %}
+          {% with f=form.incident_level_3 %}<div class="am-level"><div class="am-level-h" style="background:#d97706">LEVEL 3 - SERIOUS</div><div class="am-level-b">{% for cb in f %}<label>{{ cb.tag }} {{ cb.choice_label }}</label>{% endfor %}</div></div>{% endwith %}
+          {% with f=form.incident_level_4 %}<div class="am-level"><div class="am-level-h" style="background:#dc2626">LEVEL 4 - SEVERE</div><div class="am-level-b">{% for cb in f %}<label>{{ cb.tag }} {{ cb.choice_label }}</label>{% endfor %}</div></div>{% endwith %}
         </div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:6px">The overall level is the highest level ticked.</div>
       </div>

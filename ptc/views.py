@@ -566,7 +566,7 @@ class PTCCommentEntryView(RoleRequiredMixin, TemplateView):
                 action_type="PTC_COMMENT_SAVED",
                 model_name="PTCSubjectComment",
                 object_id=student.pk,
-                description=f"PTC comment saved for {student.admission_no}  {subject_name}",
+                description=f"PTC comment saved for {student.admission_no} - {subject_name}",
                 request=request
             )
 
@@ -960,7 +960,7 @@ class PTCCalendarConfigView(RoleRequiredMixin, TemplateView):
                 object_id=0,
                 description=(
                     f"User {user} (role={user.role}) denied PTC window mutation ({action}) "
-                    f"on {request.path}  missing perm: ptc.change_ptcwindow"
+                    f"on {request.path}: missing perm: ptc.change_ptcwindow"
                 ),
                 request=request,
             )

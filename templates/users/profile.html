@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ profile_user.get_full_name|default:profile_user.username }}  {{ brand.school_name }}{% endblock %}
+{% block title %}{{ profile_user.get_full_name|default:profile_user.username }} | {{ brand.school_name }}{% endblock %}
 {% block topbar_greeting %}User Profile{% endblock %}
 
 {% block content %}

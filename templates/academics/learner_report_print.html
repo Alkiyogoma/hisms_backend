@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Progress Report  {{ student.first_name }} {{ student.last_name }}{% if term %}  {{ term.name }} {{ term.academic_year.name }}{% endif %}</title>
+<title>Progress Report | {{ student.first_name }} {{ student.last_name }}{% if term %} | {{ term.name }} {{ term.academic_year.name }}{% endif %}</title>
 {% if not is_pdf %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@500;700&family=Merriweather:wght@700&display=swap" rel="stylesheet">

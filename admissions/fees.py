@@ -56,7 +56,7 @@ def child_lines(child: dict, schedule: dict) -> list[dict]:
     """[{"label", "amount"}] for one child  mirrors childLines() in the form."""
     grade = child.get("grade") or ""
     lines = [
-        {"label": "Tuition  Term 1", "amount": tuition_for(grade, schedule)},
+        {"label": "Tuition - Term 1", "amount": tuition_for(grade, schedule)},
         {"label": "Development fee (annual)", "amount": schedule["development"]},
     ]
     if child.get("isNew", True):
@@ -64,9 +64,9 @@ def child_lines(child: dict, schedule: dict) -> list[dict]:
     if grade in schedule["checkpoint_grades"]:
         lines.append({"label": "Cambridge Checkpoint", "amount": schedule["checkpoint"]})
     if child.get("stem"):
-        lines.append({"label": "STEM  Term 1", "amount": schedule["stem"]})
+        lines.append({"label": "STEM - Term 1", "amount": schedule["stem"]})
     if child.get("breakfast"):
-        lines.append({"label": "Breakfast  Term 1", "amount": schedule["breakfast"]})
+        lines.append({"label": "Breakfast - Term 1", "amount": schedule["breakfast"]})
     uniforms = child.get("uniform") or {}
     for key, item in schedule["uniform"].items():
         try:

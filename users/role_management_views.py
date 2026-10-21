@@ -471,7 +471,7 @@ class RoleDeleteView(RoleRequiredMixin, DeleteView):
         if user_count > 0:
             messages.error(
                 self.request,
-                f"Cannot delete '{self.object.label}'  {user_count} user(s) are assigned to this role. "
+                f"Cannot delete '{self.object.label}': {user_count} user(s) are assigned to this role. "
                 "Remove all users first."
             )
             return redirect("users:role_list")

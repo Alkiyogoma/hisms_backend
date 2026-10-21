@@ -413,7 +413,7 @@ def schedule_assessment(
                 )
                 dispatch_notification(
                     user=tu,
-                    title=f"Assessment Assigned  {applicant.child_full_name}",
+                    title=f"Assessment Assigned - {applicant.child_full_name}",
                     message=msg,
                     link=f"/admissions/applicant/{applicant.pk}/",
                     actor=actor,
@@ -459,7 +459,7 @@ def confirm_assessment_fee_paid(*, applicant: Applicant, actor, payment_method: 
                 applicant=applicant,
                 to_status=ApplicantStatus.ASSESSMENT_COMPLETED,
                 actor=actor,
-                reason="Assessment fee confirmed. Assessment already completed  skipping ahead.",
+                reason="Assessment fee confirmed. Assessment already completed: skipping ahead.",
             )
         else:
             # Skip straight to assessment_confirmed (fee_paid column removed from pipeline)
@@ -1211,7 +1211,7 @@ def complete_enrolment(*, applicant: Applicant, actor, override_duplicate: bool 
                 "portal_link": "/parent/admission-form/",
                 "admissions_phone": _contact.get("phone", ""),
                 "uniform_notes": "Ensure correct uniform is worn from day one.",
-                "meals": "School meals available  see fee schedule.",
+                "meals": "School meals available: see fee schedule.",
                 "transport_notes": "Transport available for qualifying zones.",
             },
         )
@@ -1466,7 +1466,7 @@ def revert_applicant_from_enrolled(*, applicant: Applicant, to_status: str, acto
             action_type="STUDENT_ARCHIVED",
             model_name="Student",
             object_id=student.pk,
-            description=f"Student {student.admission_no} ({student.first_name} {student.last_name}) archived  applicant {applicant.child_full_name} reverted from enrolled to {to_status}",
+            description=f"Student {student.admission_no} ({student.first_name} {student.last_name}) archived: applicant {applicant.child_full_name} reverted from enrolled to {to_status}",
         )
 
         from students.models import EnrollmentHistory

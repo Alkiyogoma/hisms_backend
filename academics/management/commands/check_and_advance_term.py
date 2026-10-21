@@ -177,7 +177,7 @@ class Command(BaseCommand):
         for admin in admins:
             dispatch_notification(
                 user=admin,
-                title="Term Transition  New Term Started",
+                title="Term Transition - New Term Started",
                 message=msg,
                 link=link,
                 actor=None,

@@ -4140,7 +4140,7 @@ class ConcessionCreateView(RoleRequiredMixin, CreateView):
             object_id=self.object.pk,
             description=(
                 f"Concession created: {self.object.get_concession_type_display()} "
-                f"for {self.object.student}  "
+                f"for {self.object.student} - "
                 f"TZS {self.object.discount_value:,.0f}"
             ),
             request=self.request,
@@ -4177,7 +4177,7 @@ class ConcessionApproveView(RoleRequiredMixin, View):
                 object_id=concession.pk,
                 description=(
                     f"Concession approved: {concession.get_concession_type_display()} "
-                    f"for {concession.student}  TZS {concession.discount_value:,.0f}"
+                    f"for {concession.student} - TZS {concession.discount_value:,.0f}"
                 ),
                 request=request,
             )

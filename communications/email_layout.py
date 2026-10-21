@@ -252,7 +252,7 @@ def wrap_html(inner_html, *, title="", section="", preheader="", footer_note="",
     note = html.escape(
         footer_note
         or f"You are receiving this email because you have an account with {b['school_name']}. "
-        "This is an automated message  please do not reply directly."
+        "This is an automated message: please do not reply directly."
     ).replace("\n", "<br>")
     signature_html = (
         f'<tr><td bgcolor="#ffffff" style="background:#ffffff;padding:0 36px 32px">'

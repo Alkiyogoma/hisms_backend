@@ -102,20 +102,20 @@ def classify_assessment_gap(
     if m == 0:
         return {"case": 0, "missing_exams": [], "present_exams": present,
                 "missing_count": 0, "makeup_required": False,
-                "label": "All assessments present  no redistribution"}
+                "label": "All assessments present: no redistribution"}
     if m == total:
         return {"case": 7, "missing_exams": missing, "present_exams": present,
                 "missing_count": m, "makeup_required": True,
-                "label": "Missed all assessments  grade cannot be calculated; make-up required"}
+                "label": "Missed all assessments: grade cannot be calculated; make-up required"}
     if m >= 2:
         return {"case": 6, "missing_exams": missing, "present_exams": present,
                 "missing_count": m, "makeup_required": False,
-                "label": f"Missed {m} assessments  remaining {total - m} redistributed proportionally"}
+                "label": f"Missed {m} assessments: remaining {total - m} redistributed proportionally"}
     # m == 1
     missing_name = missing[0]
     return {"case": 1, "missing_exams": missing, "present_exams": present,
             "missing_count": 1, "makeup_required": False,
-            "label": f"Missed {missing_name.replace('_', ' ').title()}  remaining assessments redistributed proportionally"}
+            "label": f"Missed {missing_name.replace('_', ' ').title()}: remaining assessments redistributed proportionally"}
 
 
 def compute_redistributed_weights(

@@ -72,7 +72,7 @@ class Command(BaseCommand):
 
             dispatch_notification(
                 user=None,
-                title=f"Assessment Reminder  {applicant.child_full_name} in 2 Days",
+                title=f"Assessment Reminder - {applicant.child_full_name} in 2 Days",
                 message=msg,
                 actor=None,
                 external_email=parent_email or None,

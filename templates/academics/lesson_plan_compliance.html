@@ -148,7 +148,7 @@
           {% for d in row.days %}
           <td>
             <span class="hm-cell hm-{{ d.status }}"
-                  title="{% if d.subject %}{{ d.subject }}  {{ d.class }}{% endif %}">
+                  title="{% if d.subject %}{{ d.subject }} - {{ d.class }}{% endif %}">
               {% if d.status == 'approved' %}Approved
               {% elif d.status == 'submitted' %}Submitted
               {% elif d.status == 'draft' %}Draft

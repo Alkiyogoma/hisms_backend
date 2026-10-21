@@ -6,10 +6,10 @@ from students.models import Student
 
 class IncidentSeverity(models.TextChoices):
     # One scale: the severity is the highest incident level ticked.
-    LOW = "low", "Level 1  Minor"
-    MEDIUM = "medium", "Level 2  Moderate"
-    HIGH = "high", "Level 3  Serious"
-    CRITICAL = "critical", "Level 4  Severe"
+    LOW = "low", "Level 1 - Minor"
+    MEDIUM = "medium", "Level 2 - Moderate"
+    HIGH = "high", "Level 3 - Serious"
+    CRITICAL = "critical", "Level 4 - Severe"
 
 
 LEVEL_SEVERITY = {

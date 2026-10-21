@@ -31,7 +31,7 @@
         <td style="padding:10px 8px">
           <div style="display:flex;flex-wrap:wrap;gap:4px">
             {% for s in item.subjects %}
-              <span class="chip chip-blue" style="font-size:11px;{% if not s.is_active %}opacity:.55;text-decoration:line-through{% endif %}" title="{% if not s.is_active %}Retired  retained for historical records{% else %}Active{% endif %}">{{ s.name }}{% if not s.is_active %} (retired){% endif %}</span>
+              <span class="chip chip-blue" style="font-size:11px;{% if not s.is_active %}opacity:.55;text-decoration:line-through{% endif %}" title="{% if not s.is_active %}Retired: retained for historical records{% else %}Active{% endif %}">{{ s.name }}{% if not s.is_active %} (retired){% endif %}</span>
             {% empty %}
               <span style="color:var(--text-muted);font-size:12px;font-style:italic">No subjects configured</span>
             {% endfor %}

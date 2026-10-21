@@ -244,7 +244,7 @@
         var serverCannot = err && (err.reason === 'no_converter' || err.reason === 'conversion_failed');
         var viewerMissing = err && err.message === 'viewer';
         if (f.fallback && (serverCannot || viewerMissing)) return showInBrowser(f, token);
-        if (viewerMissing) return unavailable(f, 'The viewer could not load  check your connection.', !office);
+        if (viewerMissing) return unavailable(f, 'The viewer could not load: check your connection.', !office);
         unavailable(f, err && err.reason ? err.message : (office ? 'The file could not be converted for preview.'
           : 'This PDF could not be shown here.'), !office);
       });
@@ -265,7 +265,7 @@
         var pages = $('#lpvPages');
         pages.innerHTML = '';
         var note = el('div', 'lpv-note', 'Shown by your browser: the server could not convert this file. '
-          + 'Layout can differ slightly from the original  download it to check.');
+          + 'Layout can differ slightly from the original: download it to check.');
         pages.appendChild(note);
         var body = el('div', 'lpv-html');
         pages.appendChild(body);

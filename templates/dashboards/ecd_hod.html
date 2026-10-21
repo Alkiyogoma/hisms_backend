@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static hodari_forms role_tags %}
 
-{% block title %}ECD HOD Dashboard  {{ brand.school_name }}{% endblock %}
+{% block title %}ECD HOD Dashboard | {{ brand.school_name }}{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -162,7 +162,7 @@
           </div>
           <span class="trow-right">
             <span class="chip {% if obs.severity == 'critical' or obs.severity == 'high' %}chip-red{% else %}chip-amber{% endif %}">
-              {{ obs.get_severity_display|split:'  '|first }}
+              {{ obs.get_severity_display|split:' ('|first }}
             </span>
           </span>
         </a>

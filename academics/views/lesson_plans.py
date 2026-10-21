@@ -684,13 +684,13 @@ class QuickLessonPlanView(RoleRequiredMixin, View):
             action_type="LESSON_PLAN_QUICK_CREATED",
             model_name="LessonPlan",
             object_id=plan.pk,
-            description=f"Quick lesson plan created for {plan.class_name}  {plan.subject_name}",
+            description=f"Quick lesson plan created for {plan.class_name} - {plan.subject_name}",
             after=_lesson_plan_snapshot(plan),
         )
 
         status_label = "submitted" if action == "submit" else "draft"
         toast_color = "#059669" if action == "submit" else "#023AA5"
-        toast_msg = f"Lesson plan {status_label} for {slot.class_name}  {slot.subject_name}"
+        toast_msg = f"Lesson plan {status_label} for {slot.class_name} - {slot.subject_name}"
 
         # Return JS to close modal, show toast, and refresh timetable
         js = (
@@ -1049,7 +1049,7 @@ def _lesson_plan_form_processing(view_instance, form):
             messages.error(view_instance.request, LESSON_PLAN_FILE_REQUIRED)
             return view_instance.form_invalid(form)
         for name in skipped:
-            messages.warning(view_instance.request, f"File '{name}' appears to be a duplicate  skipped.")
+            messages.warning(view_instance.request, f"File '{name}' appears to be a duplicate: skipped.")
 
         if submitting:
             if is_late:
@@ -1087,7 +1087,7 @@ def _lesson_plan_form_processing(view_instance, form):
             action_type=action_type,
             model_name="LessonPlan",
             object_id=form.instance.pk,
-            description=f"Lesson plan {form.instance.class_name}  {form.instance.subject_name} ({form.instance.week_start_date}) saved as {dict(LessonPlanStatus.choices).get(form.instance.status, 'unknown')}",
+            description=f"Lesson plan {form.instance.class_name} - {form.instance.subject_name} ({form.instance.week_start_date}) saved as {dict(LessonPlanStatus.choices).get(form.instance.status, 'unknown')}",
             before=before_snapshot,
             after=_lesson_plan_snapshot(form.instance),
             request=view_instance.request,
@@ -1137,7 +1137,7 @@ class LessonPlanSubmitView(RoleRequiredMixin, LoginRequiredMixin, View):
             action_type="LESSON_PLAN_SUBMITTED",
             model_name="LessonPlan",
             object_id=plan.pk,
-            description=f"Lesson plan {plan.class_name}  {plan.subject_name} ({plan.week_start_date}) submitted for review",
+            description=f"Lesson plan {plan.class_name} - {plan.subject_name} ({plan.week_start_date}) submitted for review",
             before=before,
             after=_lesson_plan_snapshot(plan),
             request=request,
@@ -1177,7 +1177,7 @@ class LessonPlanWithdrawView(RoleRequiredMixin, LoginRequiredMixin, View):
             action_type="LESSON_PLAN_WITHDRAWN",
             model_name="LessonPlan",
             object_id=plan.pk,
-            description=f"Lesson plan {plan.class_name}  {plan.subject_name} ({plan.week_start_date}) withdrawn to draft",
+            description=f"Lesson plan {plan.class_name} - {plan.subject_name} ({plan.week_start_date}) withdrawn to draft",
             before=before,
             after=_lesson_plan_snapshot(plan),
             request=request,
@@ -1267,7 +1267,7 @@ class LessonPlanDeleteView(RoleRequiredMixin, LoginRequiredMixin, View):
             action_type="DELETE",
             model_name="LessonPlan",
             object_id=str(plan.pk),
-            description=f"Deleted lesson plan: {plan.class_name}  {plan.subject_name} ({plan.week_start_date})",
+            description=f"Deleted lesson plan: {plan.class_name} - {plan.subject_name} ({plan.week_start_date})",
             before=_lesson_plan_snapshot(plan),
             request=request,
         )
@@ -1393,13 +1393,13 @@ def _notify_hod_lesson_plan(plan, actor, event="submitted", detail=""):
     for hod in hods:
         if event == "comment":
             title = "Teacher commented on a lesson plan"
-            message = f"{plan.teacher.get_full_name()} on {plan.class_name}  {plan.subject_name}:\n\n{detail}"
+            message = f"{plan.teacher.get_full_name()} on {plan.class_name} - {plan.subject_name}:\n\n{detail}"
         elif event == "withdrawn":
             title = "Lesson plan withdrawn"
-            message = f"Lesson plan withdrawn  {plan.teacher.get_full_name()}, {plan.class_name}  {plan.subject_name}"
+            message = f"Lesson plan withdrawn - {plan.teacher.get_full_name()}, {plan.class_name} - {plan.subject_name}"
         else:
             title = "New lesson plan submitted"
-            message = f"New lesson plan submitted  {plan.teacher.get_full_name()}, {plan.class_name}  {plan.subject_name}"
+            message = f"New lesson plan submitted - {plan.teacher.get_full_name()}, {plan.class_name} - {plan.subject_name}"
         dispatch_notification(
             user=hod,
             title=title,
@@ -1558,7 +1558,7 @@ class LessonPlanReviewView(RoleRequiredMixin, View):
             action_type=action_type,
             model_name="LessonPlan",
             object_id=plan.pk,
-            description=f"Lesson plan {plan.class_name}  {plan.subject_name} ({plan.term.name}) {plan.get_status_display().lower()}",
+            description=f"Lesson plan {plan.class_name} - {plan.subject_name} ({plan.term.name}) {plan.get_status_display().lower()}",
             before=before,
             after=_lesson_plan_snapshot(plan),
             request=request,
@@ -1568,7 +1568,7 @@ class LessonPlanReviewView(RoleRequiredMixin, View):
         from communications.email_service import dispatch_notification
         status_text = plan.get_status_display().lower()
         title = f"Lesson Plan {status_text.capitalize()}"
-        msg = f"Your lesson plan for {plan.class_name}  {plan.subject_name} ({plan.term.name}) was {status_text} by {request.user.get_full_name()}."
+        msg = f"Your lesson plan for {plan.class_name} - {plan.subject_name} ({plan.term.name}) was {status_text} by {request.user.get_full_name()}."
         if feedback:
             msg += f"\n\nFeedback: {feedback}"
         

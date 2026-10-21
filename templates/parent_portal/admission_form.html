@@ -4,7 +4,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Hodari Christian School  Enrolment</title>
+<title>Hodari Christian School | Enrolment</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet">
@@ -343,12 +343,12 @@ var money = function(n){ return 'TSh ' + n.toLocaleString('en-US'); };
 
 function childLines(c){
   var L = [];
-  L.push({l:'Tuition  Term 1', a:FEE.tuition(c.grade)});
+  L.push({l:'Tuition - Term 1', a:FEE.tuition(c.grade)});
   L.push({l:'Development fee (annual)', a:FEE.development});
   if(c.isNew) L.push({l:'Admission fee (one-time)', a:FEE.admission});
   if(FEE.checkpointGrades.indexOf(c.grade)!==-1) L.push({l:'Cambridge Checkpoint', a:FEE.checkpoint});
-  if(c.stem) L.push({l:'STEM  Term 1', a:FEE.stem});
-  if(c.breakfast) L.push({l:'Breakfast  Term 1', a:FEE.breakfast});
+  if(c.stem) L.push({l:'STEM - Term 1', a:FEE.stem});
+  if(c.breakfast) L.push({l:'Breakfast - Term 1', a:FEE.breakfast});
   for(var k in FEE.uniform){
     var q = c.uniform[k]||0;
     if(q) L.push({l: FEE.uniform[k].label + ' × ' + q, a:FEE.uniform[k].price*q});
@@ -452,7 +452,7 @@ function stepStudents(){
   return '<p class="eyebrow">Admission form · Section 1 of 9</p><h1 class="step-t">Student information</h1>'+
   '<p class="lede">'+(LINK_MODE
     ? 'This is Hodari\'s admission form, completed online. It takes about fifteen minutes, and you can save it and come back later using the link in your email. When you submit it you\'ll receive an invoice for Term 1 that you can download and pay.'
-    : 'This is Hodari\'s admission form, completed online. It takes about fifteen minutes, and at the end you\'ll receive an invoice for Term 1 that you can download and pay. Your child\'s name and grade came from the offer letter  check them, and add any brothers or sisters joining at the same time.')+'</p>'+
+    : 'This is Hodari\'s admission form, completed online. It takes about fifteen minutes, and at the end you\'ll receive an invoice for Term 1 that you can download and pay. Your child\'s name and grade came from the offer letter: check them, and add any brothers or sisters joining at the same time.')+'</p>'+
   S.children.map(function(c,i){
   return '<div class="child">'+
     '<div class="child-h"><div class="pip">'+(i+1)+'</div><h3>'+(c.name?esc(c.name):'Student '+(i+1))+'</h3>'+
@@ -516,7 +516,7 @@ function stepHealth(){
     '<div class="grid">'+
       field('Overall state of health','children.'+i+'.health',{options:['Excellent','Good','Fair','Ongoing concerns']})+
       '<div class="f"></div>'+
-      field('Allergies','children.'+i+'.allergies',{opt:true,ph:'Food, medication, insect  and what we should do',span:true,area:true})+
+      field('Allergies','children.'+i+'.allergies',{opt:true,ph:'Food, medication, insect, and what we should do',span:true,area:true})+
       field('Long-term medication','children.'+i+'.meds',{opt:true,ph:'Name, dose, when it is taken',span:true,area:true})+
       field('Disabilities or special needs','children.'+i+'.sen',{opt:true,ph:'Educational, emotional, social or physical',span:true,area:true})+
     '</div>'+
@@ -563,19 +563,19 @@ function stepFaith(){
 function stepOptions(){
   var menu = [['Monday','Bread with margarine, boiled eggs, milk & black tea'],['Tuesday','Sweet potatoes / potato wedges, eggs & rosella juice'],['Wednesday','Maandazi, sausage and milk / black tea'],['Thursday','Chapati, sausage and milk / black tea'],['Friday','Vitumbua & tea / yoghurt & fruits']];
   return '<p class="eyebrow">Admission form · Section 8 of 9</p><h1 class="step-t">Choose your extras</h1>'+
-  '<p class="lede">Tuition already covers lunch, books and stationery, events and school trips within the timetable. These three are the only choices you need to make  and breakfast and STEM can be changed each term.</p>'+
+  '<p class="lede">Tuition already covers lunch, books and stationery, events and school trips within the timetable. These three are the only choices you need to make, and breakfast and STEM can be changed each term.</p>'+
   S.children.map(function(c,i){
   return '<div class="child">'+
     '<div class="child-h"><div class="pip">'+(i+1)+'</div><h3>'+esc(c.name||'Student '+(i+1))+' · '+esc(c.grade)+'</h3></div>'+
     '<div class="stack">'+
       '<label class="check '+(c.breakfast?'on':'')+'"><input type="checkbox" data-path="children.'+i+'.breakfast" '+(c.breakfast?'checked':'')+'>'+
-        '<div><div class="t">Breakfast  '+money(FEE.breakfast)+' per term</div>'+
+        '<div><div class="t">Breakfast: '+money(FEE.breakfast)+' per term</div>'+
         '<div class="d">Served from 7:15am, Monday to Friday. You can start or stop this at the beginning of any term.</div></div></label>'+
       '<details class="menu-d"><summary>See this term\'s breakfast menu</summary>'+
         '<table class="menu"><tr><th>Day</th><th>Served</th></tr>'+
         menu.map(function(r){return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td></tr>'}).join('')+'</table></details>'+
       '<label class="check '+(c.stem?'on':'')+'"><input type="checkbox" data-path="children.'+i+'.stem" '+(c.stem?'checked':'')+'>'+
-        '<div><div class="t">STEM programme  '+money(FEE.stem)+' per term</div>'+
+        '<div><div class="t">STEM programme: '+money(FEE.stem)+' per term</div>'+
         '<div class="d">Weekly hands-on science, coding and robotics beyond the Cambridge curriculum.</div></div></label>'+
     '</div>'+
     '<fieldset style="margin-top:20px"><legend>Uniform from the school office</legend>'+
@@ -583,30 +583,30 @@ function stepOptions(){
       Object.entries(FEE.uniform).map(function(entry){
         var k = entry[0], u = entry[1];
         return '<div class="f">'+
-        '<label>'+u.label+'  '+money(u.price)+'</label>'+
+        '<label>'+u.label+': '+money(u.price)+'</label>'+
         '<select data-path="children.'+i+'.uniform.'+k+'">'+[0,1,2,3,4,5].map(function(n){
           return '<option value="'+n+'"'+((c.uniform[k]||0)===n?' selected':'')+'>'+(n===0?'None':n)+'</option>';
         }).join('')+'</select></div>';
       }).join('')+
       '</div>'+
-      '<p class="hint" style="margin-top:10px">Trousers, dresses and sports shorts are bought from <b>Rockdove Kids Empire</b>, Mikocheni (next to East Africa Primary School), 0717 419 498  they are not billed by the school.</p>'+
+      '<p class="hint" style="margin-top:10px">Trousers, dresses and sports shorts are bought from <b>Rockdove Kids Empire</b>, Mikocheni (next to East Africa Primary School), 0717 419 498: they are not billed by the school.</p>'+
     '</fieldset>'+
   '</div>';
   }).join('')+
   '<div class="check" style="cursor:default;border-color:var(--navy);background:#F6F8FD">'+
     '<div><div class="t">School transport is arranged directly with the bus operator</div>'+
-    '<div class="d">Routes cost between '+money(400000)+' and '+money(600000)+' a term. Call Upanga Transport Company on 0711 729 572  the school does not invoice for it.</div></div></div>';
+    '<div class="d">Routes cost between '+money(400000)+' and '+money(600000)+' a term. Call Upanga Transport Company on 0711 729 572: the school does not invoice for it.</div></div></div>';
 }
 
 var PORTAL_DOCS = [['birth','Child\u2019s birth certificate','A clear photo of the original is fine'],
     ['clearance','Clearance form from previous school','Ask the previous school\u2019s office to issue this'],
-    ['photo','Passport photo of the student','We print the ID cards here  one photo is enough'],
+    ['photo','Passport photo of the student','We print the ID cards here: one photo is enough'],
     ['nid','Parent National ID','Front side, for the parent signing this form']];
 var LINK_DOCS = [['birth','Child\u2019s birth certificate','A clear photo of the original is fine'],
     ['report','Most recent report from the previous school','Needed unless this is the child\u2019s first school'],
-    ['photo','Passport photo of the child','We print the ID cards here  one photo is enough'],
+    ['photo','Passport photo of the child','We print the ID cards here: one photo is enough'],
     ['passport','Passport or residence permit','Needed if the child is not Tanzanian'],
-    ['clearance','Clearance form from previous school','Optional now  the school needs it before the first day']];
+    ['clearance','Clearance form from previous school','Optional now: the school needs it before the first day']];
 function docList(){ return LINK_MODE ? LINK_DOCS : PORTAL_DOCS; }
 /* Same rules as admissions.parent_form.required_uploads */
 function requiredDocs(){
@@ -855,7 +855,7 @@ function renderAside(){
     '<div class="ledger-h"><div class="k">Total due at enrolment</div><div class="v">'+money(grandTotal())+'</div></div>'+
     '<div class="ledger-b">'+body+'</div>'+
     '<div class="ltotal"><span>Term 1 total</span><span>'+money(grandTotal())+'</span></div>'+
-    '<div class="lnote">Term 1 only. Terms 2 and 3 are billed later and will be lower  the admission, development and Checkpoint fees don\'t repeat.</div>'+
+    '<div class="lnote">Term 1 only. Terms 2 and 3 are billed later and will be lower: the admission, development and Checkpoint fees don\'t repeat.</div>'+
   '</div>';
   $('#mtotal').innerHTML = '<small>Total due</small><b>'+money(grandTotal())+'</b>';
 }
@@ -902,7 +902,7 @@ function validate(){
   }
   if(S.step===7){
     var missing = ['uniform','conduct','swim'].filter(function(k){return !S.ack[k]});
-    if(missing.length){ toast('Please tick all three policies  uniform, code of conduct and swimming  to confirm you have read them.'); return false; }
+    if(missing.length){ toast('Please tick all three policies (uniform, code of conduct and swimming) to confirm you have read them.'); return false; }
   }
   if(S.step===8 && !S.consent.core){
     toast('The school cannot enrol your child without consent to hold their data. If you have concerns, contact dpo@hodari.ac.tz.'); return false;
@@ -940,7 +940,7 @@ function render(){
     if(!last){ $('#next').style.display='none'; }
     var banner=document.createElement('div');
     banner.style.cssText='padding:14px 18px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;margin-bottom:16px;font-size:13px;color:#16A34A;font-weight:600;display:flex;align-items:center;gap:8px';
-    banner.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Enrolment submitted  form is read-only. Contact the school office to make changes.';
+    banner.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Enrolment submitted: form is read-only. Contact the school office to make changes.';
     $('#panel').prepend(banner);
   }
 }

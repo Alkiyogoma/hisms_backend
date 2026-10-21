@@ -601,7 +601,7 @@ def _build_defaults():
         {
             "template_type": "admission_meeting",
             "name": "Admissions Meeting Scheduled",
-            "subject": "Your meeting with the Head of School  {{ reference_number|default:ref }}",
+            "subject": "Your meeting with the Head of School - {{ reference_number|default:ref }}",
             "html_body": _brand(
                 "Admissions Meeting",
                 _p("Dear <strong>{{ parent_name }}</strong>,", mb="8px")
@@ -636,7 +636,7 @@ def _build_defaults():
         {
             "template_type": "admission_meeting_rescheduled",
             "name": "Admissions Meeting Rescheduled",
-            "subject": "Rescheduled: your meeting with the Head of School  {{ reference_number|default:ref }}",
+            "subject": "Rescheduled: your meeting with the Head of School - {{ reference_number|default:ref }}",
             "html_body": _brand(
                 "Meeting Rescheduled",
                 _p("Dear <strong>{{ parent_name }}</strong>,", mb="8px")
@@ -669,7 +669,7 @@ def _build_defaults():
         {
             "template_type": "admission_assessment_logistics",
             "name": "Assessment Logistics Sent",
-            "subject": "What to expect on assessment day  {{ reference_number }}",
+            "subject": "What to expect on assessment day - {{ reference_number }}",
             "html_body": _brand(
                 "Assessment Logistics",
                 _p("Dear <strong>{{ parent_name }}</strong>,", mb="8px")
@@ -742,8 +742,8 @@ def _build_defaults():
         # ── Admissions: Application Denied (E14) ──
         {
             "template_type": "admission_denied",
-            "name": "Assessment Outcome  Not Successful (E14)",
-            "subject": "Assessment outcome for {{ child_full_name }}  {{ reference_number }}",
+            "name": "Assessment Outcome - Not Successful (E14)",
+            "subject": "Assessment outcome for {{ child_full_name }} - {{ reference_number }}",
             "html_body": _brand(
                 "Assessment Outcome",
                 _p("Dear <strong>{{ parent_name }}</strong>,", mb="8px")
@@ -844,7 +844,7 @@ def _build_defaults():
         {
             "template_type": "admission_offer_letter",
             "name": "Admission Offer Letter (E15)",
-            "subject": "Congratulations  a place for {{ child_name }} at {{ school_name|default:'Hodari' }}",
+            "subject": "Congratulations: a place for {{ child_name }} at {{ school_name|default:'Hodari' }}",
             "html_body": _brand(
                 "Offer of a Place",
                 _p("Dear <strong>{{ parent_name }}</strong>,", mb="8px")
@@ -869,13 +869,13 @@ def _build_defaults():
                      "when the invoice is settled in full.", mb="8px")
                 + _warning_card("Please complete the form by {{ offer_expiry_date|default:'14 days' }}. "
                                 "If we haven't heard from you by then we may need to release the place.")
-                + _info_card("Uniform  T-shirts and sweaters are available at school, but our vendor needs "
+                + _info_card("Uniform: T-shirts and sweaters are available at school, but our vendor needs "
                              "measurements to tailor shorts and trousers, so please come in for measuring "
                              "as early as you can.")
-                + _info_card("Meals  lunch is included in the fees. The mid-morning meal is an optional extra.")
-                + _info_card("Transport  our transport is run by Upanga Transport Company (0711 729 572), "
+                + _info_card("Meals: lunch is included in the fees. The mid-morning meal is an optional extra.")
+                + _info_card("Transport: our transport is run by Upanga Transport Company (0711 729 572), "
                              "and payments go directly to them.")
-                + _info_card("Invoice  for any help with payment, contact our accountant at "
+                + _info_card("Invoice: for any help with payment, contact our accountant at "
                              "{{ finance_email|default:admissions_email }}.")
                 + _p("Everything is completed online, so there's nothing to print or bring in.", mb="8px")
                 + _p("We look forward to having {{ child_name }} at Hodari.", mb="0"),
@@ -897,11 +897,11 @@ def _build_defaults():
                 "when the invoice is settled in full.\n\n"
                 "Please complete the form by {{ offer_expiry_date|default:'14 days' }}. If we haven't "
                 "heard from you by then we may need to release the place.\n\n"
-                "Uniform  T-shirts and sweaters are available at school. Our vendor needs measurements "
+                "Uniform: T-shirts and sweaters are available at school. Our vendor needs measurements "
                 "to tailor shorts and trousers.\n"
-                "Meals  lunch is included in the fees.\n"
-                "Transport  run by Upanga Transport Company (0711 729 572).\n"
-                "Invoice  contact our accountant at {{ finance_email|default:admissions_email }}.\n\n"
+                "Meals: lunch is included in the fees.\n"
+                "Transport: run by Upanga Transport Company (0711 729 572).\n"
+                "Invoice: contact our accountant at {{ finance_email|default:admissions_email }}.\n\n"
                 "Everything is completed online. We look forward to having {{ child_name }} at Hodari.\n\n"
                 "Admissions Office\n{{ school_name }}"
             ),
@@ -943,7 +943,7 @@ def _build_defaults():
         {
             "template_type": "admission_assessment_fee_reminder",
             "name": "Assessment Fee Reminder",
-            "subject": "Reminder: assessment fee for {{ learner_name }}  {{ reference_number }}",
+            "subject": "Reminder: assessment fee for {{ learner_name }} - {{ reference_number }}",
             "html_body": _brand(
                 "Assessment Fee Reminder",
                 _p("Dear <strong>{{ parent_name }}</strong>,", mb="8px")
@@ -975,7 +975,7 @@ def _build_defaults():
         {
             "template_type": "admission_report_reminder",
             "name": "Assessment Report Reminder",
-            "subject": "Reminder: assessment report needed for {{ learner_name }}  {{ reference_number }}",
+            "subject": "Reminder: assessment report needed for {{ learner_name }} - {{ reference_number }}",
             "html_body": _brand(
                 "Assessment Report Reminder",
                 _p("Dear <strong>{{ teacher_name }}</strong>,", mb="8px")
@@ -1037,7 +1037,7 @@ def _build_defaults():
         {
             "template_type": "admission_invoice_reminder",
             "name": "Admission Invoice Reminder",
-            "subject": "Reminder: admission invoice for {{ learner_name }}  {{ invoice_number }}",
+            "subject": "Reminder: admission invoice for {{ learner_name }} - {{ invoice_number }}",
             "html_body": _brand(
                 "Admission Invoice Reminder",
                 _p("Dear <strong>{{ parent_name }}</strong>,", mb="8px")
@@ -1072,7 +1072,7 @@ def _build_defaults():
         {
             "template_type": "admission_declined_at_meeting",
             "name": "Declined at Meeting",
-            "subject": "Your application to Hodari Christian School  {{ reference_number }}",
+            "subject": "Your application to Hodari Christian School - {{ reference_number }}",
             "html_body": _brand(
                 "Application Update",
                 _p("Dear <strong>{{ parent_name }}</strong>,", mb="8px")
@@ -1098,7 +1098,7 @@ def _build_defaults():
         {
             "template_type": "admission_assessment_fee_invoice",
             "name": "Assessment Scheduled + Fee Due",
-            "subject": "Assessment for {{ child_name }} scheduled  {{ reference_number }}",
+            "subject": "Assessment for {{ child_name }} scheduled - {{ reference_number }}",
             "html_body": _brand(
                 "Assessment & Fee Due",
                 _p("Dear <strong>{{ parent_name }}</strong>,", mb="8px")
@@ -1142,7 +1142,7 @@ def _build_defaults():
         {
             "template_type": "admission_report_submitted_hos",
             "name": "Assessment Report Submitted (Notify HOS)",
-            "subject": "Review needed: {{ child_name }}  {{ reference_number }}",
+            "subject": "Review needed: {{ child_name }} - {{ reference_number }}",
             "html_body": _brand(
                 "Assessment Report",
                 _p("The assessment report for <strong>{{ child_name }}</strong> has been submitted by "
@@ -1171,7 +1171,7 @@ def _build_defaults():
         {
             "template_type": "admission_welcome",
             "name": "Welcome / Enrolment Confirmed",
-            "subject": "Welcome to {{ school_name }}  {{ child_name }}",
+            "subject": "Welcome to {{ school_name }} - {{ child_name }}",
             "html_body": _brand(
                 "Welcome!",
                 _p("Dear <strong>{{ parent_name }}</strong>,", mb="8px")
@@ -1188,7 +1188,7 @@ def _build_defaults():
                 + _info_card("Your parent portal account is now active. Log in at {{ portal_link|default:'/accounts/login/' }} "
                              "to view attendance, report cards, invoices, and school communications.")
                 + _info_card("Uniform: {{ uniform_notes|default:'Ensure correct uniform is worn from day one.' }}")
-                + _info_card("Meals: {{ meals|default:'School meals available  see fee schedule.' }}")
+                + _info_card("Meals: {{ meals|default:'School meals available: see fee schedule.' }}")
                 + _info_card("Transport: {{ transport_notes|default:'Transport available for qualifying zones.' }}")
                 + _p("We look forward to welcoming {{ child_name }} on the first day of school!", mb="0"),
                 footer="{{ school_name }} Admissions",
@@ -1206,7 +1206,7 @@ def _build_defaults():
                 "Log in at {{ portal_link|default:'/accounts/login/' }} to view attendance, "
                 "report cards, invoices, and school communications.\n\n"
                 "Uniform: {{ uniform_notes|default:'Ensure correct uniform is worn from day one.' }}\n"
-                "Meals: {{ meals|default:'School meals available  see fee schedule.' }}\n"
+                "Meals: {{ meals|default:'School meals available: see fee schedule.' }}\n"
                 "Transport: {{ transport_notes|default:'Transport available for qualifying zones.' }}\n\n"
                 "We look forward to welcoming {{ child_name }} on the first day of school!\n\n"
                 "Admissions Office\n{{ school_name }}"
@@ -1216,7 +1216,7 @@ def _build_defaults():
         {
             "template_type": "admission_meeting_reminder_48h",
             "name": "Meeting Reminder (48 Hours)",
-            "subject": "Reminder: Meeting in 2 days  {{ child_name }}",
+            "subject": "Reminder: Meeting in 2 days - {{ child_name }}",
             "html_body": _brand(
                 "Meeting Reminder",
                 _p("Dear <strong>{{ parent_name }}</strong>,", mb="8px")
@@ -1247,7 +1247,7 @@ def _build_defaults():
         {
             "template_type": "admission_meeting_reminder_24h",
             "name": "Meeting Reminder (24 Hours)",
-            "subject": "Reminder: Meeting tomorrow  {{ child_name }}",
+            "subject": "Reminder: Meeting tomorrow - {{ child_name }}",
             "html_body": _brand(
                 "Meeting Reminder",
                 _p("Dear <strong>{{ parent_name }}</strong>,", mb="8px")
@@ -1278,7 +1278,7 @@ def _build_defaults():
         {
             "template_type": "admission_hos_review_reminder",
             "name": "HOS Review Reminder (72 Hours)",
-            "subject": "Reminder: Assessment report awaiting review  {{ child_name }}",
+            "subject": "Reminder: Assessment report awaiting review - {{ child_name }}",
             "html_body": _brand(
                 "Review Reminder",
                 _p("Dear <strong>{{ hos_name }}</strong>,", mb="8px")
@@ -1306,7 +1306,7 @@ def _build_defaults():
         {
             "template_type": "admission_payment_receipt",
             "name": "Payment Receipt",
-            "subject": "Payment Received  {{ child_name }}  {{ reference_number }}",
+            "subject": "Payment Received - {{ child_name }} - {{ reference_number }}",
             "html_body": _brand(
                 "Payment Received",
                 _p("Dear <strong>{{ parent_name }}</strong>,", mb="8px")
@@ -1364,7 +1364,7 @@ def _build_defaults():
         {
             "template_type": "admission_new_inquiry",
             "name": "New Inquiry Received (E01)",
-            "subject": "New inquiry: {{ child_name }}, Grade {{ grade }}  {{ reference_number }}",
+            "subject": "New inquiry: {{ child_name }}, Grade {{ grade }} - {{ reference_number }}",
             "html_body": _brand(
                 "New Inquiry",
                 _p("A new admission inquiry has been submitted.", mb="12px")
@@ -1398,7 +1398,7 @@ def _build_defaults():
         {
             "template_type": "admission_form_outstanding",
             "name": "Form Outstanding 14 Days (E17)",
-            "subject": "Form outstanding: {{ child_name }}  {{ reference_number }}",
+            "subject": "Form outstanding: {{ child_name }} - {{ reference_number }}",
             "html_body": _brand(
                 "Admission Form Outstanding",
                 _p("The admission form for <strong>{{ child_name }}</strong> has not been completed "
@@ -1431,9 +1431,9 @@ def _build_defaults():
         {
             "template_type": "admission_invoice_outstanding_30d",
             "name": "Invoice Outstanding 30 Days (E20)",
-            "subject": "Invoice outstanding 30 days: {{ child_name }}  {{ reference_number }}",
+            "subject": "Invoice outstanding 30 days: {{ child_name }} - {{ reference_number }}",
             "html_body": _brand(
-                "Invoice Outstanding  30 Days",
+                "Invoice Outstanding - 30 Days",
                 _p("The admission invoice for <strong>{{ child_name }}</strong> has been outstanding "
                    "for 30 days.", mb="12px")
                 + _details_card([

@@ -18,6 +18,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='assessmentschedule',
             name='hod_comments',
-            field=models.TextField(blank=True, help_text='Internal staff comments  never shown to parents'),
+            field=models.TextField(blank=True, help_text='Internal staff comments: never shown to parents'),
         ),
     ]

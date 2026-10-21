@@ -173,7 +173,7 @@ class PTCWindow(TimeStampedModel):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"PTC {self.get_term_slot_display()}  {self.academic_year.name} ({self.ptc_date})"
+        return f"PTC {self.get_term_slot_display()} - {self.academic_year.name} ({self.ptc_date})"
 
     # --- Convenience properties ---
 
@@ -254,7 +254,7 @@ class EnrichmentSubject(TimeStampedModel):
 
     def __str__(self):
         teacher = self.assigned_teacher.get_full_name() if self.assigned_teacher else "Unassigned"
-        return f"{self.subject.name}  {teacher}"
+        return f"{self.subject.name} - {teacher}"
 
 
 # ---------------------------------------------------------------------------
