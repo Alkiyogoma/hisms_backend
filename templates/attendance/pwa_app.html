@@ -261,8 +261,9 @@ body{
   flex:1;display:flex;align-items:center;justify-content:center;
   position:relative;margin:0 20px;border-radius:20px;overflow:hidden;
 }
-#qr-reader{width:100%!important;height:100%!important}
-#qr-reader video{width:100%!important;height:100%!important;object-fit:cover!important}
+#qr-reader{width:100%!important}
+/* Keep the preview geometry identical to the canvas used by the decoder. */
+#qr-reader video{width:100%!important;height:auto!important}
 .scanner-frame-overlay{
   position:absolute;inset:0;z-index:10;
   display:flex;align-items:center;justify-content:center;
@@ -776,7 +777,7 @@ body{
       throw e;
     });
   }
-  function apiPost(p,b){return apiFetch(API+p,{method:'POST',credentials:'same-origin',headers:{'X-CSRFToken':getCSRF(),'Content-Type':'application/json'},body:JSON.stringify(b)})}
+  function apiPost(p,b,signal){return apiFetch(API+p,{signal:signal,method:'POST',credentials:'same-origin',headers:{'X-CSRFToken':getCSRF(),'Content-Type':'application/json'},body:JSON.stringify(b)})}
   function apiGet(p){return apiFetch(API+p,{credentials:'same-origin',headers:{'X-CSRFToken':getCSRF()}})}
 
   // ── Navigation ──
@@ -1045,19 +1046,50 @@ body{
   function startScanner(){
     if(isScanning)return;
     if(typeof Html5Qrcode==='undefined'){loadQrLibrary(function(){startScanner()});return}
-    if(!html5Qr)html5Qr=new Html5Qrcode('qr-reader');
+    if(!document.getElementById('scannerOverlay').classList.contains('show'))return;
+    if(!html5Qr)html5Qr=new Html5Qrcode('qr-reader',{
+      formatsToSupport:[Html5QrcodeSupportedFormats.QR_CODE],
+      useBarCodeDetectorIfSupported:true
+    });
     isScanning=true;
-    html5Qr.start({facingMode:'environment'},{fps:10,qrbox:{width:250,height:250},aspectRatio:1},
+    scannerStart=html5Qr.start({facingMode:'environment'},{
+      fps:10,
+      disableFlip:true,
+      // Ideal constraints keep capture modest without requiring a square camera stream.
+      videoConstraints:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},
+      qrbox:function(width,height){
+        var size=Math.floor(Math.min(width,height)*0.75);
+        var frame=document.querySelector('.scan-frame');
+        frame.style.width=size+'px';frame.style.height=size+'px';
+        return {width:size,height:size};
+      }
+    },
       function(code){
+        if(scannerStopping)return;
         fb.scanSuccess();
         // Pause scanning (don't stop camera) while showing confirmation
-        html5Qr.pause(true);
+        html5Qr.pause();
         showStudentConfirm(code.trim());
       },
       function(){}
-    ).catch(function(){stopScanner()});
+    ).catch(function(error){
+      isScanning=false;
+      showToast('Camera could not start. Check camera permission and try again.','error');
+      console.error('QR camera startup failed',error);
+    });
   }
-  function stopScanner(){if(html5Qr&&isScanning){html5Qr.stop().then(function(){isScanning=false}).catch(function(){isScanning=false})}else isScanning=false}
+  var scannerStart=null, scannerStopping=false;
+  function stopScanner(){
+    if(!html5Qr||!isScanning||scannerStopping)return;
+    scannerStopping=true;
+    // WebKit may still be opening the camera when the user closes the overlay.
+    Promise.resolve(scannerStart).then(function(){
+      if(isScanning)return html5Qr.stop();
+    }).catch(function(error){console.error('QR camera stop failed',error)}).finally(function(){
+      isScanning=false;scannerStopping=false;
+      if(document.getElementById('scannerOverlay').classList.contains('show'))startScanner();
+    });
+  }
 
   var torchOn=false;
   window.toggleTorch=function(){
@@ -1091,10 +1123,23 @@ body{
   var pendingStudentData=null;
   var qrLookupPending=false;
   var qrLookupFailed=false;
-  function showStudentConfirm(studentId){
+  var lookupController=null, lookupSequence=0;
+  function cancelLookup(){
+    lookupSequence++;
+    if(lookupController)lookupController.abort();
+    lookupController=null;
+    qrLookupPending=false;
+  }
+  function showStudentConfirm(studentId,source){
+    cancelLookup();
+    var sequence=lookupSequence;
+    var controller=new AbortController();
+    lookupController=controller;
+    // Bound the lookup, including reading the response body, on weak connections.
+    var lookupTimer=setTimeout(function(){controller.abort()},10000);
     pendingStudentId=studentId;
     pendingStudentData=null;
-    pendingSource='qr';
+    pendingSource=source||'qr';
     qrLookupPending=true;
     qrLookupFailed=false;
     document.getElementById('confirmAvatar').textContent='?';
@@ -1106,24 +1151,29 @@ body{
     document.querySelector('.btn-checkin').style.opacity='.5';
     document.querySelector('.btn-checkout').style.opacity='.5';
     fb.scanSuccess();
-    apiPost('/attendance/api/qr/lookup/',{qr_code:studentId}).then(function(d){
+    apiPost('/attendance/api/qr/lookup/',{qr_code:studentId},controller.signal).then(function(d){
+      if(sequence!==lookupSequence)return;
       var s=d.data||d;
       pendingStudentData={id:s.id||studentId,name:s.name||studentId,admission_no:s.admission_no||'',class:s.class||''};
       document.getElementById('confirmAvatar').textContent=(s.name||'?').charAt(0).toUpperCase();
       document.getElementById('confirmName').textContent=s.name||'Unknown';
       document.getElementById('confirmId').textContent='ID: '+(s.admission_no||'')+' | '+(s.class||'');
-    }).catch(function(){
+    }).catch(function(error){
+      if(sequence!==lookupSequence)return;
       qrLookupFailed=true;
       pendingStudentData=null;
       document.getElementById('confirmAvatar').textContent='?';
-      document.getElementById('confirmName').textContent='Student not found';
+      document.getElementById('confirmName').textContent=error.name==='AbortError'?'Lookup timed out':'Student lookup failed';
       document.getElementById('confirmId').textContent='QR: '+studentId.substring(0,40);
       document.querySelector('.btn-checkin').disabled=true;
       document.querySelector('.btn-checkout').disabled=true;
       document.querySelector('.btn-checkin').style.opacity='.3';
       document.querySelector('.btn-checkout').style.opacity='.3';
-      showToast('Student not found. Check the QR code.',true);
+      showToast(error.name==='AbortError'?'Student lookup took too long. Check your connection and scan again.':'Could not look up student. Check the code and connection.','error');
     }).finally(function(){
+      clearTimeout(lookupTimer);
+      if(sequence!==lookupSequence)return;
+      lookupController=null;
       qrLookupPending=false;
       if(!qrLookupFailed){
         document.querySelector('.btn-checkin').disabled=false;
@@ -1145,6 +1195,7 @@ body{
     if(html5Qr&&isScanning){try{html5Qr.resume()}catch(e){}}
   };
   window.cancelConfirm=function(){
+    cancelLookup();
     document.getElementById('confirmOverlay').classList.remove('show');
     pendingStudentId='';
     pendingStudentData=null;
@@ -1161,43 +1212,7 @@ body{
     if(!id){showToast('Enter a student ID',true);return}
     closeManual();
     fb.tap();
-    pendingStudentId=id;
-    pendingStudentData={id:id,name:'Unknown',admission_no:id,class:''};
-    pendingSource='manual';
-    document.getElementById('confirmAvatar').textContent='?';
-    document.getElementById('confirmName').textContent='Looking up student...';
-    document.getElementById('confirmId').textContent='Manual entry...';
-    document.getElementById('confirmOverlay').classList.add('show');
-    document.querySelector('.btn-checkin').disabled=true;
-    document.querySelector('.btn-checkout').disabled=true;
-    document.querySelector('.btn-checkin').style.opacity='.5';
-    document.querySelector('.btn-checkout').style.opacity='.5';
-    apiPost('/attendance/api/qr/lookup/',{qr_code:id}).then(function(d){
-      var s=d.data||d;
-      pendingStudentData={id:s.id||id,name:s.name||'Unknown',admission_no:s.admission_no||'',class:s.class||''};
-      document.getElementById('confirmAvatar').textContent=(s.name||'?').charAt(0).toUpperCase();
-      document.getElementById('confirmName').textContent=s.name||'Unknown';
-      document.getElementById('confirmId').textContent='ID: '+(s.admission_no||'')+' | '+(s.class||'');
-    }).catch(function(){
-      qrLookupFailed=true;
-      pendingStudentData=null;
-      document.getElementById('confirmAvatar').textContent='?';
-      document.getElementById('confirmName').textContent='Student not found';
-      document.getElementById('confirmId').textContent='ID: '+id;
-      document.querySelector('.btn-checkin').disabled=true;
-      document.querySelector('.btn-checkout').disabled=true;
-      document.querySelector('.btn-checkin').style.opacity='.3';
-      document.querySelector('.btn-checkout').style.opacity='.3';
-      showToast('Student not found. Check the ID.',true);
-    }).finally(function(){
-      qrLookupPending=false;
-      if(!qrLookupFailed){
-        document.querySelector('.btn-checkin').disabled=false;
-        document.querySelector('.btn-checkout').disabled=false;
-        document.querySelector('.btn-checkin').style.opacity='1';
-        document.querySelector('.btn-checkout').style.opacity='1';
-      }
-    });
+    showStudentConfirm(id,'manual');
   };
 
   // ── Submit All ──

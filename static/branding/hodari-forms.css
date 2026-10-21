@@ -259,7 +259,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator,
 /* ── Buttons ── */
 .btn-primary,.btn-secondary,.btn-danger{
   display:inline-flex;align-items:center;justify-content:center;gap:8px;
-  height:40px;padding:0 20px;border-radius:var(--hf2-radius);
+  height:30px;padding:0 20px;border-radius:var(--hf2-radius);
   font-size:13.5px;font-weight:600;font-family:var(--font-ui);
   cursor:pointer;text-decoration:none;white-space:nowrap;
   transition:background .15s,box-shadow .15s,transform .1s;border:none

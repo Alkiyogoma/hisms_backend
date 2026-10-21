@@ -54,7 +54,7 @@
       {% if student_row %}<button type="button" class="clear" id="f-student-clear" title="All students">&times;</button>{% endif %}
       <datalist id="f-students">{% for r in roster %}<option value="{{ r.name }} · {{ r.admission_no }}" data-id="{{ r.id }}">{{ r.class_name }}</option>{% endfor %}</datalist>
     </div>
-    <div class="at-auto">Filters apply automatically. Click a figure to list those students; click a student for their pattern over the range.</div>
+    <div class="at-auto">Filters apply automatically.</div>
     <div class="at-quick">
       {% for q in quick %}<a href="{% querystring start=q.start|date:'Y-m-d' end=q.end|date:'Y-m-d' page=None %}" class="{% if q.on %}on{% endif %}">{{ q.label }}</a>{% endfor %}
     </div>

@@ -140,7 +140,11 @@ every address people use to log in (include `:port` if URLs use one):
 ```ini
 CSRF_TRUSTED_ORIGINS=https://connect.hodari.ac.tz,https://hodari.elimcoregroup.com
 POSTGRES_SSLMODE=disable
+SITE_URL=https://connect.hodari.ac.tz
 ```
+
+`SITE_URL` is the address used for links and the logo in every email.
+Without it they point at `http://127.0.0.1:8000`.
 
 Optional (the attendance webhooks already reject requests on production
 today because these are unset; set them only when the webhook is in use):
@@ -313,18 +317,48 @@ ssh root@187.7.21.133
 sudo bash /opt/hodari/hisms_backend/deployment/production/update.sh
 ```
 
-The script (same steps as the testing script `deployment/nguzo/update.sh`):
+The script prints `HODARI PRODUCTION DEPLOYMENT` immediately, followed by
+the branch, current commit and a deployment-log path. It displays eight
+timestamped steps:
 
-0. copies every uploaded file to `/var/backups/hodari/media/` (adds, never
-   deletes) and counts them;
-1. backs up the database to `/var/backups/hodari/<db>_<date>.dump` and prints
-   the commit the server was on;
-2. pulls the latest code on the checked-out branch (`git pull`);
-3. fixes ownership, installs requirements, runs `migrate` and `collectstatic`;
-4. counts the uploaded files again and **refuses to restart** if any went
-   missing, printing the command that restores them from the backup;
-5. restarts `hodari`, `hodari-celery`, `hodari-celery-beat` and shows their
-   status and the site's HTTP response.
+1. backs up uploaded files to `/var/backups/hodari/media/` (adds, never
+   deletes), shows copy progress and counts the files;
+2. backs up the database to `/var/backups/hodari/<db>_<date>_<pid>.dump`;
+3. fetches and pulls the checked-out branch with `--ff-only`, then shows
+   the old and new commits. If there are no new commits, it says so and
+   continues refreshing the application;
+4. fixes application ownership;
+5. installs requirements with visible package-installation output;
+6. runs database migrations;
+7. collects static files and **refuses to restart** if uploaded files went
+   missing;
+8. restarts `hodari`, `hodari-celery`, `hodari-celery-beat`, checks each
+   service and checks the site's HTTP response.
+
+`DEPLOYMENT SUCCESSFUL` appears only after all checks pass. A failure prints
+`DEPLOYMENT FAILED`, the step, exit status and log path, then exits with a
+nonzero status. Complete logs are saved as
+`/var/backups/hodari/deploy_<date>_<pid>.log`; deployment logs and new database
+backups are readable only by their owner.
+
+`MEDIA_ROOT` is optional: when absent or empty, uploads default to
+`/opt/hodari/hisms_backend/media`. `POSTGRES_DB` is required. A configured
+upload directory that does not exist stops deployment with a clear error.
+
+If an older copy of this script returns immediately without printing anything,
+it may have exited while looking up an absent `MEDIA_ROOT`: the old `grep`
+lookup failed under `set -euo pipefail` before the first progress message.
+Use the updated script; it handles missing optional settings explicitly.
+
+The script can be checked locally without accessing production:
+
+```bash
+bash -n deployment/production/update.sh
+python3 -m unittest discover -s deployment/production -p 'test_update.py'
+```
+
+The tests use temporary directories and simulated commands, including backup,
+Git, package installation, service and HTTP failures.
 
 If something goes wrong, roll back to the commit printed in step 1 and, only if
 new migrations ran and the old code errors, restore the backup:
