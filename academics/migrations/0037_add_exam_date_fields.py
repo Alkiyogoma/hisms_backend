@@ -33,11 +33,11 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='term',
             name='exam_end_date',
-            field=models.DateField(blank=True, help_text='DEPRECATED  use endterm_exam_end_date.', null=True),
+            field=models.DateField(blank=True, help_text='DEPRECATED: use endterm_exam_end_date.', null=True),
         ),
         migrations.AlterField(
             model_name='term',
             name='exam_start_date',
-            field=models.DateField(blank=True, help_text='DEPRECATED  use endterm_exam_start_date.', null=True),
+            field=models.DateField(blank=True, help_text='DEPRECATED: use endterm_exam_start_date.', null=True),
         ),
     ]

@@ -109,7 +109,7 @@
         {% if invite.status == 'submitted' or invite.status == 'changes_requested' %}
         <form method="post" action="{% url 'admissions:parent_form_review' applicant.pk %}" style="margin-top:12px">{% csrf_token %}
           <label class="hf2-label" for="rcMsg">Ask the parent for something missing</label>
-          <textarea id="rcMsg" name="message" class="hf2-textarea" rows="2" style="width:100%" placeholder="e.g. The birth certificate photo is blurred  please upload it again." required></textarea>
+          <textarea id="rcMsg" name="message" class="hf2-textarea" rows="2" style="width:100%" placeholder="e.g. The birth certificate photo is blurred: please upload it again." required></textarea>
           <button type="submit" name="action" value="request_changes" class="btn-secondary" style="padding:6px 12px;font-size:12px;margin-top:6px">Request changes</button>
         </form>
         {% endif %}
@@ -328,7 +328,7 @@
             </div>
           </div>
           <div style="display:flex;gap:8px;margin-top:12px">
-            <button type="button" class="btn-primary" style="flex:1;background:var(--green);border-color:var(--green)" onclick="confirmDeleteModal({title:'Reschedule Meeting?',body:'Move this applicant back to Meeting Scheduled to reschedule a new meeting?',detail:'This will allow you to schedule a new meeting with the parent.',confirmText:'Reschedule',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'meeting_scheduled'},{name:'reason',value:'Declined at meeting  rescheduling.'}]})">Reschedule Meeting</button>
+            <button type="button" class="btn-primary" style="flex:1;background:var(--green);border-color:var(--green)" onclick="confirmDeleteModal({title:'Reschedule Meeting?',body:'Move this applicant back to Meeting Scheduled to reschedule a new meeting?',detail:'This will allow you to schedule a new meeting with the parent.',confirmText:'Reschedule',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'meeting_scheduled'},{name:'reason',value:'Declined at meeting: rescheduling.'}]})">Reschedule Meeting</button>
             <button type="button" class="btn-secondary" style="flex:1;border-color:#DC2626;color:#DC2626" onclick="confirmDeleteModal({title:'Withdraw Application?',body:'Withdraw this applicant?',detail:'This will move the applicant to Withdrawn status.',confirmText:'Withdraw',url:'{% url 'admissions:transition' applicant.id %}',type:'danger',extraData:[{name:'to_status',value:'withdrawn'},{name:'reason',value:'Withdrawn after declining at meeting.'}]})">Withdraw</button>
           </div>
         {% endif %}
@@ -441,12 +441,12 @@
       {% elif applicant.status == 'assessment_fee_paid' %}
       <div class="card">
         <div class="card-title-row">
-          <div class="card-title" style="margin:0">Assessment Fee Confirmed  Actions</div>
+          <div class="card-title" style="margin:0">Assessment Fee Confirmed - Actions</div>
           <span class="chip" style="background:#F0FDF4;color:#16A34A;border-color:#BBF7D0;font-size:10px;padding:2px 8px">Fee confirmed</span>
         </div>
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">The assessment fee has been confirmed as paid. When the assessment is done, mark it complete below.</div>
         <div style="display:flex;flex-wrap:wrap;gap:10px">
-          <button type="button" onclick="confirmDeleteModal({title:'Mark Assessment Complete?',body:'Mark this assessment as completed?',detail:'This will move the applicant to Assessment Completed for report submission.',confirmText:'Confirm',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'assessment_completed'},{name:'reason',value:'Assessment completed  confirmed by Finance Officer.'}]})"
+          <button type="button" onclick="confirmDeleteModal({title:'Mark Assessment Complete?',body:'Mark this assessment as completed?',detail:'This will move the applicant to Assessment Completed for report submission.',confirmText:'Confirm',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'assessment_completed'},{name:'reason',value:'Assessment completed: confirmed by Finance Officer.'}]})"
             style="flex:1;min-width:140px;padding:12px 16px;font-size:13px;font-weight:700;color:#fff;background:#16A34A;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background 0.2s"
             onmouseover="this.style.background='#15803D'" onmouseout="this.style.background='#16A34A'">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
@@ -545,12 +545,12 @@
       {% if applicant.status == 'assessment_confirmed' %}
       <div class="card">
         <div class="card-title-row">
-          <div class="card-title" style="margin:0">Assessment Confirmed  Actions</div>
+          <div class="card-title" style="margin:0">Assessment Confirmed - Actions</div>
           <span class="chip" style="background:#EFF6FF;color:#2563EB;border-color:#BFDBFE;font-size:10px;padding:2px 8px">Confirmed</span>
         </div>
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">The assessment fee has been confirmed and the assessment is scheduled. When the assessment is done, mark it complete below.</div>
         <div style="display:flex;flex-wrap:wrap;gap:10px">
-          <button type="button" onclick="confirmDeleteModal({title:'Mark Assessment Complete?',body:'Mark this assessment as completed?',detail:'This will move the applicant to Assessment Completed for report submission.',confirmText:'Confirm',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'assessment_completed'},{name:'reason',value:'Assessment completed  confirmed by Admin Officer.'}]})"
+          <button type="button" onclick="confirmDeleteModal({title:'Mark Assessment Complete?',body:'Mark this assessment as completed?',detail:'This will move the applicant to Assessment Completed for report submission.',confirmText:'Confirm',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'assessment_completed'},{name:'reason',value:'Assessment completed: confirmed by Admin Officer.'}]})"
             style="flex:1;min-width:140px;padding:12px 16px;font-size:13px;font-weight:700;color:#fff;background:#16A34A;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background 0.2s"
             onmouseover="this.style.background='#15803D'" onmouseout="this.style.background='#16A34A'">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
@@ -569,7 +569,7 @@
       {% if applicant.status == 'assessment_completed' %}
       <div class="card">
         <div class="card-title-row">
-          <div class="card-title" style="margin:0">Assessment Done  Actions</div>
+          <div class="card-title" style="margin:0">Assessment Done - Actions</div>
           <span class="chip" style="background:#F0FDF4;color:#16A34A;border-color:#BBF7D0;font-size:10px;padding:2px 8px">Done</span>
         </div>
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">The assessment has been completed by the teacher. Submit the report or forward to HOS for review.</div>
@@ -580,7 +580,7 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             Forward to HOS Review
           </button>
-          <button type="button" onclick="confirmDeleteModal({title:'Skip to HOS Decision?',body:'Skip the review and go directly to HOS Decision?',detail:'Move to the decision stage where you can Admit, Deny, Waitlist, or Conditionally admit.',confirmText:'Proceed',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'hos_decision'},{name:'reason',value:'Assessment completed  skipping to HOS Decision.'}]})"
+          <button type="button" onclick="confirmDeleteModal({title:'Skip to HOS Decision?',body:'Skip the review and go directly to HOS Decision?',detail:'Move to the decision stage where you can Admit, Deny, Waitlist, or Conditionally admit.',confirmText:'Proceed',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'hos_decision'},{name:'reason',value:'Assessment completed: skipping to HOS Decision.'}]})"
             style="flex:1;min-width:120px;padding:12px 16px;font-size:13px;font-weight:700;color:#fff;background:#7C3AED;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background 0.2s"
             onmouseover="this.style.background='#6D28D9'" onmouseout="this.style.background='#7C3AED'">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -599,18 +599,18 @@
       {% if applicant.status == 'assessment_failed' %}
       <div class="card" style="">
         <div class="card-title-row">
-          <div class="card-title" style="margin:0">Assessment Failed  Actions</div>
+          <div class="card-title" style="margin:0">Assessment Failed - Actions</div>
           <span class="chip" style="background:#FEF2F2;color:#DC2626;border-color:#FECACA;font-size:10px;padding:2px 8px">Failed</span>
         </div>
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">The applicant did not meet the assessment requirements. Choose an action below.</div>
         <div style="display:flex;flex-wrap:wrap;gap:10px">
-          <button type="button" onclick="confirmDeleteModal({title:'Retry Assessment?',body:'Move this applicant back to Assessment Pending to schedule a new assessment?',detail:'This will allow you to schedule a new assessment date and notify the parent.',confirmText:'Retry',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'assessment_pending'},{name:'reason',value:'Assessment failed  retrying.'}]})"
+          <button type="button" onclick="confirmDeleteModal({title:'Retry Assessment?',body:'Move this applicant back to Assessment Pending to schedule a new assessment?',detail:'This will allow you to schedule a new assessment date and notify the parent.',confirmText:'Retry',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'assessment_pending'},{name:'reason',value:'Assessment failed: retrying.'}]})"
             style="flex:1;min-width:120px;padding:12px 16px;font-size:13px;font-weight:700;color:#fff;background:#2563EB;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background 0.2s"
             onmouseover="this.style.background='#1D4ED8'" onmouseout="this.style.background='#2563EB'">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
             Retry Assessment
           </button>
-          <button type="button" onclick="confirmDeleteModal({title:'Admit Anyway?',body:'Override the failed assessment and admit this applicant?',detail:'This will move the applicant directly to Admitted status, bypassing the assessment result.',confirmText:'Admit',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'admitted'},{name:'reason',value:'HOS override  admitted despite failed assessment.'}]})"
+          <button type="button" onclick="confirmDeleteModal({title:'Admit Anyway?',body:'Override the failed assessment and admit this applicant?',detail:'This will move the applicant directly to Admitted status, bypassing the assessment result.',confirmText:'Admit',url:'{% url 'admissions:transition' applicant.id %}',type:'info',extraData:[{name:'to_status',value:'admitted'},{name:'reason',value:'HOS override: admitted despite failed assessment.'}]})"
             style="flex:1;min-width:120px;padding:12px 16px;font-size:13px;font-weight:700;color:#fff;background:#16A34A;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background 0.2s"
             onmouseover="this.style.background='#15803D'" onmouseout="this.style.background='#16A34A'">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
@@ -759,7 +759,7 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             </div>
             <div style="flex:1;min-width:0">
-              <div style="font-size:13px;font-weight:600;color:#DC2626">Offer expired  flagged for HOS review</div>
+              <div style="font-size:13px;font-weight:600;color:#DC2626">Offer expired: flagged for HOS review</div>
               <div style="font-size:11px;color:#DC2626;margin-top:2px">The 14-day offer window has passed without enrolment completion.</div>
             </div>
           </div>

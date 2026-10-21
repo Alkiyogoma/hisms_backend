@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='enrollmenthistory',
             name='action',
-            field=models.CharField(choices=[('enrolled', 'Enrolled'), ('promoted', 'Promoted'), ('retained', 'Retained'), ('transferred', 'Transferred'), ('graduated', 'Graduated')], default='enrolled', help_text="What triggered this enrollment record. NOTE: Historical rows where action='promoted' may represent retentions from the old CLI script  the note field should be checked for 'Repeating' to distinguish actual promotions from retentions prior to this module's launch.", max_length=20),
+            field=models.CharField(choices=[('enrolled', 'Enrolled'), ('promoted', 'Promoted'), ('retained', 'Retained'), ('transferred', 'Transferred'), ('graduated', 'Graduated')], default='enrolled', help_text="What triggered this enrollment record. NOTE: Historical rows where action='promoted' may represent retentions from the old CLI script: the note field should be checked for 'Repeating' to distinguish actual promotions from retentions prior to this module's launch.", max_length=20),
         ),
     ]

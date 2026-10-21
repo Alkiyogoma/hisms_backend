@@ -574,7 +574,7 @@ class InquiryCreateView(AdmissionsCountsMixin, PermissionCacheMixin, AdmissionsR
                     )
                     send_email_safe(
                         to_email=admissions_email,
-                        subject=f"New inquiry: {child_name}, Grade {grade}  {ref_number}",
+                        subject=f"New inquiry: {child_name}, Grade {grade} - {ref_number}",
                         body=e01_body,
                     )
                 # Also send to Head of School directly
@@ -588,7 +588,7 @@ class InquiryCreateView(AdmissionsCountsMixin, PermissionCacheMixin, AdmissionsR
                             context=e01_context,
                         ) if db_sent else send_email_safe(
                             to_email=hos.email,
-                            subject=f"New inquiry: {child_name}, Grade {grade}  {ref_number}",
+                            subject=f"New inquiry: {child_name}, Grade {grade} - {ref_number}",
                             body=e01_body,
                         )
             except Exception:
@@ -1198,7 +1198,7 @@ class ApplicantTransitionView(HtmxRequiredMixin, PermissionCacheMixin, Admission
                     label = "admitted" if to_status == "admitted" else "conditionally admitted"
                     # S05: Offer sent SMS (spec copy)
                     sms_msg = (
-                        f"Hodari: Good news  {applicant.child_full_name} has been offered a place. "
+                        f"Hodari: Good news - {applicant.child_full_name} has been offered a place. "
                         f"Check your email for portal login details. Ref {applicant.reference_number}."
                     )
                     dispatch_notification(
@@ -1208,7 +1208,7 @@ class ApplicantTransitionView(HtmxRequiredMixin, PermissionCacheMixin, Admission
                     )
                     # S05: Dedicated offer-sent SMS (spec copy)
                     offer_sms = (
-                        f"Good news  {applicant.child_full_name} has been offered a place in Grade {applicant.grade_applying_for}. "
+                        f"Good news - {applicant.child_full_name} has been offered a place in Grade {applicant.grade_applying_for}. "
                         f"Please complete the form and pay the fee within 14 days to secure the spot."
                     )
                     dispatch_notification(
@@ -1364,7 +1364,7 @@ class AssessmentScheduleView(HtmxRequiredMixin, PermissionCacheMixin, Admissions
                 # Reset logistics so AO must re-send with updated details
                 assessment.logistics_sent_at = None
                 assessment.save(update_fields=["logistics_sent_at", "updated_at"])
-                messages.warning(request, "Assessment date/time changed after logistics were sent. Logistics have been reset  please re-send updated logistics to the parent.")
+                messages.warning(request, "Assessment date/time changed after logistics were sent. Logistics have been reset: please re-send updated logistics to the parent.")
         form = AssessmentScheduleForm(request.POST, instance=assessment)
         if form.is_valid():
             try:
@@ -3332,7 +3332,7 @@ class SendParentFormView(AdmissionsCountsMixin, PermissionCacheMixin, Admissions
         try:
             validate_email(values["parent_email"])
         except ValidationError:
-            errors.append("Enter a valid email address  the form link is sent there.")
+            errors.append("Enter a valid email address: the form link is sent there.")
         if not values["parent_phone"]:
             errors.append("Enter the parent's phone number.")
         if values["grade"] and not GradeClass.objects.filter(name=values["grade"]).exists():

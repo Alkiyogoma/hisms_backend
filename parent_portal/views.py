@@ -1312,7 +1312,7 @@ class ParentGenerateInvoiceView(ParentOnlyMixin, View):
             if not send_dynamic_email(template_type="invoice_generated", to_email=fo.email, context=e18_context):
                 send_email_safe(
                     to_email=fo.email,
-                    subject=f"Invoice raised: {applicant.child_full_name}  {applicant.reference_number}",
+                    subject=f"Invoice raised: {applicant.child_full_name} - {applicant.reference_number}",
                     body=(
                         f"An admission invoice has been generated and payment is expected.\n\n"
                         f"Student: {applicant.child_full_name}\n"

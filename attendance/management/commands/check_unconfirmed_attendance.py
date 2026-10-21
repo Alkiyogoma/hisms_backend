@@ -98,7 +98,7 @@ class Command(BaseCommand):
             for teacher in teachers:
                 dispatch_notification(
                     user=teacher,
-                    title=f"Unconfirmed Students  {class_name}",
+                    title=f"Unconfirmed Students - {class_name}",
                     message=msg,
                     link="/attendance/",
                     actor=sys_user,
@@ -117,7 +117,7 @@ class Command(BaseCommand):
                 )
                 lines.append(f"{class_name} ({len(students)}): {names}")
             admin_msg = (
-                f"Unconfirmed attendance as of 09:00 today  "
+                f"Unconfirmed attendance as of 09:00 today: "
                 f"{total_unconfirmed} student(s) across "
                 f"{len(unconfirmed_by_class)} class(es).\n\n"
                 + "\n".join(lines)
@@ -126,7 +126,7 @@ class Command(BaseCommand):
             for ao in admin_officers:
                 dispatch_notification(
                     user=ao,
-                    title=f"Unconfirmed Attendance  {total_unconfirmed} Student(s)",
+                    title=f"Unconfirmed Attendance - {total_unconfirmed} Student(s)",
                     message=admin_msg,
                     link="/attendance/",
                     actor=sys_user,
@@ -144,7 +144,7 @@ class Command(BaseCommand):
             )
             dispatch_notification(
                 user=hos,
-                title=f"Unconfirmed Attendance  {total_unconfirmed} Student(s)",
+                title=f"Unconfirmed Attendance - {total_unconfirmed} Student(s)",
                 message=hos_msg,
                 link="/attendance/",
                 actor=sys_user,

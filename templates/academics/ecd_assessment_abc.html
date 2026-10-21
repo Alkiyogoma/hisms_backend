@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
-{% block title %}ECD Reports  ABC Class{% endblock %}
-{% block topbar_greeting %}ECD Reports  ABC Class{% endblock %}
+{% block title %}ECD Reports | ABC Class{% endblock %}
+{% block topbar_greeting %}ECD Reports - ABC Class{% endblock %}
 {% block topbar_date %}{% if current_term %}{{ current_term.name }} &middot; {{ current_term.academic_year.name }} &middot; Supervisor's Progress Card{% else %}Supervisor's Progress Card{% endif %} &middot; {{ brand.school_name }}{% endblock %}
 {% block topbar_badges %}<div class="topbar-badge badge-amber" id="topbar-progress-badge"><span class="badge-dot"></span><span id="topbar-badge-text">Loading...</span></div>{% endblock %}
 {% block extra_head %}
@@ -33,7 +33,7 @@
 
   <!-- ACE banner -->
   <div style="background:#1A1A2E;border-radius:8px;padding:10px 16px;margin-bottom:14px;font-size:12.5px;display:flex;align-items:center;gap:10px">
-    <strong style="color:#FBBC05">ABC Class  A.C.E. Curriculum</strong>
+    <strong style="color:#FBBC05">ABC Class - A.C.E. Curriculum</strong>
     <span style="color:rgba(251,188,5,.4)">|</span>
     <span style="color:rgba(255,255,255,.7);font-size:12px">Record Supervisor score (S%) per PACE. M% = Moderator score (optional). STK = sticker sequence number.</span>
   </div>

@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
-                ('severity', models.CharField(choices=[('low', 'Low  general observation'), ('medium', 'Medium  requires monitoring'), ('high', 'High  HOD follow-up required'), ('critical', 'Critical  immediate escalation')], db_index=True, default='low', max_length=10)),
+                ('severity', models.CharField(choices=[('low', 'Low: general observation'), ('medium', 'Medium: requires monitoring'), ('high', 'High: HOD follow-up required'), ('critical', 'Critical: immediate escalation')], db_index=True, default='low', max_length=10)),
                 ('observation_date', models.DateField(db_index=True)),
                 ('observation_text', models.TextField()),
                 ('action_taken', models.TextField(blank=True)),

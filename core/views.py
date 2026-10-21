@@ -2016,7 +2016,7 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
                 if is_current and other_current:
                     messages.error(
                         request,
-                        f"Cannot create '{name}' as the current academic year  "
+                        f"Cannot create '{name}' as the current academic year: "
                         f"'{other_current.name}' is already the current year. "
                         f"Clear its current flag first."
                     )
@@ -2061,7 +2061,7 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
                 from django.utils import timezone
                 today = timezone.now().date()
                 if ay.end_date and ay.end_date < today:
-                    messages.error(request, f"Cannot edit '{ay.name}'  it ended on {ay.end_date}. Past academic years are read-only.")
+                    messages.error(request, f"Cannot edit '{ay.name}': it ended on {ay.end_date}. Past academic years are read-only.")
                     return redirect(f"{reverse_lazy('core:school_settings')}?tab=academic_year")
                 name = request.POST.get("name", "").strip()
                 start_date_str = request.POST.get("start_date", "").strip()
@@ -2092,7 +2092,7 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
                     if other_current:
                         messages.error(
                             request,
-                            f"Cannot set '{name}' as the current academic year  "
+                            f"Cannot set '{name}' as the current academic year: "
                             f"'{other_current.name}' is already the current year. "
                             f"Clear its current flag first."
                         )
@@ -2115,7 +2115,7 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
                 name = ay.name
                 term_count = ay.terms.count()
                 if term_count > 0:
-                    messages.error(request, f"Cannot delete '{name}'  it has {term_count} term(s). Delete all terms first.")
+                    messages.error(request, f"Cannot delete '{name}': it has {term_count} term(s). Delete all terms first.")
                     return redirect(f"{reverse_lazy('core:school_settings')}?tab=academic_year")
                 try:
                     ay.delete()
@@ -2123,13 +2123,13 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
                 except ProtectedError as e:
                     blocked = str(e)
                     if "CambridgeCheckpointScore" in blocked:
-                        messages.error(request, f"Cannot delete '{name}'  it has Cambridge Checkpoint scores. Remove those first.")
+                        messages.error(request, f"Cannot delete '{name}': it has Cambridge Checkpoint scores. Remove those first.")
                     elif "ReportCard" in blocked:
-                        messages.error(request, f"Cannot delete '{name}'  it has report cards. Remove those first.")
+                        messages.error(request, f"Cannot delete '{name}': it has report cards. Remove those first.")
                     elif "ExamScore" in blocked:
-                        messages.error(request, f"Cannot delete '{name}'  it has exam scores. Remove those first.")
+                        messages.error(request, f"Cannot delete '{name}': it has exam scores. Remove those first.")
                     else:
-                        messages.error(request, f"Cannot delete '{name}'  it has associated records that must be removed first.")
+                        messages.error(request, f"Cannot delete '{name}': it has associated records that must be removed first.")
                 return redirect(f"{reverse_lazy('core:school_settings')}?tab=academic_year")
 
             if action == "add_term":
@@ -2447,7 +2447,7 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
                 if tpl:
                     tpl.is_enabled = request.POST.get("is_enabled") == "on"
                     tpl.save(update_fields=["is_enabled", "updated_at"])
-                    state = "on  it will be sent" if tpl.is_enabled else "off  it will not be sent"
+                    state = "on, so it will be sent" if tpl.is_enabled else "off, so it will not be sent"
                     messages.success(request, f"'{tpl.name}' email is now {state}.")
                 return redirect(f"{reverse_lazy('core:school_settings')}?tab=email_templates")
 

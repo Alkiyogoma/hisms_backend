@@ -38,7 +38,7 @@ elif settings.DEBUG:
     WEBHOOK_API_TOKEN = "hodari-webhook-token-2026"
 else:
     WEBHOOK_API_TOKEN = None
-    logger.warning("WEBHOOK_API_TOKEN not set  webhook endpoints will reject all requests")
+    logger.warning("WEBHOOK_API_TOKEN not set: webhook endpoints will reject all requests")
 
 
 def _verify_webhook_token(request) -> bool:

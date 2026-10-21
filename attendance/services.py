@@ -275,7 +275,7 @@ class AttendanceService:
                     action_type="CHECKIN_EVENT",
                     model_name="AttendanceEntry",
                     object_id=str(entry.pk),
-                    description=f"Check-in: {student.get_full_name()} at {timestamp.strftime('%H:%M')}  {entry.status}",
+                    description=f"Check-in: {student.get_full_name()} at {timestamp.strftime('%H:%M')} - {entry.status}",
                     after={"student": student.pk, "status": entry.status, "check_in_time": entry.check_in_time.strftime('%H:%M:%S')},
                 )
             except Exception:

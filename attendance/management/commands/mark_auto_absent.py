@@ -59,7 +59,7 @@ class Command(BaseCommand):
         if not is_school_day(target_date):
             self.stdout.write(
                 self.style.WARNING(
-                    f"{target_date} is not a school day  skipping."
+                    f"{target_date} is not a school day: skipping."
                 )
             )
             return

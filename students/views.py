@@ -1263,7 +1263,7 @@ class GuardianCreateView(RoleRequiredMixin, TemplateView):
             try:
                 student = Student.objects.get(pk=student_id)
             except (Student.DoesNotExist, ValueError):
-                messages.warning(request, "Selected student not found  parent created without link.")
+                messages.warning(request, "Selected student not found: parent created without link.")
 
 
         try:
@@ -1321,7 +1321,7 @@ class GuardianCreateView(RoleRequiredMixin, TemplateView):
         if portal_access:
             messages.success(
                 request,
-                f"Parent {guardian.full_name} created  portal account created. Credentials sent via notification."
+                f"Parent {guardian.full_name} created with a portal account. Credentials sent via notification."
             )
         else:
             messages.success(request, f"Parent {guardian.full_name} created.")
@@ -1605,7 +1605,7 @@ class StudentGuardianLinkView(RoleRequiredMixin, TemplateView):
             else:
                 messages.success(
                     request,
-                    f"{guardian.full_name} was already linked  relationship and primary contact updated.",
+                    f"{guardian.full_name} was already linked: relationship and primary contact updated.",
                 )
 
             # FR-STU-005: Notify Finance Officer if sibling relationship confirmed
@@ -1668,7 +1668,7 @@ class StudentGuardianLinkView(RoleRequiredMixin, TemplateView):
         if portal_access:
             messages.success(
                 request,
-                f"Created and linked new parent: {guardian.full_name}  portal account created. Credentials sent via notification."
+                f"Created and linked new parent {guardian.full_name} with a portal account. Credentials sent via notification."
             )
         else:
             messages.success(request, f"Created and linked new parent: {guardian.full_name}")

@@ -488,7 +488,7 @@ class WeeklyFocusSubmitView(RoleRequiredMixin, TemplateView):
                 Notification(
                     recipient=u,
                     category=NotificationCategory.BROADCAST,
-                    title=f"Week {week_number} Focus  {class_name}: {theme}",
+                    title=f"Week {week_number} Focus - {class_name}: {theme}",
                     body=f"Planned activities:\n{planned_activities}" + (
                         f"\n\nItems to bring:\n{items_to_bring}" if items_to_bring else ""
                     ),
@@ -683,7 +683,7 @@ class WeeklyFocusReviewView(RoleRequiredMixin, View):
                 Notification(
                     recipient=u,
                     category=NotificationCategory.BROADCAST,
-                    title=f"Week {entry.week_number} Focus  {entry.class_name}: {entry.theme}",
+                    title=f"Week {entry.week_number} Focus - {entry.class_name}: {entry.theme}",
                     body=f"Planned activities:\n{entry.planned_activities}" + (
                         f"\n\nItems to bring:\n{entry.items_to_bring}" if entry.items_to_bring else ""
                     ),

@@ -122,7 +122,7 @@ class RoleRequiredMixin(LoginRequiredMixin):
 
                             f"User {request.user} (role={request.user.role}) denied access to "
 
-                            f"{request.method} {request.path}  missing one of: "
+                            f"{request.method} {request.path}: missing one of: "
 
                             f"{', '.join(self.required_permissions_any)}"
 
@@ -156,7 +156,7 @@ class RoleRequiredMixin(LoginRequiredMixin):
 
                         f"User {request.user} (role={request.user.role}) denied access to "
 
-                        f"{request.method} {request.path}  missing perm: {self.required_permission}"
+                        f"{request.method} {request.path}: missing perm: {self.required_permission}"
 
                     ),
 

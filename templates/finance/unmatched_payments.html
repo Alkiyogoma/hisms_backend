@@ -44,7 +44,7 @@
             <select name="invoice_id" required class="hf2-select" style="width:160px;height:32px;padding:0 8px;font-size:12px">
               <option value="">Select invoice…</option>
               {% for inv in invoicelist %}
-              <option value="{{ inv.id }}">{{ inv.invoice_number|default:inv.id }}  {{ inv.student.first_name }} {{ inv.student.last_name }} ({{ inv.student.class_name }})</option>
+              <option value="{{ inv.id }}">{{ inv.invoice_number|default:inv.id }} - {{ inv.student.first_name }} {{ inv.student.last_name }} ({{ inv.student.class_name }})</option>
               {% endfor %}
             </select>
             <button type="submit" class="btn btn-primary" style="padding:5px 10px;font-size:11px">Match</button>

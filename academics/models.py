@@ -30,10 +30,10 @@ class ProgressionOutcome(models.TextChoices):
 
 
 class CalculationBasis(models.TextChoices):
-    COMPLETE = "complete", "Complete  all assessments present"
-    ZERO_SCORED = "zero_scored", "Zero-scored  one or more absences recorded as zero"
-    REDISTRIBUTED = "redistributed", "Redistributed  excused absence, remaining components scaled"
-    INCOMPLETE = "incomplete", "Incomplete  missing grade data, cannot calculate"
+    COMPLETE = "complete", "Complete: all assessments present"
+    ZERO_SCORED = "zero_scored", "Zero-scored: one or more absences recorded as zero"
+    REDISTRIBUTED = "redistributed", "Redistributed: excused absence, remaining components scaled"
+    INCOMPLETE = "incomplete", "Incomplete: missing grade data, cannot calculate"
 
 
 class AcademicYear(TimeStampedModel):
@@ -68,13 +68,13 @@ class AcademicYear(TimeStampedModel):
         # Cannot set is_current on a year that has already ended
         if self.is_current and self.end_date and self.end_date < today:
             raise ValidationError(
-                f"Cannot set '{self.name}' as current  it ended on {self.end_date}. "
+                f"Cannot set '{self.name}' as current: it ended on {self.end_date}. "
                 f"Choose a current or future academic year."
             )
         # Cannot publish a year that has already ended
         if self.is_published and self.end_date and self.end_date < today:
             raise ValidationError(
-                f"Cannot publish '{self.name}'  it ended on {self.end_date}. "
+                f"Cannot publish '{self.name}': it ended on {self.end_date}. "
                 f"Past academic years cannot be published."
             )
         if self.start_date and self.end_date:
@@ -307,7 +307,7 @@ class TimetableEntry(TimeStampedModel):
         related_name="timetable_entries",
         null=True,
         blank=True,
-        help_text="Term this timetable belongs to  FR-TT-002",
+        help_text="Term this timetable belongs to - FR-TT-002",
     )
     class_name = models.CharField(max_length=64, db_index=True)
     day_of_week = models.CharField(max_length=10, choices=WeekDay.choices)
@@ -388,8 +388,8 @@ class Term(TimeStampedModel):
         help_text="Working days after quiz period for teachers to enter grades (excludes weekends).",
     )
     # Deprecated: kept temporarily for backward compat; use endterm fields above.
-    exam_start_date = models.DateField(null=True, blank=True, help_text="DEPRECATED  use endterm_exam_start_date.")
-    exam_end_date = models.DateField(null=True, blank=True, help_text="DEPRECATED  use endterm_exam_end_date.")
+    exam_start_date = models.DateField(null=True, blank=True, help_text="DEPRECATED: use endterm_exam_start_date.")
+    exam_end_date = models.DateField(null=True, blank=True, help_text="DEPRECATED: use endterm_exam_end_date.")
 
     class Meta:
         unique_together = ("academic_year", "name")
@@ -795,7 +795,7 @@ class ExamScore(TimeStampedModel):
     correction_reason = models.TextField(blank=True)
     previous_score = models.DecimalField(
         max_digits=5, decimal_places=2, null=True, blank=True,
-        help_text="Original score before correction  retained for audit trail (FR-ACAD-008).",
+        help_text="Original score before correction: retained for audit trail (FR-ACAD-008).",
     )
 
     class Meta:
@@ -1059,7 +1059,7 @@ class ECDDomainConfig(TimeStampedModel):
         unique_together = ("class_type", "domain_name")
 
     def __str__(self) -> str:
-        return f"{self.get_class_type_display()}  {self.domain_name}"
+        return f"{self.get_class_type_display()} - {self.domain_name}"
 
 
 class ECDEvaluation(TimeStampedModel):
@@ -1298,7 +1298,7 @@ class ProgressionCase(TimeStampedModel):
         ]
 
     def __str__(self) -> str:
-        return f"{self.student}  {self.get_status_display()}"
+        return f"{self.student} - {self.get_status_display()}"
 
     def clean(self):
         """Enforce status transition rules at the model layer."""

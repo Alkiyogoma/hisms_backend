@@ -28,6 +28,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='feestructure',
             name='sibling_discount_value',
-            field=models.DecimalField(decimal_places=2, default=0, help_text='Discount amount  interpret as percentage or fixed TZS based on mode', max_digits=10),
+            field=models.DecimalField(decimal_places=2, default=0, help_text='Discount amount: interpret as percentage or fixed TZS based on mode', max_digits=10),
         ),
     ]

@@ -114,7 +114,7 @@ def delete_incident(incident, user, reason, duplicate_of=None, request=None):
             action_type="discipline_incident_deleted",
             model_name="DisciplineIncident",
             object_id=incident.pk,
-            description=f"{incident.reference} for {incident.student} deleted  {why[:200]}",
+            description=f"{incident.reference} for {incident.student} deleted - {why[:200]}",
             before=snapshot,
             after={"deleted_at": now.isoformat(), "deleted_by": staff_name(user), "reason": reason,
                    "duplicate_of": duplicate_of.reference if duplicate_of else None},

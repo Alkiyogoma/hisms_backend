@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<title>Attendance  {{ brand.school_name }}</title>
+<title>Attendance | {{ brand.school_name }}</title>
 <style>
 :root {
   --blue:#2563EB; --blue-dark:#1D4ED8;
@@ -764,7 +764,7 @@ body{
   function apiFetch(url,opts){
     return fetch(url,opts).then(function(r){
       if(r.ok)return r.json();
-      if(r.status===403||r.status===401){showToast('Session expired  redirecting...',true);setTimeout(function(){window.location.href=API+'/accounts/login/'},1500);throw new Error('auth_redirect')}
+      if(r.status===403||r.status===401){showToast('Session expired: redirecting...',true);setTimeout(function(){window.location.href=API+'/accounts/login/'},1500);throw new Error('auth_redirect')}
       return r.json().then(function(d){
         console.error('API error',r.status,url,d);
         throw new Error(d.detail||d.message||JSON.stringify(d)||r.statusText);
@@ -1185,7 +1185,7 @@ body{
   }
   window.confirmMode=function(mode){
     if(qrLookupPending){showToast('Please wait, looking up student...',true);return}
-    if(qrLookupFailed||!pendingStudentData){showToast('Cannot proceed  student not found',true);return}
+    if(qrLookupFailed||!pendingStudentData){showToast('Cannot proceed: student not found',true);return}
     document.getElementById('confirmOverlay').classList.remove('show');
     var resolvedId=pendingStudentData?pendingStudentData.id:pendingStudentId;
     var name=pendingStudentData?pendingStudentData.name:'Unknown';
@@ -1243,7 +1243,7 @@ body{
           }).catch(function(){});
         }
       }).catch(function(){
-        showToast('Failed to queue  try again',true);
+        showToast('Failed to queue: try again',true);
       });
       return;
     }

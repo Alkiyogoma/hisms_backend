@@ -480,7 +480,7 @@ class Command(BaseCommand):
         # ════════════════════════════════════════════════════════════════════
         # SIBLING: Faith Kipchoge (HCS0005)  ECD Pre-School
         # ════════════════════════════════════════════════════════════════════
-        self.stdout.write("\nSetting up Faith Kipchoge (HCS0005)  sibling...")
+        self.stdout.write("\nSetting up Faith Kipchoge (HCS0005): sibling...")
 
         faith, faith_created = Student.objects.get_or_create(
             admission_no="HCS0005",
@@ -725,7 +725,7 @@ class Command(BaseCommand):
                 ("behavioral", "low", "Faith was shy to participate in group activity. Encouraged by teacher."),
                 ("academic", "low", "Faith needs more practice with letter recognition."),
                 ("health", "medium", "Faith had a stomach ache. Parents called to pick her up."),
-                ("behavioral", "low", "Faith shared her toys nicely  positive behavior noted."),
+                ("behavioral", "low", "Faith shared her toys nicely: positive behavior noted."),
                 ("academic", "low", "Faith is improving in counting activities."),
             ]
             fw = faith_welfare[ti % len(faith_welfare)]

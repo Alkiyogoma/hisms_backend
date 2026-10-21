@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load role_tags %}
 {% load static hodari_forms role_tags %}
-{% block title %}Disciplinary Form  {{ brand.school_name }}{% endblock %}
+{% block title %}Disciplinary Form | {{ brand.school_name }}{% endblock %}
 {% block topbar_greeting %}Disciplinary Form{% endblock %}
 {% block topbar_date %}{{ today_date }}{% endblock %}
 
@@ -180,7 +180,7 @@
             </div>
             <div class="hf2-group" style="margin-top:16px">
                <label class="hf2-label">Overall level</label>
-               <div id="severity-display" class="hf2-input" style="background:#f8fafc;font-weight:700" data-labels='{% for val, lbl in severity_choices %}{{ lbl }}{% if not forloop.last %}|{% endif %}{% endfor %}'>Level 1  Minor</div>
+               <div id="severity-display" class="hf2-input" style="background:#f8fafc;font-weight:700" data-labels='{% for val, lbl in severity_choices %}{{ lbl }}{% if not forloop.last %}|{% endif %}{% endfor %}'>Level 1 - Minor</div>
                <div style="font-size:11px;color:var(--text-muted);margin-top:3px">The overall level is the highest level ticked above. It is the only scale on the record.</div>
             </div>
           </div>
