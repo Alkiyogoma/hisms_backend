@@ -1,0 +1,236 @@
+{# One learner's ECD report; rendered by ecd_report_preview.html, once per learner for a class. #}
+{% load static %}
+  <div class="report-container">
+    {% include "includes/hodari_print_header.html" %}
+
+    <!-- Report Title Row -->
+    <div style="padding:16px 32px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)">
+      <div style="font-weight:700;color:var(--hodari-blue);font-size:14px">
+        {% if report.ecd_template_type == "pre_k" %}PRE-KINDERGARTEN{% elif report.ecd_template_type == "kindergarten" %}KINDERGARTEN{% elif report.ecd_template_type == "pre_school" %}PRE-SCHOOL{% elif report.ecd_template_type == "abc" %}ABC CLASS{% else %}{{ report.ecd_template_type|upper }}{% endif %} PROGRESS REPORT
+      </div>
+      <div style="text-align:right;font-size:12px;color:var(--text-muted)">
+        Academic Year: {{ report.term.academic_year.name }}<br>
+        Term: {{ report.term.name }}<br>
+        Date: {% now "d F Y" %}
+      </div>
+    </div>
+
+    <!-- Student Info Bar -->
+    <div class="student-bar">
+      <div class="field">
+        <label>Student Name</label>
+        <value>{{ student.get_full_name }}</value>
+      </div>
+      <div class="field">
+        <label>Admission No</label>
+        <value>{{ student.admission_no|default:"—" }}</value>
+      </div>
+      <div class="field">
+        <label>Class</label>
+        <value>{{ student.class_name }}</value>
+      </div>
+      <div class="field">
+        <label>Class Teacher</label>
+        <value>{{ class_teacher|default:"—" }}</value>
+      </div>
+    </div>
+
+    <!-- Rating Key -->
+    <div class="key-banner">
+      <span class="key-label">Key:</span>
+      <span class="key-item ki-E">E &middot; Excellent</span>
+      <span class="key-item ki-G">G &middot; Good</span>
+      <span class="key-item ki-S">S &middot; Satisfactory</span>
+      <span class="key-item ki-N">N &middot; Not Yet</span>
+    </div>
+
+    <div class="report-body">
+      <div class="section-title">Academic Progress</div>
+
+      {% if ecd.template_type == 'abc' %}
+        <!-- ==================== ABC CLASS SECTION ==================== -->
+
+        <!-- PACE Progress -->
+        <div class="domain-section no-break">
+          <div class="domain-header">PACE Progress Tracker</div>
+          <table class="abc-table">
+            <thead>
+              <tr>
+                <th>Subject</th>
+                <th>PACE No.</th>
+                <th>Sticker</th>
+                <th>Status</th>
+                <th style="text-align:center">Sup. Score</th>
+                <th style="text-align:center">Mod. Score</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for pace in ecd.abc_pace_progress %}
+                <tr>
+                  <td style="font-weight:700">{{ pace.subject }}</td>
+                  <td>{{ pace.pace_no }}</td>
+                  <td>{{ pace.sticker_no|default:"-" }}</td>
+                  <td>
+                    <span class="status-badge {% if pace.status == 'complete' %}status-complete{% else %}status-in_progress{% endif %}">
+                      {{ pace.status|title }}
+                    </span>
+                  </td>
+                  <td style="text-align:center;font-weight:700;color:var(--hodari-blue)">{{ pace.supervisor_score|default:"-" }}</td>
+                  <td style="text-align:center;color:var(--text-muted)">{{ pace.moderator_score|default:"-" }}</td>
+                  <td style="color:var(--text-muted)">{{ pace.date_completed|default:"-" }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:16px">No PACE records</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Scripture & Reading -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px" class="no-break">
+          <div class="domain-section">
+            <div class="domain-header">Scripture &amp; Reading</div>
+            <div class="competency-row"><span class="competency-name">Scripture Memorisation (T1)</span><span class="competency-rating" style="font-weight:600">{{ ecd.abc_scripture.1|default:"-" }}</span></div>
+            <div class="competency-row"><span class="competency-name">Scripture Memorisation (T2)</span><span class="competency-rating" style="font-weight:600">{{ ecd.abc_scripture.2|default:"-" }}</span></div>
+            <div class="competency-row"><span class="competency-name">Scripture Memorisation (T3)</span><span class="competency-rating" style="font-weight:600">{{ ecd.abc_scripture.3|default:"-" }}</span></div>
+            <div class="competency-row"><span class="competency-name">Reading WPM (T3)</span><span class="competency-rating" style="font-weight:600">{{ ecd.abc_reading.3.wpm|default:"-" }}</span></div>
+            <div class="competency-row"><span class="competency-name">Reading % (T3)</span><span class="competency-rating" style="font-weight:600">{{ ecd.abc_reading.3.percentage|default:"-" }}%</span></div>
+            <div class="competency-row"><span class="competency-name">Comprehension (T3)</span><span class="competency-rating" style="font-weight:600">{{ ecd.abc_reading.3.comprehension_score|default:"-" }}%</span></div>
+          </div>
+          <div class="domain-section">
+            <div class="domain-header">General Assignments</div>
+            <div class="competency-row"><span class="competency-name">Assignment (T1)</span><span class="competency-rating" style="font-weight:600">{{ ecd.abc_assignments.1.score|default:"-" }}%</span></div>
+            <div class="competency-row"><span class="competency-name">Assignment (T2)</span><span class="competency-rating" style="font-weight:600">{{ ecd.abc_assignments.2.score|default:"-" }}%</span></div>
+            <div class="competency-row"><span class="competency-name">Assignment (T3)</span><span class="competency-rating" style="font-weight:600">{{ ecd.abc_assignments.3.score|default:"-" }}%</span></div>
+          </div>
+        </div>
+
+        <!-- Term 3 Internal Exam -->
+        {% if ecd.abc_internal_exams %}
+        <div class="domain-section no-break" style="margin-top:16px">
+          <div class="domain-header">Term 3 Internal Exam</div>
+          {% for exam in ecd.abc_internal_exams %}
+          <div class="competency-row">
+            <span class="competency-name">{{ exam.subject }}</span>
+            <span class="competency-rating"><span class="rating-pill rating-{{ exam.rating }}">{{ exam.rating }}</span></span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- ABC Character Domains -->
+        {% for group in ecd.domain_groups %}
+          <div class="domain-section no-break">
+            <div class="domain-header">{{ group.section }}</div>
+            {% for item in group.items %}
+              <div class="competency-row">
+                <span class="competency-name">{{ item.domain }}</span>
+                <span class="competency-rating">
+                  {% if item.rating %}
+                    <span class="rating-pill rating-{{ item.rating }}">{{ item.rating }}</span>
+                  {% else %}
+                    <span class="rating-pill rating-empty">-</span>
+                  {% endif %}
+                </span>
+              </div>
+            {% endfor %}
+          </div>
+        {% endfor %}
+
+      {% else %}
+        <!-- ==================== PRE-K / KG / PRE-SCHOOL SECTION ==================== -->
+        {% for group in ecd.domain_groups %}
+          <div class="domain-section no-break">
+            <div class="domain-header">{{ group.section }}</div>
+            {% for item in group.items %}
+              <div class="competency-row">
+                <span class="competency-name">{{ item.domain }}</span>
+                <span class="competency-rating">
+                  {% if item.rating %}
+                    <span class="rating-pill rating-{{ item.rating }}">{{ item.rating }}</span>
+                  {% else %}
+                    <span class="rating-pill rating-empty">-</span>
+                  {% endif %}
+                </span>
+              </div>
+            {% endfor %}
+          </div>
+        {% endfor %}
+      {% endif %}
+
+      <!-- Average & Remarks -->
+      {% if ecd.avg_score is not None %}
+      <div class="summary-grid">
+        <div class="summary-card">
+          <div class="label">Average Points</div>
+          <div class="value">{{ ecd.avg_score }}</div>
+        </div>
+        <div class="summary-card">
+          <div class="label">Overall Remarks</div>
+          <div class="value remarks">{{ ecd.remarks_label }}</div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Attendance -->
+      <div class="section-title" style="margin-top:20px">Attendance</div>
+      <div class="attendance-row">
+        <div class="att-card att-present">
+          <div class="att-val">{{ attendance.present }}</div>
+          <div class="att-lbl">Days Present</div>
+        </div>
+        <div class="att-card att-absent">
+          <div class="att-val">{{ attendance.absent }}</div>
+          <div class="att-lbl">Days Absent</div>
+        </div>
+        <div class="att-card att-late">
+          <div class="att-val">{{ attendance.late }}</div>
+          <div class="att-lbl">Days Late</div>
+        </div>
+      </div>
+
+      <!-- Teacher Comment -->
+      {% if ecd.teacher_comments %}
+        <div class="comment-section">
+          <div class="section-title">Class Teacher's Comment</div>
+          <div class="comment-box">
+            {{ ecd.teacher_comments }}
+          </div>
+        </div>
+      {% endif %}
+
+      <!-- Signatures -->
+      <div class="signatures">
+        <div>
+          <div class="sig-line">
+            {% if report.generated_by %}
+              <div style="font-size: 12px; color: var(--text-primary); font-weight: 600; text-align: center; padding-top: 4px;">{{ report.generated_by.get_full_name|default:report.generated_by.username }}</div>
+            {% endif %}
+          </div>
+          <div class="sig-label">Class Teacher Signature</div>
+        </div>
+        <div>
+          <div class="sig-line">
+            {% if report.signed_off_by %}
+              <div class="sig-stamp">OFFICIALLY SIGNED</div>
+              <div style="font-size: 11px; color: var(--text-muted); text-align: center; padding-top: 4px;">{{ report.signed_off_by.get_full_name|default:report.signed_off_by.username }}</div>
+            {% endif %}
+          </div>
+          <div class="sig-label">Head of School Signature</div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="footer">
+        <div style="flex:1">
+          <div style="font-weight:600; color:var(--hodari-charcoal)">School Re-opens: {{ report.term.next_term_start|default:"To be announced" }}</div>
+          <div style="margin-top:4px">&copy; {% now "Y" %} {{ brand.school_name }} &bull; Confidential Student Record</div>
+        </div>
+        <div style="text-align:right">
+          <div>{{ brand.phone }} &nbsp;|&nbsp; {{ brand.email }}</div>
+          <div>{{ brand.address }}</div>
+        </div>
+      </div>
+    </div>
+  </div>

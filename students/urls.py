@@ -19,6 +19,7 @@ urlpatterns = [
     path("guardians/<int:pk>/delete/", views.GuardianDeleteView.as_view(), name="guardian_delete"),
     path("guardians/<int:pk>/archive/", views.GuardianArchiveView.as_view(), name="guardian_archive"),
     path("guardians/<int:pk>/restore/", views.GuardianArchiveView.as_view(restore=True), name="guardian_restore"),
+    path("guardians/<int:pk>/portal-access/", views.GuardianPortalAccessView.as_view(), name="guardian_portal_access"),
     path("guardians/<int:pk>/consent-withdraw/", views.GuardianConsentWithdrawView.as_view(), name="guardian_consent_withdraw"),
     path("<int:pk>/guardians/link/", views.StudentGuardianLinkView.as_view(), name="guardian_link"),
     path("api/search/", views.StudentSearchAPIView.as_view(), name="api_search"),

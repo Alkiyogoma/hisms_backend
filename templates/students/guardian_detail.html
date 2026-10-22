@@ -465,7 +465,15 @@
         {% if guardian.user %}
         <div class="gp-detail-item">
           <label>Portal Access</label>
+          {% if guardian.user.is_active %}
           <span class="chip chip-green" style="width:fit-content">Active</span>
+          {% else %}
+          <span class="chip chip-grey" style="width:fit-content">Disabled</span>
+          {% endif %}
+        </div>
+        <div class="gp-detail-item">
+          <label>Portal Login</label>
+          <span style="font-family:monospace;font-size:12px">{{ guardian.user.username }}</span>
         </div>
         {% else %}
         <div class="gp-detail-item">
@@ -474,6 +482,13 @@
         </div>
         {% endif %}
       </div>
+      {% has_perm user "students.change_parentguardian" as can_manage_portal %}
+      {% if can_manage_portal and not guardian.is_archived %}
+      <button type="button" class="hf-btn hf-btn-outline" style="width:100%;justify-content:center;margin-top:12px"
+        onclick="confirmDeleteModal({title:'{% if guardian.user %}Resend login details?{% else %}Create portal access?{% endif %}',body:'{% if guardian.user %}Send <strong>{{ guardian.full_name|escapejs }}</strong> a new temporary password? Their current password will stop working.{% else %}Create a parent portal login for <strong>{{ guardian.full_name|escapejs }}</strong>?{% endif %}',detail:'Login details will be sent{% if guardian.email %} by email to {{ guardian.email|escapejs }}{% endif %}{% if guardian.phone %}{% if guardian.email %} and{% endif %} by SMS to {{ guardian.phone|escapejs }} (if SMS is set up){% endif %}. They must change the password on first login.',confirmText:'{% if guardian.user %}Send New Password{% else %}Create Access{% endif %}',url:'{% url 'students:guardian_portal_access' guardian.pk %}',type:'info'})">
+        {% if guardian.user %}Resend Login Details{% else %}Create Portal Access{% endif %}
+      </button>
+      {% endif %}
     </div>
   </div>
 </div>

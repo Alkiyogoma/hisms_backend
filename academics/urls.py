@@ -26,6 +26,7 @@ from academics.views import (
     ExamScoreEntryView,
     HOSSignOffListView,
     HOSReportPreviewView,
+    ClassReportPrintView,
     HOSSignOffActionView,
     ReportReviewQueueView,
     ParentReportListView,
@@ -111,6 +112,7 @@ urlpatterns = [
     path("reports/list/", ReportCardListView.as_view(), name="report_card_list"),
 
     path("reports/<int:pk>/preview/", HOSReportPreviewView.as_view(), name="report_preview"),
+    path("reports/<int:pk>/preview/class/", ClassReportPrintView.as_view(), name="report_preview_class"),
     path("reports/signoff/action/", HOSSignOffActionView.as_view(), name="signoff_action"),
     path("reports/parent/", ParentReportListView.as_view(), name="parent_reports"),
     path("ecd-evaluations/", ECDEvaluationEntryView.as_view(), name="ecd_evaluations_entry"),

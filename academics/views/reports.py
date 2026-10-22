@@ -539,7 +539,44 @@ class HOSReportPreviewView(RoleRequiredMixin, TemplateView):
         else:
             ctx["signoff_blocked"] = False
             ctx["signoff_block_reason"] = ""
-        
+
+        # The learner's class this term, for "Print all" and "Approve & Sign Off All".
+        if user.role != UserRole.PARENT:
+            class_reports = self.class_report_queryset(report)
+            ctx["class_name"] = report.student.class_name
+            ctx["class_total"] = class_reports.count()
+            ctx["class_unpublished"] = class_reports.exclude(status=ReportCardStatus.PUBLISHED).count()
+
+        return ctx
+
+    @staticmethod
+    def class_report_queryset(report):
+        # Same reports the class-wide sign-off acts on (class name and term).
+        return ReportCard.objects.filter(
+            term=report.term, student__class_name=report.student.class_name,
+            is_ecd_report=report.is_ecd_report,
+        )
+
+
+class ClassReportPrintView(HOSReportPreviewView):
+    """Every report in the learner's class for that term on one page, one learner per printed page."""
+
+    def get_context_data(self, **kwargs):
+        if self.request.user.role == UserRole.PARENT:
+            raise PermissionDenied()
+        ctx = super().get_context_data(**kwargs)
+        from django.template.loader import render_to_string
+        report = ctx["report"]
+        partial = "academics/_ecd_report_body.html" if report.is_ecd_report else "academics/_report_card_sheets.html"
+        reports = (
+            self.class_report_queryset(report)
+            .select_related("student", "term__academic_year", "signed_off_by")
+            .order_by("student__last_name", "student__first_name")
+        )
+        ctx["class_view"] = True
+        ctx["class_reports"] = [
+            render_to_string(partial, _build_report_card_context(r), request=self.request) for r in reports
+        ]
         return ctx
 
 
