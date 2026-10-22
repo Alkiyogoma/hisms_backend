@@ -94,3 +94,46 @@
   // Server can trigger `HX-Trigger: hui:closeModal` after a successful save
   document.body.addEventListener('hui:closeModal', function () { closeTop(); });
 })();
+
+/* ── Dropdown menu ──
+   <div class="hf-menu"><button type="button" data-hf-menu aria-expanded="false">…</button>
+   <div class="hf-menu-list" role="menu">…items…</div></div>
+   Toggles on click; closes on outside click, Esc, or choosing an item. */
+(function () {
+  function closeAll(except) {
+    document.querySelectorAll('.hf-menu.open').forEach(function (m) {
+      if (m === except) return;
+      m.classList.remove('open');
+      var t = m.querySelector('[data-hf-menu]');
+      if (t) t.setAttribute('aria-expanded', 'false');
+    });
+  }
+  document.addEventListener('click', function (e) {
+    var trigger = e.target.closest('[data-hf-menu]');
+    if (trigger) {
+      var menu = trigger.closest('.hf-menu');
+      var willOpen = !menu.classList.contains('open');
+      closeAll(menu);
+      menu.classList.toggle('open', willOpen);
+      trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+      if (willOpen) place(menu, trigger);
+      return;
+    }
+    if (e.target.closest('.hf-menu-list .hf-menu-item')) { closeAll(); return; }
+    if (!e.target.closest('.hf-menu')) closeAll();
+  });
+  // Fixed positioning so overflow:hidden/auto ancestors (cards, table-wrap) never clip the list.
+  function place(menu, trigger) {
+    var list = menu.querySelector('.hf-menu-list');
+    var r = trigger.getBoundingClientRect(), gap = 6, pad = 8;
+    var w = list.offsetWidth, h = list.offsetHeight;
+    var left = Math.min(Math.max(pad, r.right - w), window.innerWidth - w - pad);
+    var top = r.bottom + gap;
+    if (top + h > window.innerHeight - pad && r.top - gap - h > pad) top = r.top - gap - h;
+    list.style.left = left + 'px';
+    list.style.top = top + 'px';
+  }
+  window.addEventListener('resize', function () { closeAll(); });
+  window.addEventListener('scroll', function () { closeAll(); }, true);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(); });
+})();

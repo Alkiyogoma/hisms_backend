@@ -16,26 +16,8 @@
   .count-badge { background:var(--hodari-blue); color:#fff; padding:2px 8px; border-radius:99px;
     font-size:12px; font-weight:700; margin-left:8px; }
 
-  /* Grid view */
-  .student-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-top:20px; }
-  .student-card { background:#fff; border:1px solid var(--border); border-radius:12px; padding:16px;
-    transition:all .2s ease; display:flex; flex-direction:column; min-height:160px; }
-  .student-card:hover { border-color:var(--hodari-blue); box-shadow:0 8px 20px rgba(0,0,0,.06); transform:translateY(-2px); }
-  .card-avatar { width:44px; height:44px; border-radius:10px; background:var(--hodari-blue-light);
-    color:var(--hodari-blue); display:flex; align-items:center; justify-content:center;
-    font-weight:700; font-size:16px; border:1px solid var(--border); overflow:hidden; }
-  .card-avatar img { width:100%; height:100%; object-fit:cover; }
-  .card-name { font-weight:700; color:var(--text-primary); font-size:13.5px; margin-bottom:2px; }
-  .card-admission { font-family:var(--font-mono); font-size:10.5px; color:var(--text-muted); }
-  .card-class { font-size:12px; font-weight:600; color:var(--text-secondary); }
-
-  /* View toggle mechanics */
-  .view-mode-list .student-grid { display:none; }
-  .view-mode-grid .results-table-container { display:none; }
-
   @media print {
-    .view-mode-grid, .view-mode-list, .filter-bar { display:block !important; }
-    .student-grid, .toolbar, .filter-bar, .pagination { display:none !important; }
+    .toolbar, .hf-filterbar, .hf-bulkbar, .col-check, .pagination { display:none !important; }
     .print-only { display:block !important; }
   }
 </style>
@@ -60,7 +42,7 @@
   </div>
 </div>
 
-<div id="student-page-container" class="card view-mode-list">
+<div id="student-page-container" class="card">
 
   {# Summary stats #}
   <div class="metrics" style="margin-top:4px;margin-bottom:20px">
@@ -84,104 +66,73 @@
   {% endif %}
 
   {# Filters #}
-  <form method="get" class="filter-bar" style="background:var(--bg-page);padding:16px;border-radius:10px;margin-bottom:18px">
-    <div class="filter-field" style="flex:2;min-width:250px">
-      <label>Search</label>
-      <input name="q" type="text" class="hf2-input" id="student-search-input" placeholder="Name or admission no…" value="{{ request.GET.q }}" autocomplete="off" data-search-url="{% url 'students:api_search' %}" data-include-archived="{% if archive_status != 'active' %}1{% else %}0{% endif %}">
+  {% has_perm user "students.add_student" as can_add_student %}
+  <form method="get" class="hf-filterbar" id="student-filters">
+    <input type="hidden" name="archive_status" value="{{ archive_status }}">
+    <div class="hf-filters">
+      <div class="hf-fg wide">
+        <label for="student-search-input">Search</label>
+        <input name="q" type="text" id="student-search-input" placeholder="Name or admission no…" value="{{ request.GET.q }}" autocomplete="off" data-search-url="{% url 'students:api_search' %}">
+      </div>
+      <div class="hf-fg">
+        <label for="f-dept">Department</label>
+        <select id="f-dept" name="department" onchange="this.form.submit()">
+          <option value="">All departments</option>
+          {% for val, lbl in departments %}<option value="{{ val }}" {% if request.GET.department == val %}selected{% endif %}>{{ lbl }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="hf-fg">
+        <label for="f-class">Class</label>
+        <select id="f-class" name="class_name" onchange="this.form.submit()">
+          <option value="">All classes</option>
+          {% for cls in classes %}<option value="{{ cls }}" {% if request.GET.class_name == cls %}selected{% endif %}>{{ cls }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="hf-fg">
+        <label for="f-status">Status</label>
+        <select id="f-status" name="status" onchange="this.form.submit()">
+          <option value="">All statuses</option>
+          {% for val, lbl in statuses %}<option value="{{ val }}" {% if request.GET.status == val %}selected{% endif %}>{{ lbl }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="hf-fg">
+        <label for="f-year">Academic year</label>
+        <select id="f-year" name="academic_year" onchange="this.form.submit()">
+          <option value="">All years</option>
+          {% for ay in academic_years %}<option value="{{ ay.id }}" {% if request.GET.academic_year == ay.id|stringformat:"d" %}selected{% endif %}>{{ ay.name }}{% if ay.is_current %} (current){% endif %}</option>{% endfor %}
+        </select>
+      </div>
     </div>
-    <div class="filter-field" style="flex:1;min-width:140px">
-      <label>Department</label>
-      <select name="department" class="hf2-select">
-        <option value="">All Departments</option>
-        {% for val, lbl in departments %}<option value="{{ val }}" {% if request.GET.department == val %}selected{% endif %}>{{ lbl }}</option>{% endfor %}
-      </select>
+    <div class="hf-filterfoot">
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>Showing {% if archive_status == 'archived' %}archived{% elif archive_status == 'all' %}all{% else %}active{% endif %} students &mdash; filters apply as you choose them.</span>
+      <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <noscript><button type="submit" class="hf-btn hf-btn-primary">Apply</button></noscript>
+        {% if request.GET.class_name and can_add_student %}
+        <a class="hf-reset" href="{% url 'students:print_class_id_bulk' request.GET.class_name %}" target="_blank">Print IDs</a>
+        <a class="hf-reset" href="#" onclick="confirmDeleteModal({title:'Bulk Generate IDs?',body:'Generate IDs for all students in <strong>{{ request.GET.class_name|escapejs }}</strong> who do not have a valid ADM-YYYY-XXX format?',detail:'Existing valid IDs will NOT be changed.',confirmText:'Generate IDs',url:'{% url 'students:bulk_generate_ids' %}',type:'info',extraData:[{name:'class_name',value:'{{ request.GET.class_name|escapejs }}'}]});return false">Bulk generate IDs</a>
+        {% endif %}
+        {% if request.GET.q or request.GET.department or request.GET.class_name or request.GET.status or request.GET.academic_year or request.GET.gender %}
+        <a class="hf-reset" href="?archive_status={{ archive_status }}">Clear filters</a>
+        {% endif %}
+      </span>
     </div>
-    <div class="filter-field" style="flex:1;min-width:140px">
-      <label>Class</label>
-      <select name="class_name" class="hf2-select">
-        <option value="">All Classes</option>
-        {% for cls in classes %}<option value="{{ cls }}" {% if request.GET.class_name == cls %}selected{% endif %}>{{ cls }}</option>{% endfor %}
-      </select>
-    </div>
-    <div class="filter-field" style="flex:.8;min-width:120px">
-      <label>Status</label>
-      <select name="status" class="hf2-select">
-        <option value="">All Status</option>
-        {% for val, lbl in statuses %}<option value="{{ val }}" {% if request.GET.status == val %}selected{% endif %}>{{ lbl }}</option>{% endfor %}
-      </select>
-    </div>
-    <div class="filter-field" style="flex:1;min-width:140px">
-      <label>Academic Year</label>
-      <select name="academic_year" class="hf2-select">
-        <option value="">All Years</option>
-        {% for ay in academic_years %}<option value="{{ ay.id }}" {% if request.GET.academic_year == ay.id|stringformat:"d" %}selected{% endif %}>{{ ay.name }}{% if ay.is_current %} (Current){% endif %}</option>{% endfor %}
-      </select>
-    </div>
-    <div class="filter-field" style="flex:.8;min-width:120px">
-      <label>Records</label>
-      <select name="archive_status" class="hf2-select">
-        <option value="active" {% if archive_status == 'active' %}selected{% endif %}>Active students</option>
-        <option value="archived" {% if archive_status == 'archived' %}selected{% endif %}>Archived students</option>
-        <option value="all" {% if archive_status == 'all' %}selected{% endif %}>All students</option>
-      </select>
-    </div>
-    <div class="toolbar-group">
-      <c-button type="submit" variant="primary" id="filter-apply-btn">Apply</c-button>
-      <c-button variant="secondary" href="{% url 'students:list' %}">Reset</c-button>
-    </div>
-    {% has_perm user "students.add_student" as can_add_student %}
-    {% if request.GET.class_name and can_add_student %}
-    <div class="toolbar-group" style="margin-left:auto">
-      <c-button variant="secondary" href="{% url 'students:print_class_id_bulk' request.GET.class_name %}" target="_blank">
-        <c-slot name="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg></c-slot>
-        Print IDs
-      </c-button>
-      <c-button variant="secondary"
-        onclick="confirmDeleteModal({title:'Bulk Generate IDs?',body:'Generate IDs for all students in <strong>{{ request.GET.class_name }}</strong> who do not have a valid ADM-YYYY-XXX format?',detail:'Existing valid IDs will NOT be changed.',confirmText:'Generate IDs',url:'{% url 'students:bulk_generate_ids' %}',type:'info',extraData:[{name:'class_name',value:'{{ request.GET.class_name }}'}]})">
-        <c-slot name="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></c-slot>
-        Bulk Generate IDs
-      </c-button>
-    </div>
-    {% endif %}
   </form>
 
-  {# Results  grid (toggle) #}
-  <div class="student-grid">
-    {% for student in students %}
-    <div class="student-card">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-        <div class="card-avatar">
-          {% if student.photo %}<img src="{{ student.photo.url }}">{% else %}{{ student.first_name|slice:":1" }}{{ student.last_name|slice:":1" }}{% endif %}
-        </div>
-        <div style="flex:1;min-width:0">
-          <div class="card-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ student.first_name }} {{ student.last_name }}</div>
-          <div class="card-admission">{{ student.admission_no }}</div>
-        </div>
-      </div>
-      <div style="padding-top:12px;border-top:1px solid #f1f5f9;margin-top:auto">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-          <div class="card-class">{{ student.class_name }}</div>
-          <div style="display:flex;gap:4px;align-items:center">
-            {% if student.is_archived %}<c-badge variant="grey">Archived</c-badge>{% endif %}
-            <c-badge variant="{% if student.status == 'active' %}green{% elif student.status == 'suspended' %}amber{% elif student.status == 'withdrawn' %}red{% else %}grey{% endif %}">{{ student.get_status_display }}</c-badge>
-          </div>
-        </div>
-        <c-button variant="secondary" size="sm" href="{% url 'students:detail' student.pk %}" style="width:100%">View Profile</c-button>
-        {% include "students/_student_archive_action.html" %}
-      </div>
+  {# Results #}
+  {% has_perm user "students.delete_student" as can_purge %}
+  {% if archive_status == 'archived' and can_purge %}
+  <form method="post" action="{% url 'students:bulk_purge' %}" id="bulk-purge-form" onsubmit="return confirmPurge(this)">
+    {% csrf_token %}
+    <div class="hf-bulkbar">
+      <span><strong id="bulk-count">0</strong> selected &mdash; full delete removes the student records for good (use for duplicates).</span>
+      <button type="submit" class="hf-btn hf-btn-danger" id="bulk-purge-btn" disabled>Delete permanently</button>
     </div>
-    {% empty %}
-    <div id="empty-grid-state" style="grid-column:1 / -1">
-      {% include '_partials/empty_state.html' with title='No student records yet' desc='Enrol students via the Admissions Pipeline, Add student (direct enrolment) or Bulk Import.' icon='users' action_url='/students/add/' action_text='Add student' %}
-    </div>
-    {% endfor %}
-  </div>
-
-  {# Results  table (default) #}
+  {% endif %}
   <div class="results-table-container table-wrap">
     <table class="h-table">
       <thead>
         <tr>
+          {% if archive_status == 'archived' and can_purge %}<th class="col-check"><input type="checkbox" id="check-all" aria-label="Select all"></th>{% endif %}
           <th>Admission</th>
           <th>Student Name</th>
           <th>Grade / Class</th>
@@ -193,6 +144,7 @@
       <tbody>
         {% for student in students %}
         <tr>
+          {% if archive_status == 'archived' and can_purge %}<td class="col-check"><input type="checkbox" class="row-check" name="ids" value="{{ student.pk }}" form="bulk-purge-form" aria-label="Select {{ student.first_name }} {{ student.last_name }}"></td>{% endif %}
           <td style="color:var(--text-muted);font-family:var(--font-mono);font-size:12px">{{ student.admission_no }}</td>
           <td>
             <div style="display:flex;align-items:center;gap:12px">
@@ -215,57 +167,83 @@
             </div>
           </td>
           <td class="col-actions no-print-area">
-            <c-button variant="secondary" size="sm" href="{% url 'students:detail' student.pk %}">View Profile</c-button>
-            {% include "students/_student_archive_action.html" %}
+            {% include "students/_student_row_actions.html" %}
           </td>
         </tr>
         {% empty %}
         <tr id="empty-table-state">
-          <td colspan="6">{% include '_partials/empty_state.html' with title='No student records found' desc='Try adjusting your search or filters.' icon='search' icon_color='grey' %}</td>
+          <td colspan="7">{% include '_partials/empty_state.html' with title='No student records found' desc='Try adjusting your search or filters.' icon='search' icon_color='grey' %}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+  {% if archive_status == 'archived' and can_purge %}</form>{% endif %}
 
   {# Pagination  canonical #}
   <c-pagination :page_obj="page_obj" label="students" />
 </div>
 
 <script>
-  function setView(mode) {
-    const container = document.getElementById('student-page-container');
-    const btnGrid = document.getElementById('btn-grid');
-    const btnList = document.getElementById('btn-list');
-    if (mode === 'grid') {
-      container.classList.remove('view-mode-list'); container.classList.add('view-mode-grid');
-      btnGrid && btnGrid.classList.add('active'); btnList && btnList.classList.remove('active');
-    } else {
-      container.classList.remove('view-mode-grid'); container.classList.add('view-mode-list');
-      btnList && btnList.classList.add('active'); btnGrid && btnGrid.classList.remove('active');
-    }
-    localStorage.setItem('student_view_mode', mode);
+  function confirmPurge(form) {
+    if (form.dataset.confirmed) return true;
+    var n = document.querySelectorAll('.row-check:checked').length;
+    confirmDeleteModal({title:'Delete permanently?', body:'Permanently delete <strong>' + n + ' student(s)</strong>?',
+      detail:'This cannot be undone. Students with attendance, marks or finance records are kept.', confirmText:'Delete', type:'danger',
+      onConfirm:function(){ form.dataset.confirmed = '1'; form.submit(); }});
+    return false;
   }
-  setView(localStorage.getItem('student_view_mode') || 'list');
 
+  // Bulk selection for permanent delete (archived tab only)
+  (function () {
+    var all = document.getElementById('check-all'), btn = document.getElementById('bulk-purge-btn');
+    if (!btn) return;
+    function sync() {
+      var n = document.querySelectorAll('.row-check:checked').length;
+      document.getElementById('bulk-count').textContent = n; btn.disabled = n === 0;
+    }
+    all && all.addEventListener('change', function () {
+      document.querySelectorAll('.row-check').forEach(function (c) { c.checked = all.checked; }); sync();
+    });
+    document.addEventListener('change', function (e) { if (e.target.classList.contains('row-check')) sync(); });
+  })();
 
   // ── Real-time AJAX search with debounce ──────────────────────────────
   (function() {
     const searchInput = document.getElementById('student-search-input');
     if (!searchInput) return;
     const searchUrl = searchInput.getAttribute('data-search-url');
-    const gridContainer = document.querySelector('.student-grid');
     const tableBody = document.querySelector('.h-table tbody');
     const countBadge = document.querySelector('.count-badge');
     let searchTimeout = null;
-    function archiveAction(s) {
-      if (!s.archive_url) return '';
-      return '<form method="post" action="' + s.archive_url + '" data-student-archive="1" style="display:inline">' +
-        '<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token|escapejs }}">' +
-        '<button type="submit" class="hf-btn hf-btn-secondary">' + (s.is_archived ? 'Restore' : 'Archive') + '</button></form>';
+    var ICON = {
+      view: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+      edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/>',
+      archive: '<rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 002 2h12a2 2 0 002-2V8"/><path d="M10 12h4"/>',
+      restore: '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>'
+    };
+    function svg(name) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' + ICON[name] + '</svg>'; }
+    function rowActions(s) {
+      var html = '<div class="hf-acts"><a class="hf-act" href="/students/' + s.id + '/" title="View profile">' + svg('view') + '</a>';
+      if (s.archive_url) {
+        if (!s.is_archived) html += '<a class="hf-act" href="/students/' + s.id + '/edit/" title="Edit">' + svg('edit') + '</a>';
+        html += '<button type="button" class="hf-act' + (s.is_archived ? '' : ' warn') + '" title="' + (s.is_archived ? 'Restore' : 'Archive') +
+          '" data-archive-url="' + s.archive_url + '" data-name="' + escapeHtml(s.full_name) + '" data-archived="' + (s.is_archived ? '1' : '') + '">' +
+          svg(s.is_archived ? 'restore' : 'archive') + '</button>';
+      }
+      return html + '</div>';
     }
-    document.addEventListener('submit', function(event) {
-      if (event.target.dataset.studentArchive && !confirm('Change this student’s archive status? Their history will be kept.')) event.preventDefault();
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-archive-url]');
+      if (!b) return;
+      var restoring = !!b.dataset.archived;
+      confirmDeleteModal({
+        title: restoring ? 'Restore student?' : 'Archive student?',
+        body: (restoring ? 'Restore ' : 'Archive ') + '<strong>' + b.dataset.name + '</strong>?',
+        detail: restoring ? '' : 'Their records are kept and can be restored later.',
+        confirmText: restoring ? 'Restore' : 'Archive', type: restoring ? 'info' : 'warning',
+        url: b.dataset.archiveUrl, extraData: [{name: 'next', value: window.location.pathname + window.location.search}]
+      });
     });
 
     function escapeHtml(str) { if (!str) return ''; const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
@@ -279,38 +257,26 @@
       return '<div class="' + cls + '">' + (s.photo_url ? '<img src="' + s.photo_url + '">' : initials) + '</div>';
     }
 
-    function renderStudentCard(s) {
-      return '<div class="student-card">' +
-        '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">' + avatar(s, 'card-avatar') +
-        '<div style="flex:1;min-width:0"><div class="card-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' +
-        escapeHtml(s.first_name) + ' ' + escapeHtml(s.last_name) + '</div>' +
-        '<div class="card-admission">' + escapeHtml(s.admission_no) + '</div></div></div>' +
-        '<div style="padding-top:12px;border-top:1px solid #f1f5f9;margin-top:auto">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
-        '<div class="card-class">' + escapeHtml(s.class_name) + '</div>' +
-        '<div style="display:flex;gap:4px;align-items:center">' + archivedChip(s) + statusChip(s) + '</div></div>' +
-        '<a href="/students/' + s.id + '/" class="btn btn-secondary btn-sm" style="width:100%">View Profile</a>' + archiveAction(s) +
-        '</div></div>';
-    }
-
     function renderStudentRow(s) {
       var preferred = s.preferred_name ? '<div style="font-size:11px;color:var(--text-muted)">"' + escapeHtml(s.preferred_name) + '"</div>' : '';
       var stream = s.stream_name ? '<div style="font-size:11px;color:var(--text-muted)">Stream: ' + escapeHtml(s.stream_name) + '</div>' : '';
-      return '<tr>' +
+      var check = document.getElementById('bulk-purge-btn') && s.is_archived
+        ? '<td class="col-check"><input type="checkbox" class="row-check" name="ids" value="' + s.id + '" form="bulk-purge-form"></td>'
+        : (document.getElementById('bulk-purge-btn') ? '<td class="col-check"></td>' : '');
+      return '<tr>' + check +
         '<td style="color:var(--text-muted);font-family:var(--font-mono);font-size:12px">' + escapeHtml(s.admission_no) + '</td>' +
         '<td><div style="display:flex;align-items:center;gap:12px">' + avatar(s, 'avatar-circle') +
         '<div><div style="font-weight:600;color:var(--text-primary)">' + escapeHtml(s.first_name) + ' ' + escapeHtml(s.last_name) + '</div>' + preferred + '</div></div></td>' +
         '<td><div style="font-weight:500">' + escapeHtml(s.class_name) + '</div>' + stream + '</td>' +
         '<td style="text-transform:capitalize">' + escapeHtml(s.gender || 'N/A') + '</td>' +
         '<td><div style="display:flex;gap:4px;align-items:center">' + archivedChip(s) + statusChip(s) + '</div></td>' +
-        '<td class="col-actions no-print-area"><a href="/students/' + s.id + '/" class="btn btn-secondary btn-sm">View Profile</a>' + archiveAction(s) + '</td>' +
+        '<td class="col-actions no-print-area">' + rowActions(s) + '</td>' +
         '</tr>';
     }
 
     function renderEmpty(msg) {
       var block = '<div style="padding:60px;text-align:center;color:var(--text-muted);font-size:15px">' + msg + '</div>';
-      gridContainer.innerHTML = '<div style="grid-column:1 / -1">' + block + '</div>';
-      tableBody.innerHTML = '<tr><td colspan="6">' + block + '</td></tr>';
+      tableBody.innerHTML = '<tr><td colspan="7">' + block + '</td></tr>';
     }
 
     function doSearch(q) {
@@ -321,7 +287,6 @@
         if (countBadge) countBadge.textContent = data.count;
         if (data.count === 0) { renderEmpty('No students found matching your search.'); }
         else {
-          gridContainer.innerHTML = data.students.map(renderStudentCard).join('');
           tableBody.innerHTML = data.students.map(renderStudentRow).join('');
         }
       }).catch(function(){});

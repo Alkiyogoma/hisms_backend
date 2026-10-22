@@ -1,0 +1,30 @@
+{% load role_tags %}
+{% has_perm user "students.change_student" as can_change_student %}
+{% has_perm user "students.delete_student" as can_delete_student %}
+<div class="hf-acts">
+  <a class="hf-act" href="{% url 'students:detail' student.pk %}" title="View profile" aria-label="View profile">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+  </a>
+  {% if can_change_student %}
+  {% if not student.is_archived %}
+  <a class="hf-act" href="{% url 'students:edit' student.pk %}" title="Edit" aria-label="Edit">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
+  </a>
+  <button type="button" class="hf-act warn" title="Archive" aria-label="Archive"
+    onclick="confirmDeleteModal({title:'Archive student?',body:'Archive <strong>{{ student.first_name|escapejs }} {{ student.last_name|escapejs }}</strong>?',detail:'Their records are kept and can be restored later.',confirmText:'Archive',type:'warning',url:'{% url 'students:archive' student.pk %}',extraData:[{name:'next',value:'{{ request.get_full_path|escapejs }}'}]})">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 002 2h12a2 2 0 002-2V8"/><path d="M10 12h4"/></svg>
+  </button>
+  {% else %}
+  <button type="button" class="hf-act" title="Restore" aria-label="Restore"
+    onclick="confirmDeleteModal({title:'Restore student?',body:'Restore <strong>{{ student.first_name|escapejs }} {{ student.last_name|escapejs }}</strong> to active records?',confirmText:'Restore',type:'info',url:'{% url 'students:restore' student.pk %}',extraData:[{name:'next',value:'{{ request.get_full_path|escapejs }}'}]})">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+  </button>
+  {% endif %}
+  {% endif %}
+  {% if student.is_archived and can_delete_student %}
+  <button type="button" class="hf-act danger" title="Delete permanently" aria-label="Delete permanently"
+    onclick="confirmDeleteModal({title:'Delete permanently?',body:'Permanently delete <strong>{{ student.first_name|escapejs }} {{ student.last_name|escapejs }}</strong>?',detail:'This cannot be undone. Students with attendance, marks or finance records are kept.',confirmText:'Delete',type:'danger',url:'{% url 'students:bulk_purge' %}',extraData:[{name:'ids',value:'{{ student.pk }}'}]})">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+  </button>
+  {% endif %}
+</div>

@@ -12,6 +12,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Q, Count
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
 from django.utils import timezone
 from django.views.generic import DetailView, ListView, TemplateView, View
 
@@ -904,7 +905,7 @@ def _form_error_summary(form):
 
 
 class StudentLifecycleMixin:
-    def get_student(self, request, pk):
+    def scoped_students(self, request):
         qs = Student.objects.all()
         if request.user.role == UserRole.TEACHER:
             from core.teacher_context import get_teacher_assigned_classes
@@ -913,7 +914,10 @@ class StudentLifecycleMixin:
         names = hod_class_names(request.user)
         if names is not None:
             qs = qs.filter(class_name__in=names)
-        return get_object_or_404(qs, pk=pk)
+        return qs
+
+    def get_student(self, request, pk):
+        return get_object_or_404(self.scoped_students(request), pk=pk)
 
 
 class StudentArchiveView(StudentLifecycleMixin, RoleRequiredMixin, View):
@@ -964,7 +968,7 @@ class StudentArchiveView(StudentLifecycleMixin, RoleRequiredMixin, View):
             
             messages.success(request, f"Student {student} has been archived.")
 
-        return redirect("students:detail", pk=pk)
+        return _safe_next(request, f"/students/{pk}/")
 
 
 class StudentRestoreView(StudentLifecycleMixin, RoleRequiredMixin, View):
@@ -976,7 +980,7 @@ class StudentRestoreView(StudentLifecycleMixin, RoleRequiredMixin, View):
 
         if not student.is_archived:
             messages.warning(request, "Student is not archived.")
-            return redirect("students:detail", pk=pk)
+            return _safe_next(request, f"/students/{pk}/")
 
         from academics.models import GradeClass, get_class_capacity
         from students.models import StudentStatus
@@ -988,7 +992,7 @@ class StudentRestoreView(StudentLifecycleMixin, RoleRequiredMixin, View):
                 f"Cannot restore {student}: class '{student.class_name}' no longer exists. "
                 f"Update the student's class first.",
             )
-            return redirect("students:detail", pk=pk)
+            return _safe_next(request, f"/students/{pk}/")
 
         if target_class.is_exit_grade:
             messages.error(
@@ -996,7 +1000,7 @@ class StudentRestoreView(StudentLifecycleMixin, RoleRequiredMixin, View):
                 f"Cannot restore {student} into exit grade '{student.class_name}'. "
                 f"Exit grades cannot accept restored students.",
             )
-            return redirect("students:detail", pk=pk)
+            return _safe_next(request, f"/students/{pk}/")
 
         cap = get_class_capacity(target_class)
         if cap:
@@ -1010,7 +1014,7 @@ class StudentRestoreView(StudentLifecycleMixin, RoleRequiredMixin, View):
                     f"Cannot restore {student}: class '{student.class_name}' is at capacity "
                     f"({enrolled}/{cap}).",
                 )
-                return redirect("students:detail", pk=pk)
+                return _safe_next(request, f"/students/{pk}/")
 
         student.is_archived = False
         student.archived_at = None
@@ -1029,7 +1033,7 @@ class StudentRestoreView(StudentLifecycleMixin, RoleRequiredMixin, View):
         )
         messages.success(request, f"Student {student} has been restored and is now active.")
 
-        return redirect("students:detail", pk=pk)
+        return _safe_next(request, f"/students/{pk}/")
 
 
 class GuardianListView(RoleRequiredMixin, ListView):
@@ -1046,6 +1050,15 @@ class GuardianListView(RoleRequiredMixin, ListView):
         q = self.request.GET.get("q", "").strip()
         if q:
             qs = qs.filter(Q(full_name__icontains=q) | Q(phone__icontains=q) | Q(email__icontains=q))
+        pdpa = self.request.GET.get("pdpa", "")
+        if pdpa in ("given", "pending"):
+            qs = qs.filter(pdpa_consent_given=pdpa == "given")
+        portal = self.request.GET.get("portal", "")
+        if portal in ("yes", "no"):
+            qs = qs.filter(user__isnull=portal == "no")
+        links = self.request.GET.get("links", "")
+        if links in ("none", "some"):
+            qs = qs.filter(studentguardian__isnull=links == "none").distinct()
         user = self.request.user
         if not user.is_school_wide and user.role not in (UserRole.ADMIN_OFFICER, UserRole.FINANCE_OFFICER):
             from users.role_models import RoleConfig
@@ -1079,10 +1092,10 @@ class GuardianArchiveView(RoleRequiredMixin, View):
         guardian = get_object_or_404(directory.get_queryset(), pk=pk)
         if guardian.is_archived == (not self.restore):
             messages.info(request, "Parent is already in the requested state.")
-            return redirect("students:guardian_detail", pk=pk)
+            return _safe_next(request, f"/students/guardians/{pk}/")
         if guardian.user_id and guardian.user.role != UserRole.PARENT:
             messages.error(request, "This parent record is linked to a staff account. Correct the account link first.")
-            return redirect("students:guardian_detail", pk=pk)
+            return _safe_next(request, f"/students/guardians/{pk}/")
         guardian.is_archived = not self.restore
         guardian.archived_at = None if self.restore else timezone.now()
         guardian.archived_by = None if self.restore else request.user
@@ -1100,7 +1113,7 @@ class GuardianArchiveView(RoleRequiredMixin, View):
             description=f"Parent {guardian.full_name} {'restored' if self.restore else 'archived'}.", request=request,
         )
         messages.success(request, f"Parent {guardian.full_name} has been {'restored' if self.restore else 'archived'}.")
-        return redirect("students:guardian_detail", pk=pk)
+        return _safe_next(request, f"/students/guardians/{pk}/")
 
 
 class GuardianDetailView(RoleRequiredMixin, DetailView):
@@ -1113,6 +1126,7 @@ class GuardianDetailView(RoleRequiredMixin, DetailView):
         ctx = super().get_context_data(**kwargs)
         linked = self.object.studentguardian_set.select_related("student")
         ctx["linked_students"] = linked
+        ctx["relationships"] = GuardianRelationship.choices
 
         # Relationship breakdown stats
         from django.db.models import Count, Q
@@ -1793,7 +1807,7 @@ class GuardianEditView(RoleRequiredMixin, TemplateView):
                 guardian.save()
                 # Relationship and primary contact for each linked student. Making
                 # this guardian primary clears the student's other primary (FR-PAR-002).
-                for link in guardian.studentguardian_set.select_related("student"):
+                for link in list(guardian.studentguardian_set.select_related("student")):
                     relationship = request.POST.get(f"relationship_{link.pk}")
                     if relationship is None:
                         continue  # link added after the page was opened
@@ -2198,3 +2212,185 @@ class PrintLeavingCertificateView(RoleRequiredMixin, DetailView):
         ctx = super().get_context_data(**kwargs)
         ctx["reason"] = self.request.GET.get("reason", "")
         return ctx
+
+
+def _safe_next(request, fallback):
+    from django.utils.http import url_has_allowed_host_and_scheme
+    nxt = request.POST.get("next") or ""
+    if nxt and url_has_allowed_host_and_scheme(nxt, allowed_hosts={request.get_host()}):
+        return redirect(nxt)
+    return redirect(fallback)
+
+
+class StudentGuardianUnlinkView(StudentLifecycleMixin, RoleRequiredMixin, View):
+    """Remove the link between a student and a parent. Both records are kept."""
+    required_permission = "students.change_student"
+
+    def post(self, request, pk, guardian_pk):
+        student = self.get_student(request, pk)
+        link = get_object_or_404(StudentGuardian, student=student, guardian_id=guardian_pk)
+        guardian = link.guardian
+        link.delete()
+        from audit.models import log_event
+        log_event(
+            actor=request.user, action_type="GUARDIAN_UNLINKED", model_name="StudentGuardian",
+            object_id=student.pk,
+            description=f"Parent {guardian.full_name} unlinked from student {student.admission_no}.",
+            request=request,
+        )
+        messages.success(request, f"Unlinked {guardian.full_name} from {student.first_name} {student.last_name}.")
+        return _safe_next(request, f"/students/{student.pk}/")
+
+
+class GuardianStudentLinkView(StudentLifecycleMixin, RoleRequiredMixin, View):
+    """Link an existing student to this parent from the parent's profile."""
+    required_permission = "students.change_student"
+
+    def post(self, request, pk):
+        guardian = get_object_or_404(ParentGuardian, pk=pk, is_archived=False)
+        student_id = (request.POST.get("student_id") or "").strip()
+        student = self.scoped_students(request).filter(pk=student_id).first() if student_id.isdigit() else None
+        if student is None:
+            messages.error(request, "Search for and select a student to link.")
+            return redirect("students:guardian_detail", pk=pk)
+        relationship = request.POST.get("relationship", GuardianRelationship.GUARDIAN)
+        is_primary = request.POST.get("is_primary") == "on"
+        try:
+            with transaction.atomic():
+                _link, created = _set_guardian_link(student, guardian, relationship, is_primary)
+        except (ValidationError, IntegrityError) as exc:
+            messages.error(request, "The student was not linked: " + "; ".join(getattr(exc, "messages", None) or [str(exc)]))
+            return redirect("students:guardian_detail", pk=pk)
+        from audit.models import log_event
+        log_event(
+            actor=request.user, action_type="GUARDIAN_LINKED", model_name="StudentGuardian",
+            object_id=student.pk,
+            description=f"Parent {guardian.full_name} linked to student {student.admission_no}.",
+            request=request,
+        )
+        name = f"{student.first_name} {student.last_name}"
+        if created:
+            messages.success(request, f"Linked {name} to {guardian.full_name}.")
+        else:
+            messages.success(request, f"{name} was already linked: relationship and primary contact updated.")
+        return redirect("students:guardian_detail", pk=pk)
+
+
+def _blocking_records(exc):
+    """Human list of the record types that stopped a delete (ProtectedError)."""
+    names = sorted({str(o._meta.verbose_name_plural) for o in exc.protected_objects})
+    return ", ".join(names)
+
+
+def _purge_student(student, actor, request):
+    """Hard-delete one student and their cascading data. Returns an error
+    string when other records (attendance, marks, invoices…) still point at it."""
+    from django.db.models import ProtectedError
+    from audit.models import log_event
+    label = f"{student.admission_no} {student.first_name} {student.last_name}".strip()
+    try:
+        with transaction.atomic():
+            # Queryset delete bypasses Student.delete()'s retention guard: this is
+            # the deliberate "full delete" for duplicates and junk records.
+            Student.objects.filter(pk=student.pk).delete()
+    except ProtectedError as exc:
+        return f"{label} (has {_blocking_records(exc)})"
+    log_event(
+        actor=actor, action_type="PERMANENT_DELETE", model_name="Student", object_id=student.pk,
+        description=f"Student {label} permanently deleted.", request=request,
+    )
+    return None
+
+
+def _report_purge(request, kind, deleted, skipped):
+    if deleted:
+        messages.success(request, f"Permanently deleted {deleted} {kind}{'' if deleted == 1 else 's'}.")
+    if skipped:
+        messages.error(
+            request,
+            "Not deleted, because other records still use them (remove those first or keep them archived): "
+            + "; ".join(skipped) + ".",
+        )
+
+
+class StudentBulkPurgeView(StudentLifecycleMixin, RoleRequiredMixin, View):
+    """Permanently delete the selected archived students."""
+    required_permission = "students.delete_student"
+
+    def post(self, request):
+        ids = [i for i in request.POST.getlist("ids") if i.isdigit()]
+        students = list(self.scoped_students(request).filter(pk__in=ids, is_archived=True))
+        if not students:
+            messages.warning(request, "Select at least one archived student to delete.")
+            return redirect(f"{reverse('students:list')}?archive_status=archived")
+        deleted, skipped = 0, []
+        for student in students:
+            error = _purge_student(student, request.user, request)
+            if error:
+                skipped.append(error)
+            else:
+                deleted += 1
+        _report_purge(request, "student", deleted, skipped)
+        return redirect(f"{reverse('students:list')}?archive_status=archived")
+
+
+class GuardianBulkPurgeView(RoleRequiredMixin, View):
+    """Permanently delete the selected archived parents, their portal accounts
+    and (optionally) their students that have no other parent — used to clear
+    out duplicate families."""
+    required_permission = "students.delete_parentguardian"
+
+    def post(self, request):
+        from django.db.models import ProtectedError
+        from audit.models import log_event
+        ids = [i for i in request.POST.getlist("ids") if i.isdigit()]
+        directory = GuardianListView()
+        directory.request = request
+        directory.include_all_archives = True
+        guardians = list(directory.get_queryset().filter(pk__in=ids, is_archived=True))
+        back = f"{reverse('students:guardian_list')}?archive_status=archived"
+        if not guardians:
+            messages.warning(request, "Select at least one archived parent to delete.")
+            return redirect(back)
+
+        with_students = request.POST.get("with_students") == "1"
+        can_delete_students = request.user.has_perm("students.delete_student")
+        selected = {g.pk for g in guardians}
+        deleted, students_deleted, skipped = 0, 0, []
+        for guardian in guardians:
+            if with_students and can_delete_students:
+                for link in list(guardian.studentguardian_set.select_related("student")):
+                    student = link.student
+                    shared = StudentGuardian.objects.filter(student=student).exclude(guardian_id__in=selected).exists()
+                    if shared:
+                        continue  # another parent still owns this student; just drop the link
+                    error = _purge_student(student, request.user, request)
+                    if error:
+                        skipped.append(error)
+                    else:
+                        students_deleted += 1
+            user = guardian.user if guardian.user_id and guardian.user.role == UserRole.PARENT else None
+            try:
+                with transaction.atomic():
+                    ParentGuardian.objects.filter(pk=guardian.pk).delete()
+            except ProtectedError as exc:
+                skipped.append(f"{guardian.full_name} (has {_blocking_records(exc)})")
+                continue
+            if user is not None:
+                try:
+                    with transaction.atomic():
+                        user.delete()
+                except ProtectedError:
+                    # Audit history references the account; keep it but locked.
+                    user.is_active = False
+                    user.save(update_fields=["is_active"])
+            log_event(
+                actor=request.user, action_type="PERMANENT_DELETE", model_name="ParentGuardian",
+                object_id=guardian.pk, description=f"Parent {guardian.full_name} permanently deleted.",
+                request=request,
+            )
+            deleted += 1
+        _report_purge(request, "parent", deleted, skipped)
+        if students_deleted:
+            messages.success(request, f"Also deleted {students_deleted} linked student{'' if students_deleted == 1 else 's'}.")
+        return redirect(back)

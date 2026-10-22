@@ -1,0 +1,36 @@
+{% load role_tags %}
+{% has_perm user "students.change_parentguardian" as can_change_guardian %}
+{% has_perm user "students.delete_parentguardian" as can_delete_guardian %}
+{% has_perm user "students.delete_student" as can_delete_students %}
+<div class="hf-acts">
+  <a class="hf-act" href="{% url 'students:guardian_detail' guardian.pk %}" title="View profile" aria-label="View profile">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+  </a>
+  {% if can_change_guardian %}
+  {% if guardian.user and not guardian.is_archived %}
+  <a class="hf-act" href="{% url 'users:impersonate_start' guardian.user.pk %}" title="View as parent" aria-label="View as parent">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
+  </a>
+  {% endif %}
+  {% if not guardian.is_archived %}
+  <a class="hf-act" href="{% url 'students:guardian_edit' guardian.pk %}" title="Edit" aria-label="Edit">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
+  </a>
+  <button type="button" class="hf-act warn" title="Archive" aria-label="Archive"
+    onclick="confirmDeleteModal({title:'Archive parent?',body:'Archive <strong>{{ guardian.full_name|escapejs }}</strong>?',detail:'Portal access is disabled. Student links and history are kept for restoration.',confirmText:'Archive',type:'warning',url:'{% url 'students:guardian_archive' guardian.pk %}',extraData:[{name:'next',value:'{{ request.get_full_path|escapejs }}'}]})">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 002 2h12a2 2 0 002-2V8"/><path d="M10 12h4"/></svg>
+  </button>
+  {% else %}
+  <button type="button" class="hf-act" title="Restore" aria-label="Restore"
+    onclick="confirmDeleteModal({title:'Restore parent?',body:'Restore <strong>{{ guardian.full_name|escapejs }}</strong> and their portal access?',confirmText:'Restore',type:'info',url:'{% url 'students:guardian_restore' guardian.pk %}',extraData:[{name:'next',value:'{{ request.get_full_path|escapejs }}'}]})">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+  </button>
+  {% endif %}
+  {% endif %}
+  {% if guardian.is_archived and can_delete_guardian %}
+  <button type="button" class="hf-act danger" title="Delete permanently" aria-label="Delete permanently"
+    onclick="confirmDeleteModal({title:'Delete permanently?',body:'Permanently delete <strong>{{ guardian.full_name|escapejs }}</strong>{% if can_delete_students %} and their students that have no other parent{% endif %}?',detail:'This cannot be undone. Their portal login is removed too. Records still used by attendance, marks or invoices are kept.',confirmText:'Delete',type:'danger',url:'{% url 'students:guardian_bulk_purge' %}',extraData:[{name:'ids',value:'{{ guardian.pk }}'}{% if can_delete_students %},{name:'with_students',value:'1'}{% endif %}]})">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+  </button>
+  {% endif %}
+</div>
