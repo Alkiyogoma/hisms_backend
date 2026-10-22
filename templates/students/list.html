@@ -44,27 +44,6 @@
 
 <div id="student-page-container" class="card">
 
-  {# Summary stats #}
-  <div class="metrics" style="margin-top:4px;margin-bottom:20px">
-    {% include '_partials/stat_card.html' with label='Total Students' value=summary.total variant='blue' link='?' %}
-    {% include '_partials/stat_card.html' with label='Boys (Male)' value=summary.male variant='blue' link='?gender=male' %}
-    {% include '_partials/stat_card.html' with label='Girls (Female)' value=summary.female variant='blue' link='?gender=female' %}
-    {% if summary.unspecified %}
-    {% include '_partials/stat_card.html' with label='Gender Unspecified' value=summary.unspecified variant='blue' link='?gender=' %}
-    {% endif %}
-  </div>
-
-  {% if summary.religions %}
-  <div class="section-hdr" style="margin-bottom:12px">
-    <span class="section-title" style="font-size:13px">Religion Breakdown</span>
-  </div>
-  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">
-    {% for religion, count in summary.religions.items %}
-      <c-badge variant="green">{{ religion|title }} · {{ count }}</c-badge>
-    {% endfor %}
-  </div>
-  {% endif %}
-
   {# Filters #}
   {% has_perm user "students.add_student" as can_add_student %}
   <form method="get" class="hf-filterbar" id="student-filters">

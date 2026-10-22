@@ -1,7 +1,6 @@
 {% load role_tags %}
 {% has_perm user "students.change_parentguardian" as can_change_guardian %}
 {% has_perm user "students.delete_parentguardian" as can_delete_guardian %}
-{% has_perm user "students.delete_student" as can_delete_students %}
 <div class="hf-acts">
   <a class="hf-act" href="{% url 'students:guardian_detail' guardian.pk %}" title="View profile" aria-label="View profile">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -29,7 +28,7 @@
   {% endif %}
   {% if guardian.is_archived and can_delete_guardian %}
   <button type="button" class="hf-act danger" title="Delete permanently" aria-label="Delete permanently"
-    onclick="confirmDeleteModal({title:'Delete permanently?',body:'Permanently delete <strong>{{ guardian.full_name|escapejs }}</strong>{% if can_delete_students %} and their students that have no other parent{% endif %}?',detail:'This cannot be undone. Their portal login is removed too. Records still used by attendance, marks or invoices are kept.',confirmText:'Delete',type:'danger',url:'{% url 'students:guardian_bulk_purge' %}',extraData:[{name:'ids',value:'{{ guardian.pk }}'}{% if can_delete_students %},{name:'with_students',value:'1'}{% endif %}]})">
+    onclick="confirmDeleteModal({title:'Delete permanently?',body:'Permanently delete <strong>{{ guardian.full_name|escapejs }}</strong>?',detail:'This cannot be undone. Their portal login is removed too; their students are only unlinked. To delete students as well, tick the rows and use Delete permanently with Also delete their students.',confirmText:'Delete',type:'danger',url:'{% url 'students:guardian_bulk_purge' %}',extraData:[{name:'ids',value:'{{ guardian.pk }}'}]})">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
   </button>
   {% endif %}

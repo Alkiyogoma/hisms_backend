@@ -1,0 +1,21 @@
+{% load role_tags %}
+{# Shown when no PTC window (date) exists yet. Optional: what — what this page will show once dates exist. #}
+{% has_perm user "ptc.change_ptcwindow" as can_set_dates %}
+<div class="ptc-nowin">
+  <div class="ptc-nowin-icon">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="10" y1="15" x2="14" y2="15"/></svg>
+  </div>
+  <div class="ptc-nowin-body">
+    <div class="ptc-nowin-title">PTC dates are not set up yet</div>
+    <p class="ptc-nowin-desc">
+      {{ what|default:"This page" }} will open once a PTC date is added for this academic year.
+      {% if can_set_dates %}Add the Term 1 or Term 3 PTC date in Calendar Setup to get started.{% else %}Ask the Admin Officer to add the PTC dates in Calendar Setup.{% endif %}
+    </p>
+    {% if can_set_dates %}
+    <a href="{% url 'ptc:calendar_config' %}" class="hf-btn hf-btn-primary">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Set up PTC dates
+    </a>
+    {% endif %}
+  </div>
+</div>

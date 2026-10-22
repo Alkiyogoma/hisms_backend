@@ -7,17 +7,8 @@
 {% endblock %}
 
 {% block extra_head %}
+{% include "ptc/_styles.html" %}
 <style>
-  .ec-row { display:flex; align-items:center; padding:14px 20px; border-bottom:1px solid #F0F4FB; transition:background .1s; }
-  .ec-row:hover { background:#F7F9FC; }
-  .ec-row:last-child { border-bottom:none; }
-  .ec-name { font-weight:700; color:var(--hodari-blue); min-width:160px; }
-  .ec-teacher, .ec-class { flex:1; font-size:13px; color:var(--text-primary); }
-  .ec-teacher.muted, .ec-class.muted { color:var(--text-muted); font-style:italic; }
-  .ec-weight { width:80px; text-align:center; font-weight:700; font-size:13px; }
-  .ec-status { width:90px; text-align:center; }
-  .ec-actions { display:flex; gap:6px; justify-content:flex-end; min-width:170px; }
-  .ec-empty { padding:32px; text-align:center; color:var(--text-muted); font-size:13px; }
   .ec-form-row { display:grid; grid-template-columns:1fr 1fr 1fr 140px auto; gap:14px; align-items:end; }
   @media (max-width:900px) { .ec-form-row { grid-template-columns:1fr 1fr; } }
 </style>
@@ -26,77 +17,66 @@
 {% block content %}
 {% has_perm user "ptc.manage_enrichment_config" as can_manage %}
 {% include "ptc/_top_tabs.html" %}
-<div style="max-width:1100px;margin:0 auto">
+<div class="ptc-page">
+  <div class="ptc-head"><p>Enrichment subjects, their specialist teachers, classes and exam weighting.</p></div>
 
-  <div class="page-hdr">
-    <h2>Enrichment Subject Setup</h2>
-    <p>Configure enrichment subjects, assign specialist teachers, classes, and exam weightings.</p>
+  {% if subjects %}
+  <div class="table-wrap" style="margin-bottom:20px">
+    <table class="h-table">
+      <thead>
+        <tr>
+          <th>Subject</th>
+          <th>Teacher</th>
+          <th>Class</th>
+          <th>Weight</th>
+          <th>Status</th>
+          {% if can_manage %}<th class="col-actions">Action</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in subjects %}
+        <tr>
+          <td style="font-weight:700;color:var(--text-primary)">{{ s.subject.name }}</td>
+          <td>{% if s.assigned_teacher %}{{ s.assigned_teacher.get_full_name }}{% else %}<span style="color:var(--text-muted)">Unassigned</span>{% endif %}</td>
+          <td>{% if s.assigned_class %}{{ s.assigned_class.name }}{% else %}<span style="color:var(--text-muted)">All classes</span>{% endif %}</td>
+          <td>{% if s.weight_percentage > 0 %}<strong style="color:var(--hodari-blue)">{{ s.weight_percentage }}%</strong>{% else %}<span style="color:var(--text-muted)">&mdash;</span>{% endif %}</td>
+          <td>{% if s.is_active %}<span class="chip chip-green">Active</span>{% else %}<span class="chip chip-amber">Inactive</span>{% endif %}</td>
+          {% if can_manage %}
+          <td class="col-actions">
+            <div class="hf-acts">
+              <button type="button" class="hf-act" title="Edit" aria-label="Edit {{ s.subject.name }}"
+                onclick="openEditModal('{{ s.id }}', '{{ s.subject.name|escapejs }}', '{{ s.assigned_teacher_id|default:"" }}', '{{ s.assigned_class_id|default:"" }}', '{{ s.weight_percentage }}', '{{ s.is_active }}')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
+              </button>
+              {% if s.is_active %}
+              <button type="button" class="hf-act warn" title="Deactivate" aria-label="Deactivate {{ s.subject.name }}"
+                onclick="confirmDeleteModal({title:'Deactivate subject?',body:'Deactivate <strong>{{ s.subject.name|escapejs }}</strong>?',detail:'It stops appearing for grade entry. Existing grades are kept and you can activate it again.',confirmText:'Deactivate',type:'warning',url:'{{ request.path }}',extraData:[{name:'action',value:'toggle_active'},{name:'subject_id',value:'{{ s.id }}'}]})">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+              </button>
+              {% else %}
+              <button type="button" class="hf-act" title="Activate" aria-label="Activate {{ s.subject.name }}"
+                onclick="confirmDeleteModal({title:'Activate subject?',body:'Activate <strong>{{ s.subject.name|escapejs }}</strong> for grade entry?',confirmText:'Activate',type:'info',url:'{{ request.path }}',extraData:[{name:'action',value:'toggle_active'},{name:'subject_id',value:'{{ s.id }}'}]})">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              </button>
+              {% endif %}
+            </div>
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
-
-  <div class="card" style="padding:0;overflow:hidden;margin-bottom:20px">
-    <div style="padding:12px 20px;background:var(--hodari-blue);color:#fff;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:space-between">
-      <span>Configured Enrichment Subjects</span>
-      <span style="font-size:11px;opacity:.8">{{ subjects|length }} subject{{ subjects|length|pluralize }}</span>
-    </div>
-
-    <div style="padding:0 20px;background:#F7F9FC;border-bottom:1px solid #E8ECF2">
-      <div style="display:flex;align-items:center;padding:8px 0;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">
-        <span style="min-width:160px">Subject</span>
-        <span style="flex:1">Assigned Teacher</span>
-        <span style="flex:1">Assigned Class</span>
-        <span style="width:80px;text-align:center">Weight</span>
-        <span style="width:90px;text-align:center">Status</span>
-        {% if can_manage %}
-        <span style="min-width:170px;text-align:right">Actions</span>
-        {% endif %}
-      </div>
-    </div>
-
-    {% if subjects %}
-    {% for s in subjects %}
-    <div class="ec-row">
-      <span class="ec-name">{{ s.subject.name }}</span>
-      <span class="ec-teacher {% if not s.assigned_teacher %}muted{% endif %}">
-        {% if s.assigned_teacher %}{{ s.assigned_teacher.get_full_name }}{% else %}Unassigned{% endif %}
-      </span>
-      <span class="ec-class {% if not s.assigned_class %}muted{% endif %}">
-        {% if s.assigned_class %}{{ s.assigned_class.name }}{% else %}All classes{% endif %}
-      </span>
-      <span class="ec-weight" style="{% if s.weight_percentage > 0 %}color:var(--hodari-blue){% else %}color:var(--text-muted){% endif %}">
-        {% if s.weight_percentage > 0 %}{{ s.weight_percentage }}%{% else %}&mdash;{% endif %}
-      </span>
-      <span class="ec-status">
-        {% if s.is_active %}
-          <span class="chip chip-green">Active</span>
-        {% else %}
-          <span class="chip chip-amber">Inactive</span>
-        {% endif %}
-      </span>
-      {% if can_manage %}
-      <span class="ec-actions">
-        <button type="button" class="hf-btn" style="padding:4px 12px;font-size:11px"
-                onclick="openEditModal('{{ s.id }}', '{{ s.subject.name }}', '{{ s.assigned_teacher_id|default:"" }}', '{{ s.assigned_class_id|default:"" }}', '{{ s.weight_percentage }}', '{{ s.is_active }}')">Edit</button>
-        <form method="post" style="display:inline">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="toggle_active">
-          <input type="hidden" name="subject_id" value="{{ s.id }}">
-          <button type="submit" class="hf-btn" style="padding:4px 12px;font-size:11px;{% if s.is_active %}background:#FEF2F2;color:#9B1C1C;border:1px solid #FECACA{% else %}background:#E8F5EC;color:#1B7B34;border:1px solid #B7DFBF{% endif %}">
-            {% if s.is_active %}Deactivate{% else %}Activate{% endif %}
-          </button>
-        </form>
-      </span>
-      {% endif %}
-    </div>
-    {% endfor %}
-    {% else %}
-    <div class="ec-empty">No enrichment subjects configured yet. Add one below.</div>
-    {% endif %}
+  {% else %}
+  <div class="card" style="margin-bottom:20px">
+    {% include '_partials/empty_state.html' with icon='doc' icon_color='blue' title='No enrichment subjects yet' desc='Add the first enrichment subject below.' %}
   </div>
+  {% endif %}
 
   {% if can_manage %}
   <div class="card" style="margin-bottom:20px">
     <div class="card-title-row">
-      <span class="card-title">Add New Enrichment Subject</span>
+      <span class="card-title">Add an enrichment subject</span>
     </div>
     <form method="post">
       {% csrf_token %}

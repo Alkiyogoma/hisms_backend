@@ -167,26 +167,6 @@ class StudentListView(RoleRequiredMixin, ListView):
             "archive_status", "all" if self.request.GET.get("include_archived") == "1" else "active",
         )
         
-        # Summary Statistics  single aggregated query instead of multiple
-        from django.db.models import Count
-        stats = qs.aggregate(
-            total=Count('id'),
-            male=Count('id', filter=Q(gender='male')),
-            female=Count('id', filter=Q(gender='female')),
-            other=Count('id', filter=Q(gender='other')),
-        )
-        stats['unspecified'] = stats['total'] - stats['male'] - stats['female'] - stats['other']
-        religion_counts = {item['religion']: item['count'] for item in qs.order_by().values('religion').annotate(count=Count('religion')).order_by('-count')[:4] if item['religion']}
-        
-        ctx["summary"] = {
-            "total": stats['total'],
-            "male": stats['male'],
-            "female": stats['female'],
-            "other": stats['other'],
-            "unspecified": stats['unspecified'],
-            "religions": religion_counts,
-        }
-        
         from academics.models import Department, GradeClass
         # Scope filter dropdowns to the user's allowed departments (DB/UI-configurable)
         hod_roles = {UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD}

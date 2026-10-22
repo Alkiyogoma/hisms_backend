@@ -1,25 +1,26 @@
 {% extends "base.html" %}
 {% block title %}PTC - Compliance Dashboard{% endblock %}
 
+{% block extra_head %}
+{% include "ptc/_styles.html" %}
+{% endblock %}
+
 {% block topbar_greeting %}
 <h1 class="topbar-title">PTC Compliance Dashboard</h1>
 {% endblock %}
 
 {% block content %}
 {% include "ptc/_top_tabs.html" %}
-<div style="max-width:1000px;margin:0 auto">
-  <div style="margin-bottom:20px">
-    <h2 style="font-size:20px;font-weight:700;color:var(--text-primary);margin:0">PTC Compliance Dashboard</h2>
-    <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 0">
-      {% if ptc_window %}PTC Date: {{ ptc_window.ptc_date }} ({{ ptc_window.get_term_slot_display }}) - {{ academic_year.name }}{% endif %}
-      <br><em style="font-size:11px">Read-only view. This dashboard shows teacher completion status for PTC data entry.</em>
-    </p>
+<div class="ptc-page" style="max-width:1000px">
+  <div class="ptc-head">
+    <div>
+      <p>Read-only: how far each teacher is with PTC data entry.</p>
+      {% if ptc_window %}<div class="ptc-meta"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> PTC {{ ptc_window.ptc_date|date:"d M Y" }} · {{ ptc_window.get_term_slot_display }}{% if academic_year %} · {{ academic_year.name }}{% endif %}</span></div>{% endif %}
+    </div>
   </div>
 
   {% if not ptc_window %}
-  <div style="padding:16px 20px;margin-bottom:16px">
-    {% include '_partials/empty_state.html' with icon='alert' icon_color='amber' title='No PTC window configured' desc='Compliance data will appear once a PTC window is set up.' %}
-  </div>
+  {% include "ptc/_no_window.html" with what="The compliance dashboard" %}
   {% endif %}
 
   {% if ptc_window %}

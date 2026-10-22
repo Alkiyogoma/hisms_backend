@@ -98,7 +98,7 @@
       <span><strong id="bulk-count">0</strong> selected &mdash; full delete removes the parent and their portal login for good (use for duplicates).</span>
       <span style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
         {% if can_purge_students %}
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="with_students" value="1" id="with-students" checked> Also delete their students (only those with no other parent)</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="with_students" value="1" id="with-students"> Also delete their students (only those with no other parent)</label>
         {% endif %}
         <button type="submit" class="hf-btn hf-btn-danger" id="bulk-purge-btn" disabled>Delete permanently</button>
       </span>
