@@ -1,0 +1,408 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}{{ department_label }} {% if assessment_is_remarks %}Term Remarks{% else %}Score Entry{% endif %}  {{ brand.school_name }}{% endblock %}
+{% block topbar_greeting %}{{ department_label }} {% if assessment_is_remarks %}Term Remarks{% else %}Score Entry{% endif %}{% endblock %}
+{% block topbar_date %}{{ term.name|default:"No term" }}{% endblock %}
+
+{% block content %}
+{% include "academics/_top_tabs_progress.html" %}
+{% include "academics/_progress_filters.html" %}
+{% has_perm user "academics.change_examscore" as can_submit %}
+
+{% if not classes %}
+  <div class="ag-empty"><c-empty-state title="No classes assigned" desc="You are not assigned to a {{ department_label }} class, so there is nothing to mark here." icon="users" /></div>
+{% elif not term %}
+  <div class="ag-empty"><c-empty-state title="No term" desc="The selected academic year has no terms yet. Add terms under Academic years." icon="calendar" /></div>
+{% elif not columns %}
+  <div class="ag-empty"><c-empty-state title="No subjects" desc="{% if assessment_is_remarks %}No remark-only subjects are available for this class and your teaching assignment.{% else %}No mark-bearing subjects are available for this class and your teaching assignment.{% endif %}" icon="doc" /></div>
+{% else %}
+
+{% if term.is_locked %}<div class="alert alert-warning" style="margin-bottom:12px">{{ term.name }} is locked, so marks and remarks can only be viewed.</div>{% endif %}
+
+<div class="ag-legend">
+  {% if assessment_is_remarks %}
+  <span><i style="background:#FFFBEB;border-color:#FBBF24"></i>Unsaved change</span>
+  <span><i style="background:#F8FAFC"></i>Read only (not your subject, or the report has gone for sign-off)</span>
+  {% else %}
+  <span><i style="background:#fff"></i>Draft</span>
+  <span><i style="background:#EFF6FF"></i>Submitted to HOD</span>
+  <span><i style="background:#ECFDF3"></i>Approved</span>
+  <span><i style="background:#FEF2F2;border-color:#FCA5A5"></i>Returned for correction</span>
+  <span><i style="background:#FFFBEB;border-color:#FBBF24"></i>Unsaved change</span>
+  {% if can_amend %}<span>Click an approved mark to change it</span>{% endif %}
+  {% endif %}
+</div>
+
+<div class="ag-wrap" id="ag-wrap">
+<table class="ag-table" id="ag-table">
+  <thead>
+    {% with ntypes=column_types|length %}
+    <tr>
+      <th class="ag-stu" {% if ntypes > 1 %}rowspan="2"{% endif %}>Student ({{ rows|length }})</th>
+      {% for subject in columns %}
+        <th class="ag-subj" {% if ntypes > 1 %}colspan="{{ ntypes }}"{% endif %}>{{ subject }}{% if subject not in editable_subjects %}<span class="ag-w">read only</span>{% elif ntypes == 1 %}<span class="ag-w">{{ column_types.0.name }} &middot; /{{ column_types.0.max_score|floatformat:0 }}</span>{% endif %}</th>
+      {% endfor %}
+      <th {% if ntypes > 1 %}rowspan="2"{% endif %}>Status</th>
+      {% if not assessment_is_remarks %}<th {% if ntypes > 1 %}rowspan="2"{% endif %} title="Average of HOD-approved marks only">Approved avg</th>{% endif %}
+    </tr>
+    {% if ntypes > 1 %}
+    <tr class="ag-h2">
+      {% for subject in columns %}{% for et in column_types %}
+        <th title="{{ et.name }}, out of {{ et.max_score|floatformat:0 }}, {{ et.weight_percentage|floatformat:0 }}% of the subject">{{ et.name }}<span class="ag-w">/{{ et.max_score|floatformat:0 }} &middot; {{ et.weight_percentage|floatformat:0 }}%</span></th>
+      {% endfor %}{% endfor %}
+    </tr>
+    {% endif %}
+    {% endwith %}
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    {% with s=row.student %}
+    <tr data-student="{{ s.id }}" data-name="{{ s.first_name }} {{ s.last_name }}" data-adm="{{ s.admission_no }}" data-done="{{ row.done|yesno:'1,0' }}">
+      <th class="ag-stu" scope="row"><div class="nm" title="{{ s.first_name }} {{ s.last_name }}">{{ s.last_name }}, {{ s.first_name }}</div><div class="adm">{{ s.admission_no }}</div></th>
+      {% for c in row.cells %}
+        {% if assessment_is_remarks %}
+        <td class="ag-cell{% if c.readonly %} closed{% endif %}">
+          <select class="hf-select remark-input-val" data-subject="{{ c.subject }}" data-student="{{ s.id }}" data-col="{{ forloop.counter0 }}" data-orig="{{ c.remark }}" aria-label="{{ c.subject }} remark for {{ s.first_name }} {{ s.last_name }}"{% if c.lock_reason %} title="{{ c.lock_reason }}"{% endif %}
+                  {% if c.readonly %}data-readonly="1" disabled{% endif %}>
+            <option value="">&mdash;</option>
+            {% for r in remark_choices %}<option value="{{ r }}"{% if r == c.remark %} selected{% endif %}>{{ r }}</option>{% endfor %}
+          </select>
+        </td>
+        {% else %}
+        <td class="ag-cell{% if c.status %} st-{{ c.status }}{% endif %}{% if c.readonly and not c.status %} closed{% endif %}{% if can_amend and c.status == 'approved' %} amendable{% endif %}"
+            title="{{ c.subject }} &middot; {{ c.type.name }}{% if c.lock_reason %} &mdash; {{ c.lock_reason }}{% endif %}{% if c.feedback %}&#10;HOD feedback: {{ c.feedback }}{% endif %}{% if c.score.approval_note %}&#10;{{ c.score.approval_note }}{% endif %}{% for a in c.amendments %}&#10;Changed {{ a.previous_score|floatformat:'-2' }} &rarr; {{ a.new_score|floatformat:'-2' }} by {{ a.changed_by.get_full_name|default:a.changed_by.username }}, {{ a.created_at|date:'d M Y H:i' }}. Reason: {{ a.reason }}{% endfor %}">
+          <input type="number" data-subject="{{ c.subject }}" data-type="{{ c.type.code }}" data-type-name="{{ c.type.name }}" data-max_score="{{ c.type.max_score }}" data-student="{{ s.id }}" data-col="{{ forloop.counter0 }}" data-orig="{{ c.value }}"
+                 class="ag-in score-input-val" step="1" min="0" max="{{ c.type.max_score }}" value="{{ c.value }}" inputmode="numeric" aria-label="{{ c.subject }} {{ c.type.name }} for {{ s.first_name }} {{ s.last_name }}"
+                 {% if can_amend and c.status == 'approved' and c.score %}data-score-id="{{ c.score.pk }}" data-score="{{ c.value }}"{% endif %}
+                 {% if c.readonly %}readonly{% endif %}>
+          {% if c.feedback %}<span class="ag-mark fb"></span>{% elif c.amendments %}<span class="ag-mark"></span>{% endif %}
+        </td>
+        {% endif %}
+      {% endfor %}
+      <td class="ag-side">
+        {% with p=row.progress %}
+        {% if assessment_is_remarks %}
+          {% if row.done %}<span class="chip chip-green">Complete</span>{% else %}<span class="chip chip-grey">Pending</span>{% endif %}
+        {% elif p.status == 'returned' %}<span class="chip chip-red">Returned</span>
+        {% elif p.status == 'approved' %}<span class="chip chip-green">Approved</span>
+        {% elif p.status == 'submitted' %}<span class="chip chip-blue">Submitted</span>
+        {% elif p.status == 'partial' %}<span class="chip chip-blue">{{ p.approved_subjects }}/{{ p.total_subjects }} approved</span>
+        {% elif p.status == 'draft' %}<span class="chip chip-amber">Saved</span>
+        {% else %}<span class="chip chip-grey">Pending</span>{% endif %}
+        {% endwith %}
+      </td>
+      {% if not assessment_is_remarks %}
+      <td class="ag-side ag-avg">{% if row.progress.grand_average is not None %}<span style="color:{% if row.progress.grand_average >= 50 %}#05603A{% else %}#B42318{% endif %}">{{ row.progress.grand_average|floatformat:1 }}%</span><small>{{ row.progress.included_subjects }} of {{ row.progress.mark_subjects }} subj.</small>{% else %}<span style="color:#94A3B8">&mdash;</span>{% endif %}</td>
+      {% endif %}
+    </tr>
+    {% endwith %}
+    {% empty %}
+    <tr><td colspan="99"><c-empty-state title="No students" desc="No students are enrolled in {{ selected_class }}." icon="users" /></td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<div class="ag-summary">
+  <div class="ag-progress">
+    <div class="ag-progress-top">
+      <span>{% if assessment_is_remarks %}Remarks{% else %}Grading progress{% endif %} &middot; {{ selected_class }} &middot; {{ term.name }}</span>
+      <span>{{ students_done }} of {{ rows|length }} student{{ rows|length|pluralize }} {% if assessment_is_remarks %}with every remark{% else %}started{% endif %}</span>
+    </div>
+    <div class="ag-track"><div class="ag-fill" style="width:{% if rows %}{% widthratio students_done rows|length 100 %}{% else %}0{% endif %}%"></div></div>
+  </div>
+  {% if can_submit and submit_subjects and not assessment_is_remarks and not term.is_locked %}
+  <div class="ag-submit">
+    {% if submit_subjects|length > 1 %}
+    <select id="submit-subject" class="hf-select" title="Submit one subject or all of your subjects" style="min-width:160px">
+      <option value="">All my subjects</option>
+      {% for subj in submit_subjects %}<option value="{{ subj }}">{{ subj }}</option>{% endfor %}
+    </select>
+    {% endif %}
+    <button id="submit-hod-btn" type="button" onclick="submitAllToHOD()" class="hf-btn hf-btn-success" {% if class_submitted %}disabled style="background:#059669;cursor:default"{% endif %}>{% if class_submitted %}&#10003; Submitted{% elif returned_count > 0 %}Submit {{ returned_count }} to HOD{% else %}Submit all to HOD{% endif %}</button>
+  </div>
+  {% endif %}
+</div>
+
+{% if can_edit and not term.is_locked and rows %}
+<div class="ag-savebar">
+  <span class="ag-dirty-count" id="ag-dirty">No unsaved changes</span>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button type="button" class="hf-btn hf-btn-secondary" id="ag-discard" onclick="discardChanges()" disabled>Discard</button>
+    <button type="button" class="hf-btn hf-btn-primary" id="ag-save" onclick="saveChanges()" disabled>{% if assessment_is_remarks %}Save term remarks{% else %}Save marks{% endif %}</button>
+  </div>
+</div>
+{% endif %}
+{% endif %}
+
+{% if can_amend %}
+<div id="amendModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);align-items:center;justify-content:center" onclick="if(event.target===this)closeAmendModal()">
+  <div style="background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.2);width:100%;max-width:480px;margin:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border)">
+      <h3 style="margin:0;font-size:16px;font-weight:700;color:var(--text-primary)">Change approved mark</h3>
+      <button type="button" onclick="closeAmendModal()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted);padding:0 4px">&times;</button>
+    </div>
+    <div style="padding:20px 22px;display:flex;flex-direction:column;gap:12px">
+      <p id="amend-context" style="font-size:13px;color:var(--text-secondary);margin:0"></p>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label class="hf-label" for="amend-score">New mark</label>
+        <input type="number" id="amend-score" class="hf-input" step="1" min="0" style="max-width:140px">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label class="hf-label" for="amend-reason">Reason (required)</label>
+        <textarea id="amend-reason" style="width:100%;min-height:90px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--font-ui);resize:vertical" placeholder="e.g. Mark was mis-keyed; script re-marked on appeal"></textarea>
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin:0">The previous mark, the new mark, your name, the time and this reason are kept as a note on the grade.</p>
+      <div id="amend-error" style="font-size:12px;color:var(--red)"></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 22px;border-top:1px solid var(--border)">
+      <button type="button" class="hf-btn hf-btn-secondary" onclick="closeAmendModal()">Cancel</button>
+      <button type="button" id="amend-save" class="hf-btn hf-btn-primary" onclick="submitAmend()">Save change</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script>
+const CLASS_NAME = "{{ selected_class|escapejs }}";
+const TERM_ID = "{{ term.id|default:'' }}";
+const API = "{{ api_base }}";
+const CSRF = "{{ csrf_token }}";
+const IS_REMARKS = {{ assessment_is_remarks|yesno:"true,false" }};
+const RETURNED_COUNT = {{ returned_count|default:"0" }};
+const CAN_SUBMIT_HOD = {{ can_submit|yesno:"true,false" }};
+
+const table = document.getElementById("ag-table");
+const fields = () => table ? Array.from(table.querySelectorAll(IS_REMARKS ? ".remark-input-val" : ".score-input-val")) : [];
+
+function isDirty(el) { return el.value !== (el.dataset.orig || ""); }
+function cellOf(el) { return el.closest("td"); }
+
+function refreshDirty() {
+  const dirty = fields().filter(el => !el.readOnly && !el.disabled && isDirty(el));
+  const rowsDirty = new Set(dirty.map(el => el.dataset.student)).size;
+  const label = document.getElementById("ag-dirty");
+  if (label) label.innerHTML = dirty.length
+    ? "<strong>" + dirty.length + " unsaved change" + (dirty.length > 1 ? "s" : "") + "</strong> for " + rowsDirty + " student" + (rowsDirty > 1 ? "s" : "")
+    : "No unsaved changes";
+  ["ag-save", "ag-discard"].forEach(id => { const b = document.getElementById(id); if (b) b.disabled = !dirty.length; });
+  return dirty;
+}
+
+/* Whole numbers only, from 0 to the assessment's maximum. Returns an error or "". */
+function scoreError(inp) {
+  const raw = inp.value.trim();
+  if (raw === "") return "";
+  const max = parseInt(inp.dataset.max_score || "100", 10);
+  const val = parseInt(raw, 10);
+  if (raw.indexOf(".") !== -1 || isNaN(val) || val < 0 || val > max || String(val) !== raw)
+    return inp.dataset.subject + " – " + inp.dataset.typeName + ": must be a whole number from 0 to " + max + ".";
+  return "";
+}
+
+function markCell(el) {
+  const td = cellOf(el);
+  td.classList.toggle("dirty", isDirty(el));
+  if (!IS_REMARKS) {
+    const err = scoreError(el);
+    td.classList.toggle("invalid", !!err);
+    el.setCustomValidity(err);
+  }
+}
+
+if (table) {
+  table.addEventListener("input", e => { if (e.target.matches(".score-input-val, .remark-input-val")) { markCell(e.target); refreshDirty(); } });
+  table.addEventListener("change", e => { if (e.target.matches(".remark-input-val")) { markCell(e.target); refreshDirty(); } });
+  /* Spreadsheet keys: Enter / arrow down moves down the column, arrow up moves up. */
+  table.addEventListener("keydown", e => {
+    const el = e.target;
+    if (!el.matches(".score-input-val, .remark-input-val")) return;
+    let dir = 0;
+    if (e.key === "Enter" || (e.key === "ArrowDown" && !IS_REMARKS)) dir = e.shiftKey ? -1 : 1;
+    else if (e.key === "ArrowUp" && !IS_REMARKS) dir = -1;
+    if (!dir) return;
+    e.preventDefault();
+    let tr = el.closest("tr");
+    while ((tr = dir > 0 ? tr.nextElementSibling : tr.previousElementSibling)) {
+      const next = tr.querySelector('[data-col="' + el.dataset.col + '"]');
+      if (next && !next.readOnly && !next.disabled) { next.focus(); if (next.select) next.select(); return; }
+    }
+  });
+  table.addEventListener("wheel", e => { if (e.target.matches(".score-input-val") && document.activeElement === e.target) e.target.blur(); }, {passive: true});
+  table.addEventListener("click", e => {
+    const el = e.target.closest("[data-score-id]");
+    if (el) openAmendModal(el);
+  });
+}
+
+window.addEventListener("beforeunload", e => { if (refreshDirty().length) { e.preventDefault(); e.returnValue = ""; } });
+/* Changing a filter reloads the page: confirm before unsaved changes are lost. */
+(function () {
+  const form = document.getElementById("pfFilters");
+  if (!form) return;
+  form.addEventListener("change", e => {
+    if (refreshDirty().length && !confirm("You have unsaved changes. Leave without saving them?")) {
+      e.stopImmediatePropagation(); form.reset();
+    }
+  }, true);
+})();
+
+function discardChanges() {
+  fields().forEach(el => { if (!el.readOnly && !el.disabled) { el.value = el.dataset.orig || ""; markCell(el); } });
+  refreshDirty();
+}
+
+async function saveChanges() {
+  const dirty = refreshDirty();
+  if (!dirty.length) return;
+  if (!IS_REMARKS) {
+    const bad = dirty.filter(el => scoreError(el));
+    if (bad.length) {
+      showToast("Nothing was saved. " + bad.map(scoreError).join(" "), "error");
+      bad[0].focus();
+      return;
+    }
+  }
+  const byStudent = {};
+  dirty.forEach(el => {
+    const p = byStudent[el.dataset.student] = byStudent[el.dataset.student] || {scores: {}, remarks: {}};
+    if (IS_REMARKS) p.remarks[el.dataset.subject] = el.value;
+    else (p.scores[el.dataset.subject] = p.scores[el.dataset.subject] || {})[el.dataset.type] = el.value.trim();
+  });
+  const btn = document.getElementById("ag-save");
+  btn.disabled = true; btn.textContent = "Saving…";
+  const failures = [], warnings = [];
+  let saved = 0;
+  for (const [sid, payload] of Object.entries(byStudent)) {
+    const name = table.querySelector('tr[data-student="' + sid + '"]').dataset.name;
+    try {
+      const r = await fetch(API + "scores/" + sid + "/", {
+        method: "POST",
+        headers: {"Content-Type": "application/json", "X-CSRFToken": CSRF},
+        body: JSON.stringify({term: TERM_ID, scores: payload.scores, remarks: payload.remarks}),
+      });
+      const resp = await r.json().catch(() => null);
+      if (!r.ok || !resp) {
+        failures.push(name + ": " + ((resp && resp.error) || "error " + r.status));
+        ((resp && resp.invalid) || []).forEach(c => {
+          const inp = table.querySelector('tr[data-student="' + sid + '"] input[data-subject="' + CSS.escape(c.subject) + '"][data-type="' + CSS.escape(c.type) + '"]');
+          if (inp) cellOf(inp).classList.add("invalid");
+        });
+        continue;
+      }
+      saved++;
+      (resp.window_warnings || []).forEach(w => warnings.push(name + ": " + w));
+      if (resp.locked && resp.locked.length) warnings.push(name + ": already submitted and locked: " + resp.locked.join(", "));
+      table.querySelectorAll('tr[data-student="' + sid + '"] .score-input-val, tr[data-student="' + sid + '"] .remark-input-val')
+        .forEach(el => { el.dataset.orig = el.value; markCell(el); });
+    } catch (e) {
+      failures.push(name + ": the server could not be reached");
+    }
+  }
+  btn.textContent = IS_REMARKS ? "Save term remarks" : "Save marks";
+  refreshDirty();
+  if (failures.length) {
+    showToast((saved ? saved + " student(s) saved. " : "") + "Not saved: " + failures.join("; "), "error");
+    return;
+  }
+  if (warnings.length) showToast("Saved with warnings: " + warnings.join("; "), "warning");
+  else showToast("Saved for " + saved + " student" + (saved > 1 ? "s" : "") + ".", "success");
+  setTimeout(() => window.location.reload(), warnings.length ? 2500 : 700);
+}
+
+{% if can_amend %}
+let amendScoreId = null;
+function openAmendModal(inp) {
+  amendScoreId = inp.dataset.scoreId;
+  const name = inp.closest("tr").dataset.name;
+  document.getElementById("amend-context").textContent =
+    name + " — " + inp.dataset.subject + ", " + inp.dataset.typeName + ". Current mark: " + inp.dataset.score + ".";
+  const sc = document.getElementById("amend-score");
+  sc.value = ""; sc.max = inp.dataset.max_score;
+  document.getElementById("amend-reason").value = "";
+  document.getElementById("amend-error").textContent = "";
+  document.getElementById("amendModal").style.display = "flex";
+  sc.focus();
+}
+function closeAmendModal() {
+  document.getElementById("amendModal").style.display = "none";
+  amendScoreId = null;
+}
+async function submitAmend() {
+  const err = document.getElementById("amend-error");
+  const score = document.getElementById("amend-score").value.trim();
+  const reason = document.getElementById("amend-reason").value.trim();
+  if (score === "") { err.textContent = "Enter the new mark."; return; }
+  if (!reason) { err.textContent = "A reason is required. The change is not saved without one."; return; }
+  const btn = document.getElementById("amend-save");
+  btn.disabled = true;
+  try {
+    const r = await fetch("/academics/exam-scores/" + amendScoreId + "/correct/", {
+      method: "POST",
+      headers: {"Content-Type": "application/json", "X-CSRFToken": CSRF},
+      body: JSON.stringify({score: score, reason: reason}),
+    });
+    let resp = {};
+    try { resp = await r.json(); } catch (e) {}
+    if (!r.ok) { err.textContent = resp.error || ("The mark was not changed (error " + r.status + ")."); return; }
+    closeAmendModal();
+    showToast("Approved mark changed. The previous mark and reason are kept on the record.", "success");
+    setTimeout(() => window.location.reload(), 700);
+  } finally {
+    btn.disabled = false;
+  }
+}
+{% else %}
+function openAmendModal() {}
+{% endif %}
+
+function submitAllToHOD() {
+  if (!CAN_SUBMIT_HOD) { showToast("You are not authorized to submit scores to HOD", "error"); return; }
+  if (refreshDirty().length) { showToast("Save or discard your unsaved changes before submitting to the HOD.", "warning"); return; }
+  const missing = Array.from(table.querySelectorAll("tbody tr[data-student]")).filter(tr => tr.dataset.done !== "1");
+
+  window._submitToHOD = function () {
+    const btn = document.getElementById("submit-hod-btn");
+    btn.disabled = true; btn.textContent = "Submitting…";
+    fetch(API + "submit-all/", {
+      method: "POST",
+      headers: {"Content-Type": "application/json", "X-CSRFToken": CSRF},
+      body: JSON.stringify({class_name: CLASS_NAME, term: TERM_ID, subject: (document.getElementById("submit-subject") || {}).value || ""}),
+    }).then(r => r.json().then(d => ({ok: r.ok, d: d})).catch(() => ({ok: r.ok, d: {}}))).then(({ok, d}) => {
+      if (ok) {
+        showToast(d.message || "Submitted to the HOD.", "success");
+        btn.innerHTML = "&#10003; Submitted";
+        setTimeout(() => window.location.reload(), 1200);
+      } else {
+        showToast(d.error || "Submission failed. Please try again.", "error");
+        btn.disabled = false; btn.textContent = "Submit all to HOD";
+      }
+    }).catch(() => {
+      showToast("Network error. Please check your connection.", "error");
+      btn.disabled = false; btn.textContent = "Submit all to HOD";
+    });
+  };
+
+  const origConfirm = confirmDeleteAction, origClose = closeConfirmDeleteModal;
+  closeConfirmDeleteModal = function () { confirmDeleteAction = origConfirm; closeConfirmDeleteModal = origClose; origClose(); };
+  confirmDeleteAction = function () { closeConfirmDeleteModal(); window._submitToHOD(); };
+  const esc = s => s.replace(/[&<>"]/g, ch => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[ch]));
+  confirmDeleteModal(missing.length ? {
+    title: "Missing marks",
+    body: "<strong>" + missing.length + " student" + (missing.length > 1 ? "s have" : " has") + " no marks yet:</strong> "
+      + missing.slice(0, 12).map(tr => esc(tr.dataset.name)).join(", ") + (missing.length > 12 ? " and " + (missing.length - 12) + " more" : "") + ".",
+    detail: "Their reports will show --% until marks are entered. Submitted entries are locked.",
+    confirmText: "Submit anyway",
+    type: "warning",
+  } : {
+    title: RETURNED_COUNT > 0 ? "Resubmit " + RETURNED_COUNT + " corrected?" : "Submit all to HOD?",
+    body: RETURNED_COUNT > 0
+      ? "You have <strong>" + RETURNED_COUNT + " corrected student(s)</strong> in <strong>" + esc(CLASS_NAME) + "</strong> to resubmit to the HOD."
+      : "Submit all scores for <strong>" + esc(CLASS_NAME) + "</strong> to the HOD for review?",
+    detail: "This locks the submitted entries.",
+    confirmText: RETURNED_COUNT > 0 ? "Resubmit " + RETURNED_COUNT : "Submit all",
+    type: "warning",
+  });
+}
+</script>
+{% endblock %}

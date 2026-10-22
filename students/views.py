@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 from attendance.models import PRESENT_STATUSES
 from .models import GuardianRelationship, ParentGuardian, Student, StudentGuardian, StudentStatus, PDPAConsentLog
 from .forms import StudentCreateForm, StudentEditForm, StudentPhotoUploadForm
-from .services import generate_admission_number
+from .services import describe_delivery, generate_admission_number, grant_portal_access
 
 # HOD academic scope derived from role (more reliable than staff_profile.department,
 # which may reflect an administrative department). staff_profile.department is a fallback.
@@ -1207,6 +1207,38 @@ def _clean_guardian_post(post, exclude_pk=None):
     return values, errors
 
 
+def _clean_consent_post(post, values, errors):
+    """Read the optional PDPA consent fields into values. Consent is not
+    required, but when it is ticked the method and statement version must be
+    recorded with it (FR-PAR-004). Returns True when consent was given."""
+    given = post.get("pdpa_consent_given") == "on"
+    values.update(
+        pdpa_consent_given=given,
+        pdpa_consent_method=post.get("pdpa_consent_method", "").strip(),
+        pdpa_consent_version=post.get("pdpa_consent_version", "").strip(),
+    )
+    if given:
+        if values["pdpa_consent_method"] not in dict(ParentGuardian._meta.get_field("pdpa_consent_method").choices):
+            errors["pdpa"] = "PDPA Consent: choose how consent was given (in-person or digital)."
+        elif not values["pdpa_consent_version"]:
+            errors["pdpa"] = "The version of the PDPA consent statement must be recorded with the consent."
+    return given
+
+
+def _record_consent(guardian, values, actor, notes):
+    """Set the guardian's consent fields from values and log it (unsaved guardian
+    fields are saved by the caller)."""
+    guardian.pdpa_consent_given = True
+    guardian.pdpa_consent_method = values["pdpa_consent_method"]
+    guardian.pdpa_consent_version = values["pdpa_consent_version"]
+    guardian.pdpa_consented_at = timezone.now()
+    PDPAConsentLog.objects.create(
+        guardian=guardian, action=PDPAConsentLog.Action.GIVEN,
+        method=values["pdpa_consent_method"], version=values["pdpa_consent_version"],
+        actor=actor, notes=notes,
+    )
+
+
 def _guardian_error_message(errors, general=""):
     if general:
         return f"The parent record was not saved: {general}"
@@ -1234,24 +1266,13 @@ class GuardianCreateView(RoleRequiredMixin, TemplateView):
 
     def post(self, request):
         values, errors = _clean_guardian_post(request.POST)
-        # FR-PDPA-002: PDPA consent must be recorded before creating a guardian
-        pdpa_consent_given = request.POST.get("pdpa_consent_given") == "on"
-        pdpa_consent_method = request.POST.get("pdpa_consent_method", "").strip()
-        pdpa_consent_version = request.POST.get("pdpa_consent_version", "").strip()
+        # PDPA consent is optional; it can be recorded later from Edit Parent.
+        pdpa_consent_given = _clean_consent_post(request.POST, values, errors)
         values.update(
-            pdpa_consent_given=pdpa_consent_given,
-            pdpa_consent_method=pdpa_consent_method,
-            pdpa_consent_version=pdpa_consent_version,
             portal_access=request.POST.get("portal_access") == "on",
             relationship=request.POST.get("relationship", GuardianRelationship.GUARDIAN),
             is_primary=request.POST.get("is_primary") == "on",
         )
-
-        if not pdpa_consent_given or not pdpa_consent_method:
-            errors["pdpa"] = "PDPA consent must be recorded before this record can be saved."
-        # FR-PAR-004: the version of the consent statement presented is mandatory
-        elif not pdpa_consent_version:
-            errors["pdpa"] = "The version of the PDPA consent statement must be recorded with the consent."
         if errors:
             return self._invalid(request, values, errors)
 
@@ -1276,17 +1297,10 @@ class GuardianCreateView(RoleRequiredMixin, TemplateView):
                     address=values["address"],
                     preferred_invoice_name=values["preferred_invoice_name"],
                     preferred_language=values["preferred_language"],
-                    pdpa_consent_given=True,
-                    pdpa_consent_method=pdpa_consent_method,
-                    pdpa_consent_version=pdpa_consent_version,
-                    pdpa_consented_at=timezone.now(),
                 )
-                PDPAConsentLog.objects.create(
-                    guardian=guardian, action=PDPAConsentLog.Action.GIVEN,
-                    method=pdpa_consent_method, version=pdpa_consent_version,
-                    actor=request.user,
-                    notes="Consent recorded during parent creation.",
-                )
+                if pdpa_consent_given:
+                    _record_consent(guardian, values, request.user, "Consent recorded during parent creation.")
+                    guardian.save()
                 # Link student only if one was selected
                 if student:
                     _set_guardian_link(
@@ -1297,7 +1311,7 @@ class GuardianCreateView(RoleRequiredMixin, TemplateView):
                 # Portal access: create linked User account if requested
                 portal_access = request.POST.get("portal_access") == "on"
                 if portal_access:
-                    self._create_parent_user(guardian, request.user)
+                    _created, username, delivered = grant_portal_access(guardian, request.user)
 
                 # Tracker 12.1: audit guardian creation
                 from audit.models import log_event
@@ -1319,99 +1333,14 @@ class GuardianCreateView(RoleRequiredMixin, TemplateView):
                 general=f"The system could not save it ({e}). Nothing was saved; please try again.",
             )
         if portal_access:
-            messages.success(
+            (messages.success if delivered else messages.warning)(
                 request,
-                f"Parent {guardian.full_name} created with a portal account. Credentials sent via notification."
+                f"Parent {guardian.full_name} created with portal login {username}; details {describe_delivery(delivered)}."
             )
         else:
             messages.success(request, f"Parent {guardian.full_name} created.")
         return redirect("students:guardian_detail", pk=guardian.pk)
 
-    def _create_parent_user(self, guardian, actor):
-        """Create a linked User account with role=PARENT for portal access."""
-        from users.models import User, UserRole
-        from django.contrib.auth.models import Group
-        from django.utils.crypto import get_random_string
-        from django.template.loader import render_to_string
-        from communications.email_service import send_parent_notification
-        from core.models import SchoolSettings
-
-        phone_digits = "".join(filter(str.isdigit, guardian.phone or ""))
-        base_username = f"parent_{phone_digits[:12]}" if phone_digits else f"parent_{guardian.pk}"
-        username = base_username
-        counter = 1
-        while User.objects.filter(username=username).exists():
-            username = f"{base_username}_{counter}"
-            counter += 1
-
-        raw_password = get_random_string(length=10)
-        name_parts = (guardian.full_name or "").strip().split(maxsplit=1)
-        parent_first = name_parts[0] if name_parts else ""
-        parent_last = name_parts[1] if len(name_parts) > 1 else ""
-
-        parent_user = User.objects.create(
-            username=username,
-            email=guardian.email or "",
-            role=UserRole.PARENT,
-            first_name=parent_first,
-            last_name=parent_last,
-            must_change_password=True,
-        )
-        parent_user.set_password(raw_password)
-        parent_user.save()
-
-        grp, _ = Group.objects.get_or_create(name="role_parent")
-        grp.user_set.add(parent_user)
-
-        guardian.user = parent_user
-        guardian.save(update_fields=["user", "updated_at"])
-
-        school_name = SchoolSettings.get_settings().school_name or "Hodari School"
-        login_url = getattr(settings, 'SITE_URL', 'http://localhost:8000') + '/parent/admission-form/'
-
-        creds_message = (
-            f"Dear {guardian.full_name},\n\n"
-            f"Your parent portal account has been created. You can now access your child's "
-            f"attendance records, report cards, invoices, and school communications.\n\n"
-            f"Email: {guardian.email}\n"
-            f"Password: {raw_password}\n\n"
-            f"IMPORTANT: You will be required to change your password on first login.\n\n"
-            f"Parent Portal: {login_url}\n\n"
-            f"Thank you for choosing {school_name}."
-        )
-
-        tpl_context = {
-            "guardian_name": guardian.full_name,
-            "email": guardian.email,
-            "username": username,
-            "temp_password": raw_password,
-            "login_url": login_url,
-            "school_name": school_name,
-            "site_url": getattr(settings, 'SITE_URL', 'http://127.0.0.1:8000'),
-            "static_url": getattr(settings, 'STATIC_URL', '/static/'),
-            "portal_link": getattr(settings, 'SITE_URL', 'http://127.0.0.1:8000') + '/parent/admission-form/',
-        }
-
-        # Try dynamic DB template first
-        from core.email_templates import send_dynamic_email
-        db_sent = send_dynamic_email(
-            template_type="parent_portal",
-            to_email=guardian.email,
-            context=tpl_context,
-            actor=actor,
-        )
-
-        if not db_sent:
-            html_body = render_to_string("registration/parent_portal_email.html", tpl_context)
-
-            send_parent_notification(
-                guardian=guardian,
-                title="Your Parent Portal Account Has Been Created",
-                message=creds_message,
-                html_body=html_body,
-                actor=actor,
-                action_type="PARENT_PORTAL_ACCOUNT",
-            )
 
 
 class StudentDataExportView(RoleRequiredMixin, View):
@@ -1589,11 +1518,6 @@ class StudentGuardianLinkView(RoleRequiredMixin, TemplateView):
                                    "or switch to Create New Parent.",
                 }, mode)
             values["guardian"] = guardian
-            if not guardian.has_given_consent():
-                return self._invalid(request, pk, values, {
-                    "guardian_id": f"Parent: {guardian.full_name} has no recorded PDPA consent. "
-                                   "Consent must be recorded before this record can be saved.",
-                }, mode)
             try:
                 with transaction.atomic():
                     _link, created = _set_guardian_link(student, guardian, relationship, is_primary)
@@ -1615,21 +1539,10 @@ class StudentGuardianLinkView(RoleRequiredMixin, TemplateView):
 
         # Scenario 2: Create new
         values, errors = _clean_guardian_post(request.POST)
-        # FR-PDPA-002: PDPA consent must be recorded before creating/linking a guardian
-        pdpa_consent_given = request.POST.get("pdpa_consent_given") == "on"
-        pdpa_consent_method = request.POST.get("pdpa_consent_method", "").strip()
-        pdpa_consent_version = request.POST.get("pdpa_consent_version", "").strip()
+        # PDPA consent is optional; it can be recorded later from Edit Parent.
+        pdpa_consent_given = _clean_consent_post(request.POST, values, errors)
         portal_access = request.POST.get("portal_access") == "on"
-        values.update(
-            pdpa_consent_given=pdpa_consent_given, pdpa_consent_method=pdpa_consent_method,
-            pdpa_consent_version=pdpa_consent_version, portal_access=portal_access,
-            relationship=relationship, is_primary=is_primary,
-        )
-        if not pdpa_consent_given or not pdpa_consent_method:
-            errors["pdpa"] = "PDPA consent must be recorded before this record can be saved."
-        # FR-PAR-004: the version of the consent statement presented is mandatory
-        elif not pdpa_consent_version:
-            errors["pdpa"] = "The version of the PDPA consent statement must be recorded with the consent."
+        values.update(portal_access=portal_access, relationship=relationship, is_primary=is_primary)
         if errors:
             return self._invalid(request, pk, values, errors, mode)
 
@@ -1643,21 +1556,14 @@ class StudentGuardianLinkView(RoleRequiredMixin, TemplateView):
                     address=values["address"],
                     preferred_invoice_name=values["preferred_invoice_name"],
                     preferred_language=values["preferred_language"],
-                    pdpa_consent_given=True,
-                    pdpa_consent_method=pdpa_consent_method,
-                    pdpa_consent_version=pdpa_consent_version,
-                    pdpa_consented_at=timezone.now(),
                 )
-                PDPAConsentLog.objects.create(
-                    guardian=guardian, action=PDPAConsentLog.Action.GIVEN,
-                    method=pdpa_consent_method, version=pdpa_consent_version,
-                    actor=request.user,
-                    notes="Consent recorded during parent link flow.",
-                )
+                if pdpa_consent_given:
+                    _record_consent(guardian, values, request.user, "Consent recorded during parent link flow.")
+                    guardian.save()
                 _set_guardian_link(student, guardian, relationship, is_primary)
                 # Portal access: create linked User account if requested
                 if portal_access:
-                    self._create_parent_user(guardian, request.user)
+                    _created, username, delivered = grant_portal_access(guardian, request.user)
         except Exception as e:
             logger.exception("Parent create-and-link failed")
             return self._invalid(
@@ -1666,9 +1572,9 @@ class StudentGuardianLinkView(RoleRequiredMixin, TemplateView):
             )
 
         if portal_access:
-            messages.success(
+            (messages.success if delivered else messages.warning)(
                 request,
-                f"Created and linked new parent {guardian.full_name} with a portal account. Credentials sent via notification."
+                f"Created and linked new parent {guardian.full_name} with portal login {username}; details {describe_delivery(delivered)}."
             )
         else:
             messages.success(request, f"Created and linked new parent: {guardian.full_name}")
@@ -1683,91 +1589,6 @@ class StudentGuardianLinkView(RoleRequiredMixin, TemplateView):
         """Delegates to the standalone notify_sibling_confirmation function."""
         notify_sibling_confirmation(request, student, guardian)
 
-    def _create_parent_user(self, guardian: ParentGuardian, actor) -> None:
-        """Create a linked User account with role=PARENT for portal access."""
-        from users.models import User
-        from django.contrib.auth.models import Group
-        from django.utils.crypto import get_random_string
-        from django.template.loader import render_to_string
-        from communications.email_service import send_parent_notification
-        from core.models import SchoolSettings
-
-        phone_digits = "".join(filter(str.isdigit, guardian.phone or ""))
-        base_username = f"parent_{phone_digits[:12]}" if phone_digits else f"parent_{guardian.pk}"
-        username = base_username
-        counter = 1
-        while User.objects.filter(username=username).exists():
-            username = f"{base_username}_{counter}"
-            counter += 1
-
-        raw_password = get_random_string(length=10)
-        name_parts = (guardian.full_name or "").strip().split(maxsplit=1)
-        parent_first = name_parts[0] if name_parts else ""
-        parent_last = name_parts[1] if len(name_parts) > 1 else ""
-
-        parent_user = User.objects.create(
-            username=username,
-            email=guardian.email or "",
-            role=UserRole.PARENT,
-            first_name=parent_first,
-            last_name=parent_last,
-            must_change_password=True,
-        )
-        parent_user.set_password(raw_password)
-        parent_user.save()
-
-        grp, _ = Group.objects.get_or_create(name="role_parent")
-        grp.user_set.add(parent_user)
-
-        guardian.user = parent_user
-        guardian.save(update_fields=["user", "updated_at"])
-
-        school_name = SchoolSettings.get_settings().school_name or "Hodari School"
-        login_url = getattr(settings, 'SITE_URL', 'http://localhost:8000') + '/parent/admission-form/'
-
-        creds_message = (
-            f"Dear {guardian.full_name},\n\n"
-            f"Your parent portal account has been created. You can now access your child's "
-            f"attendance records, report cards, invoices, and school communications.\n\n"
-            f"Email: {guardian.email}\n"
-            f"Password: {raw_password}\n\n"
-            f"IMPORTANT: You will be required to change your password on first login.\n\n"
-            f"Parent Portal: {login_url}\n\n"
-            f"Thank you for choosing {school_name}."
-        )
-
-        tpl_context = {
-            "guardian_name": guardian.full_name,
-            "email": guardian.email,
-            "username": username,
-            "temp_password": raw_password,
-            "login_url": login_url,
-            "school_name": school_name,
-            "site_url": getattr(settings, 'SITE_URL', 'http://127.0.0.1:8000'),
-            "static_url": getattr(settings, 'STATIC_URL', '/static/'),
-            "portal_link": getattr(settings, 'SITE_URL', 'http://127.0.0.1:8000') + '/parent/admission-form/',
-        }
-
-        # Try dynamic DB template first
-        from core.email_templates import send_dynamic_email
-        db_sent = send_dynamic_email(
-            template_type="parent_portal",
-            to_email=guardian.email,
-            context=tpl_context,
-            actor=actor,
-        )
-
-        if not db_sent:
-            html_body = render_to_string("registration/parent_portal_email.html", tpl_context)
-
-            send_parent_notification(
-                guardian=guardian,
-                title="Your Parent Portal Account Has Been Created",
-                message=creds_message,
-                html_body=html_body,
-                actor=actor,
-                action_type="PARENT_PORTAL_ACCOUNT",
-            )
 
 
 class GuardianConsentWithdrawView(RoleRequiredMixin, View):
@@ -1808,6 +1629,47 @@ class GuardianConsentWithdrawView(RoleRequiredMixin, View):
         return redirect("students:guardian_detail", pk=pk)
 
 
+class GuardianPortalAccessView(RoleRequiredMixin, View):
+    """Give an existing parent portal access, or send them a new temporary
+    password when they already have a login."""
+    required_permission = "students.change_parentguardian"
+
+    def post(self, request, pk):
+        guardian = get_object_or_404(ParentGuardian, pk=pk)
+        if guardian.is_archived:
+            messages.error(request, f"{guardian.full_name} is archived. Restore the parent before giving portal access.")
+            return redirect("students:guardian_detail", pk=pk)
+        if not (guardian.email or guardian.phone):
+            messages.error(request, f"{guardian.full_name} has no email or phone to send login details to.")
+            return redirect("students:guardian_detail", pk=pk)
+        try:
+            with transaction.atomic():
+                created, username, delivered = grant_portal_access(guardian, request.user)
+        except Exception as e:
+            logger.exception("Parent portal access failed for guardian %s", pk)
+            messages.error(request, f"Portal access was not set up ({e}). Nothing was changed; please try again.")
+            return redirect("students:guardian_detail", pk=pk)
+
+        from audit.models import log_event
+        log_event(
+            actor=request.user,
+            action_type="PARENT_PORTAL_ACCOUNT",
+            model_name="ParentGuardian",
+            object_id=guardian.pk,
+            description=(
+                f"Portal {'account created' if created else 'password reset'} for parent "
+                f"{guardian.full_name} (login {username}) by {request.user.username}"
+            ),
+            request=request,
+        )
+        notify = messages.success if delivered else messages.warning
+        if created:
+            notify(request, f"Portal access created for {guardian.full_name}. Login {username}; details {describe_delivery(delivered)}.")
+        else:
+            notify(request, f"New login details for {guardian.full_name} (login {username}) {describe_delivery(delivered)}.")
+        return redirect("students:guardian_detail", pk=pk)
+
+
 class GuardianEditView(RoleRequiredMixin, TemplateView):
     """FR-PAR-001: Edit an existing guardian record."""
     template_name = "students/guardian_form.html"
@@ -1835,6 +1697,11 @@ class GuardianEditView(RoleRequiredMixin, TemplateView):
         if "values" not in kwargs:
             ctx["values"] = {f: getattr(guardian, f) for f in GUARDIAN_TEXT_FIELDS}
             ctx["values"]["preferred_language"] = guardian.preferred_language
+            ctx["values"].update(
+                pdpa_consent_given=guardian.pdpa_consent_given,
+                pdpa_consent_method=guardian.pdpa_consent_method,
+                pdpa_consent_version=guardian.pdpa_consent_version,
+            )
         return ctx
 
     def _invalid(self, request, pk, values, errors, general=""):
@@ -1844,9 +1711,41 @@ class GuardianEditView(RoleRequiredMixin, TemplateView):
         )
         return self.render_to_response(ctx)
 
+    def _apply_consent(self, guardian, values, actor):
+        """Turn consent on, update it, or withdraw it to match the edit form."""
+        if values["pdpa_consent_given"]:
+            if not guardian.has_given_consent():
+                _record_consent(guardian, values, actor, "Consent recorded from Edit Parent.")
+            elif (guardian.pdpa_consent_method, guardian.pdpa_consent_version) != (
+                values["pdpa_consent_method"], values["pdpa_consent_version"]
+            ):
+                guardian.pdpa_consent_method = values["pdpa_consent_method"]
+                guardian.pdpa_consent_version = values["pdpa_consent_version"]
+                guardian.pdpa_consented_at = timezone.now()
+                PDPAConsentLog.objects.create(
+                    guardian=guardian, action=PDPAConsentLog.Action.UPDATED,
+                    method=guardian.pdpa_consent_method, version=guardian.pdpa_consent_version,
+                    actor=actor, notes="Consent updated from Edit Parent.",
+                )
+        elif guardian.pdpa_consent_given:
+            PDPAConsentLog.objects.create(
+                guardian=guardian, action=PDPAConsentLog.Action.WITHDRAWN,
+                method=guardian.pdpa_consent_method, version=guardian.pdpa_consent_version,
+                actor=actor, notes="Consent turned off from Edit Parent.",
+            )
+            guardian.pdpa_consent_given = False
+            guardian.pdpa_consent_method = ""
+            guardian.pdpa_consent_version = ""
+            guardian.pdpa_consented_at = None
+
     def post(self, request, pk):
         guardian = get_object_or_404(ParentGuardian, pk=pk)
         values, errors = _clean_guardian_post(request.POST, exclude_pk=guardian.pk)
+        # Only touch consent when the form showed the consent box, so a post
+        # without it never withdraws consent by accident.
+        consent_in_form = "pdpa_consent_shown" in request.POST
+        if consent_in_form:
+            _clean_consent_post(request.POST, values, errors)
         if errors:
             return self._invalid(request, pk, values, errors)
         full_name = values["full_name"]
@@ -1889,6 +1788,8 @@ class GuardianEditView(RoleRequiredMixin, TemplateView):
         guardian.preferred_language = values["preferred_language"]
         try:
             with transaction.atomic():
+                if consent_in_form:
+                    self._apply_consent(guardian, values, request.user)
                 guardian.save()
                 # Relationship and primary contact for each linked student. Making
                 # this guardian primary clears the student's other primary (FR-PAR-002).

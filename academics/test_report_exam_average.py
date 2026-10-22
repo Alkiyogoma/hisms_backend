@@ -200,7 +200,7 @@ class ReportLayoutTests(TestCase):
         page = self._preview()
         self.assertEqual(page.count('class="header"'), 1)
         self.assertIn('class="page2-head"', page)
-        self.assertIn("Admission No: ADM-2026-065", page)
+        self.assertIn("<span>Admission no.</span><b>ADM-2026-065</b>", page)
         self.assertIn('<th colspan="4">Work Habits</th>', page)
         self.assertIn("traits-full", page)
         self.assertIn("Works well independently</td><td class=\"g\">E", page)

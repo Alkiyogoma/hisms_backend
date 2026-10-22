@@ -485,6 +485,16 @@ def _export_students_for_user(user):
     return qs.filter(class_name__in=names) if names else Student.objects.none()
 
 
+def _requested_term(request):
+    """The term picked in the page's filter bar (``?term=``), else the current term."""
+    term_id = request.GET.get("term", "")
+    if term_id.isdigit():
+        term = Term.objects.filter(pk=term_id).first()
+        if term:
+            return term
+    return get_current_term()
+
+
 def _ecd_api_class_allowed(request, class_name: str) -> bool:
     if not (class_name or "").strip():
         return False
@@ -506,7 +516,56 @@ def _ecd_api_class_allowed(request, class_name: str) -> bool:
 
 
 def _ecd_api_student_allowed(request, student: Student) -> bool:
+    # Reading an earlier term, the page names the class the learner was in
+    # then (they may have moved up since).
+    class_name = request.GET.get("class_name", "").strip()
+    if class_name and class_name != student.class_name:
+        term = _requested_term(request)
+        return (
+            _ecd_api_class_allowed(request, class_name)
+            and term is not None
+            and ecd_class_roster(class_name, term).filter(pk=student.pk).exists()
+        )
     return _ecd_api_class_allowed(request, student.class_name)
+
+
+def _ecd_class_of(request, student: Student) -> str:
+    """The class the learner is evaluated under: the page's class, else their own."""
+    return request.GET.get("class_name", "").strip() or student.class_name
+
+
+def ecd_term_editable(term) -> bool:
+    """Only the current term is evaluated; earlier (and later) terms are read-only."""
+    return term is not None and term == get_current_term()
+
+
+def ecd_class_roster(class_name, term):
+    """Learners in an ECD class during ``term``.
+
+    The enrolment history places learners in a class for a term or a year, so
+    a past year's class is found even after they move up or leave. In the
+    current academic year, anyone in the class now is included as well.
+    """
+    from django.db.models import Q
+
+    ids = set(
+        EnrollmentHistory.objects.filter(class_name=class_name)
+        .filter(Q(term=term) | Q(term__isnull=True, academic_year=term.academic_year))
+        .values_list("student_id", flat=True)
+    )
+    ids |= set(
+        ReportCard.objects.filter(term=term, is_ecd_report=True, student__class_name=class_name)
+        .values_list("student_id", flat=True)
+    )
+    current = get_current_term()
+    if current is None or term.academic_year_id == current.academic_year_id:
+        ids |= set(
+            Student.objects.filter(class_name=class_name, is_archived=False).values_list("id", flat=True)
+        )
+    return Student.objects.filter(pk__in=ids)
+
+
+READ_ONLY_TERM_ERROR = "Earlier terms are read-only. Only the current term can be evaluated."
 
 
 class ECDStudentsAPIView(RoleRequiredMixin, View):
@@ -522,13 +581,17 @@ class ECDStudentsAPIView(RoleRequiredMixin, View):
         if not _ecd_api_class_allowed(request, class_name):
             return JsonResponse({"error": "Access denied for this class"}, status=403)
 
+        term = _requested_term(request)
+        roster = (
+            ecd_class_roster(class_name, term) if term
+            else Student.objects.filter(class_name=class_name, is_archived=False)
+        )
         students = (
-            Student.objects.filter(class_name=class_name, is_archived=False)
-            .order_by("last_name", "first_name")
+            roster.order_by("last_name", "first_name")
             .values("id", "first_name", "last_name", "admission_no", "date_of_birth")
         )
 
-        return JsonResponse({"students": list(students)})
+        return JsonResponse({"students": list(students), "read_only": not ecd_term_editable(term)})
 
 
 class ECDEvaluationAPIView(RoleRequiredMixin, View):
@@ -553,43 +616,59 @@ class ECDEvaluationAPIView(RoleRequiredMixin, View):
         if not _ecd_api_student_allowed(request, student):
             return JsonResponse({"error": "Access denied for this student"}, status=403)
 
-        tpl = ecd_template_type_from_class_name(student.class_name)
+        tpl = ecd_template_type_from_class_name(_ecd_class_of(request, student))
         if not tpl:
             return JsonResponse({"error": "Student is not in a recognised ECD class"}, status=400)
         # UAT ECD-008: Pre-School formal assessment only in Term 1 and Term 3
         if tpl == "pre_school":
-            current_term_chk = get_current_term()
+            current_term_chk = _requested_term(request)
             if current_term_chk and "Term 2" in current_term_chk.name:
                 return JsonResponse(
                     {"error": "Pre-School formal assessment is only conducted in Term 1 and Term 3 per school policy."},
                     status=403,
                 )
 
-        term = get_current_term()
+        term = _requested_term(request)
         if not term:
             return JsonResponse({"error": "No active term found"}, status=400)
 
-        report_card, created = ReportCard.objects.get_or_create(
-            student=student,
-            term=term,
-            defaults={
-                "is_ecd_report": True,
-                "ecd_template_type": tpl,
-                "generated_by": request.user,
-                "status": ReportCardStatus.DRAFT,
-            },
-        )
-        if report_card.ecd_template_type != tpl:
-            report_card.is_ecd_report = True
-            report_card.ecd_template_type = tpl
-            report_card.save(update_fields=["is_ecd_report", "ecd_template_type", "updated_at"])
+        domains = ECDEvaluationEntryView.get_flat_domains(tpl)
+        if not ecd_term_editable(term):
+            # Reading an earlier term: show what was recorded, never start a report.
+            report_card = ReportCard.objects.filter(student=student, term=term).first()
+            if report_card is None:
+                return JsonResponse({
+                    "student": {
+                        "id": student.id,
+                        "name": f"{student.first_name} {student.last_name}",
+                        "class_name": student.class_name,
+                        "admission_no": student.admission_no,
+                    },
+                    "report_card_id": None, "ecd_template_type": tpl, "evaluations": {},
+                    "domains": domains, "teacher_comments": "", "ecd_remarks": "",
+                    "status": "", "is_locked": True, "is_term_locked": term.is_locked,
+                    "read_only": True, "no_report": True,
+                })
+        else:
+            report_card, created = ReportCard.objects.get_or_create(
+                student=student,
+                term=term,
+                defaults={
+                    "is_ecd_report": True,
+                    "ecd_template_type": tpl,
+                    "generated_by": request.user,
+                    "status": ReportCardStatus.DRAFT,
+                },
+            )
+            if report_card.ecd_template_type != tpl:
+                report_card.is_ecd_report = True
+                report_card.ecd_template_type = tpl
+                report_card.save(update_fields=["is_ecd_report", "ecd_template_type", "updated_at"])
 
-        report_card.populate_attendance_summary()
+            report_card.populate_attendance_summary()
 
         evaluations = ECDEvaluation.objects.filter(report_card=report_card)
         eval_data = {ev.domain: ev.rating for ev in evaluations}
-
-        domains = ECDEvaluationEntryView.get_flat_domains(tpl)
 
         response_data = {
             "student": {
@@ -604,8 +683,10 @@ class ECDEvaluationAPIView(RoleRequiredMixin, View):
             "domains": domains,
             "teacher_comments": report_card.teacher_comments or "",
             "ecd_remarks": report_card.ecd_remarks or "",
-            "status": report_card.status,            "is_locked": report_card.status != ReportCardStatus.DRAFT,
+            "status": report_card.status,
+            "is_locked": report_card.status != ReportCardStatus.DRAFT or not ecd_term_editable(term),
             "is_term_locked": term.is_locked,
+            "read_only": not ecd_term_editable(term),
         }
 
         # Add ABC specific data
@@ -673,21 +754,23 @@ class ECDEvaluationAPIView(RoleRequiredMixin, View):
         if not _ecd_api_student_allowed(request, student):
             return JsonResponse({"error": "Access denied for this student"}, status=403)
 
-        tpl = ecd_template_type_from_class_name(student.class_name)
+        tpl = ecd_template_type_from_class_name(_ecd_class_of(request, student))
         if not tpl:
             return JsonResponse({"error": "Student is not in a recognised ECD class"}, status=400)
         # UAT ECD-008: Pre-School formal assessment only in Term 1 and Term 3
         if tpl == "pre_school":
-            current_term_chk = get_current_term()
+            current_term_chk = _requested_term(request)
             if current_term_chk and "Term 2" in current_term_chk.name:
                 return JsonResponse(
                     {"error": "Pre-School formal assessment is only conducted in Term 1 and Term 3 per school policy."},
                     status=403,
                 )
 
-        term = get_current_term()
+        term = _requested_term(request)
         if not term:
             return JsonResponse({"error": "No active term found"}, status=400)
+        if not ecd_term_editable(term):
+            return JsonResponse({"error": READ_ONLY_TERM_ERROR}, status=403)
 
         if term.is_locked:
             return JsonResponse(
@@ -839,19 +922,21 @@ class ECDSubmissionAPIView(RoleRequiredMixin, View):
         if not _ecd_api_student_allowed(request, student):
             return JsonResponse({"error": "Access denied for this student"}, status=403)
 
-        tpl = ecd_template_type_from_class_name(student.class_name)
+        tpl = ecd_template_type_from_class_name(_ecd_class_of(request, student))
         # UAT ECD-008: Pre-School formal assessment only in Term 1 and Term 3
         if tpl == "pre_school":
-            current_term_chk = get_current_term()
+            current_term_chk = _requested_term(request)
             if current_term_chk and "Term 2" in current_term_chk.name:
                 return JsonResponse(
                     {"error": "Pre-School formal assessment is only conducted in Term 1 and Term 3 per school policy."},
                     status=403,
                 )
 
-        term = get_current_term()
+        term = _requested_term(request)
         if not term:
             return JsonResponse({"error": "No active term found"}, status=400)
+        if not ecd_term_editable(term):
+            return JsonResponse({"error": READ_ONLY_TERM_ERROR}, status=403)
 
         report_card = get_object_or_404(ReportCard, student=student, term=term)
         report_card.populate_attendance_summary()
@@ -931,14 +1016,13 @@ class ECDAssessmentView(RoleRequiredMixin, TemplateView):
     required_permission = "academics.view_reportcard"
 
     def get_template_names(self):
-        class_name = (self.request.GET.get("class_name") or "Pre-K").strip()
-        tpl = ecd_template_type_from_class_name(class_name) or "pre_k"
-        return [f"academics/ecd_assessment_{tpl}.html"]
+        # get_context_data resolves the class (and so the template) first.
+        return [f"academics/ecd_assessment_{getattr(self, 'ecd_template_type', 'pre_k')}.html"]
 
     def get_context_data(self, **kwargs):
+        from academics.progress_filters import ProgressFilters
         ctx = super().get_context_data(**kwargs)
-        class_name = (self.request.GET.get("class_name") or "Pre-K").strip()
-        tpl = ecd_template_type_from_class_name(class_name) or "pre_k"
+        pf = ProgressFilters(self.request)
 
         # FRD 2.3: ECD tabs derived dynamically from GradeClass registry
         from academics.models import GradeClass, Department
@@ -961,17 +1045,30 @@ class ECDAssessmentView(RoleRequiredMixin, TemplateView):
             assigned_class_names = set(assigned_tca.keys())
             available_tabs = [tab for tab in ECD_TABS if tab["class_name"] in assigned_class_names]
             ctx["ecd_tabs"] = available_tabs
-
             if not available_tabs:
                 ctx["no_class_assigned"] = True
-            elif class_name not in {tab["class_name"] for tab in available_tabs}:
-                class_name = available_tabs[0]["class_name"]
-                tpl = ecd_template_type_from_class_name(class_name) or "pre_k"
         else:
             ctx["ecd_tabs"] = ECD_TABS
 
-        # Current term for display and term gating (FR-CAL-002: 3 terms)
-        current_term = get_current_term()
+        # The shared progress filter bar: year, term and class. ECD classes are
+        # evaluated by domain, so subject and assessment type do not apply.
+        class_name = pf.pick_class(
+            [tab["class_name"] for tab in ctx["ecd_tabs"]],
+            labels={tab["class_name"]: tab["display_name"] for tab in ctx["ecd_tabs"]},
+        ) or "Pre-K"
+        tpl = ecd_template_type_from_class_name(class_name) or "pre_k"
+        self.ecd_template_type = tpl
+        pf.pick_subject([], note="Learning domains")
+        pf.pick_type(note="Term evaluation")
+        ctx["ecd_read_only"] = bool(pf.term) and not ecd_term_editable(pf.term)
+        ctx["pf"] = pf.context(footnote=(
+            "Earlier term: reports are shown as recorded and cannot be changed."
+            if ctx["ecd_read_only"] else
+            "Rate each learner on every domain for the term, then submit the report to the HOD."
+        ))
+
+        # Selected term for display and term gating (FR-CAL-002: 3 terms)
+        current_term = pf.term
         ctx["current_term"] = current_term
         if current_term:
             try:
@@ -1105,7 +1202,6 @@ class ECDAssessmentView(RoleRequiredMixin, TemplateView):
             ("Self-discipline", "abc_c4"),
             ("Attitude toward learning", "abc_c5"),
         ]
-        ctx["current_term"] = get_current_term()
         from django.utils.timezone import localdate
         ctx["today_display"] = localdate().strftime("%b %d, %Y").lstrip("0").replace(" 0", " ")
         ctx["academics_tab"] = "ecd_evaluations"
@@ -1120,7 +1216,10 @@ class ECDAssessmentView(RoleRequiredMixin, TemplateView):
         # Welfare linkage: flag students with open high/critical welfare observations
         from welfare.models import WelfareObservation, WelfareSeverity
         welfare_flags = {}
-        students_in_class = Student.objects.filter(class_name=class_name, is_archived=False)
+        students_in_class = (
+            ecd_class_roster(class_name, pf.term) if pf.term
+            else Student.objects.filter(class_name=class_name, is_archived=False)
+        )
         open_welfare = WelfareObservation.objects.filter(
             student__in=students_in_class,
             severity__in=[WelfareSeverity.HIGH, WelfareSeverity.CRITICAL],
@@ -1158,11 +1257,11 @@ class ECDProgressAPIView(RoleRequiredMixin, View):
         if not tpl:
             return JsonResponse({"error": "Not an ECD class"}, status=400)
 
-        term = get_current_term()
+        term = _requested_term(request)
         if not term:
             return JsonResponse({"error": "No active term found"}, status=400)
 
-        students = Student.objects.filter(class_name=class_name, is_archived=False)
+        students = ecd_class_roster(class_name, term)
         total_students = students.count()
 
         if total_students == 0:

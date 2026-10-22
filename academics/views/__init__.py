@@ -42,6 +42,7 @@ from academics.views.reports import (
     ReportCardListView,
     _build_report_card_context,
     HOSReportPreviewView,
+    ClassReportPrintView,
     HOSSignOffActionView,
     ReportReviewQueueView,
     AcademicAnalyticsView,

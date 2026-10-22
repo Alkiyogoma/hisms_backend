@@ -116,11 +116,9 @@
     document.getElementById('linkMode').value = mode;
     if (mode === 'new') {
         clearSelection();
-        document.getElementById('pdpa_version').setAttribute('required', 'required');
         document.getElementById('id_full_name').setAttribute('required', 'required');
         document.getElementById('id_phone').setAttribute('required', 'required');
     } else {
-        document.getElementById('pdpa_version').removeAttribute('required');
         document.getElementById('id_full_name').removeAttribute('required');
         document.getElementById('id_phone').removeAttribute('required');
     }

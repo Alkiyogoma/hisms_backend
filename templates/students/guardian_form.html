@@ -87,9 +87,9 @@
         </label>
       </div>
     </div>
+    {% endif %}
 
     {% include "students/_guardian_consent_fields.html" %}
-    {% endif %}
 
     <div class="form-actions">
       <a href="{% if edit_mode %}{% url 'students:guardian_detail' guardian.pk %}{% else %}{% url 'students:guardian_list' %}{% endif %}" class="btn-secondary">Cancel</a>

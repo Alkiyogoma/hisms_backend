@@ -1,0 +1,63 @@
+{# Toolbar above a report preview (one learner) or a class print (class_view). #}
+{% load role_tags %}
+<style>
+    .no-print .tb-title { margin-right: auto; align-self: center; font: 600 14px/1.3 Arial, sans-serif; color: #1A1A2E; }
+    .tb-messages { max-width: 800px; margin: 0 auto 16px; font: 13px/1.45 Arial, sans-serif; }
+    .tb-msg { padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; background: #E8EEF9; color: #023AA5; border: 1px solid #BFCFE9; }
+    .tb-msg-success { background: #E8F5EC; color: #1B7B34; border-color: #B7DFBF; }
+    .tb-msg-warning { background: #FEF3C7; color: #92550A; border-color: #FCD34D; }
+    .tb-msg-error { background: #FEF2F2; color: #9B1C1C; border-color: #FECACA; }
+    @media print { .tb-messages { display: none !important; } }
+</style>
+<div class="no-print">
+    {% is_hod_like user as can_signoff %}
+    {% if class_view %}
+        <span class="tb-title">{{ class_name }} &middot; {{ report.term.name }} &middot; {{ class_total }} report{{ class_total|pluralize }}</span>
+    {% endif %}
+    {% if can_signoff %}
+        {% if not class_view and report.status == 'pending_sign_off' or not class_view and report.status == 'draft' %}
+            {% if not signoff_blocked %}
+            <form method="POST" action="{% url 'academics:signoff_action' %}" style="margin:0">
+                {% csrf_token %}
+                <input type="hidden" name="report_id" value="{{ report.id }}">
+                <button type="submit" class="btn btn-green">Approve & Sign Off</button>
+            </form>
+            {% else %}
+            <span class="btn btn-green" style="opacity:0.5;cursor:not-allowed" title="{{ signoff_block_reason }}">Approve & Sign Off</span>
+            {% endif %}
+        {% endif %}
+        {% if class_unpublished %}
+            {% if not signoff_blocked %}
+            <form method="POST" action="{% url 'academics:signoff_action' %}" style="margin:0"
+                  onsubmit="return confirm('Approve, sign off and publish {{ class_unpublished }} unpublished report{{ class_unpublished|pluralize }} in {{ class_name|escapejs }}? Parents will be able to see them.')">
+                {% csrf_token %}
+                <input type="hidden" name="class_name" value="{{ class_name }}">
+                <input type="hidden" name="term_id" value="{{ report.term_id }}">
+                <button type="submit" class="btn btn-green">Approve & Sign Off All ({{ class_unpublished }})</button>
+            </form>
+            {% else %}
+            <span class="btn btn-green" style="opacity:0.5;cursor:not-allowed" title="{{ signoff_block_reason }}">Approve & Sign Off All ({{ class_unpublished }})</span>
+            {% endif %}
+        {% endif %}
+    {% endif %}
+    {% if perms.academics.view_reportcard %}
+        {% if class_view %}
+        <button onclick="window.print()" class="btn btn-primary">Print all</button>
+        {% else %}
+        <button onclick="window.print()" class="btn btn-primary">Print</button>
+        {% if class_total > 1 %}<a href="{% url 'academics:report_preview_class' report.id %}" class="btn btn-primary">Print all ({{ class_total }})</a>{% endif %}
+        {% endif %}
+    {% endif %}
+    {% if class_view %}
+        <a href="{% url 'academics:report_preview' report.id %}" class="btn btn-outline">Back</a>
+    {% elif not perms.academics.change_reportcard %}
+        <a href="{% url 'academics:parent_reports' %}" class="btn btn-outline">Back</a>
+    {% else %}
+        <button onclick="window.history.go(-2)" class="btn btn-outline">Back</button>
+    {% endif %}
+</div>
+{% if messages %}
+<div class="tb-messages">
+    {% for m in messages %}<div class="tb-msg tb-msg-{{ m.tags }}">{{ m }}</div>{% endfor %}
+</div>
+{% endif %}

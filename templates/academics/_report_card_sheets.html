@@ -1,0 +1,203 @@
+{# One learner's report sheets; rendered by report_card_print.html, once per learner for a class. #}
+{% load static %}
+<div class="report-wrapper">
+<section class="sheet">
+    <!-- HEADER (standardized format): once, at the top of page 1 -->
+    {% include "includes/hodari_print_header.html" %}
+
+    <div class="doc-title"><h1>Student Progress Report</h1><span class="scope">{{ report.term.name }}{% if report.term.academic_year.name not in report.term.name %} &middot; {{ report.term.academic_year.name }}{% endif %}</span></div>
+    <div class="meta">
+        <div><span>Student</span><b>{{ student.get_full_name }}</b></div>
+        <div><span>Admission no.</span><b>{{ student.admission_no|default:"—" }}</b></div>
+        <div><span>Class</span><b>{{ student.class_name }}</b></div>
+        <div><span>Class teacher</span><b>{{ class_teacher|default:"—" }}</b></div>
+    </div>
+
+    {% if not report.is_ecd_report %}
+        <!-- ACADEMIC PROGRESS -->
+        <div class="section-title">ACADEMIC PROGRESS</div>
+
+        {% comment %}Mark-bearing subjects only, approved scores only. Columns are weighted
+           points, so TOTAL is out of 100. No total, grade or exam average is
+           printed until the assessments are complete.{% endcomment %}
+        <table class="academic-table">
+            <thead>
+                <tr>
+                    <th rowspan="2" style="width: 25%; text-align: left; padding-left: 10px;">Subject</th>
+                    <th colspan="{{ exam.types|length|add:1 }}">{{ report.term.name|upper }}</th>
+                    <th rowspan="2" style="width: 8%;">Grade</th>
+                    <th rowspan="2" style="width: 15%;">Remarks</th>
+                </tr>
+                <tr>
+                    {% for t in exam.types %}<th>{{ t.name }} ({{ t.weight_percentage|floatformat:0 }})</th>{% endfor %}
+                    <th style="width: 12%;">TOTAL/100</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in exam.rows %}
+                    <tr>
+                        <td class="subject-col">{{ row.subject }}</td>
+                        {% for c in row.cells %}<td{% if c is None %} class="awaiting"{% endif %}>{% if c is not None %}{{ c|floatformat:"-1" }}{% else %}&mdash;{% endif %}</td>{% endfor %}
+                        {% if row.complete %}
+                        <td>{{ row.total|floatformat:"-1" }}</td>
+                        <td>{{ row.grade }}</td>
+                        <td style="text-align: left;">{{ row.label }}</td>
+                        {% else %}
+                        <td class="awaiting">&mdash;</td>
+                        <td class="awaiting">&mdash;</td>
+                        <td class="awaiting" style="text-align: left;">Awaiting end of term</td>
+                        {% endif %}
+                    </tr>
+                {% empty %}
+                    <tr><td class="subject-col" colspan="{{ exam.types|length|add:4 }}" style="color:#64748B">No approved marks yet.</td></tr>
+                {% endfor %}
+
+                <tr class="exam-avg-row">
+                    <td class="subject-col">Exam Average</td>
+                    {% if exam.complete %}
+                    {% for c in exam.column_averages %}<td>{{ c|floatformat:"-1" }}</td>{% endfor %}
+                    <td>{{ exam.average|floatformat:"-2" }}</td>
+                    <td>{{ exam.grade }}</td>
+                    <td style="text-align: left;">{{ exam.label }}</td>
+                    {% else %}
+                    <td colspan="{{ exam.types|length|add:1 }}" class="awaiting">
+                        Awaiting end of term
+                        <div style="font-size:9px; font-weight:400">{{ exam.assessed }} of {{ exam.total_subjects }} mark-bearing subject{{ exam.total_subjects|pluralize }} assessed</div>
+                    </td>
+                    <td class="awaiting">&mdash;</td>
+                    <td class="awaiting">&mdash;</td>
+                    {% endif %}
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- REMARKS ONLY TABLE: remark-only subjects (set in the Subjects module) -->
+        {% if remark_rows %}
+        <table class="remarks-table">
+            <thead>
+                <tr>
+                    <th style="width: 85%;"></th>
+                    <th style="width: 15%; text-align: left;">Remarks</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for subj, remark in remark_rows %}
+                    <tr>
+                        <td class="subject-col">{{ subj }}</td>
+                        <td class="remark-val-col">{{ remark }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        <!-- GRADING SCALE -->
+        <table class="grading-scale">
+            <thead>
+                <tr>
+                    <th colspan="6">GRADING SCALE</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="bold-row">
+                    <td>A*</td><td>A</td><td>B</td><td>C</td><td>D</td><td>E</td>
+                </tr>
+                <tr>
+                    <td>90 - 100</td><td>80 - 89</td><td>70 - 79</td><td>60 - 69</td><td>50 - 59</td><td>0 - 49</td>
+                </tr>
+                <tr>
+                    <td>Outstanding</td><td>High</td><td>Good</td><td>Aspiring</td><td>Basic</td><td>Needs Improvement</td>
+                </tr>
+            </tbody>
+        </table>
+
+</section>
+
+<section class="sheet sheet-2">
+        <!-- PAGE 2: school name and the learner it belongs to; no second photo -->
+        <div class="page2-head">
+            <div class="page2-school">
+                <img src="{% static 'branding/hodari_school_logo.jpg' %}" alt="Hodari Christian School">
+                <div><b>HODARI CHRISTIAN SCHOOL</b><br>Progress Report &middot; page 2</div>
+            </div>
+            <div class="page2-learner">
+                {{ student.get_full_name }}<br>
+                {{ student.class_name }} &middot; {{ student.admission_no }}<br>
+                {{ report.term.name }}, {{ report.term.academic_year.name }}
+            </div>
+        </div>
+
+        <!-- GENERAL TRAITS -->
+        <div class="section-title">GENERAL TRAITS</div>
+        {# Two sections per row (Social Traits spans the row), two traits per line. #}
+        <div class="traits-container">
+            {% for title, rows in trait_groups %}
+            <table class="traits-table{% if forloop.last %} traits-full{% endif %}">
+                <tr><th colspan="4">{{ title }}</th></tr>
+                {% for a, b in rows %}
+                <tr>
+                    <td>{{ a.0 }}</td><td class="g">{{ a.1 }}</td>
+                    <td>{% if b %}{{ b.0 }}{% endif %}</td><td class="g">{% if b %}{{ b.1 }}{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% endfor %}
+        </div>
+
+        <!-- CHARACTER GRADING -->
+        <table class="char-grading-table">
+            <tr><th colspan="4">Character Grading</th></tr>
+            <tr style="font-weight: bold;">
+                <td>E</td><td>G</td><td>S</td><td>N</td>
+            </tr>
+            <tr>
+                <td>Excellent</td><td>Good</td><td>Satisfactory</td><td>Needs Improvement</td>
+            </tr>
+        </table>
+
+        <!-- FOOTER INFO -->
+        <table class="footer-info-table">
+            <tr>
+                <td>Days Absent : {{ attendance.absent }}
+                    <div style="font-size:8pt;font-weight:normal;color:#555">{% if attendance.excused %}incl. {{ attendance.excused }} excused &middot; {% endif %}of {{ attendance.marked }} school day{{ attendance.marked|pluralize }} marked &middot; unmarked days not counted</div>
+                </td>
+                <td>School Reopens on: {% if reopens_on %}{{ reopens_on|date:"jS F Y" }}{% else %}To be announced{% endif %}</td>
+            </tr>
+        </table>
+
+        <!-- CLASS TEACHER REMARK -->
+        <div class="teacher-remark">
+            <div class="teacher-remark-label">Class Teacher Remark</div>
+            <div>{{ report.teacher_comments|default:"—" }}</div>
+        </div>
+
+        <!-- SIGNATURES -->
+        <div class="signatures">
+            <div><div class="sig-line"></div><div class="sig-label">Class teacher<br><span>{{ class_teacher|default:"Signature and date" }}</span></div></div>
+            <div class="sig-hos">
+                <div class="sig-line"></div>
+                <div class="sig-label">Head of School<br><span>{% if report.signed_off_by %}{{ report.signed_off_by.get_full_name|default:report.signed_off_by.username }}{% else %}Signature and date{% endif %}</span></div>
+                {% if report.status == 'published' and report.signed_off_at %}
+                <div class="stamp-container">
+                    <img src="{% static 'branding/hodari_school_stamp.png' %}" alt="Stamp" class="stamp-img">
+                    <div class="stamp-date">{{ report.signed_off_at|date:"d M Y"|upper }}</div>
+                </div>
+                {% endif %}
+            </div>
+            <div><div class="sig-line"></div><div class="sig-label">Parent<br><span>Signature and date</span></div></div>
+        </div>
+
+    {% else %}
+        <!-- ECD Report Placeholder -->
+        <div style="font-weight: bold; text-transform: uppercase; margin-bottom: 10px;">Developmental & Academic Progress</div>
+        {% for eval in report.ecd_evaluations.all %}
+            <div style="display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #eee;">
+                <span>{{ eval.domain }}</span>
+                <span style="font-weight: bold;">{{ eval.rating }}</span>
+            </div>
+        {% empty %}
+            <div style="padding: 20px; text-align: center; color: #666;">No evaluations recorded.</div>
+        {% endfor %}
+    {% endif %}
+</section>
+</div>

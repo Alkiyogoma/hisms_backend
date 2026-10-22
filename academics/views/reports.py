@@ -213,45 +213,37 @@ class ReportCardListView(RoleRequiredMixin, TemplateView):
     required_permission = "academics.view_reportcard"
 
     def get_context_data(self, **kwargs):
+        from academics.progress_filters import ProgressFilters
         ctx = super().get_context_data(**kwargs)
-        class_name = self.request.GET.get("class_name")
-        current_term = get_current_term()
-        term_id = self.request.GET.get("term_id")
-        if term_id:
-            try:
-                term = Term.objects.get(id=term_id)
-            except (Term.DoesNotExist, ValueError):
-                term = current_term
-        else:
-            term = current_term
-        ctx["class_name"] = class_name
-        ctx["current_term"] = current_term
+        pf = ProgressFilters(self.request)
+        term = pf.term
+        ctx["current_term"] = get_current_term()
         ctx["term"] = term
         ctx["term_id"] = term.id if term else ""
-        ctx["all_terms"] = Term.objects.all().order_by("-start_date")
 
         # RBAC: teachers restricted to their class-teacher-only classes
+        requested = self.request.GET.get("class_name")
         if self.request.user.role == UserRole.TEACHER:
             from core.teacher_context import get_teacher_assigned_classes_from_tca
             all_teacher_classes = get_teacher_assigned_classes_from_tca(self.request.user)
-            class_teacher_classes = [cls for cls, info in all_teacher_classes.items() if info.get("is_class_teacher")]
-            if class_name and class_name not in class_teacher_classes:
-                class_name = None
-                ctx["class_name"] = None
+            available = [cls for cls, info in all_teacher_classes.items() if info.get("is_class_teacher")]
+            if requested and requested not in available:
                 ctx["class_error"] = "You are not the class teacher for this class."
-            ctx["available_classes"] = class_teacher_classes
         else:
             from academics.models import GradeClass, Department
-            dept_ctx = Department.PRIMARY
             if self.request.user.is_school_wide:
-                available = GradeClass.objects.all().values_list("name", flat=True)
+                classes = GradeClass.objects.all()
             elif self.request.user.section_departments:
-                available = GradeClass.objects.filter(
-                    department__in=self.request.user.section_departments
-                ).values_list("name", flat=True)
+                classes = GradeClass.objects.filter(department__in=self.request.user.section_departments)
             else:
-                available = GradeClass.objects.filter(department=Department.PRIMARY).values_list("name", flat=True)
-            ctx["available_classes"] = list(available)
+                classes = GradeClass.objects.filter(department=Department.PRIMARY)
+            available = list(classes.order_by("sort_order", "name").values_list("name", flat=True))
+        ctx["available_classes"] = available
+        class_name = None if ctx.get("class_error") else (pf.pick_class(available) or None)
+        ctx["class_name"] = class_name
+        pf.pick_subject([], note="All subjects")
+        pf.pick_type(note="Term report")
+        ctx["pf"] = pf.context(footnote="Each student's term report: marks, remarks and comments, signed off before parents see it.")
 
         if class_name and term:
             reports = ReportCard.objects.filter(
@@ -547,7 +539,44 @@ class HOSReportPreviewView(RoleRequiredMixin, TemplateView):
         else:
             ctx["signoff_blocked"] = False
             ctx["signoff_block_reason"] = ""
-        
+
+        # The learner's class this term, for "Print all" and "Approve & Sign Off All".
+        if user.role != UserRole.PARENT:
+            class_reports = self.class_report_queryset(report)
+            ctx["class_name"] = report.student.class_name
+            ctx["class_total"] = class_reports.count()
+            ctx["class_unpublished"] = class_reports.exclude(status=ReportCardStatus.PUBLISHED).count()
+
+        return ctx
+
+    @staticmethod
+    def class_report_queryset(report):
+        # Same reports the class-wide sign-off acts on (class name and term).
+        return ReportCard.objects.filter(
+            term=report.term, student__class_name=report.student.class_name,
+            is_ecd_report=report.is_ecd_report,
+        )
+
+
+class ClassReportPrintView(HOSReportPreviewView):
+    """Every report in the learner's class for that term on one page, one learner per printed page."""
+
+    def get_context_data(self, **kwargs):
+        if self.request.user.role == UserRole.PARENT:
+            raise PermissionDenied()
+        ctx = super().get_context_data(**kwargs)
+        from django.template.loader import render_to_string
+        report = ctx["report"]
+        partial = "academics/_ecd_report_body.html" if report.is_ecd_report else "academics/_report_card_sheets.html"
+        reports = (
+            self.class_report_queryset(report)
+            .select_related("student", "term__academic_year", "signed_off_by")
+            .order_by("student__last_name", "student__first_name")
+        )
+        ctx["class_view"] = True
+        ctx["class_reports"] = [
+            render_to_string(partial, _build_report_card_context(r), request=self.request) for r in reports
+        ]
         return ctx
 
 

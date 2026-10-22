@@ -1,7 +1,0 @@
-<nav class="sub-nav" aria-label="Assessment entry">
-  <a href="{% url score_entry_url %}?class_name={{ selected_class|default:''|urlencode }}" class="sub-tab {% if not assessment_is_remarks %}active{% endif %}">Score entry</a>
-  <a href="{% url remark_entry_url %}?class_name={{ selected_class|default:''|urlencode }}" class="sub-tab {% if assessment_is_remarks %}active{% endif %}">Term remarks</a>
-</nav>
-<p style="color:#64748B;margin:0 0 20px">
-  {% if assessment_is_remarks %}Choose one remark per subject for the term. These subjects do not take marks.{% else %}Enter marks for mark-bearing subjects. Assess remark-only subjects under Term remarks.{% endif %}
-</p>

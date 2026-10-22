@@ -1,0 +1,29 @@
+{% include "academics/_progress_filters.html" %}
+{% if ecd_read_only %}
+{# Reading an earlier term: show the recorded ratings in full, without the "locked" overlay. #}
+<style>
+  #lock-banner, #lock-overlay { display: none !important; }
+  .ecd-grade-btn { opacity: 1 !important; }
+  button[onclick*="saveDraft"], button[onclick*="submitToHOD"], button[onclick*="submitAllToHOD"] { display: none !important; }
+  .ecd-readonly-note { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; font-size: 12.5px; color: var(--text-muted); }
+</style>
+<div class="ecd-readonly-note"><span class="chip chip-grey">Read only</span>{{ pf.term.name }} &middot; the learners who were in {{ ecd_class_name }} that term, with the reports as recorded.</div>
+{% endif %}
+<script>
+/* The ECD APIs read the term and class from the query string; send the ones
+   picked in the filter bar with every ECD API call, so an earlier term's
+   reports load for the learners who were in the class then. */
+(function () {
+  var params = "term={{ pf.term.pk|default:'' }}&class_name={{ ecd_class_name|urlencode }}";
+  if (!"{{ pf.term.pk|default:'' }}" || window.__ecdTermFetch) return;
+  window.__ecdTermFetch = true;
+  var nativeFetch = window.fetch;
+  window.fetch = function (url, opts) {
+    if (typeof url === "string" && url.indexOf("/academics/api/ecd/") === 0) {
+      var extra = params.split("&").filter(function (p) { return url.indexOf(p.split("=")[0] + "=") === -1; });
+      if (extra.length) url += (url.indexOf("?") === -1 ? "?" : "&") + extra.join("&");
+    }
+    return nativeFetch.call(this, url, opts);
+  };
+})();
+</script>

@@ -72,20 +72,20 @@ class NarrativeCommentClassTests(TestCase):
         self.assertEqual(response.context["classes"], [f"Grade {n}" for n in range(1, 10)])
         self.assertNotIn(self.ecd.name, response.context["classes"])
         for number in (7, 8, 9):
-            self.assertContains(response, f">Grade {number}</a>")
+            self.assertContains(response, f">Grade {number}</option>")
 
     def test_new_configured_class_appears_automatically(self):
         GradeClass.objects.create(name="New Report Class", department=Department.LOWER_SECONDARY, sort_order=10)
         response = self.client.get(self.url)
         self.assertIn("New Report Class", response.context["classes"])
-        self.assertContains(response, ">New Report Class</a>")
+        self.assertContains(response, ">New Report Class</option>")
 
     def test_department_label_follows_the_selected_class(self):
         for number, department in ((3, "Primary"), (7, "Lower Secondary")):
             with self.subTest(number=number):
                 response = self.client.get(self.url, {"class_name": f"Grade {number}"})
                 self.assertEqual(response.context["selected_department_label"], department)
-                self.assertContains(response, f"{department} Department &middot; Narrative Comments")
+                self.assertContains(response, f"{department} Department</span>")
                 self.assertEqual(response.context["student_reports"][0]["report"], self.reports[number])
 
     def test_section_heads_see_their_own_departments(self):

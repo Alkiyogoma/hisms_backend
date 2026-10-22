@@ -1,0 +1,94 @@
+{# Shared filter bar for the progress-marking pages; see academics/progress_filters.py. #}
+<form method="get" class="pf-bar" id="pfFilters">
+  {% for name, value in pf.hidden.items %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+  <div class="pf-grid">
+    <div class="pf-fg">
+      <label for="pfYear">Academic year</label>
+      <select id="pfYear" name="year" data-reset-term>
+        {% for y in pf.years %}
+          <option value="{{ y.pk }}"{% if pf.year and y.pk == pf.year.pk %} selected{% endif %}>{{ y.name }}{% if y.is_current %} (current){% endif %}</option>
+        {% empty %}
+          <option value="">No academic years</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="pf-fg">
+      <label for="pfTerm">Term</label>
+      <select id="pfTerm" name="term"{% if not pf.year_terms %} disabled{% endif %}>
+        {% if pf.all_terms %}<option value="all"{% if not pf.term %} selected{% endif %}>All terms</option>{% endif %}
+        {% for t in pf.year_terms %}
+          <option value="{{ t.pk }}"{% if pf.term and t.pk == pf.term.pk %} selected{% endif %}>{{ t.name }}</option>
+        {% empty %}
+          <option value="">No terms</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="pf-fg">
+      <label for="pfClass">Class</label>
+      <select id="pfClass" name="class_name"{% if pf.class_note or not pf.class_options %} disabled{% endif %}>
+        {% if pf.class_note %}<option>{{ pf.class_note }}</option>
+        {% else %}
+          {% if pf.class_all or not pf.class_options %}<option value="">{% if pf.class_options %}All classes{% else %}No classes{% endif %}</option>{% endif %}
+          {% for value, label in pf.class_options %}
+            <option value="{{ value }}"{% if value == pf.class_name %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        {% endif %}
+      </select>
+    </div>
+    {% if pf.views %}
+    <div class="pf-fg">
+      <label for="pfView">Entry</label>
+      <select id="pfView" data-view>
+        {% for url, label, active in pf.views %}
+          <option value="{{ url }}"{% if active %} selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    {% if not pf.subject_note %}
+    <div class="pf-fg">
+      <label for="pfSubject">Subject</label>
+      <select id="pfSubject" name="subject">
+        <option value="">All subjects</option>
+        {% for s in pf.subject_options %}
+          <option value="{{ s }}"{% if s == pf.subject %} selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    {% if not pf.type_note %}
+    <div class="pf-fg">
+      <label for="pfType">Assessment type</label>
+      <select id="pfType" name="type">
+        <option value="">All assessed so far</option>
+        {% for e in pf.exam_types %}
+          <option value="{{ e.code }}"{% if e.code == pf.exam_type %} selected{% endif %}>{{ e.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+  </div>
+  <div class="pf-foot">
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>{{ pf.footnote }}</span>
+    <span>
+      {% if pf.term and not pf.is_current_term %}<span class="pf-past">Viewing {{ pf.term.name }}, not the current term</span>{% endif %}
+      <noscript><button type="submit" class="hf-btn hf-btn-primary">Apply</button></noscript>
+    </span>
+  </div>
+</form>
+<script>
+(function () {
+  var form = document.getElementById('pfFilters');
+  if (!form) return;
+  form.addEventListener('change', function (e) {
+    if (e.target.hasAttribute('data-reset-term') && form.term) form.term.disabled = true;
+    if (e.target.hasAttribute('data-view')) {
+      // Another entry page: keep year, term and class; its subjects and types differ.
+      form.action = e.target.value;
+      ['subject', 'type'].forEach(function (n) { if (form[n]) form[n].disabled = true; });
+    }
+    form.classList.add('is-loading');
+    form.submit();
+  });
+})();
+</script>

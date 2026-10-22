@@ -10,6 +10,13 @@ APPUSER=hodari
 BACKUP_DIR=/var/backups/hodari
 SITE_URL=https://connect.hodari.ac.tz/
 SERVICES=(hodari hodari-celery hodari-celery-beat)
+# Celery Beat writes its pidfile here and lists it in ReadWritePaths; /run is
+# wiped at boot, and systemd refuses to start Beat (226/NAMESPACE) without it.
+RUN_DIR=/run/hodari
+# gunicorn needs a few seconds after a restart; until then nginx answers with
+# an error page. Check the site this many times, this many seconds apart.
+SITE_ATTEMPTS=20
+SITE_RETRY_DELAY=3
 STEP="Preparing deployment"
 LOG=""
 DUMP=""
@@ -147,6 +154,8 @@ chown -R "$APPUSER:$APPUSER" "$MEDIA"
 printf 'Static files ready. Upload count: %s before, %s after.\n' "$MEDIA_BEFORE" "$MEDIA_AFTER"
 
 step "8/8 Restarting services and checking the site"
+mkdir -p "$RUN_DIR"
+chown "$APPUSER:$APPUSER" "$RUN_DIR"
 systemctl restart "${SERVICES[@]}"
 for service in "${SERVICES[@]}"; do
   if ! systemctl is-active --quiet "$service"; then
@@ -156,11 +165,23 @@ for service in "${SERVICES[@]}"; do
   printf '  %s: active\n' "$service"
 done
 printf 'Checking %s ...\n' "$SITE_URL"
-HTTP_CODE="$(curl --silent --show-error --location --output /dev/null --write-out '%{http_code}' \
-  --connect-timeout 8 --max-time 20 --retry 3 --retry-delay 2 --retry-connrefused "$SITE_URL")"
+HTTP_CODE=000
+for (( attempt = 1; attempt <= SITE_ATTEMPTS; attempt++ )); do
+  HTTP_CODE="$(curl --silent --location --output /dev/null --write-out '%{http_code}' \
+    --connect-timeout 8 --max-time 20 "$SITE_URL")" || HTTP_CODE=000
+  case "$HTTP_CODE" in
+    2??|3??) break ;;
+  esac
+  if (( attempt < SITE_ATTEMPTS )); then
+    printf '  Site answered HTTP %s; waiting for it to finish starting (check %s of %s).\n' \
+      "$HTTP_CODE" "$attempt" "$SITE_ATTEMPTS"
+    sleep "$SITE_RETRY_DELAY"
+  fi
+done
 case "$HTTP_CODE" in
   2??|3??) printf 'Site responded with HTTP %s.\n' "$HTTP_CODE" ;;
-  *) fail "Site responded with HTTP $HTTP_CODE after restart." ;;
+  000) fail "Site could not be reached after $SITE_ATTEMPTS checks." ;;
+  *) fail "Site still responded with HTTP $HTTP_CODE after $SITE_ATTEMPTS checks." ;;
 esac
 
 printf '\nDEPLOYMENT SUCCESSFUL in %ss\nBranch: %s\nCommit: %s -> %s\nDatabase backup: %s\nDeployment log: %s\n' \

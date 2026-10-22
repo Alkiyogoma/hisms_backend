@@ -157,7 +157,38 @@ class GuardianFormErrorTests(TestCase):
         self.assertIn('value="mary@example.com"', content)
         self.assertIn(">Arusha</textarea>", content)
         self.assertIn('value="sw" selected', content)
-        self.assertNotIn('name="pdpa_consent_version"', content)
+        self.assertIn('name="pdpa_consent_given"', content)
+        self.assertNotIn('name="portal_access"', content)
+
+    def test_edit_turns_consent_on_then_off(self):
+        from students.models import PDPAConsentLog
+        resp = self._post(pdpa_consent_shown="1", pdpa_consent_given="on",
+                          pdpa_consent_method="in_person", pdpa_consent_version="v1.0")
+        self.assertEqual(resp.status_code, 302)
+        self.guardian.refresh_from_db()
+        self.assertTrue(self.guardian.has_given_consent())
+        self.assertTrue(PDPAConsentLog.objects.filter(guardian=self.guardian, action="given").exists())
+
+        resp = self._post(pdpa_consent_shown="1")
+        self.assertEqual(resp.status_code, 302)
+        self.guardian.refresh_from_db()
+        self.assertFalse(self.guardian.pdpa_consent_given)
+        self.assertEqual(self.guardian.pdpa_consent_version, "")
+        self.assertTrue(PDPAConsentLog.objects.filter(guardian=self.guardian, action="withdrawn").exists())
+
+    def test_edit_consent_without_version_is_a_field_error(self):
+        resp = self._post(pdpa_consent_shown="1", pdpa_consent_given="on", pdpa_consent_method="digital")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("version of the PDPA consent statement", resp.content.decode())
+        self.guardian.refresh_from_db()
+        self.assertFalse(self.guardian.pdpa_consent_given)
+
+    def test_edit_without_consent_box_keeps_consent(self):
+        self._post(pdpa_consent_shown="1", pdpa_consent_given="on",
+                   pdpa_consent_method="in_person", pdpa_consent_version="v1.0")
+        self._post(full_name="Mary A. Kajeguka")
+        self.guardian.refresh_from_db()
+        self.assertTrue(self.guardian.has_given_consent())
 
     def test_missing_phone_is_marked_and_input_kept(self):
         resp = self._post(phone="", address="Moshi")
@@ -187,15 +218,26 @@ class GuardianFormErrorTests(TestCase):
         self.assertEqual(self.guardian.email, "mary@example.com")
         self.assertEqual(self.guardian.secondary_phone, "+255743000001")
 
-    def test_create_without_consent_keeps_input(self):
+    def test_create_without_consent_is_allowed(self):
+        from students.models import ParentGuardian
         resp = self.client.post(reverse("students:guardian_create"), {
             "full_name": "Grace Mushi", "phone": "+255767000003", "address": "Dodoma",
+        })
+        self.assertEqual(resp.status_code, 302)
+        grace = ParentGuardian.objects.get(full_name="Grace Mushi")
+        self.assertFalse(grace.pdpa_consent_given)
+        self.assertFalse(grace.consent_logs.exists())
+
+    def test_create_with_consent_but_no_version_keeps_input(self):
+        resp = self.client.post(reverse("students:guardian_create"), {
+            "full_name": "Grace Mushi", "phone": "+255767000003", "address": "Dodoma",
+            "pdpa_consent_given": "on", "pdpa_consent_method": "in_person",
         })
         self.assertEqual(resp.status_code, 200)
         content = resp.content.decode()
         self.assertIn('value="Grace Mushi"', content)
         self.assertIn(">Dodoma</textarea>", content)
-        self.assertIn("PDPA consent must be recorded", content)
+        self.assertIn("version of the PDPA consent statement", content)
 
     def test_link_flow_duplicate_guardian_does_not_crash(self):
         student = Student.objects.create(
