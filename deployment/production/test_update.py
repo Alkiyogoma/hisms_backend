@@ -56,7 +56,13 @@ elif command == 'systemctl':
     if args[0] == 'status': print('Simulated service failure details')
 elif command == 'curl':
     if failure == 'connection': sys.exit(7)
-    print('503' if failure == 'http' else '200', end='')
+    calls = root / 'curl-calls'
+    count = int(calls.read_text()) + 1 if calls.exists() else 1
+    calls.write_text(str(count))
+    if failure == 'warming' and count <= 2:
+        print('404', end='')  # nginx error page while gunicorn starts
+    else:
+        print('503' if failure == 'http' else '200', end='')
 '''
 
 
@@ -85,7 +91,9 @@ class ProductionUpdateTests(unittest.TestCase):
             path.write_text(f'#!{sys.executable}\n' + FAKE_COMMAND)
             path.chmod(0o755)
         source = Path(__file__).with_name('update.sh').read_text()
-        for key, value in (('APP', self.app), ('VENV', self.venv), ('BACKUP_DIR', self.backups)):
+        self.run_dir = self.root / 'run' / 'hodari'
+        for key, value in (('APP', self.app), ('VENV', self.venv), ('BACKUP_DIR', self.backups),
+                           ('RUN_DIR', self.run_dir), ('SITE_ATTEMPTS', 4), ('SITE_RETRY_DELAY', 0)):
             lines = source.splitlines()
             source = '\n'.join(f'{key}="{value}"' if line.startswith(key + '=') else line for line in lines) + '\n'
         self.script = self.root / 'update.sh'
@@ -169,6 +177,38 @@ class ProductionUpdateTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0, result.stdout)
                 self.assertIn('DEPLOYMENT FAILED during: 8/8', result.stdout)
                 self.assertNotIn('DEPLOYMENT SUCCESSFUL', result.stdout)
+
+    def test_http_and_connection_failures_retry_then_explain(self):
+        for failure, message in (('http', 'still responded with HTTP 503 after 4 checks'),
+                                 ('connection', 'could not be reached after 4 checks')):
+            with self.subTest(failure=failure):
+                for leftover in ('curl-calls', 'commands.jsonl'):
+                    (self.root / leftover).unlink(missing_ok=True)
+                result = self.run_update(DEPLOY_TEST_FAILURE=failure)
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn(message, result.stdout)
+                curls = [c for c in self._commands() if c[0] == 'curl']
+                self.assertEqual(len(curls), 4)
+                self.assertEqual(result.stdout.count('waiting for it to finish starting'), 3)
+
+    def test_site_still_starting_is_waited_for(self):
+        result = self.run_update(DEPLOY_TEST_FAILURE='warming')
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn('Site answered HTTP 404; waiting for it to finish starting (check 1 of 4)', result.stdout)
+        self.assertIn('Site responded with HTTP 200.', result.stdout)
+        self.assertIn('DEPLOYMENT SUCCESSFUL', result.stdout)
+
+    def test_beat_run_folder_is_created_before_restart(self):
+        result = self.run_update()
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertTrue(self.run_dir.is_dir())
+        commands = self._commands()
+        chown = commands.index(['chown', 'hodari:hodari', str(self.run_dir)])
+        restart = next(i for i, c in enumerate(commands) if c[:2] == ['systemctl', 'restart'])
+        self.assertLess(chown, restart)
+
+    def _commands(self):
+        return [json.loads(line) for line in (self.root / 'commands.jsonl').read_text().splitlines()]
 
 
 if __name__ == '__main__':
