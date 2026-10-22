@@ -1,0 +1,1 @@
+{"version": "0.0.1", "configurations": [{"name": "hisms-preview", "runtimeExecutable": "/bin/sh", "runtimeArgs": ["-c", "S=/private/tmp/claude-501/-Users-mac-hodari-hisms-backend/7eb9bfca-036c-4e8b-98a5-421842605b66/scratchpad; PYTHONPATH=$S/preview DJANGO_SETTINGS_MODULE=preview_settings exec $S/venv/bin/python manage.py runserver 8765"], "port": 8765}]}

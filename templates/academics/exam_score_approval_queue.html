@@ -43,6 +43,7 @@
 
 {% block content %}
 {% include "academics/_top_tabs_progress.html" %}
+{% include "academics/_progress_filters.html" %}
 
 {% if not can_approve %}
 <div class="card" style="margin-bottom:16px;padding:12px 16px;font-size:13px;color:var(--text-secondary)">
@@ -51,7 +52,7 @@
 {% endif %}
 {% if not queue_details %}
   {% if can_approve %}
-  {% include '_partials/empty_state.html' with icon='check' title='All Clear' desc='No scores pending HOD review for this term.' cta_url='academics:performance_report' cta_label='View Performance Report' %}
+  {% include '_partials/empty_state.html' with icon='check' title='All Clear' desc='No scores pending HOD review for this selection.' cta_url='academics:performance_report' cta_label='View Performance Report' %}
   {% else %}
   {% include '_partials/empty_state.html' with icon='check' title='Nothing submitted yet' desc='Scores you submit to the HOD will appear here with their sign-off status.' %}
   {% endif %}
@@ -75,34 +76,6 @@
     <div class="mc-sub" style="color:#059669">subject{{ subjects_count|pluralize }} in queue</div>
   </div>
 </div>
-
-<!-- Filters -->
-<div class="section-hdr">
-  <span class="section-title">Filters</span>
-  {% if selected_class or selected_subject %}
-    <a href="{% url 'academics:exam_score_approval_queue' %}" class="section-link">Clear All</a>
-  {% endif %}
-</div>
-<form method="get" style="display:flex;gap:12px;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap">
-  <div style="display:flex;flex-direction:column;gap:4px">
-    <label class="hf-label">Class</label>
-    <select name="class_name" class="hf-select" onchange="this.form.submit()" style="min-width:160px">
-      <option value="">All Classes</option>
-      {% for c in available_classes %}
-        <option value="{{ c }}" {% if selected_class == c %}selected{% endif %}>{{ c }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div style="display:flex;flex-direction:column;gap:4px">
-    <label class="hf-label">Subject</label>
-    <select name="subject_name" class="hf-select" onchange="this.form.submit()" style="min-width:160px">
-      <option value="">All Subjects</option>
-      {% for s in available_subjects %}
-        <option value="{{ s }}" {% if selected_subject == s %}selected{% endif %}>{{ s }}</option>
-      {% endfor %}
-    </select>
-  </div>
-</form>
 
 <!-- Exam Type Tabs (sticky like primary assessment) -->
 <div class="class-tabs-container">

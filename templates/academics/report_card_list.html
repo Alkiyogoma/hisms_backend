@@ -7,6 +7,7 @@
 
 {% block content %}
 {% include "academics/_top_tabs_reports.html" %}
+{% include "academics/_progress_filters.html" %}
 
 {% if signoff_blocked %}
 <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:14px 20px;margin:16px 0;display:flex;align-items:center;gap:12px">
@@ -20,21 +21,6 @@
 
 <div class="section-hdr">
   <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap">
-    <form method="GET" style="display:flex; align-items:center; gap:8px; margin:0">
-      <label style="font-size:12px; font-weight:600; color:var(--text-secondary)">Term:</label>
-      <select name="term_id" onchange="this.form.submit()" class="hf2-input" style="padding:6px 12px; font-size:13px; min-width:140px">
-        {% for t in all_terms %}
-          <option value="{{ t.id }}" {% if term_id == t.id %}selected{% endif %}>{{ t.name }} &middot; {{ t.academic_year.name }}</option>
-        {% endfor %}
-      </select>
-      <label style="font-size:12px; font-weight:600; color:var(--text-secondary)">Class:</label>
-      <select name="class_name" onchange="this.form.submit()" class="hf2-input" style="padding:6px 12px; font-size:13px; min-width:180px">
-        <option value="">-- Select Class --</option>
-        {% for c in available_classes %}
-          <option value="{{ c }}" {% if class_name == c %}selected{% endif %}>{{ c }}</option>
-        {% endfor %}
-      </select>
-    </form>
     {% is_hod_like user as can_signoff %}
     {% if has_pending and can_signoff and not signoff_blocked %}
       <button type="button" class="hf-btn hf-btn-primary" style="font-size:12px; padding:6px 14px"
@@ -125,7 +111,7 @@
 </div>
 {% else %}
 <div class="card" style="padding:40px; text-align:center; color:var(--text-muted)">
-  Select a class above to view report cards.
+  {% if available_classes %}No term selected.{% else %}You have no classes to show report cards for.{% endif %}
 </div>
 {% endif %}
 

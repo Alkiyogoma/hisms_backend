@@ -520,17 +520,13 @@ class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
             approval_block_reason, approver_class_names, can_approve_grades,
         )
 
-        term = get_current_term()
+        from academics.progress_filters import ProgressFilters
+        pf = ProgressFilters(self.request)
+        term = pf.term
         ctx["current_term"] = term
         user = self.request.user
         can_approve = can_approve_grades(user)
         ctx["can_approve"] = can_approve
-
-        # Filters
-        selected_class = self.request.GET.get("class_name", "").strip()
-        selected_subject = self.request.GET.get("subject_name", "").strip()
-        ctx["selected_class"] = selected_class
-        ctx["selected_subject"] = selected_subject
 
         if can_approve:
             # Base queryset: submitted scores for review
@@ -553,13 +549,28 @@ class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
                     own |= Q(student__class_name=class_name, subject_name__in=info["subjects"])
             qs = qs.filter(own)
 
-        if term:
-            qs = qs.filter(term=term)
-
+        # Filters: the shared progress filter bar (year, term, class, subject, type).
+        qs = qs.filter(term=term) if term else qs.none()
+        if can_approve:
+            class_options = sorted(scope) if scope is not None else sorted(
+                GradeClass.objects.values_list("name", flat=True))
+        else:
+            class_options = sorted(get_teacher_assigned_classes_from_tca(user))
+        selected_class = pf.pick_class(class_options, allow_all=True)
         if selected_class:
             qs = qs.filter(student__class_name=selected_class)
+        selected_subject = pf.pick_subject(qs.values_list("subject_name", flat=True).distinct())
         if selected_subject:
             qs = qs.filter(subject_name=selected_subject)
+        selected_type = pf.pick_type()
+        if selected_type:
+            qs = qs.filter(exam_type=selected_type)
+        ctx["selected_class"] = selected_class
+        ctx["selected_subject"] = selected_subject
+        ctx["pf"] = pf.context(footnote=(
+            "Marks submitted to the HOD for review. Approve or return them per learner or per group."
+            if can_approve else "The sign-off status of the marks you entered."
+        ))
 
         # Group by class + subject for the queue
         from django.db.models import Count
@@ -615,14 +626,6 @@ class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
         ctx["exam_types_count"] = exam_type_summary.count()
         ctx["subjects_count"] = qs.values("subject_name").distinct().count()
 
-        # Available filter options
-        ctx["available_classes"] = (
-            qs.values_list("student__class_name", flat=True).distinct().order_by("student__class_name")
-        )
-        ctx["available_subjects"] = (
-            qs.values_list("subject_name", flat=True).distinct().order_by("subject_name")
-        )
-
         ctx["academics_tab"] = "approval_queue"
 
         return ctx
@@ -644,7 +647,7 @@ class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
 
         if not score_ids:
             messages.error(request, "No scores selected.")
-            return redirect("academics:exam_score_approval_queue")
+            return redirect(request.get_full_path())
 
         scores = ExamScore.objects.filter(
             pk__in=score_ids, status=ScoreStatus.SUBMITTED
@@ -703,7 +706,7 @@ class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
             elif action == "return":
                 if not reason:
                     messages.error(request, "Reason is required when returning scores for correction.")
-                    return redirect("academics:exam_score_approval_queue")
+                    return redirect(request.get_full_path())
                 score.status = ScoreStatus.RETURNED
                 score.correction_reason = reason
                 score.is_locked = False
@@ -742,7 +745,7 @@ class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
             messages.success(request, f"{updated} score(s) {action_label}.")
         for msg, count in blocked.items():
             messages.error(request, f"{count} score(s) not {action_label}: {msg}")
-        return redirect("academics:exam_score_approval_queue")
+        return redirect(request.get_full_path())
 
 
 class CambridgeCheckpointEntryView(RoleRequiredMixin, TemplateView):
@@ -763,10 +766,11 @@ class CambridgeCheckpointEntryView(RoleRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        from academics.progress_filters import ProgressFilters
         user = self.request.user
-        term = get_current_term()
-        academic_year = term.academic_year if term else None
-        ctx["current_term"] = term
+        pf = ProgressFilters(self.request)
+        academic_year = pf.year
+        ctx["current_term"] = pf.term
         ctx["academic_year"] = academic_year
 
         # Available classes: Grades 6-9 only
@@ -781,10 +785,15 @@ class CambridgeCheckpointEntryView(RoleRequiredMixin, TemplateView):
 
         ctx["eligible_classes"] = eligible_classes
 
-        selected_class = self.request.GET.get("class_name", "").strip()
+        # Checkpoint results are recorded once per academic year, so the term
+        # filter only follows the year and there are no assessment types.
+        selected_class = pf.pick_class(eligible_classes)
         ctx["selected_class"] = selected_class
+        pf.pick_type(note="Checkpoint (1.0–6.0)")
+        if not (selected_class and academic_year):
+            pf.pick_subject([], note="English, Mathematics, Science")
 
-        if selected_class and selected_class in eligible_classes and academic_year:
+        if selected_class and academic_year:
             subjects = self.CHECKPOINT_SUBJECTS.get(selected_class, ["English", "Mathematics", "Science"])
 
             # Per-subject teacher restriction: teachers only see subjects they teach
@@ -801,6 +810,9 @@ class CambridgeCheckpointEntryView(RoleRequiredMixin, TemplateView):
                 if teacher_subjects:
                     subjects = [s for s in subjects if s in teacher_subjects]
 
+            subject = pf.pick_subject(subjects)
+            if subject:
+                subjects = [subject]
             ctx["subjects"] = subjects
 
             students = Student.objects.filter(
@@ -818,26 +830,32 @@ class CambridgeCheckpointEntryView(RoleRequiredMixin, TemplateView):
 
             students_data = []
             for s in students:
-                subj_scores = {}
+                cells = []
                 for subj in subjects:
                     cs = score_map.get((s.id, subj))
-                    subj_scores[subj] = cs.score if cs else None
-                students_data.append({"student": s, "scores": subj_scores})
+                    cells.append({"subject": subj, "score": cs.score if cs else None})
+                students_data.append({"student": s, "cells": cells})
 
             ctx["students_data"] = students_data
 
+        ctx["pf"] = pf.context(
+            footnote="Checkpoint results are on a 1.0–6.0 scale and recorded once per academic year.",
+        )
         ctx["academics_tab"] = "cambridge"
 
         return ctx
 
     def post(self, request, *args, **kwargs):
+        from academics.models import AcademicYear
         user = request.user
-        term = get_current_term()
-        if not term:
-            messages.error(request, "No active term found.")
+        academic_year = AcademicYear.objects.filter(pk=request.POST.get("year") or None).first()
+        if academic_year is None:
+            term = get_current_term()
+            academic_year = term.academic_year if term else None
+        if academic_year is None:
+            messages.error(request, "No academic year found.")
             return redirect("academics:cambridge_checkpoint_entry")
 
-        academic_year = term.academic_year
         class_name = request.POST.get("class_name", "").strip()
         if class_name not in self.CHECKPOINT_SUBJECTS:
             messages.error(request, "Invalid class for Cambridge Checkpoint.")
@@ -903,4 +921,4 @@ class CambridgeCheckpointEntryView(RoleRequiredMixin, TemplateView):
                 )
 
         messages.success(request, f"Saved {updated} Cambridge Checkpoint score(s) for {class_name}.")
-        return redirect(f"{request.path}?class_name={class_name}")
+        return redirect(request.get_full_path())

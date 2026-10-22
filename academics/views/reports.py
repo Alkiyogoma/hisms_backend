@@ -213,45 +213,37 @@ class ReportCardListView(RoleRequiredMixin, TemplateView):
     required_permission = "academics.view_reportcard"
 
     def get_context_data(self, **kwargs):
+        from academics.progress_filters import ProgressFilters
         ctx = super().get_context_data(**kwargs)
-        class_name = self.request.GET.get("class_name")
-        current_term = get_current_term()
-        term_id = self.request.GET.get("term_id")
-        if term_id:
-            try:
-                term = Term.objects.get(id=term_id)
-            except (Term.DoesNotExist, ValueError):
-                term = current_term
-        else:
-            term = current_term
-        ctx["class_name"] = class_name
-        ctx["current_term"] = current_term
+        pf = ProgressFilters(self.request)
+        term = pf.term
+        ctx["current_term"] = get_current_term()
         ctx["term"] = term
         ctx["term_id"] = term.id if term else ""
-        ctx["all_terms"] = Term.objects.all().order_by("-start_date")
 
         # RBAC: teachers restricted to their class-teacher-only classes
+        requested = self.request.GET.get("class_name")
         if self.request.user.role == UserRole.TEACHER:
             from core.teacher_context import get_teacher_assigned_classes_from_tca
             all_teacher_classes = get_teacher_assigned_classes_from_tca(self.request.user)
-            class_teacher_classes = [cls for cls, info in all_teacher_classes.items() if info.get("is_class_teacher")]
-            if class_name and class_name not in class_teacher_classes:
-                class_name = None
-                ctx["class_name"] = None
+            available = [cls for cls, info in all_teacher_classes.items() if info.get("is_class_teacher")]
+            if requested and requested not in available:
                 ctx["class_error"] = "You are not the class teacher for this class."
-            ctx["available_classes"] = class_teacher_classes
         else:
             from academics.models import GradeClass, Department
-            dept_ctx = Department.PRIMARY
             if self.request.user.is_school_wide:
-                available = GradeClass.objects.all().values_list("name", flat=True)
+                classes = GradeClass.objects.all()
             elif self.request.user.section_departments:
-                available = GradeClass.objects.filter(
-                    department__in=self.request.user.section_departments
-                ).values_list("name", flat=True)
+                classes = GradeClass.objects.filter(department__in=self.request.user.section_departments)
             else:
-                available = GradeClass.objects.filter(department=Department.PRIMARY).values_list("name", flat=True)
-            ctx["available_classes"] = list(available)
+                classes = GradeClass.objects.filter(department=Department.PRIMARY)
+            available = list(classes.order_by("sort_order", "name").values_list("name", flat=True))
+        ctx["available_classes"] = available
+        class_name = None if ctx.get("class_error") else (pf.pick_class(available) or None)
+        ctx["class_name"] = class_name
+        pf.pick_subject([], note="All subjects")
+        pf.pick_type(note="Term report")
+        ctx["pf"] = pf.context(footnote="Each student's term report: marks, remarks and comments, signed off before parents see it.")
 
         if class_name and term:
             reports = ReportCard.objects.filter(

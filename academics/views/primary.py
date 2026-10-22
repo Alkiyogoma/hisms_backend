@@ -21,6 +21,7 @@ from academics.models import (
     ECDEvaluation,
     ExamScore,
     ExamType,
+    ExamTypeConfiguration,
     LessonPlan,
     LessonPlanAttachment,
     LessonPlanStatus,
@@ -161,8 +162,10 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
     ]
 
     def get_context_data(self, **kwargs):
+        from academics.progress_filters import ProgressFilters
         ctx = super().get_context_data(**kwargs)
-        term = get_current_term()
+        pf = ProgressFilters(self.request)
+        term = pf.term
         ctx["current_term"] = term
         ctx["academics_tab"] = "comments"
         from django.utils import timezone
@@ -190,9 +193,12 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
         classes = {grade.name: grade for grade in self._comment_classes()}
         ctx["classes"] = list(classes)
 
-        selected_class = self.request.GET.get("class_name")
-        if selected_class and selected_class not in classes:
+        if self.request.GET.get("class_name") and self.request.GET["class_name"] not in classes:
             raise PermissionDenied("You do not have access to narrative comments for this class.")
+        selected_class = pf.pick_class(list(classes))
+        pf.pick_subject([], note="All subjects")
+        pf.pick_type(note="Narrative comments")
+        ctx["pf"] = pf.context(footnote="One narrative comment and trait ratings per student, written by the class teacher.")
         ctx["selected_class"] = selected_class
         if selected_class:
             ctx["selected_department_label"] = classes[selected_class].get_department_display()
@@ -410,11 +416,49 @@ class ScoreCorrectionHistoryView(RoleRequiredMixin, TemplateView):
         return ctx
 
 
+def exam_window_codes(term, today=None):
+    """(open_codes, closed_codes): assessment types whose entry window is open,
+    or has ended, on ``today`` in ``term``. Types without a window are neither."""
+    from academics.utils import _CODE_TO_TYPE, _EXAM_WINDOW_MAP
+
+    today = today or timezone.now().date()
+    open_codes, closed_codes = set(), set()
+    if not term:
+        return open_codes, closed_codes
+    for et in ExamTypeConfiguration.objects.filter(is_active=True):
+        canonical = _CODE_TO_TYPE.get(et.code, et.code)
+        if canonical == "quiz":
+            start, end = getattr(term, "quiz_start_date", None), getattr(term, "quiz_end_date", None)
+        else:
+            mapping = _EXAM_WINDOW_MAP.get(canonical)
+            if not mapping:
+                continue
+            field_start, field_end = mapping
+            start = getattr(term, field_start, None) if field_start else None
+            end = getattr(term, field_end, None) if field_end else None
+            if not start and not end:
+                continue
+        if (not start or today >= start) and (not end or today <= end):
+            open_codes.add(et.code)
+        elif end and today > end:
+            closed_codes.add(et.code)
+    return open_codes, closed_codes
+
+
 class SubjectAssessmentEntryMixin:
-    """Keep score and term-remark entry separate using the Subjects setting."""
+    """Score entry and term-remark entry for one department.
+
+    One page per mode (the Subjects setting decides which subjects take marks
+    and which take a term remark), laid out as a grid: a row per student and
+    a column per subject (and per assessment type, for marks). The shared
+    progress filter bar picks the year, term, class, subject and type.
+    """
 
     assessment_mode = AssessmentMode.MARKS
     assessment_department = None
+    hod_role = None
+    academics_tab = ""
+    department_label = ""
 
     def assessment_context(self, ctx):
         qs = Subject.objects.filter(
@@ -437,116 +481,85 @@ class SubjectAssessmentEntryMixin:
         prefix = "primary" if self.assessment_department == Department.PRIMARY else "lower_secondary"
         ctx["score_entry_url"] = f"academics:{prefix}_assessment"
         ctx["remark_entry_url"] = f"academics:{prefix}_remarks"
+        ctx["api_base"] = f"/academics/api/{prefix.replace('_', '-')}/"
         return ctx
 
-
-class PrimaryScoreEntryView(SubjectAssessmentEntryMixin, ScoreEntryAccessMixin, RoleRequiredMixin, TemplateView):
-    """New focused score entry view for Primary students matching ECD UI."""
-    template_name = "academics/primary_score_entry.html"
-    assessment_department = Department.PRIMARY
-    allowed_roles = [UserRole.TEACHER, UserRole.PRIMARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
-    # Viewing needs either permission (Head of School holds view only, and
-    # changes approved grades from this page); saving still needs change.
-    required_permissions_any = ["academics.change_examscore", "academics.view_examscore"]
-
     def get_context_data(self, **kwargs):
+        from academics.progress_filters import ProgressFilters
+        from academics.remarks import REMARK_CHOICES
+
         ctx = super().get_context_data(**kwargs)
-        from academics.models import ExamTypeConfiguration
-        
-        # Determine available classes
         user = self.request.user
         role = user.role
+        department_classes = grade_class_names_for_department(self.assessment_department)
         teacher_tca = {}
         if role == UserRole.TEACHER:
             from core.teacher_context import get_teacher_assigned_classes_from_tca
             teacher_tca = get_teacher_assigned_classes_from_tca(user)
-            # Filter for primary classes only
-            primary_names = grade_class_names_for_department(Department.PRIMARY)
-            classes = sorted(c for c in teacher_tca if c in primary_names)
-            ctx["_teacher_tca"] = teacher_tca
+            classes = sorted(c for c in teacher_tca if c in department_classes)
             ctx["class_teacher_classes"] = {c for c, info in teacher_tca.items() if info.get("is_class_teacher")}
-        elif role == UserRole.PRIMARY_HOD:
-            classes = sorted(grade_class_names_for_department(Department.PRIMARY))
         else:
-            # HOS/SuperAdmin see all primary classes
-            classes = sorted(grade_class_names_for_department(Department.PRIMARY))
+            classes = sorted(department_classes)
 
-        selected_class = self.request.GET.get("class_name")
-        if not selected_class and classes:
-            selected_class = classes[0]
-        
-        ctx["classes"] = classes
-        ctx["selected_class"] = selected_class
-        ctx["current_term"] = get_current_term()
-        
-        # Get active exam types for the form
-        ctx["exam_types"] = ExamTypeConfiguration.objects.filter(is_active=True).order_by('display_order')
+        pf = ProgressFilters(self.request)
+        selected_class = pf.pick_class(classes, labels={
+            c: f"{c} ★ Class teacher" for c in ctx.get("class_teacher_classes", ())
+        })
+        term = pf.term
+        ctx.update({
+            "classes": classes,
+            "selected_class": selected_class,
+            "term": term,
+            "current_term": term,
+            "academics_tab": self.academics_tab,
+            "department_label": self.department_label,
+            "remark_choices": REMARK_CHOICES,
+            "exam_types": ExamTypeConfiguration.objects.filter(is_active=True).order_by("display_order"),
+        })
+        ctx["open_exam_codes"], ctx["closed_exam_codes"] = exam_window_codes(term)
 
-        # Pass exam window info so frontend can gray out closed windows
-        term = ctx["current_term"]
-        if term:
-            today = timezone.now().date()
-            from academics.utils import _EXAM_WINDOW_MAP, _CODE_TO_TYPE
-            active_configs = ExamTypeConfiguration.objects.filter(is_active=True)
-            open_codes = set()
-            closed_codes = set()
-            for et in active_configs:
-                canonical = _CODE_TO_TYPE.get(et.code, et.code)
-                if canonical == "quiz":
-                    quiz_start = getattr(term, "quiz_start_date", None)
-                    quiz_end = getattr(term, "quiz_end_date", None)
-                    start_ok = (not quiz_start or today >= quiz_start)
-                    end_ok = (not quiz_end or today <= quiz_end)
-                    if start_ok and end_ok:
-                        open_codes.add(et.code)
-                    elif quiz_end and today > quiz_end:
-                        closed_codes.add(et.code)
-                else:
-                    mapping = _EXAM_WINDOW_MAP.get(canonical)
-                    if not mapping:
-                        continue
-                    field_start, field_end = mapping
-                    exam_start = getattr(term, field_start, None) if field_start else None
-                    exam_end = getattr(term, field_end, None) if field_end else None
-                    if not exam_start and not exam_end:
-                        continue
-                    start_ok = (not exam_start or today >= exam_start)
-                    end_ok = (not exam_end or today <= exam_end)
-                    if start_ok and end_ok:
-                        open_codes.add(et.code)
-                    elif exam_end and today > exam_end:
-                        closed_codes.add(et.code)
-            ctx["open_exam_codes"] = open_codes
-            ctx["closed_exam_codes"] = closed_codes
-        
-        # Get subjects for the selected class
-        if selected_class:
-            if role == UserRole.TEACHER:
-                class_info = teacher_tca.get(selected_class, {})
-                assigned_subjects = class_info.get("subjects", set())
-                # Class teacher sees ALL subjects for their class
-                if class_info.get("is_class_teacher"):
-                    gc = GradeClass.objects.filter(name=selected_class).first()
-                    if gc:
-                        all_subs = set(gc.subjects.filter(is_active=True).values_list("name", flat=True))
-                        subjects = all_subs
-                    else:
-                        subjects = assigned_subjects
-                else:
-                    subjects = assigned_subjects
-                ctx["subjects"] = sorted(subjects)
-                ctx["editable_subjects"] = assigned_subjects
-        ctx["academics_tab"] = "primary_assessment"
-        from academics.remarks import REMARK_CHOICES
+        if selected_class and role == UserRole.TEACHER:
+            class_info = teacher_tca.get(selected_class, {})
+            assigned_subjects = class_info.get("subjects", set())
+            subjects = assigned_subjects
+            # A class teacher sees every subject of the class, read-only
+            # where another teacher teaches it.
+            if class_info.get("is_class_teacher"):
+                gc = GradeClass.objects.filter(name=selected_class).first()
+                if gc:
+                    subjects = set(gc.subjects.filter(is_active=True).values_list("name", flat=True))
+            ctx["subjects"] = sorted(subjects)
+            ctx["editable_subjects"] = assigned_subjects
         ctx = self.assessment_context(ctx)
-        ctx["remark_choices"] = REMARK_CHOICES
+        is_remarks = ctx["assessment_is_remarks"]
 
-        if selected_class and ctx.get("current_term") and not ctx["assessment_is_remarks"]:
-            from academics.models import ExamScore, ScoreStatus
+        subject = pf.pick_subject(ctx["subjects"])
+        pf.pick_type(note="Term remark" if is_remarks else "")
+        ctx["columns"] = [subject] if subject else ctx["subjects"]
+        ctx["column_types"] = [] if is_remarks else pf.selected_types
+        ctx["pf"] = pf.context(
+            views=[
+                (reverse(ctx["score_entry_url"]), "Score entry", not is_remarks),
+                (reverse(ctx["remark_entry_url"]), "Term remarks", is_remarks),
+            ],
+            footnote=(
+                "One remark per subject for the term. These subjects do not take marks."
+                if is_remarks else
+                "Enter whole-number marks. Approved marks are locked; remark-only subjects are under Term remarks."
+            ),
+        )
+
+        ctx["can_edit"] = user.role == UserRole.SUPER_ADMIN or user.has_perm("academics.change_examscore")
+        if selected_class and term:
+            ctx["rows"] = self._grid_rows(ctx, selected_class, term)
+            ctx["students_done"] = sum(1 for r in ctx["rows"] if r["done"])
+
+        if selected_class and term and not is_remarks:
+            from academics.models import ScoreStatus
             # Scoped to the subjects this user can edit: another teacher's
             # submission or approval must not mark this teacher's work as done.
             own_scores = ExamScore.objects.filter(
-                student__class_name=selected_class, term=ctx["current_term"],
+                student__class_name=selected_class, term=term,
             ).mark_bearing()
             if role == UserRole.TEACHER:
                 own_scores = own_scores.filter(subject_name__in=ctx.get("editable_subjects") or [])
@@ -562,8 +575,91 @@ class PrimaryScoreEntryView(SubjectAssessmentEntryMixin, ScoreEntryAccessMixin, 
             # Remark-only subjects have no marks to submit to the HOD.
             ctx["submit_subjects"] = sorted(set(ctx.get("editable_subjects") or []) - ctx["remark_subjects"])
             ctx["returned_student_ids"] = returned_student_ids
-
         return ctx
+
+    def _grid_rows(self, ctx, class_name, term):
+        """One row per student: a cell per subject (remarks) or per subject and
+        assessment type (marks), with everything the cell needs to render."""
+        from academics.approval_policy import can_amend_approved_grades
+        from academics.models import ScoreStatus, SubjectTermRemark
+        from academics.score_progress import class_progress
+
+        students = list(Student.objects.filter(class_name=class_name, is_archived=False).order_by("last_name", "first_name"))
+        ids = [s.id for s in students]
+        progress = class_progress(ids, term.id, class_name)
+        editable = set(ctx["editable_subjects"]) if ctx["can_edit"] and not term.is_locked else set()
+        is_remarks = ctx["assessment_is_remarks"]
+        ctx["can_amend"] = not is_remarks and can_amend_approved_grades(self.request.user)
+
+        scores, remarks, remarks_locked = {}, {}, set()
+        if is_remarks:
+            for sid, subject, remark in SubjectTermRemark.objects.filter(
+                    student_id__in=ids, term=term).values_list("student_id", "subject_name", "remark"):
+                remarks[(sid, subject)] = remark
+            remarks_locked = set(ReportCard.objects.filter(
+                student_id__in=ids, term=term,
+                status__in=[ReportCardStatus.PENDING_SIGN_OFF, ReportCardStatus.PUBLISHED],
+            ).values_list("student_id", flat=True))
+        else:
+            for s in (ExamScore.objects.filter(student_id__in=ids, term=term, subject_name__in=ctx["columns"])
+                      .prefetch_related("amendments__changed_by")):
+                scores[(s.student_id, s.subject_name, s.exam_type)] = s
+
+        open_codes, closed_codes = ctx["open_exam_codes"], ctx["closed_exam_codes"]
+        rows = []
+        for student in students:
+            cells = []
+            for subject in ctx["columns"]:
+                if is_remarks:
+                    locked = subject not in editable or student.id in remarks_locked
+                    cells.append({
+                        "subject": subject, "remark": remarks.get((student.id, subject), ""),
+                        "readonly": locked,
+                        "lock_reason": "The report has gone for sign-off." if student.id in remarks_locked else "",
+                    })
+                    continue
+                for et in ctx["column_types"]:
+                    sc = scores.get((student.id, subject, et.code))
+                    status = sc.status if sc else ""
+                    returned = status == ScoreStatus.RETURNED
+                    if subject not in editable:
+                        reason = "Read only"
+                    elif status == ScoreStatus.APPROVED:
+                        reason = "Approved"
+                    elif sc and sc.is_locked and not returned:
+                        reason = "Submitted to the HOD"
+                    elif et.code in closed_codes and not returned:
+                        reason = f"{et.name} window has ended"
+                    elif et.code not in open_codes and not returned:
+                        reason = f"Opens when the {et.name} window starts"
+                    else:
+                        reason = ""
+                    cells.append({
+                        "subject": subject, "type": et, "score": sc, "status": status,
+                        "value": (int(sc.score) if sc.score == int(sc.score) else sc.score) if sc else "",
+                        "readonly": bool(reason), "lock_reason": reason,
+                        "feedback": (sc.correction_reason or sc.hod_feedback or "") if returned else "",
+                        "amendments": list(sc.amendments.all()) if sc else [],
+                    })
+            p = progress.get(student.id) or {}
+            if is_remarks:
+                done = all(c["remark"] for c in cells) if cells else False
+            else:
+                done = p.get("status") not in (None, "", "pending")
+            rows.append({"student": student, "cells": cells, "progress": p, "done": done})
+        return rows
+
+
+class PrimaryScoreEntryView(SubjectAssessmentEntryMixin, ScoreEntryAccessMixin, RoleRequiredMixin, TemplateView):
+    """Primary score entry and term remarks: a student x subject grid."""
+    template_name = "academics/assessment_grid.html"
+    assessment_department = Department.PRIMARY
+    academics_tab = "primary_assessment"
+    department_label = "Primary"
+    allowed_roles = [UserRole.TEACHER, UserRole.PRIMARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
+    # Viewing needs either permission (Head of School holds view only, and
+    # changes approved grades from this page); saving still needs change.
+    required_permissions_any = ["academics.change_examscore", "academics.view_examscore"]
 
 class PrimaryStudentsAPIView(RoleRequiredMixin, View):
     """API to get student list for Primary focused entry."""
@@ -1034,122 +1130,15 @@ class PrimaryBulkSubmissionAPIView(RoleRequiredMixin, View):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class LowerSecondaryScoreEntryView(SubjectAssessmentEntryMixin, ScoreEntryAccessMixin, RoleRequiredMixin, TemplateView):
-    """Score entry view for Lower Secondary students (Grade 7–9)."""
-    template_name = "academics/lower_secondary_score_entry.html"
+    """Lower Secondary (Grade 7-9) score entry and term remarks: a student x subject grid."""
+    template_name = "academics/assessment_grid.html"
     assessment_department = Department.LOWER_SECONDARY
+    academics_tab = "lower_secondary_assessment"
+    department_label = "Lower Secondary"
     allowed_roles = [UserRole.TEACHER, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
     # Viewing needs either permission (Head of School holds view only, and
     # changes approved grades from this page); saving still needs change.
     required_permissions_any = ["academics.change_examscore", "academics.view_examscore"]
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        from academics.models import ExamTypeConfiguration
-
-        user = self.request.user
-        role = user.role
-        teacher_tca = {}
-        if role == UserRole.TEACHER:
-            from core.teacher_context import get_teacher_assigned_classes_from_tca
-            teacher_tca = get_teacher_assigned_classes_from_tca(user)
-            ls_names = grade_class_names_for_department(Department.LOWER_SECONDARY)
-            classes = sorted(c for c in teacher_tca if c in ls_names)
-            ctx["_teacher_tca"] = teacher_tca
-            ctx["class_teacher_classes"] = {c for c, info in teacher_tca.items() if info.get("is_class_teacher")}
-        elif role == UserRole.LOWER_SECONDARY_HOD:
-            classes = sorted(grade_class_names_for_department(Department.LOWER_SECONDARY))
-        else:
-            classes = sorted(grade_class_names_for_department(Department.LOWER_SECONDARY))
-
-        selected_class = self.request.GET.get("class_name")
-        if not selected_class and classes:
-            selected_class = classes[0]
-
-        ctx["classes"] = classes
-        ctx["selected_class"] = selected_class
-        ctx["current_term"] = get_current_term()
-
-        ctx["exam_types"] = ExamTypeConfiguration.objects.filter(is_active=True).order_by("display_order")
-
-        term = ctx["current_term"]
-        if term:
-            today = timezone.now().date()
-            from academics.utils import _EXAM_WINDOW_MAP, _CODE_TO_TYPE
-            active_configs = ExamTypeConfiguration.objects.filter(is_active=True)
-            open_codes = set()
-            closed_codes = set()
-            for et in active_configs:
-                canonical = _CODE_TO_TYPE.get(et.code, et.code)
-                if canonical == "quiz":
-                    quiz_start = getattr(term, "quiz_start_date", None)
-                    quiz_end = getattr(term, "quiz_end_date", None)
-                    start_ok = not quiz_start or today >= quiz_start
-                    end_ok = not quiz_end or today <= quiz_end
-                    if start_ok and end_ok:
-                        open_codes.add(et.code)
-                    elif quiz_end and today > quiz_end:
-                        closed_codes.add(et.code)
-                else:
-                    mapping = _EXAM_WINDOW_MAP.get(canonical)
-                    if not mapping:
-                        continue
-                    field_start, field_end = mapping
-                    exam_start = getattr(term, field_start, None) if field_start else None
-                    exam_end = getattr(term, field_end, None) if field_end else None
-                    if not exam_start and not exam_end:
-                        continue
-                    start_ok = not exam_start or today >= exam_start
-                    end_ok = not exam_end or today <= exam_end
-                    if start_ok and end_ok:
-                        open_codes.add(et.code)
-                    elif exam_end and today > exam_end:
-                        closed_codes.add(et.code)
-            ctx["open_exam_codes"] = open_codes
-            ctx["closed_exam_codes"] = closed_codes
-
-        if selected_class:
-            if role == UserRole.TEACHER:
-                class_info = teacher_tca.get(selected_class, {})
-                assigned_subjects = class_info.get("subjects", set())
-                if class_info.get("is_class_teacher"):
-                    gc = GradeClass.objects.filter(name=selected_class).first()
-                    if gc:
-                        all_subs = set(gc.subjects.filter(is_active=True).values_list("name", flat=True))
-                        subjects = all_subs
-                    else:
-                        subjects = assigned_subjects
-                else:
-                    subjects = assigned_subjects
-                ctx["subjects"] = sorted(subjects)
-                ctx["editable_subjects"] = assigned_subjects
-        ctx["academics_tab"] = "lower_secondary_assessment"
-        from academics.remarks import REMARK_CHOICES
-        ctx = self.assessment_context(ctx)
-        ctx["remark_choices"] = REMARK_CHOICES
-
-        if selected_class and ctx.get("current_term") and not ctx["assessment_is_remarks"]:
-            from academics.models import ExamScore, ScoreStatus
-            # Scoped to the subjects this user can edit: another teacher's
-            # submission or approval must not mark this teacher's work as done.
-            own_scores = ExamScore.objects.filter(
-                student__class_name=selected_class, term=ctx["current_term"],
-            ).mark_bearing()
-            if role == UserRole.TEACHER:
-                own_scores = own_scores.filter(subject_name__in=ctx.get("editable_subjects") or [])
-            returned_student_ids = list(
-                own_scores.filter(status=ScoreStatus.RETURNED)
-                .values_list("student_id", flat=True).distinct()
-            )
-            ctx["class_submitted"] = (
-                own_scores.exists()
-                and not own_scores.filter(status__in=[ScoreStatus.DRAFT, ScoreStatus.RETURNED]).exists()
-            )
-            ctx["returned_count"] = len(returned_student_ids)
-            # Remark-only subjects have no marks to submit to the HOD.
-            ctx["submit_subjects"] = sorted(set(ctx.get("editable_subjects") or []) - ctx["remark_subjects"])
-            ctx["returned_student_ids"] = returned_student_ids
-
-        return ctx
 
 
 class LowerSecondaryStudentsAPIView(RoleRequiredMixin, View):

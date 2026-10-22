@@ -6,33 +6,6 @@
 
 {% block extra_head %}
 <style>
-.class-tabs-container {
-    background: #fff;
-    border-bottom: 1px solid #E2E8F0;
-    margin: 0 -28px 24px -28px;
-    padding: 0 28px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    overflow-x: auto;
-    scrollbar-width: none;
-    position: sticky;
-    top: 108px;
-    z-index: 39;
-}
-.class-tabs-container::-webkit-scrollbar { display: none; }
-.class-tab {
-    padding: 16px 24px;
-    font-size: 14px;
-    font-weight: 600;
-    color: #64748B;
-    text-decoration: none;
-    border-bottom: 3px solid transparent;
-    transition: all 0.2s ease;
-    white-space: nowrap;
-}
-.class-tab:hover { color: #023AA5; background: #F8FAFC; }
-.class-tab.active { color: #023AA5; border-bottom-color: #023AA5; }
 
 .grading-grid {
     display: grid;
@@ -89,17 +62,20 @@
 .status-done { background: #D1FAE5; color: #065F46; }
 .status-progress { background: #FEF3C7; color: #92400E; }
 
-.progress-bar-container {
-    background: #fff;
-    border: 1px solid #E2E8F0;
-    border-radius: 12px;
-    padding: 16px 24px;
-    margin-bottom: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 24px;
-}
+.cm-modal { position:fixed; inset:0; z-index:9999; background:rgba(15,23,42,.45); display:flex; align-items:center; justify-content:center; padding:16px; }
+.cm-modal[hidden] { display:none; }
+.cm-modal-box { background:#fff; border-radius:14px; max-width:420px; width:100%; padding:22px; box-shadow:0 20px 60px rgba(0,0,0,.2); }
+.cm-modal-box h3 { margin:0 0 8px; font-size:16px; color:#1E293B; }
+.cm-modal-box p { margin:0 0 18px; font-size:13px; color:#475569; line-height:1.5; }
+.cm-head { background:#fff; border:1px solid #E2E8F0; border-radius:14px; padding:16px 20px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; }
+.cm-head > div { flex:1; }
+.cm-title { margin:0; font-size:20px; color:#1E293B; }
+.cm-title span { font-size:13px; font-weight:500; color:#64748B; }
+.cm-meta { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:6px; font-size:13px; color:#64748B; }
+.cm-meta strong { color:#023AA5; font-family:'JetBrains Mono',monospace; }
+.cm-window { border:0; cursor:pointer; font:inherit; font-size:11px; }
+.cm-track { height:6px; background:#F1F5F9; border-radius:3px; overflow:hidden; margin-top:10px; max-width:420px; }
+#comment-progress-fill { width:0; height:100%; background:#023AA5; transition:width .5s ease; }
 
 .comment-section {
     background: #fff;
@@ -176,61 +152,41 @@
 
 {% block content %}
 {% include "academics/_top_tabs_reports.html" %}
+{% include "academics/_progress_filters.html" %}
 
-{% if comment_window_status == "closed_early" and comment_window_endterm_end %}
-<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:14px 20px;margin:16px 0;display:flex;align-items:center;gap:12px">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-    <div>
-        <div style="font-size:13px;font-weight:700;color:#1E40AF">Comment entry opens after endterm exams</div>
-        <div style="font-size:12px;color:#3B82F6;margin-top:2px">Endterm exam window ends: <strong>{{ comment_window_endterm_end|date:"d M Y" }}</strong>. You can draft comments now, but submission is blocked until then.</div>
-    </div>
+{% if comment_window_status != "open" and current_term and selected_class %}
+{% if comment_window_status == "closed_late" and comment_window_grading_deadline or comment_window_status == "closed_early" and comment_window_endterm_end %}
+<div id="windowNotice" class="cm-modal" role="dialog" aria-modal="true" aria-labelledby="windowNoticeTitle" hidden onclick="if(event.target===this)closeWindowNotice()">
+  <div class="cm-modal-box">
+    {% if comment_window_status == "closed_late" %}
+    <h3 id="windowNoticeTitle">Grading deadline has passed</h3>
+    <p>The deadline was <strong>{{ comment_window_grading_deadline|date:"d M Y" }}</strong>, so comments are locked. Ask an administrator to reopen them.</p>
+    {% else %}
+    <h3 id="windowNoticeTitle">Submission opens {{ comment_window_endterm_end|date:"d M Y" }}</h3>
+    <p>You can draft comments now. Submitting them for review opens when the endterm exams end.</p>
+    {% endif %}
+    <div style="text-align:right"><button type="button" class="hf-btn hf-btn-primary" onclick="closeWindowNotice()">Got it</button></div>
+  </div>
 </div>
+<script>
+/* Shown once per term and window state; the chip in the class header reopens it. */
+var WINDOW_NOTICE_KEY = "cm-window-notice:{{ current_term.pk }}:{{ comment_window_status }}";
+function openWindowNotice() { document.getElementById("windowNotice").hidden = false; }
+function closeWindowNotice() {
+  document.getElementById("windowNotice").hidden = true;
+  try { localStorage.setItem(WINDOW_NOTICE_KEY, "1"); } catch (e) {}
+}
+document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeWindowNotice(); });
+(function () {
+  var seen = false;
+  try { seen = localStorage.getItem(WINDOW_NOTICE_KEY) === "1"; } catch (e) {}
+  if (!seen) openWindowNotice();
+})();
+</script>
 {% endif %}
-
-{% if comment_window_status == "closed_late" and comment_window_grading_deadline %}
-<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:14px 20px;margin:16px 0;display:flex;align-items:center;gap:12px">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-    <div>
-        <div style="font-size:13px;font-weight:700;color:#991B1B">Grading deadline has passed</div>
-        <div style="font-size:12px;color:#DC2626;margin-top:2px">The grading deadline was <strong>{{ comment_window_grading_deadline|date:"d M Y" }}</strong>. Comments are now locked for editing. Contact your admin to reopen.</div>
-    </div>
-</div>
 {% endif %}
-
-<div class="class-tabs-container">
-    {% for cls in classes %}
-    <a href="?class_name={{ cls|urlencode }}" class="class-tab {% if selected_class == cls %}active{% endif %}">{{ cls }}</a>
-    {% endfor %}
-</div>
 
 {% if selected_class and student_reports %}
-<div class="progress-bar-container">
-    <div style="flex:1">
-        <div style="display:flex;justify-content:space-between;margin-bottom:8px">
-            <span style="font-size:13px;font-weight:600;color:#64748B">Comment Progress &middot; {{ selected_class }}</span>
-            <span id="comment-progress-text" style="font-size:13px;font-weight:700;color:#023AA5">0 of {{ student_reports|length }} students complete</span>
-        </div>
-        <div style="height:10px;background:#F1F5F9;border-radius:5px;overflow:hidden">
-            <div id="comment-progress-fill" style="width:0%;height:100%;background:#023AA5;transition:width 0.5s ease"></div>
-        </div>
-    </div>
-    <div style="display:flex;gap:12px;align-items:center;flex-shrink:0">
-        <div style="text-align:right">
-            <div style="font-size:11px;color:#64748B;font-weight:700;text-transform:uppercase">Active Term</div>
-            <div style="font-size:14px;font-weight:700;color:#1E293B">{{ current_term.name }}</div>
-        </div>
-        <div style="display:flex;gap:8px">
-            {% if all_submitted %}
-            <span class="status-chip status-done" style="padding:8px 16px;font-size:13px">All Submitted</span>
-            {% elif comment_window_status != "open" %}
-            <span class="status-chip status-pending" style="padding:8px 16px;font-size:13px">Window Closed</span>
-            {% else %}
-            <button type="submit" id="btn-submit-top" class="hf-btn hf-btn-success" onclick="showSubmitConfirm()">Submit for Review</button>
-            {% endif %}
-        </div>
-    </div>
-</div>
-
 <div class="grading-grid">
     <div class="student-sidebar">
         <div class="sidebar-header">
@@ -261,22 +217,27 @@
             <input type="hidden" name="term_id" value="{{ current_term.id }}">
             <input type="hidden" name="class_name" value="{{ selected_class }}">
 
-            <div style="background:#fff;border:1px solid #E2E8F0;border-radius:16px;padding:24px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center">
-                <div>
-                    <h2 style="margin:0;font-size:26px;color:#1E293B">{{ selected_class }}</h2>
-                    <div style="color:#64748B;font-size:14px;margin-top:4px">{{ selected_department_label }} Department &middot; Narrative Comments &middot; {{ current_term.name }}</div>
+            <div class="cm-head">
+                <div style="min-width:0">
+                    <h2 class="cm-title">{{ selected_class }} <span>&middot; {{ selected_department_label }} Department</span></h2>
+                    <div class="cm-meta">
+                        <span><strong id="complete-count">0/{{ student_reports|length }}</strong> comments complete</span>
+                        {% if all_submitted %}<span class="chip chip-green">All submitted</span>
+                        {% elif comment_window_status == "closed_early" and comment_window_endterm_end %}<button type="button" class="chip chip-blue cm-window" onclick="openWindowNotice()">Submission opens {{ comment_window_endterm_end|date:"d M" }}</button>
+                        {% elif comment_window_status == "closed_late" %}<button type="button" class="chip chip-red cm-window" onclick="openWindowNotice()">Locked &middot; deadline passed</button>{% endif %}
+                    </div>
+                    <div class="cm-track"><div id="comment-progress-fill"></div></div>
                 </div>
-                <div style="background:#1E293B;border-radius:12px;padding:12px 24px;text-align:center;color:#fff;min-width:140px">
-                    <div style="font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;margin-bottom:2px">Complete</div>
-                    <div id="complete-count" style="font-size:24px;font-weight:800;font-family:'JetBrains Mono',monospace">0/{{ student_reports|length }}</div>
-                </div>
+                {% if not all_submitted and comment_window_status == "open" %}
+                <button type="button" id="btn-submit-top" class="hf-btn hf-btn-success" onclick="showSubmitConfirm()">Submit for Review</button>
+                {% endif %}
             </div>
 
             {% for row in student_reports %}
             <div class="comment-section" id="student-{{ row.report.id }}">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
                     <div style="display:flex;align-items:center;gap:12px">
-                        <div style="width:44px;height:44px;background:linear-gradient(135deg,#023AA5,#1e5cc8);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px">
+                        <div style="width:34px;height:34px;background:linear-gradient(135deg,#023AA5,#1e5cc8);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px">
                             {{ row.student.first_name|first }}{{ row.student.last_name|first }}
                         </div>
                         <div>
@@ -393,7 +354,6 @@
                     {% if all_submitted %}
                     <span class="status-chip status-done" style="padding:8px 16px;font-size:13px">All Submitted</span>
                     {% elif comment_window_status != "open" %}
-                    <span class="status-chip status-pending" style="padding:8px 16px;font-size:13px">Window Closed</span>
                     {% else %}
                     <button type="submit" id="btn-save" class="hf-btn hf-btn-primary">Save All Comments</button>
                     <button type="button" id="btn-submit" class="hf-btn hf-btn-success" onclick="showSubmitConfirm()">Submit for Review</button>
@@ -554,7 +514,6 @@ function updateProgress() {
     });
     document.getElementById('complete-count').textContent = complete + '/' + total;
     document.getElementById('complete-count-bottom').textContent = complete;
-    document.getElementById('comment-progress-text').textContent = complete + ' of ' + total + ' students complete';
     document.getElementById('comment-progress-fill').style.width = (total > 0 ? (complete / total * 100) : 0) + '%';
 }
 
@@ -586,8 +545,8 @@ updateProgress();
 {% else %}
 <div style="text-align:center;padding:60px 20px;background:#fff;border-radius:16px;border:1px solid #E2E8F0">
     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5" style="margin-bottom:16px"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-    <h3 style="margin:0 0 8px;font-size:16px;color:#1E293B;font-weight:700">Select a class</h3>
-    <p style="margin:0;font-size:13px;color:#64748B">Choose a class above to enter narrative comments.</p>
+    <h3 style="margin:0 0 8px;font-size:16px;color:#1E293B;font-weight:700">{% if classes %}No term selected{% else %}No classes to comment on{% endif %}</h3>
+    <p style="margin:0;font-size:13px;color:#64748B">{% if classes %}Pick a term in the filter above.{% else %}Narrative comments are written by the class teacher.{% endif %}</p>
 </div>
 {% endif %}
 {% endblock %}

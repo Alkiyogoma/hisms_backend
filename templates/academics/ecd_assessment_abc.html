@@ -7,11 +7,6 @@
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'branding/ecd-assessment.css' %}">
 <style>
-.class-tabs-container{background:#fff;border-bottom:1px solid #E2E8F0;margin:0 -28px 24px -28px;padding:0 28px;display:flex;align-items:center;gap:8px;overflow-x:auto;scrollbar-width:none;position:sticky;top:108px;z-index:39}
-.class-tabs-container::-webkit-scrollbar{display:none}
-.class-tab{padding:16px 24px;font-size:14px;font-weight:600;color:#64748B;text-decoration:none;border-bottom:3px solid transparent;transition:all .2s ease;white-space:nowrap}
-.class-tab:hover{color:#023AA5;background:#F8FAFC}
-.class-tab.active{color:#023AA5;border-bottom-color:#023AA5}
 </style>
 {% endblock %}
 
@@ -25,11 +20,7 @@
     <div style="font-size:13px; color:#94A3B8; max-width:400px; margin:0 auto">You have no ECD class assignments for the current term. Contact your administrator to assign classes.</div>
   </div>
   {% else %}
-  <!-- Class tabs -->
-  <div class="class-tabs-container">
-    {% for tab in ecd_tabs %}<a href="{% url 'academics:ecd_assessment' %}?class_name={{ tab.class_name }}" class="class-tab {% if ecd_class_name == tab.class_name %}active{% endif %}">{{ tab.display_name }}</a>{% endfor %}
-
-  </div>
+  {% include "academics/_ecd_filters.html" %}
 
   <!-- ACE banner -->
   <div style="background:#1A1A2E;border-radius:8px;padding:10px 16px;margin-bottom:14px;font-size:12.5px;display:flex;align-items:center;gap:10px">
@@ -469,8 +460,8 @@ async function loadStudent(id) {
   }
   const stEl = document.getElementById("st-" + id);
   if (stEl) {
-    stEl.textContent = d.status === 'pending_sign_off' ? 'Done' : (d.status === 'draft' ? 'Draft' : 'Pending');
-    stEl.className = d.status === 'pending_sign_off' ? 'chip chip-green' : (d.status === 'draft' ? 'chip chip-amber' : 'chip chip-grey');
+    stEl.textContent = d.status==='pending_sign_off'?'Done':d.status==='published'?'Published':d.no_report?'No report':(d.status === 'draft' ? 'Draft' : 'Pending');
+    stEl.className = (d.status==='pending_sign_off'||d.status==='published')?'chip chip-green':(d.status === 'draft' ? 'chip chip-amber' : 'chip chip-grey');
   }
 }
 
