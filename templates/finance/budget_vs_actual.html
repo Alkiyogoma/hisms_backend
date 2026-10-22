@@ -13,19 +13,25 @@
 </div>
 
 <!-- Term selector + CSV -->
-<form method="get" class="hf2-toolbar" style="padding:16px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;margin-bottom:20px">
-  <span class="hf2-toolbar-label">Term</span>
-  <select name="term" class="hf2-select" style="min-width:200px" onchange="this.form.submit()">
-    <option value="">Select term</option>
-    {% for term in terms %}
-    <option value="{{ term.pk }}" {% if selected_term.pk == term.pk %}selected{% endif %}>{{ term.name }} ({{ term.academic_year.name }})</option>
-    {% endfor %}
-  </select>
-  <a href="?{% if selected_term.pk %}term={{ selected_term.pk }}&{% endif %}format=csv"
-     class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center;gap:4px;margin-left:auto" download>
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-    Export CSV
-  </a>
+<form method="get" class="hf-filterbar">
+    <div class="hf-filters">
+      <div class="hf-fg">
+        <label for="f-term">Term</label>
+        <select id="f-term" name="term" onchange="this.form.submit()">
+          <option value="">Select term</option>
+          {% for term in terms %}
+          <option value="{{ term.pk }}" {% if selected_term.pk == term.pk %}selected{% endif %}>{{ term.name }} ({{ term.academic_year.name }})</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="hf-filterfoot">
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>Filters apply as you choose them.</span>
+      <span>
+        <noscript><button type="submit" class="hf-btn hf-btn-primary">Apply</button></noscript>
+        <a class="hf-reset" href="?{% if selected_term.pk %}term={{ selected_term.pk }}&{% endif %}format=csv" download>Export CSV</a>
+      </span>
+    </div>
 </form>
 
 {% if selected_term %}

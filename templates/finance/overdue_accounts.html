@@ -28,9 +28,6 @@
   .reminder-modal-overlay.active { display:flex; }
   .reminder-modal { background:#fff; border-radius:12px; padding:24px; width:520px; max-width:90vw; max-height:80vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.15); }
   .reminder-modal h3 { margin:0 0 16px; font-size:16px; font-weight:700; }
-  .filter-bar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; align-items:center; }
-  .filter-bar select, .filter-bar input { padding:6px 10px; border:1px solid var(--border); border-radius:6px; font-size:12.5px; background:#fff; }
-  .filter-bar .btn { padding:6px 14px; font-size:12px; }
   .stat-row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
   .reminder-log-item { padding:6px 0; display:flex; gap:8px; align-items:flex-start; border-bottom:1px solid var(--border); font-size:12px; }
   .reminder-log-item:last-child { border-bottom:none; }
@@ -110,27 +107,42 @@
 </div>
 
 <!-- Filter Bar -->
-<form method="get" class="filter-bar">
-  <label style="font-size:12px;font-weight:600;color:var(--text-secondary)">Filter:</label>
-  <select name="sort">
-    <option value="days_desc" {% if selected_sort == 'days_desc' %}selected{% endif %}>Days Overdue &darr;</option>
-    <option value="days_asc" {% if selected_sort == 'days_asc' %}selected{% endif %}>Days Overdue &uarr;</option>
-    <option value="amount_desc" {% if selected_sort == 'amount_desc' %}selected{% endif %}>Balance &darr;</option>
-    <option value="amount_asc" {% if selected_sort == 'amount_asc' %}selected{% endif %}>Balance &uarr;</option>
-    <option value="name_asc" {% if selected_sort == 'name_asc' %}selected{% endif %}>Name A&ndash;Z</option>
-    <option value="name_desc" {% if selected_sort == 'name_desc' %}selected{% endif %}>Name Z&ndash;A</option>
-    <option value="class_asc" {% if selected_sort == 'class_asc' %}selected{% endif %}>Class A&ndash;Z</option>
-    <option value="class_desc" {% if selected_sort == 'class_desc' %}selected{% endif %}>Class Z&ndash;A</option>
-  </select>
-  <select name="class">
-    <option value="">All classes</option>
-    {% for cls in classes %}
-    <option value="{{ cls }}" {% if selected_class == cls %}selected{% endif %}>{{ cls }}</option>
-    {% endfor %}
-  </select>
-  <input type="number" name="days_min" placeholder="Min days overdue" value="{{ days_min }}" style="width:120px">
-  <button type="submit" class="btn btn-secondary btn-sm">Apply</button>
-  <a href="{% url 'finance:overdue_accounts' %}" class="btn btn-secondary btn-sm" style="font-size:12px">Clear</a>
+<form method="get" class="hf-filterbar">
+    <div class="hf-filters">
+      <div class="hf-fg">
+        <label for="f-class">Class</label>
+        <select id="f-class" name="class" onchange="this.form.submit()">
+          <option value="">All classes</option>
+          {% for cls in classes %}
+          <option value="{{ cls }}" {% if selected_class == cls %}selected{% endif %}>{{ cls }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="hf-fg">
+        <label for="f-days">Min. days overdue</label>
+        <input id="f-days" type="number" min="0" name="days_min" value="{{ days_min }}" placeholder="Any" onchange="this.form.submit()">
+      </div>
+      <div class="hf-fg">
+        <label for="f-sort">Sort by</label>
+        <select id="f-sort" name="sort" onchange="this.form.submit()">
+          <option value="days_desc" {% if selected_sort == 'days_desc' %}selected{% endif %}>Days overdue (most first)</option>
+          <option value="days_asc" {% if selected_sort == 'days_asc' %}selected{% endif %}>Days overdue (fewest first)</option>
+          <option value="amount_desc" {% if selected_sort == 'amount_desc' %}selected{% endif %}>Balance (highest first)</option>
+          <option value="amount_asc" {% if selected_sort == 'amount_asc' %}selected{% endif %}>Balance (lowest first)</option>
+          <option value="name_asc" {% if selected_sort == 'name_asc' %}selected{% endif %}>Name A&ndash;Z</option>
+          <option value="name_desc" {% if selected_sort == 'name_desc' %}selected{% endif %}>Name Z&ndash;A</option>
+          <option value="class_asc" {% if selected_sort == 'class_asc' %}selected{% endif %}>Class A&ndash;Z</option>
+          <option value="class_desc" {% if selected_sort == 'class_desc' %}selected{% endif %}>Class Z&ndash;A</option>
+        </select>
+      </div>
+    </div>
+    <div class="hf-filterfoot">
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>Filters apply as you choose them.</span>
+      <span>
+        <noscript><button type="submit" class="hf-btn hf-btn-primary">Apply</button></noscript>
+        {% if selected_class or days_min or request.GET.sort %}<a class="hf-reset" href="{% url 'finance:overdue_accounts' %}">Clear filters</a>{% endif %}
+      </span>
+    </div>
 </form>
 
 <!-- Overdue Accounts Table -->

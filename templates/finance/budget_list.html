@@ -18,16 +18,25 @@
 </div>
 
 <!-- Term selector -->
-<form method="get" class="hf2-toolbar">
-  <span class="hf2-toolbar-label">Term</span>
-  <select name="term" class="hf2-select" onchange="this.form.submit()">
-    <option value="">All terms</option>
-    {% for term in terms %}
-    <option value="{{ term.pk }}" {% if selected_term|stringformat:"s" == term.pk|stringformat:"s" %}selected{% endif %}>
-      {{ term.name }} &middot; {{ term.academic_year.name }}
-    </option>
-    {% endfor %}
-  </select>
+<form method="get" class="hf-filterbar">
+    <div class="hf-filters">
+      <div class="hf-fg">
+        <label for="f-term">Term</label>
+        <select id="f-term" name="term" onchange="this.form.submit()">
+          <option value="">All terms</option>
+          {% for term in terms %}
+          <option value="{{ term.pk }}" {% if selected_term|stringformat:"s" == term.pk|stringformat:"s" %}selected{% endif %}>{{ term.name }} &middot; {{ term.academic_year.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="hf-filterfoot">
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>Filters apply as you choose them.</span>
+      <span>
+        <noscript><button type="submit" class="hf-btn hf-btn-primary">Apply</button></noscript>
+        {% if selected_term %}<a class="hf-reset" href="{% url 'finance:budget_list' %}">Clear filters</a>{% endif %}
+      </span>
+    </div>
 </form>
 
 <!-- Summary metric cards -->
