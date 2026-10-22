@@ -1,8 +1,0 @@
-{% load role_tags %}
-{% has_perm user "students.change_student" as can_archive_student %}
-{% if can_archive_student %}
-<form method="post" action="{% if student.is_archived %}{% url 'students:restore' student.pk %}{% else %}{% url 'students:archive' student.pk %}{% endif %}" style="display:inline" onsubmit="return confirm('{% if student.is_archived %}Restore this student to active records?{% else %}Archive this student? Their records will be kept and can be restored.{% endif %}')">
-  {% csrf_token %}
-  <button class="hf-btn hf-btn-secondary" type="submit">{% if student.is_archived %}Restore{% else %}Archive{% endif %}</button>
-</form>
-{% endif %}

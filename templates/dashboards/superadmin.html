@@ -13,10 +13,11 @@
   <span class="chip chip-amber">Super Admin</span>
 </div>
 
-<div class="metrics" style="grid-template-columns:repeat(3,1fr);gap:14px">
-  {% include '_partials/stat_card.html' with label='Login success rate' value=uptime unit='%' sub='Last 30 days' variant='green' %}
-  {% include '_partials/stat_card.html' with label='Active incidents' value=incidents sub='Operational' variant='amber' %}
-  {% include '_partials/stat_card.html' with label='Pending audit items' value=pending_audit sub='Review queue' variant='blue' %}
+<div class="metrics" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px">
+  {% include '_partials/stat_card.html' with label='Total Students' value=student_summary.total sub='Active enrolment' variant='blue' link='/students/' %}
+  {% include '_partials/stat_card.html' with label='Boys (Male)' value=student_summary.male variant='blue' link='/students/?gender=male' %}
+  {% include '_partials/stat_card.html' with label='Girls (Female)' value=student_summary.female variant='blue' link='/students/?gender=female' %}
+  {% include '_partials/stat_card.html' with label='Parents' value=student_summary.parents sub='Active parents' variant='blue' link='/students/guardians/' %}
 </div>
 
 <div class="card" style="margin-bottom:16px;background:#FFFDF5;border-color:#FDE68A">

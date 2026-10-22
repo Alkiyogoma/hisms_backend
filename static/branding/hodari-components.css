@@ -253,3 +253,55 @@ body.hui-lock { overflow: hidden; }
   .pagination { justify-content: center; }
   .pagination-nav { margin-left: 0; }
 }
+
+/* ── FILTER BAR (same look as the Performance Report filters) ──
+   <form class="hf-filterbar"><div class="hf-filters"><div class="hf-fg"><label/><select|input/></div>…</div>
+   <div class="hf-filterfoot">…</div></form>. Give selects onchange="this.form.submit()" to apply instantly. */
+.hf-filterbar { background:#fff; border:1px solid #E6EAF2; border-radius:14px; padding:14px 16px 12px; margin-bottom:18px; }
+.hf-filters { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; }
+.hf-fg { display:flex; flex-direction:column; gap:5px; min-width:0; }
+.hf-fg.wide { grid-column:span 2; }
+.hf-fg label { font-size:10.5px; letter-spacing:.9px; color:#7C8599; text-transform:uppercase; font-weight:700; }
+.hf-fg select, .hf-fg input { height:40px; padding:0 12px; border:1px solid #DCE2EC; border-radius:9px; font-size:13.5px; background-color:#fff; font-family:inherit; color:#1F2430; width:100%; box-sizing:border-box; }
+.hf-fg select { padding-right:34px; appearance:none; -webkit-appearance:none; cursor:pointer;
+  background-image:linear-gradient(45deg,transparent 50%,#8A91A3 50%),linear-gradient(135deg,#8A91A3 50%,transparent 50%);
+  background-position:calc(100% - 17px) 50%,calc(100% - 12px) 50%; background-size:5px 5px; background-repeat:no-repeat; }
+.hf-fg select:hover, .hf-fg input:hover { border-color:#B9C4D6; }
+.hf-fg select:focus, .hf-fg input:focus { outline:none; border-color:var(--hodari-blue); box-shadow:0 0 0 3px rgba(2,58,165,.12); }
+.hf-filterfoot { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px; font-size:12px; color:#7C8599; }
+.hf-filterfoot svg { width:13px; height:13px; vertical-align:-2px; margin-right:4px; }
+.hf-filterfoot .hf-reset { color:var(--hodari-blue); font-weight:600; text-decoration:none; }
+.hf-filterfoot .hf-reset:hover { text-decoration:underline; }
+@media (max-width:640px) { .hf-filters { grid-template-columns:1fr 1fr; } .hf-fg.wide { grid-column:1 / -1; } }
+
+/* ── BULK SELECTION BAR (archived lists) ── */
+.hf-bulkbar { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:10px 14px; margin-bottom:12px; border:1px solid #F5CFCC; background:#FDEDEC; border-radius:10px; font-size:13px; color:#7F1D1D; }
+.h-table .col-check { width:36px; text-align:center; }
+.h-table .col-check input { width:16px; height:16px; cursor:pointer; }
+
+/* ── ROW ICON ACTIONS (view / edit / archive / delete) ── */
+.hf-acts { display:inline-flex; gap:6px; justify-content:flex-end; align-items:center; }
+.hf-act { width:32px; height:32px; border-radius:8px; border:1px solid #DCE2EC; background:#fff; color:#475569;
+  display:inline-flex; align-items:center; justify-content:center; cursor:pointer; padding:0; text-decoration:none; transition:background .15s, color .15s, border-color .15s; }
+.hf-act svg { width:15px; height:15px; }
+.hf-act:hover { background:var(--hodari-blue-light); color:var(--hodari-blue); border-color:#CFDCFA; }
+.hf-act.warn:hover { background:#FFF4E4; color:#B86E12; border-color:#F3DDBA; }
+.hf-act.danger { color:#C8302A; }
+.hf-act.danger:hover { background:#FDEDEC; color:#C8302A; border-color:#F5CFCC; }
+.hf-act:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(2,58,165,.18); }
+
+/* ── DROPDOWN MENU (toggle JS in hodari-ui.js) ── */
+.hf-menu { position:relative; display:inline-flex; }
+.hf-menu-list { display:none; position:fixed; z-index:9000; min-width:210px; padding:6px;
+  background:#fff; border:1px solid #E6EAF2; border-radius:12px; box-shadow:0 12px 32px rgba(15,23,42,.14); }
+.hf-menu.open .hf-menu-list { display:block; }
+.hf-menu-item { display:flex; align-items:center; gap:10px; width:100%; padding:9px 10px; border:0; border-radius:8px; background:none;
+  font:inherit; font-size:13px; font-weight:600; color:#1F2430; text-align:left; text-decoration:none; cursor:pointer; white-space:nowrap; box-sizing:border-box; }
+.hf-menu-item svg { width:15px; height:15px; flex-shrink:0; color:#7C8599; }
+.hf-menu-item:hover, .hf-menu-item:focus-visible { background:var(--hodari-blue-light); color:var(--hodari-blue); outline:none; }
+.hf-menu-item:hover svg { color:currentColor; }
+.hf-menu-item.warn, .hf-menu-item.warn svg { color:#B86E12; }
+.hf-menu-item.warn:hover { background:#FFF4E4; }
+.hf-menu-item.danger, .hf-menu-item.danger svg { color:#C8302A; }
+.hf-menu-item.danger:hover { background:#FDEDEC; }
+.hf-menu-sep { height:1px; background:#EEF1F6; margin:6px 4px; }

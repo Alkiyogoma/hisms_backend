@@ -193,7 +193,8 @@ def navigation(request):
         add(NavItem(key="parent_admission",     label="Admission Form",   href="/parent/admission-form/",                                 section="OPERATIONS",icon="doc",      enabled=True))
     # Task badge  use task_pending_count from tasks.context_processors (runs first)
     _task_badge = str(request.task_pending_count) if getattr(request, 'task_pending_count', 0) else None
-    add(NavItem(key=ModuleKey.TASKS,            label="Tasks",            href="/tasks/",                 section="MAIN",       icon="check",    enabled=True, badge=_task_badge))
+    if not _is_parent:
+        add(NavItem(key=ModuleKey.TASKS,            label="Tasks",            href="/tasks/",                 section="MAIN",       icon="check",    enabled=True, badge=_task_badge))
     # FR-ADM-007: Finance Officers are excluded from the admissions module  they only see fee status on individual applicants.
     if role != UserRole.FINANCE_OFFICER and not _is_parent:
         add(NavItem(key=ModuleKey.ADMISSIONS,       label="Admissions",       href="/admissions/",            section="MAIN",       icon="user",     enabled=True))
@@ -212,8 +213,10 @@ def navigation(request):
     add(NavItem(key=ModuleKey.TIMETABLE,        label="Timetable",        href="/timetable/",             section="ACADEMIC",   icon="calendar", enabled=True))
     add(NavItem(key=ModuleKey.SUBJECTS,         label="Subjects",         href="/academics/subjects/",    section="ACADEMIC",   icon="doc",      enabled=True))
     add(NavItem(key=ModuleKey.REPORTS,          label="Reports",          href="/academics/reports/",     section="ACADEMIC",   icon="report",   enabled=True))
-    add(NavItem(key=ModuleKey.GRADING,         label="Progress",       href="/academics/ecd-assessment/",               section="ACADEMIC",   icon="badge",    enabled=True))
-    add(NavItem(key=ModuleKey.PTC,             label="PTC Reports",    href="/ptc/",                    section="ACADEMIC",   icon="report",   enabled=True))
+    # Progress, Tasks and PTC Reports are staff-only menus; parents don't see them.
+    if not _is_parent:
+        add(NavItem(key=ModuleKey.GRADING,         label="Progress",       href="/academics/ecd-assessment/",               section="ACADEMIC",   icon="badge",    enabled=True))
+        add(NavItem(key=ModuleKey.PTC,             label="PTC Reports",    href="/ptc/",                    section="ACADEMIC",   icon="report",   enabled=True))
     add(NavItem(key=ModuleKey.ATTENDANCE,       label="Attendance",       href="/parent/attendance/" if _is_parent else "/attendance/",            section="OPERATIONS", icon="check",    enabled=True))
     # User Management  permission-driven: any role granted user-management
     # permissions (e.g. users.view_user ticked in Role Management) sees the

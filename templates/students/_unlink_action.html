@@ -1,0 +1,5 @@
+{# Icon button that unlinks a student from a parent after a confirmation modal. Needs: unlink_url, unlink_label #}
+<button type="button" class="hf-act danger" title="Unlink" aria-label="Unlink"
+  onclick="confirmDeleteModal({title:'Unlink?',body:'Unlink <strong>{{ unlink_label|escapejs }}</strong>?',detail:'Only the link is removed; the student and parent records are kept.',confirmText:'Unlink',type:'warning',url:'{{ unlink_url }}',extraData:[{name:'next',value:'{{ request.get_full_path|escapejs }}'}]})">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.84 12.25l1.72-1.71a4.83 4.83 0 00-6.83-6.83l-1.71 1.71"/><path d="M5.17 11.75l-1.71 1.71a4.83 4.83 0 006.83 6.83l1.71-1.71"/><line x1="8" y1="2" x2="8" y2="5"/><line x1="2" y1="8" x2="5" y2="8"/><line x1="16" y1="19" x2="16" y2="22"/><line x1="19" y1="16" x2="22" y2="16"/></svg>
+</button>

@@ -252,15 +252,16 @@ class SuperAdminDashboardView(RoleRequiredMixin, TemplateView):
                 })
         ctx["view_as_users"] = view_as_users
 
-        # 2. System Health Metrics
-        from django.utils import timezone
-        from datetime import timedelta
-        now = timezone.now()
-        total_logins = AuditLog.objects.filter(action_type="LOGIN", created_at__gte=now - timedelta(days=30)).count()
-        failed_logins = AuditLog.objects.filter(action_type="LOGIN_FAILED", created_at__gte=now - timedelta(days=30)).count()
-        ctx["uptime"] = str(round((total_logins / max(total_logins + failed_logins, 1)) * 100, 1))
-        ctx["incidents"] = AuditLog.objects.filter(action_type__icontains="error", created_at__gte=now - timedelta(days=7)).count()
-        ctx["pending_audit"] = AuditLog.objects.filter(action_type__icontains="error").count()
+        # 2. Student summary (active, non-archived students)
+        from django.db.models import Count, Q
+        from students.models import ParentGuardian, Student
+        stats = Student.objects.filter(is_archived=False).aggregate(
+            total=Count("id"),
+            male=Count("id", filter=Q(gender="male")),
+            female=Count("id", filter=Q(gender="female")),
+        )
+        stats["parents"] = ParentGuardian.objects.filter(is_archived=False).count()
+        ctx["student_summary"] = stats
 
         # 3. Recent Audit Log
         ctx["recent_audit"] = AuditLog.objects.all().select_related("actor")[:10]

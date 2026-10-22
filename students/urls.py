@@ -22,6 +22,10 @@ urlpatterns = [
     path("guardians/<int:pk>/portal-access/", views.GuardianPortalAccessView.as_view(), name="guardian_portal_access"),
     path("guardians/<int:pk>/consent-withdraw/", views.GuardianConsentWithdrawView.as_view(), name="guardian_consent_withdraw"),
     path("<int:pk>/guardians/link/", views.StudentGuardianLinkView.as_view(), name="guardian_link"),
+    path("<int:pk>/guardians/<int:guardian_pk>/unlink/", views.StudentGuardianUnlinkView.as_view(), name="guardian_unlink"),
+    path("guardians/<int:pk>/students/link/", views.GuardianStudentLinkView.as_view(), name="guardian_student_link"),
+    path("guardians/purge/", views.GuardianBulkPurgeView.as_view(), name="guardian_bulk_purge"),
+    path("purge/", views.StudentBulkPurgeView.as_view(), name="bulk_purge"),
     path("api/search/", views.StudentSearchAPIView.as_view(), name="api_search"),
     path("api/guardians/search/", views.GuardianSearchView.as_view(), name="api_guardian_search"),
     # PDPA data export

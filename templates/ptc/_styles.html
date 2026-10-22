@@ -1,0 +1,18 @@
+{# Shared PTC page styles: header, no-window notice. Included from each PTC page's extra_head. #}
+<style>
+  .ptc-page { max-width:1100px; margin:0 auto; }
+  .ptc-head { display:flex; justify-content:space-between; align-items:flex-end; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
+  .ptc-head p { margin:0; font-size:13px; color:var(--text-secondary); }
+  .ptc-meta { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .ptc-meta span { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:99px; background:var(--hodari-blue-light); color:var(--hodari-blue); font-size:12px; font-weight:600; }
+  .ptc-meta svg { width:13px; height:13px; }
+  .ptc-nowin { display:flex; gap:18px; align-items:flex-start; background:#fff; border:1px solid #E6EAF2; border-left:4px solid #D97706; border-radius:14px; padding:22px 24px; margin-bottom:18px; }
+  .ptc-nowin-icon { width:48px; height:48px; border-radius:12px; background:#FFF4E4; color:#B86E12; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .ptc-nowin-icon svg { width:24px; height:24px; }
+  .ptc-nowin-title { font-size:16px; font-weight:700; color:var(--text-primary); margin-bottom:4px; }
+  .ptc-nowin-desc { margin:0 0 14px; font-size:13.5px; line-height:1.55; color:var(--text-secondary); max-width:620px; }
+  .ptc-nowin .hf-btn { display:inline-flex; align-items:center; gap:6px; }
+  .ptc-closed { display:flex; gap:10px; align-items:center; background:#FFF4E4; border:1px solid #F3DDBA; border-radius:10px; padding:12px 16px; font-size:13px; color:#8A5A12; margin-bottom:16px; }
+  .ptc-closed svg { width:16px; height:16px; flex-shrink:0; }
+  @media (max-width:640px) { .ptc-nowin { flex-direction:column; padding:18px; } }
+</style>

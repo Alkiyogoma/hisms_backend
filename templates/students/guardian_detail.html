@@ -277,44 +277,99 @@
         </div>
       </div>
 
-      {#  Detailed Student List  #}
-      <div style="display:flex;flex-direction:column;gap:10px">
-        {% for sl in linked_students %}
-        <a href="{% url 'students:detail' sl.student.pk %}" style="text-decoration:none;color:inherit">
-          <div class="rel-student-row">
-            <div class="rel-student-name">
-              <div class="avatar">{{ sl.student.first_name|slice:":1" }}{{ sl.student.last_name|slice:":1" }}</div>
-              <div class="info">
-                <div class="n">{{ sl.student.first_name }} {{ sl.student.last_name }}</div>
-                <div class="c">{{ sl.student.class_name }} · ADM {{ sl.student.admission_no }}</div>
-              </div>
-            </div>
-
-            <span class="rel-type-badge
-              {% if sl.relationship == 'mother' %}mother
-              {% elif sl.relationship == 'father' %}father
-              {% elif sl.relationship == 'parent' %}father
-              {% elif sl.relationship == 'guardian' or sl.relationship == 'step_mother' or sl.relationship == 'step_father' %}guardian
-              {% else %}other{% endif %}">
-              {{ sl.get_relationship_display }}
-            </span>
-
-            {% if sl.is_primary %}
-              <span class="rel-badge primary">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                Primary
-              </span>
-            {% else %}
-              <span class="rel-badge secondary">Secondary</span>
-            {% endif %}
-
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
-          </div>
-        </a>
-        {% empty %}
-        {% include '_partials/empty_state.html' with title='No students linked' desc='Link a student to this parent.' icon='users' icon_color='blue' action_url='/students/' action_text='Link a student' %}
-        {% endfor %}
+      {#  Linked students  #}
+      {% has_perm user "students.change_student" as can_link_student %}
+      {% if linked_students %}
+      <div class="table-wrap">
+        <table class="h-table">
+          <thead>
+            <tr><th>Student</th><th>Class</th><th>Relationship</th><th class="col-actions">Action</th></tr>
+          </thead>
+          <tbody>
+            {% for sl in linked_students %}
+            <tr>
+              <td>
+                <div style="font-weight:600;color:var(--text-primary)">{{ sl.student.first_name }} {{ sl.student.last_name }}</div>
+                <div style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono)">{{ sl.student.admission_no }}</div>
+                {% if sl.student.is_archived %}<c-badge variant="grey">Archived</c-badge>{% endif %}
+              </td>
+              <td>{{ sl.student.class_name }}</td>
+              <td>{{ sl.get_relationship_display }}{% if sl.is_primary %} · <span style="color:var(--hodari-blue);font-weight:700">Primary</span>{% endif %}</td>
+              <td class="col-actions">
+                <div class="hf-acts">
+                  <a class="hf-act" href="{% url 'students:detail' sl.student.pk %}" title="View student" aria-label="View student"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></a>
+                  {% if can_link_student %}
+                  {% url 'students:guardian_unlink' sl.student.pk guardian.pk as unlink_url %}
+                  {% include "students/_unlink_action.html" with unlink_label=sl.student.first_name|add:" "|add:sl.student.last_name %}
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
+      {% else %}
+        {% include '_partials/empty_state.html' with title='No students linked' desc='Use Link student below to connect this parent to a student.' icon='users' icon_color='blue' %}
+      {% endif %}
+
+      {% if can_link_student and not guardian.is_archived %}
+      <form method="post" action="{% url 'students:guardian_student_link' guardian.pk %}" class="hf-filterbar" id="link-student-form" style="margin:16px 0 0">
+        {% csrf_token %}
+        <input type="hidden" name="student_id" id="link-student-id">
+        <div class="hf-filters">
+          <div class="hf-fg wide" style="position:relative">
+            <label for="link-student-q">Link student</label>
+            <input id="link-student-q" type="text" placeholder="Type a name or admission no…" autocomplete="off" data-search-url="{% url 'students:api_search' %}">
+            <div id="link-student-results" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:30;background:#fff;border:1px solid #DCE2EC;border-radius:9px;margin-top:4px;max-height:240px;overflow:auto;box-shadow:0 8px 20px rgba(15,23,42,.08)"></div>
+          </div>
+          <div class="hf-fg">
+            <label for="link-rel">Relationship</label>
+            <select id="link-rel" name="relationship">
+              {% for val, lbl in relationships %}<option value="{{ val }}"{% if val == 'parent' %} selected{% endif %}>{{ lbl }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="hf-filterfoot">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="is_primary"> Primary contact for this student</label>
+          <button type="submit" class="hf-btn hf-btn-primary" id="link-student-btn" disabled>Link student</button>
+        </div>
+      </form>
+      <script>
+      (function () {
+        var q = document.getElementById('link-student-q'), box = document.getElementById('link-student-results');
+        var idField = document.getElementById('link-student-id'), btn = document.getElementById('link-student-btn');
+        var timer = null;
+        function esc(t) { var d = document.createElement('div'); d.textContent = t || ''; return d.innerHTML; }
+        q.addEventListener('input', function () {
+          idField.value = ''; btn.disabled = true;
+          clearTimeout(timer);
+          var term = q.value.trim();
+          if (term.length < 2) { box.style.display = 'none'; return; }
+          timer = setTimeout(function () {
+            fetch(q.dataset.searchUrl + '?archive_status=active&q=' + encodeURIComponent(term))
+              .then(function (r) { return r.json(); })
+              .then(function (data) {
+                if (!data.students.length) { box.innerHTML = '<div style="padding:10px 12px;color:#7C8599;font-size:13px">No students found.</div>'; }
+                else {
+                  box.innerHTML = data.students.map(function (s) {
+                    return '<button type="button" data-id="' + s.id + '" data-label="' + esc(s.full_name) + ' (' + esc(s.admission_no) + ')" style="display:block;width:100%;text-align:left;padding:9px 12px;border:0;background:none;cursor:pointer;font-size:13px">' +
+                      '<strong>' + esc(s.full_name) + '</strong> <span style="color:#7C8599">' + esc(s.admission_no) + ' · ' + esc(s.class_name) + '</span></button>';
+                  }).join('');
+                }
+                box.style.display = 'block';
+              });
+          }, 250);
+        });
+        box.addEventListener('click', function (e) {
+          var b = e.target.closest('button[data-id]');
+          if (!b) return;
+          idField.value = b.dataset.id; q.value = b.dataset.label; btn.disabled = false; box.style.display = 'none';
+        });
+        document.addEventListener('click', function (e) { if (!box.contains(e.target) && e.target !== q) box.style.display = 'none'; });
+      })();
+      </script>
+      {% endif %}
     </div>
 
     {#  Contact Details  #}

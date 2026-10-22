@@ -127,3 +127,79 @@ class StudentDataExportTests(TestCase):
         self.assertEqual([d["summary"] for d in data["discipline_incidents"]], ["Late to class"])
         self.assertEqual([e["subject_name"] for e in data["exam_scores"]], ["Mathematics"])
         self.assertEqual(len(data["report_cards"]), 1)
+
+
+class GuardianLinkAndPurgeTests(TestCase):
+    """Link/unlink parents and students, and full delete from the archived lists."""
+
+    def setUp(self):
+        from students.models import ParentGuardian, StudentGuardian
+        self.admin = User.objects.create_superuser(username="sa", email="sa@hodari.edu", password="Pass123!",
+                                                   role=UserRole.SUPER_ADMIN)
+        self.client.force_login(self.admin)
+        self.student = Student.objects.create(admission_no="DUP-001", first_name="Neema", last_name="Juma",
+                                              gender="female", class_name="Grade 3")
+        self.guardian = ParentGuardian.objects.create(full_name="Mama Neema", phone="0711000001")
+        StudentGuardian.objects.create(student=self.student, guardian=self.guardian, relationship="mother")
+
+    def test_unlink_keeps_both_records(self):
+        from students.models import ParentGuardian, StudentGuardian
+        resp = self.client.post(reverse("students:guardian_unlink", args=[self.student.pk, self.guardian.pk]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(StudentGuardian.objects.exists())
+        self.assertTrue(Student.objects.filter(pk=self.student.pk).exists())
+        self.assertTrue(ParentGuardian.objects.filter(pk=self.guardian.pk).exists())
+
+    def test_link_student_from_parent_profile(self):
+        from students.models import StudentGuardian
+        other = Student.objects.create(admission_no="DUP-002", first_name="Baraka", last_name="Juma",
+                                       gender="male", class_name="Grade 1")
+        self.client.post(reverse("students:guardian_student_link", args=[self.guardian.pk]),
+                         {"student_id": other.pk, "relationship": "mother", "is_primary": "on"})
+        link = StudentGuardian.objects.get(student=other, guardian=self.guardian)
+        self.assertTrue(link.is_primary)
+
+    def test_bulk_purge_only_deletes_archived_students(self):
+        archived = Student.objects.create(admission_no="DUP-003", first_name="Old", last_name="Copy",
+                                          gender="male", class_name="Grade 3", is_archived=True)
+        self.client.post(reverse("students:bulk_purge"), {"ids": [archived.pk, self.student.pk]})
+        self.assertFalse(Student.objects.filter(pk=archived.pk).exists())
+        self.assertTrue(Student.objects.filter(pk=self.student.pk).exists())
+
+    def test_purge_skips_student_with_protected_records(self):
+        from datetime import date
+        from academics.models import AcademicYear, ExamScore, Term
+        self.student.is_archived = True
+        self.student.save()
+        term = Term.objects.create(academic_year=AcademicYear.objects.create(name="2026", is_current=True),
+                                   name="Term 1", start_date=date(2026, 1, 10), end_date=date(2026, 4, 5))
+        ExamScore.objects.create(student=self.student, term=term, subject_name="Maths", exam_type="midterm",
+                                 score=50, entered_by=self.admin)
+        self.client.post(reverse("students:bulk_purge"), {"ids": [self.student.pk]})
+        self.assertTrue(Student.objects.filter(pk=self.student.pk).exists())
+
+    def test_guardian_purge_with_students_spares_shared_children(self):
+        from students.models import ParentGuardian, StudentGuardian
+        shared = Student.objects.create(admission_no="DUP-004", first_name="Shared", last_name="Kid",
+                                        gender="male", class_name="Grade 2")
+        StudentGuardian.objects.create(student=shared, guardian=self.guardian, relationship="mother")
+        dad = ParentGuardian.objects.create(full_name="Baba", phone="0711000002")
+        StudentGuardian.objects.create(student=shared, guardian=dad, relationship="father")
+        self.guardian.is_archived = True
+        self.guardian.save()
+        self.client.post(reverse("students:guardian_bulk_purge"), {"ids": [self.guardian.pk], "with_students": "1"})
+        self.assertFalse(ParentGuardian.objects.filter(pk=self.guardian.pk).exists())
+        self.assertFalse(Student.objects.filter(pk=self.student.pk).exists())
+        self.assertTrue(Student.objects.filter(pk=shared.pk).exists())
+
+    def test_guardian_purge_ignores_active_parents(self):
+        from students.models import ParentGuardian
+        self.client.post(reverse("students:guardian_bulk_purge"), {"ids": [self.guardian.pk]})
+        self.assertTrue(ParentGuardian.objects.filter(pk=self.guardian.pk).exists())
+
+    def test_list_pages_render_archived_tables(self):
+        for name in ("students:list", "students:guardian_list"):
+            resp = self.client.get(reverse(name) + "?archive_status=archived")
+            self.assertEqual(resp.status_code, 200)
+            self.assertContains(resp, "hf-filterbar")
+            self.assertContains(resp, "bulk-purge-form")

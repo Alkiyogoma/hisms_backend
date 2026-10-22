@@ -2,6 +2,7 @@
 {% block title %}PTC - Select Student{% endblock %}
 
 {% block extra_head %}
+{% include "ptc/_styles.html" %}
 <style>
   .ptc-tab { padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1.5px solid var(--border); background: #fff; color: var(--text-secondary); transition: all .15s; white-space: nowrap; user-select: none; }
   .ptc-tab:hover { background: var(--hodari-blue-pale, #E8EEF9); border-color: var(--hodari-blue); color: var(--hodari-blue); }
@@ -34,32 +35,21 @@
 
 {% block content %}
 {% include "ptc/_top_tabs.html" %}
-<div style="max-width:960px;margin:0 auto;padding:0 16px">
+<div class="ptc-page" style="max-width:960px">
 
-  <!-- Header -->
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px">
+  <div class="ptc-head">
     <div>
-      <h2 style="font-size:20px;font-weight:700;color:var(--text-primary);margin:0">Select Student for PTC</h2>
-      <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 0">
-        {% if active_academic_year %}Academic Year: {{ active_academic_year.name }}{% endif %}
-        {% if ptc_window %} - PTC Date: {{ ptc_window.ptc_date }} ({{ ptc_window.get_term_slot_display }}){% endif %}
-      </p>
+      <p>Pick a student to open their Parent-Teacher Conference report.</p>
+      <div class="ptc-meta">
+        {% if active_academic_year %}<span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> {{ active_academic_year.name }}</span>{% endif %}
+        {% if ptc_window %}<span>PTC {{ ptc_window.ptc_date|date:"d M Y" }} · {{ ptc_window.get_term_slot_display }}</span>{% endif %}
+      </div>
     </div>
-    {% if is_admin_view %}
-    <a href="{% url 'ptc:calendar_config' %}" title="PTC Calendar Settings" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:var(--text-secondary);text-decoration:none;font-size:12px;font-weight:600;transition:all .15s;flex-shrink:0">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      PTC Settings
-    </a>
-    {% endif %}
   </div>
 
   {% if not ptc_window %}
-  <div style="padding:16px 20px;margin-bottom:16px">
-    {% include '_partials/empty_state.html' with icon='alert' icon_color='amber' title='No PTC window configured' desc='Please ask the Admin Officer to set up PTC dates.' %}
-  </div>
-  {% endif %}
-
-  {% if classes %}
+  {% include "ptc/_no_window.html" with what="The PTC student list" %}
+  {% elif classes %}
   <!-- Search bar -->
   <div style="position:relative;margin-bottom:16px">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none">
@@ -131,7 +121,7 @@
   {% endfor %}
 
   {% else %}
-  <div style="padding:20px">
+  <div class="card">
     {% include '_partials/empty_state.html' with icon='users' icon_color='grey' title='No eligible students found' desc='Only students in Grades 1-9 (non-ECD) are eligible for PTC.' %}
   </div>
   {% endif %}
