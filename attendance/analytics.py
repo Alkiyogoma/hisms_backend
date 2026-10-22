@@ -368,11 +368,11 @@ def register_issues(period: Period, learners: list, now=None) -> list:
     for (d, cls), g in groups.items():
         open_today = d == now.date() and now.hour < lock_hour()
         if g["unmarked"] == g["on_roll"]:
-            state, label = "red", ("Not yet marked  open" if open_today else "Never confirmed")
+            state, label = "red", ("Not yet marked (open)" if open_today else "Never confirmed")
         elif g["unmarked"]:
-            state, label = ("amber" if open_today else "red"), f"Partly confirmed  {g['on_roll'] - g['unmarked']} of {g['on_roll']}"
+            state, label = ("amber" if open_today else "red"), f"Partly confirmed - {g['on_roll'] - g['unmarked']} of {g['on_roll']}"
         elif g["last"] and g["last"].time() > REGISTER_DUE:
-            state, label = "amber", f"Confirmed {g['last']:%H:%M}  late"
+            state, label = "amber", f"Confirmed {g['last']:%H:%M} (late)"
         else:
             continue
         out.append({"date": d, "class_name": cls, "teacher": teachers.get(cls, ""),

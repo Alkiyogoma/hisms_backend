@@ -21,7 +21,7 @@
   <div><div class="k">Longest run absent</div><div class="v">{{ pattern.longest_absent_run }}</div></div>
   <div><div class="k">Not marked</div><div class="v c-none">{{ row.unmarked }}</div></div>
 </div>
-<div style="font-size:12.5px;color:var(--at-muted);margin-bottom:8px">Every school day in the range, in order{% if row.admitted_in_period %}  admitted {{ row.enrolment_date|date:"j M Y" }}, counted from that date{% endif %}.</div>
+<div style="font-size:12.5px;color:var(--at-muted);margin-bottom:8px">Every school day in the range, in order{% if row.admitted_in_period %}: admitted {{ row.enrolment_date|date:"j M Y" }}, counted from that date{% endif %}.</div>
 {% for m in pattern.months %}
   <div class="at-month"><div class="ml">{{ m.label }}</div>
     <div class="at-daygrid">
@@ -38,13 +38,13 @@
 </div>
 {% if reasons %}
   <div class="at-reasons"><b>Excusal reasons</b> <span class="at-sub" style="display:inline">· authorised staff only, never printed</span>
-    <ul style="margin:6px 0 0 16px; padding:0">{% for d, text in reasons %}<li>{{ d|date:"D j M" }}  {{ text }}</li>{% endfor %}</ul>
+    <ul style="margin:6px 0 0 16px; padding:0">{% for d, text in reasons %}<li>{{ d|date:"D j M" }} - {{ text }}</li>{% endfor %}</ul>
   </div>
 {% elif reasons_hidden %}
   <div class="at-basis">Excusal reasons are held against the record and visible to authorised staff only.</div>
 {% endif %}
 <div class="at-basis">
-  {% if row.absent and pattern.worst_weekday %}Most absences fall on a <b>{{ pattern.worst_weekday.0 }}</b> ({{ pattern.worst_weekday.1 }} of {{ row.absent }}). Patterns like this are what a parent conversation needs  a figure alone does not show them.
+  {% if row.absent and pattern.worst_weekday %}Most absences fall on a <b>{{ pattern.worst_weekday.0 }}</b> ({{ pattern.worst_weekday.1 }} of {{ row.absent }}). Patterns like this are what a parent conversation needs: a figure alone does not show them.
   {% elif row.marked %}No unexcused absences in this range.{% else %}No days marked in this range yet.{% endif %}
   Rate = in school ÷ days marked; unmarked days are left out.
 </div>

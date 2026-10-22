@@ -9,7 +9,7 @@
   {% for f in form %}{% if f.errors %}
     <div>{% if f.is_hidden %}{{ f.label }}: {{ f.errors|join:" " }}{% else %}<a href="#{{ f.auto_id }}" style="color:#991B1B; text-decoration:underline">{{ f.label }}</a>: {{ f.errors|join:" " }}{% endif %}</div>
   {% endif %}{% endfor %}
-  <div style="margin-top:6px; color:#7F1D1D">Everything you typed is still here  fix the item{{ form.errors|length|pluralize }} above and save again.</div>
+  <div style="margin-top:6px; color:#7F1D1D">Everything you typed is still here: fix the item{{ form.errors|length|pluralize }} above and save again.</div>
 </div>
 <script>
   // Works on full pages and on HTMX-swapped partials: bring the first problem into view.

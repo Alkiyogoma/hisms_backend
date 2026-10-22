@@ -196,7 +196,7 @@ class SubjectForm(forms.ModelForm):
             mismatched = [gc.name for gc in classes if gc.department not in departments]
             if mismatched:
                 raise forms.ValidationError(
-                    f"The selected class(es)  {', '.join(mismatched)}  belong to a different department "
+                    f"The selected class(es) ({', '.join(mismatched)}) belong to a different department "
                     f"than the selected subject departments."
                 )
         return cleaned_data

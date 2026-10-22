@@ -5,7 +5,7 @@ from users.models import User
 
 
 class Command(BaseCommand):
-    help = "Legacy alias  runs send_fee_reminders schedules."
+    help = "Legacy alias: runs send_fee_reminders schedules."
 
     def add_arguments(self, parser):
         parser.add_argument("--dry-run", action="store_true")

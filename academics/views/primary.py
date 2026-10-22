@@ -266,7 +266,7 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
                 import logging
                 logging.getLogger(__name__).exception("Comment autosave failed for report %s", rc.pk)
                 return JsonResponse(
-                    {"error": "Not saved: the system could not save this comment. Your text is still in the box  try again."},
+                    {"error": "Not saved: the system could not save this comment. Your text is still in the box: try again."},
                     status=500,
                 )
             try:
@@ -370,7 +370,7 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
                     dispatch_notification(
                         user=rec,
                         title="Comments Ready for Review",
-                        message=f"Teacher {request.user.get_full_name()} has submitted comments for {class_name}  {len(rc_ids)} student(s) ready for HOD/HOS review.",
+                        message=f"Teacher {request.user.get_full_name()} has submitted comments for {class_name} - {len(rc_ids)} student(s) ready for HOD/HOS review.",
                         link="/academics/reports/review-queue/",
                         actor=request.user
                     )
@@ -1093,7 +1093,7 @@ class PrimaryBulkSubmissionAPIView(RoleRequiredMixin, View):
                         action_type="EXAM_SCORE_SUBMITTED",
                         model_name="ExamScore",
                         object_id=sid,
-                        description=f"Score submitted for {student.admission_no} via primary assessment  {class_name}",
+                        description=f"Score submitted for {student.admission_no} via primary assessment - {class_name}",
                         request=request,
                     )
 
@@ -1531,7 +1531,7 @@ class LowerSecondaryBulkSubmissionAPIView(RoleRequiredMixin, View):
                     log_event(
                         actor=request.user, action_type="EXAM_SCORE_SUBMITTED",
                         model_name="ExamScore", object_id=sid,
-                        description=f"Score submitted for {student.admission_no} via lower secondary assessment  {class_name}",
+                        description=f"Score submitted for {student.admission_no} via lower secondary assessment - {class_name}",
                         request=request,
                     )
 

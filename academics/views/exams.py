@@ -324,12 +324,12 @@ class ExamScoreEntryView(RoleRequiredMixin, TemplateView):
             if updates_made > 0:
                 messages.warning(
                     request,
-                    f"Saved {updates_made} score(s). These were not saved  {problem_list}"
+                    f"Saved {updates_made} score(s). These were not saved - {problem_list}"
                 )
             else:
                 messages.error(
                     request,
-                    f"No scores were saved. Fix the highlighted rows  {problem_list}"
+                    f"No scores were saved. Fix the highlighted rows - {problem_list}"
                 )
             return self.render_to_response(ctx)
 
@@ -346,7 +346,7 @@ class ExamScoreEntryView(RoleRequiredMixin, TemplateView):
                         title="Exam scores submitted for review",
                         message=(
                             f"{request.user.get_full_name()} has submitted exam scores for "
-                            f"{class_name}  {subject_name} ({exam_type}) in {term.name}. "
+                            f"{class_name} - {subject_name} ({exam_type}) in {term.name}. "
                             f"{updates_made} score(s) saved. Please review and approve."
                         ),
                         link="/academics/exam-scores/",
@@ -409,7 +409,7 @@ class ExamScoreEntryView(RoleRequiredMixin, TemplateView):
                 action_type="EXAM_SCORE_SUBMITTED",
                 model_name="ExamScore",
                 object_id=score.pk,
-                description=f"Score {score.score} submitted for review  {score.student.admission_no} in {subject_name} ({exam_type})",
+                description=f"Score {score.score} submitted for review - {score.student.admission_no} in {subject_name} ({exam_type})",
                 request=request,
             )
 
@@ -436,7 +436,7 @@ class ExamScoreEntryView(RoleRequiredMixin, TemplateView):
                         title="Exam scores submitted for HOD review",
                         message=(
                             f"{request.user.get_full_name()} has submitted {submitted_count} exam score(s) "
-                            f"for {class_name}  {subject_name} ({exam_type}) in {term.name}. "
+                            f"for {class_name} - {subject_name} ({exam_type}) in {term.name}. "
                             f"Please review and approve."
                         ),
                         link="/academics/exam-score-approval-queue/",
@@ -722,7 +722,7 @@ class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
                         user=score.entered_by,
                         title="Exam scores returned for correction",
                         message=(
-                            f"Your scores for {score.student.class_name}  {score.subject_name} "
+                            f"Your scores for {score.student.class_name} - {score.subject_name} "
                             f"({score.exam_type}) were returned by {request.user.get_full_name()}.\n\n"
                             f"Reason: {reason}"
                         ),

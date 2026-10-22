@@ -1284,7 +1284,7 @@ class GuardianCreateView(RoleRequiredMixin, TemplateView):
             try:
                 student = Student.objects.get(pk=student_id)
             except (Student.DoesNotExist, ValueError):
-                messages.warning(request, "Selected student not found  parent created without link.")
+                messages.warning(request, "Selected student not found: parent created without link.")
 
 
         try:
@@ -1335,7 +1335,7 @@ class GuardianCreateView(RoleRequiredMixin, TemplateView):
         if portal_access:
             (messages.success if delivered else messages.warning)(
                 request,
-                f"Parent {guardian.full_name} created  portal login {username} created; details {describe_delivery(delivered)}."
+                f"Parent {guardian.full_name} created with portal login {username}; details {describe_delivery(delivered)}."
             )
         else:
             messages.success(request, f"Parent {guardian.full_name} created.")
@@ -1529,7 +1529,7 @@ class StudentGuardianLinkView(RoleRequiredMixin, TemplateView):
             else:
                 messages.success(
                     request,
-                    f"{guardian.full_name} was already linked  relationship and primary contact updated.",
+                    f"{guardian.full_name} was already linked: relationship and primary contact updated.",
                 )
 
             # FR-STU-005: Notify Finance Officer if sibling relationship confirmed
@@ -1574,7 +1574,7 @@ class StudentGuardianLinkView(RoleRequiredMixin, TemplateView):
         if portal_access:
             (messages.success if delivered else messages.warning)(
                 request,
-                f"Created and linked new parent: {guardian.full_name}  portal login {username} created; details {describe_delivery(delivered)}."
+                f"Created and linked new parent {guardian.full_name} with portal login {username}; details {describe_delivery(delivered)}."
             )
         else:
             messages.success(request, f"Created and linked new parent: {guardian.full_name}")

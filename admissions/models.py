@@ -475,7 +475,7 @@ class AssessmentSchedule(TimeStampedModel):
 
     # FR-ACAD-010 / FR-ACAD-011: Results and Sign-off
     teacher_comments = models.TextField(blank=True)
-    hod_comments = models.TextField(blank=True, help_text="Internal staff comments  never shown to parents")
+    hod_comments = models.TextField(blank=True, help_text="Internal staff comments: never shown to parents")
     parent_facing_comments = models.TextField(blank=True, help_text="Feedback visible to parents (e.g. in offer letter or denial email)")
     result = models.CharField(
         max_length=20,

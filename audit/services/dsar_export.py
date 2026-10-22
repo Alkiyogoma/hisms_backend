@@ -64,7 +64,7 @@ def export_student_data(student) -> dict[str, Any]:
         "export_version": "1.0",
         "export_type": "student",
         "export_generated_at": datetime.now().isoformat(),
-        "nfr_compliance": "NFR-PDPA-003  complete personal data export within 30 minutes",
+        "nfr_compliance": "NFR-PDPA-003: complete personal data export within 30 minutes",
     }
 
     # ── 1. Core identity ─────────────────────────────────────────────────
@@ -315,7 +315,7 @@ def export_guardian_data(guardian) -> dict[str, Any]:
         "export_version": "1.0",
         "export_type": "guardian",
         "export_generated_at": datetime.now().isoformat(),
-        "nfr_compliance": "NFR-PDPA-003  complete personal data export within 30 minutes",
+        "nfr_compliance": "NFR-PDPA-003: complete personal data export within 30 minutes",
     }
 
     # ── 1. Core identity ─────────────────────────────────────────────────
@@ -595,7 +595,7 @@ def _rows_to_xlsx_bytes(sections: dict[str, list[dict]]) -> bytes:
     # --- Cover sheet ---
     ws_cover = wb.active
     ws_cover.title = "Export Info"
-    ws_cover["A1"] = "DSAR Export  NFR-PDPA-003"
+    ws_cover["A1"] = "DSAR Export - NFR-PDPA-003"
     ws_cover["A1"].font = Font(bold=True, size=14, color="023AA5")
     ws_cover["A2"] = f"Generated: {datetime.now().isoformat()}"
     ws_cover["A3"] = f"Sections: {len(sections)}"

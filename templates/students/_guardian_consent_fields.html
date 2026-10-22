@@ -4,7 +4,7 @@
   <div style="padding:14px; background:#FEF3C7; border:{% if errors.pdpa %}1.5px solid #DC2626{% else %}1px solid #FCD34D{% endif %}; border-radius:8px">
     <label style="display:flex; align-items:flex-start; gap:8px; font-size:13px; cursor:pointer">
       <input type="checkbox" name="pdpa_consent_given" id="pdpa"{% if values.pdpa_consent_given %} checked{% endif %}{% if errors.pdpa %} aria-invalid="true" aria-describedby="pdpa_error"{% endif %} style="width:18px; height:18px; accent-color:var(--green); margin-top:1px">
-      <span><strong>PDPA Consent</strong> <span style="color:#8492A6; font-weight:400">(optional)</span>  parent has acknowledged and signed the PDPA Consent Form{% if edit_mode %}. Untick to withdraw consent.{% endif %}</span>
+      <span><strong>PDPA Consent</strong> <span style="color:#8492A6; font-weight:400">(optional)</span>: parent has acknowledged and signed the PDPA Consent Form{% if edit_mode %}. Untick to withdraw consent.{% endif %}</span>
     </label>
     <div style="display:flex; gap:16px; margin-top:8px; margin-left:26px">
       <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer">
@@ -26,7 +26,7 @@
   <div style="padding:14px; background:#EEF4FF; border:1px solid #B6C9F5; border-radius:8px">
     <label style="display:flex; align-items:flex-start; gap:8px; font-size:13px; cursor:pointer">
       <input type="checkbox" name="portal_access" id="portal_access"{% if values.portal_access %} checked{% endif %} style="width:18px; height:18px; accent-color:var(--green); margin-top:1px">
-      <span><strong>Portal Access</strong>  create a login account so this parent can view attendance, report cards, invoices and school communications online.</span>
+      <span><strong>Portal Access</strong>: create a login account so this parent can view attendance, report cards, invoices and school communications online.</span>
     </label>
   </div>
   {% endif %}

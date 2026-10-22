@@ -567,7 +567,7 @@ class EnrollmentHistory(TimeStampedModel):
         help_text=(
             "What triggered this enrollment record. "
             "NOTE: Historical rows where action='promoted' may represent retentions "
-            "from the old CLI script  the note field should be checked for 'Repeating' "
+            "from the old CLI script: the note field should be checked for 'Repeating' "
             "to distinguish actual promotions from retentions prior to this module's launch."
         ),
     )
@@ -622,4 +622,4 @@ class StudentDocument(TimeStampedModel):
         ]
 
     def __str__(self):
-        return f"{self.student.admission_no}  {self.title}"
+        return f"{self.student.admission_no} - {self.title}"

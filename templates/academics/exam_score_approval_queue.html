@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Grade Approval  {{ brand.school_name }}{% endblock %}
+{% block title %}Grade Approval | {{ brand.school_name }}{% endblock %}
 {% block topbar_greeting %}{% if can_approve %}Grade Approval{% else %}Grade Sign-Off Status{% endif %}{% endblock %}
 {% block topbar_date %}{{ current_term.name|default:"No active term" }}{% endblock %}
 

@@ -231,7 +231,7 @@ def format_parent_notes(value):
         html.append('<div style="margin-bottom:14px">')
         html.append('<div style="font-weight:700;font-size:13px;margin-bottom:6px;color:var(--hodari-blue)">Emergency Contacts</div>')
         for e in active_emergency:
-            html.append(f'<div style="font-size:12.5px;margin-bottom:3px">{conditional_escape(e.get("name", ""))} ({conditional_escape(e.get("rel", ""))})  {conditional_escape(e.get("phone", ""))}</div>')
+            html.append(f'<div style="font-size:12.5px;margin-bottom:3px">{conditional_escape(e.get("name", ""))} ({conditional_escape(e.get("rel", ""))}) - {conditional_escape(e.get("phone", ""))}</div>')
         html.append('</div>')
 
     extras = []

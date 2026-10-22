@@ -58,7 +58,7 @@ class FeeStructure(TimeStampedModel):
         max_length=12, choices=SiblingDiscountMode.choices, default=SiblingDiscountMode.PERCENTAGE
     )
     sibling_discount_value = models.DecimalField(max_digits=10, decimal_places=2, default=0,
-        help_text="Discount amount  interpret as percentage or fixed TZS based on mode")
+        help_text="Discount amount: interpret as percentage or fixed TZS based on mode")
     assessment_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0,
         help_text="Assessment fee used by Admissions pipeline (TZS)")
 

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{% if mode == "keep" %}Remove repeats of{% else %}Delete{% endif %} {{ incident.reference }}  {{ brand.school_name }}{% endblock %}
+{% block title %}{% if mode == "keep" %}Remove repeats of{% else %}Delete{% endif %} {{ incident.reference }} | {{ brand.school_name }}{% endblock %}
 {% block topbar_greeting %}{% if mode == "keep" %}Remove repeats of{% else %}Delete{% endif %} {{ incident.reference }}{% endblock %}
 {% block topbar_date %}{{ incident.student.first_name }} {{ incident.student.last_name }}{% endblock %}
 
@@ -95,12 +95,12 @@
       <div class="hf2-group" style="margin-bottom:16px">
         <label class="hf2-label" for="id_duplicate_of">Is this a repeat of another incident?</label>
         <select name="duplicate_of" id="id_duplicate_of" class="hf2-select">
-          <option value="">No  delete it for another reason</option>
+          <option value="">No: delete it for another reason</option>
           {% for d in likely_duplicates %}
-          <option value="{{ d.pk }}" {% if form.duplicate_of.value|stringformat:"s" == d.pk|stringformat:"s" %}selected{% endif %}>Yes  a repeat of {{ d.reference }} (same reporter and day), which is kept</option>
+          <option value="{{ d.pk }}" {% if form.duplicate_of.value|stringformat:"s" == d.pk|stringformat:"s" %}selected{% endif %}>Yes: a repeat of {{ d.reference }} (same reporter and day), which is kept</option>
           {% endfor %}
           {% for value, label in form.fields.duplicate_of.choices %}{% if value and value.instance not in likely_duplicates %}
-          <option value="{{ value }}" {% if form.duplicate_of.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>Yes  a repeat of {{ value.instance.reference }} ({{ value.instance.occurred_on|date:"j M Y" }}), which is kept</option>
+          <option value="{{ value }}" {% if form.duplicate_of.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>Yes: a repeat of {{ value.instance.reference }} ({{ value.instance.occurred_on|date:"j M Y" }}), which is kept</option>
           {% endif %}{% endfor %}
         </select>
         {% for e in form.duplicate_of.errors %}<span class="dd-err">{{ e }}</span>{% endfor %}

@@ -122,7 +122,7 @@ class DisciplineIncidentForm(forms.ModelForm):
                 attrs={
                     "class": "form-input",
                     "rows": 4,
-                    "placeholder": "Describe what happened  what was observed, reported, or witnessed.",
+                    "placeholder": "Describe what happened: what was observed, reported, or witnessed.",
                 }
             ),
             "action_taken": forms.Textarea(

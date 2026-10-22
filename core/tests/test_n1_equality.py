@@ -470,7 +470,7 @@ class FinanceOpenInvoicesTermScopeTest(TestCase):
         )
         self.assertNotEqual(
             dashboard_open, global_open,
-            f"open_invoices={dashboard_open} equals global count {global_open}  "
+            f"open_invoices={dashboard_open} equals global count {global_open}: "
             f"the term-scoping fix is NOT applied",
         )
 

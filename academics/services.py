@@ -159,7 +159,7 @@ def sign_off_report(report_card, user):
             gaps.append(f"no term remark yet for: {', '.join(missing_remarks)}")
         if gaps:
             raise ValidationError(
-                f"Cannot sign off: {report_card.student.first_name}'s report is incomplete  "
+                f"Cannot sign off: {report_card.student.first_name}'s report is incomplete: "
                 + "; ".join(gaps) + "."
             )
 

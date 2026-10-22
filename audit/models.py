@@ -157,7 +157,7 @@ class DSARRequest(TimeStampedModel):
         verbose_name_plural = "DSAR Requests"
 
     def __str__(self) -> str:
-        return f"DSAR {self.target_type}#{self.target_id}  {self.status} ({self.export_format})"
+        return f"DSAR {self.target_type}#{self.target_id} - {self.status} ({self.export_format})"
 
     @property
     def is_within_sla(self):

@@ -197,7 +197,7 @@ function _doAssessmentSubmit(form) {
       var note = document.createElement('div');
       note.className = 'msg-toast msg-error';
       note.style.marginBottom = '12px';
-      note.textContent = 'The assessment was not saved: the server could not be reached. Your entries are still here  try again.';
+      note.textContent = 'The assessment was not saved: the server could not be reached. Your entries are still here: try again.';
       body.insertBefore(note, body.firstChild);
     });
 }

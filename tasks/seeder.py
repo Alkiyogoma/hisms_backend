@@ -286,7 +286,7 @@ def seed_lesson_plan_tasks():
                 )
                 Task.objects.create(
                     task_type='lesson_plan_review',
-                    title=f'Review: {lp.class_name}  {lp.subject_name}',
+                    title=f'Review: {lp.class_name} - {lp.subject_name}',
                     description=f'Lesson plan submitted by '
                                 f'{lp.teacher.get_full_name() or lp.teacher.username} '
                                 f'for week of {lp.week_start_date}.',
@@ -318,7 +318,7 @@ def seed_lesson_plan_tasks():
                 )
                 Task.objects.create(
                     task_type='lesson_plan_submission',
-                    title=f'Revise lesson plan: {lp.class_name}  {lp.subject_name}',
+                    title=f'Revise lesson plan: {lp.class_name} - {lp.subject_name}',
                     description=f'Your lesson plan needs revision. '
                                 f'Review feedback and resubmit.',
                     assigned_to=lp.teacher,
@@ -388,7 +388,7 @@ def seed_exam_score_tasks():
         if not _task_exists('grade_submission', score.entered_by, ct, score.pk):
             Task.objects.create(
                 task_type='grade_submission',
-                title=f'Review scores: {score.student.first_name}  {score.subject_name}',
+                title=f'Review scores: {score.student.first_name} - {score.subject_name}',
                 description=f'Exam scores for {score.exam_type} submitted by '
                             f'{score.entered_by.get_full_name() or score.entered_by.username}. '
                             f'Score: {score.score}/{score.max_score}.',
@@ -423,7 +423,7 @@ def seed_report_card_tasks():
             if not _task_exists('report_signoff', hos, ct, rc.pk):
                 Task.objects.create(
                     task_type='report_signoff',
-                    title=f'Sign off: {rc.student.first_name} {rc.student.last_name}  {rc.student.class_name}',
+                    title=f'Sign off: {rc.student.first_name} {rc.student.last_name} - {rc.student.class_name}',
                     description=f'Report card for {rc.term.name} ready for sign-off.',
                     assigned_to=hos,
                     due_date=_due_end_of_term(),
@@ -459,7 +459,7 @@ def seed_overdue_invoice_tasks():
             if not _task_exists('overdue_collection', user, ct, inv.pk):
                 Task.objects.create(
                     task_type='overdue_collection',
-                    title=f'Follow up: {inv.student.first_name} {inv.student.last_name}  overdue fees',
+                    title=f'Follow up: {inv.student.first_name} {inv.student.last_name} - overdue fees',
                     description=f'Invoice {inv.invoice_number} is overdue. '
                                 f'Balance: TZS {inv.total_due:,.0f}. Contact parent.',
                     assigned_to=user,
@@ -497,7 +497,7 @@ def seed_unmatched_payment_tasks():
             if not _task_exists('payment_matching', user, ct, payment.pk):
                 Task.objects.create(
                     task_type='payment_matching',
-                    title=f'Match payment: TZS {payment.amount:,.0f}  {payment.reference or "No ref"}',
+                    title=f'Match payment: TZS {payment.amount:,.0f} - {payment.reference or "No ref"}',
                     description=f'Bank statement entry of TZS {payment.amount:,.0f} '
                                 f'needs to be matched to an invoice.',
                     assigned_to=user,
@@ -540,7 +540,7 @@ def seed_welfare_tasks():
             if not _task_exists('welfare_alert', hod, ct, obs.pk):
                 Task.objects.create(
                     task_type='welfare_alert',
-                    title=f'Welfare alert: {obs.student.first_name}  {obs.get_severity_display()}',
+                    title=f'Welfare alert: {obs.student.first_name} - {obs.get_severity_display()}',
                     description=f'{"CRITICAL" if obs.severity == "critical" else "HIGH"} welfare '
                                 f'observation for {obs.student.first_name} {obs.student.last_name} '
                                 f'({obs.student.class_name}).',
@@ -656,7 +656,7 @@ def seed_fee_structure_tasks():
         if not _task_exists('fee_verification', user):
             Task.objects.create(
                 task_type='fee_verification',
-                title=f'Set up fee structures  {current_term.name}',
+                title=f'Set up fee structures - {current_term.name}',
                 description=f'No fee structures configured for {current_term.name}. '
                             f'Set up fees for all classes.',
                 assigned_to=user,
@@ -726,7 +726,7 @@ def seed_attendance_tasks():
         if not _task_exists('attendance_alert', teacher_user, ct, student.pk):
             Task.objects.create(
                 task_type='attendance_alert',
-                title=f'Attendance alert: {student.first_name}  {rate:.0f}%',
+                title=f'Attendance alert: {student.first_name} - {rate:.0f}%',
                 description=f'{student.first_name} {student.last_name}\'s attendance '
                             f'is {rate:.0f}%, below the 85% threshold.',
                 assigned_to=teacher_user,

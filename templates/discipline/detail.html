@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}{{ incident.reference }}  {{ brand.school_name }}{% endblock %}
+{% block title %}{{ incident.reference }} | {{ brand.school_name }}{% endblock %}
 
 {% block extra_head %}
 {% include "includes/hodari_print_styles.html" %}
@@ -233,8 +233,8 @@
         <tr>
           <td>{{ incident.occurred_on|date:"j F Y" }}</td>
           <td>{% if incident.parent_contacted %}<b>Yes</b>{% if incident.parent_contact_method or incident.parent_contact_date %} —{% if incident.parent_contact_method %} {{ incident.get_parent_contact_method_display|lower }}{% endif %}{% if incident.parent_contact_date %}{% if incident.parent_contact_method %},{% endif %} {{ incident.parent_contact_date|date:"j F Y" }}{% endif %}{% endif %}{% if incident.parent_contact_person %}<br>With: {{ incident.parent_contact_person }}{% endif %}{% else %}<b>No</b>{% endif %}</td>
-          <td>{% if incident.follow_up_required %}<b>{{ incident.get_follow_up_kind_display|default:"Follow-up arranged" }}</b>  {% if incident.follow_up_date %}{{ incident.follow_up_date|date:"l j F Y" }}{% if incident.follow_up_time %}, {{ incident.follow_up_time|time:"H:i" }}{% endif %}{% else %}date to be confirmed{% endif %}{% if incident.follow_up_details %}<br>{{ incident.follow_up_details }}{% endif %}{% else %}<b>Not required</b>{% endif %}</td>
-          <td>{% if previous_count %}<b>{{ previous_count }} previous</b>  most recent {{ previous_latest|date:"j M Y" }}{% else %}<b>None</b> on record{% endif %}</td>
+          <td>{% if incident.follow_up_required %}<b>{{ incident.get_follow_up_kind_display|default:"Follow-up arranged" }}</b>: {% if incident.follow_up_date %}{{ incident.follow_up_date|date:"l j F Y" }}{% if incident.follow_up_time %}, {{ incident.follow_up_time|time:"H:i" }}{% endif %}{% else %}date to be confirmed{% endif %}{% if incident.follow_up_details %}<br>{{ incident.follow_up_details }}{% endif %}{% else %}<b>Not required</b>{% endif %}</td>
+          <td>{% if previous_count %}<b>{{ previous_count }} previous</b>: most recent {{ previous_latest|date:"j M Y" }}{% else %}<b>None</b> on record{% endif %}</td>
         </tr>
       </table>
       </div>
@@ -267,11 +267,11 @@
 
     <div class="ds-staff">
       {% if incident.reviewed_by and same_reviewer %}
-      <div class="ds-sline" style="grid-column:1 / -1">Reported and reviewed by  {{ reporter_name }}, {{ reporter_title }}, {{ incident.reviewed_at|date:"j F Y" }}</div>
+      <div class="ds-sline" style="grid-column:1 / -1">Reported and reviewed by - {{ reporter_name }}, {{ reporter_title }}, {{ incident.reviewed_at|date:"j F Y" }}</div>
       {% else %}
-      <div class="ds-sline">Reported by  {{ reporter_name }}, {{ reporter_title }}, {{ incident.created_at|date:"j F Y" }}</div>
+      <div class="ds-sline">Reported by - {{ reporter_name }}, {{ reporter_title }}, {{ incident.created_at|date:"j F Y" }}</div>
       {% if incident.reviewed_by %}
-      <div class="ds-sline">Reviewed by  {{ reviewer_name }}, {{ reviewed_by_title }}, {{ incident.reviewed_at|date:"j F Y" }}</div>
+      <div class="ds-sline">Reviewed by - {{ reviewer_name }}, {{ reviewed_by_title }}, {{ incident.reviewed_at|date:"j F Y" }}</div>
       {% endif %}
       {% endif %}
     </div>
@@ -281,7 +281,7 @@
       <h4>Record of amendment</h4>
       {% for a in amendments %}
       <div class="ds-amend">
-        <b>{{ a.changed_at|date:"j F Y, H:i" }}  {{ a.by_name }}, {{ a.by_title }}</b><br>
+        <b>{{ a.changed_at|date:"j F Y, H:i" }} - {{ a.by_name }}, {{ a.by_title }}</b><br>
         {% for c in a.changes %}{% if c.text %}{{ c.field }} corrected.{% else %}{{ c.field }} changed from {{ c.before }} to {{ c.after }}.{% endif %}<br>{% endfor %}
         <span class="ds-amend-why">Reason: {{ a.reason }}</span>
       </div>
@@ -295,7 +295,7 @@
   <div class="ds-screen-only">
     {% if amendments %}
     <div class="ds-panel">
-      <div class="ds-panel-h">Amendment history  previous and new values</div>
+      <div class="ds-panel-h">Amendment history: previous and new values</div>
       <div class="ds-panel-b">
         {% for a in amendments %}
         <div {% if not forloop.first %}style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)"{% endif %}>
@@ -317,7 +317,7 @@
 
     {% if not can_review and incident.reviewed_by %}
     <div class="ds-panel">
-      <div class="ds-panel-h">Review  {{ incident.get_status_display }}</div>
+      <div class="ds-panel-h">Review - {{ incident.get_status_display }}</div>
       <div class="ds-panel-b">
         <div style="font-size:12px;color:#64748B;margin-bottom:8px">{{ reviewer_name }}, {{ reviewed_by_title }} · {{ incident.reviewed_at|date:"d M Y, H:i" }}</div>
         {% if incident.hod_notes %}<div class="ds-history">{{ incident.hod_notes }}</div>{% endif %}
@@ -328,7 +328,7 @@
     {% if can_review %}
     {% with f=review_form %}
     <div class="ds-panel">
-      <div class="ds-panel-h">{{ reviewer_title }} review  screen only, not printed</div>
+      <div class="ds-panel-h">{{ reviewer_title }} review: screen only, not printed</div>
       <div class="ds-panel-b">
         {% if incident.reviewed_by %}
         <div style="font-size:12px;color:#64748B;margin-bottom:12px">Last reviewed by {{ reviewer_name }}, {{ reviewed_by_title }} · {{ incident.reviewed_at|date:"d M Y, H:i" }}</div>

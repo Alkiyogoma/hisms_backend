@@ -46,7 +46,7 @@
       </button>
     </form>
     <button type="button" class="lp-btn lp-btn-danger"
-      onclick="openRejectModal({{ p.id }}, '{{ p.lesson_title|default:p.subject_name|escapejs }}  {{ p.class_name|escapejs }}, {{ p.teacher.get_full_name|escapejs }}')">
+      onclick="openRejectModal({{ p.id }}, '{{ p.lesson_title|default:p.subject_name|escapejs }} - {{ p.class_name|escapejs }}, {{ p.teacher.get_full_name|escapejs }}')">
       Reject
     </button>
     {% elif p.teacher == user %}

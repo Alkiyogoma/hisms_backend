@@ -295,7 +295,7 @@ def check_unconfirmed_attendance_9am():
     from datetime import date as _date
 
     if not is_school_day(_date.today()):
-        logger.info("check_unconfirmed_attendance_9am: skipped  not a school day")
+        logger.info("check_unconfirmed_attendance_9am: skipped (not a school day)")
         return "Skipped: not a school day"
 
     from django.core.management import call_command

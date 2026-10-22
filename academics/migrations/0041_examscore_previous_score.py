@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='examscore',
             name='previous_score',
-            field=models.DecimalField(blank=True, decimal_places=2, help_text='Original score before correction  retained for audit trail (FR-ACAD-008).', max_digits=5, null=True),
+            field=models.DecimalField(blank=True, decimal_places=2, help_text='Original score before correction: retained for audit trail (FR-ACAD-008).', max_digits=5, null=True),
         ),
     ]
