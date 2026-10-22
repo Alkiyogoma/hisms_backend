@@ -46,26 +46,44 @@
 </div>
 
 <!-- Filters -->
-<form method="get" class="hf2-toolbar">
-  <input type="text" name="q" class="hf2-input" placeholder="Search description, vendor, reference..." value="{{ q }}" style="width:200px">
-  <span class="hf2-toolbar-label">Status</span>
-  <select name="status" class="hf2-select">
-    <option value="">All statuses</option>
-    {% for code, label in expense_statuses %}
-    <option value="{{ code }}" {% if selected_status == code %}selected{% endif %}>{{ label }}</option>
-    {% endfor %}
-  </select>
-  <span class="hf2-toolbar-label">Category</span>
-  <select name="category" class="hf2-select">
-    <option value="">All categories</option>
-    {% for code, label in categories %}<option value="{{ code }}" {% if selected_category == code %}selected{% endif %}>{{ label }}</option>{% endfor %}
-  </select>
-  <span class="hf2-toolbar-label">From</span>
-  <input type="date" name="from" value="{{ date_from }}" class="hf2-input hf2-date" style="width:148px">
-  <span class="hf2-toolbar-label">To</span>
-  <input type="date" name="to" value="{{ date_to }}" class="hf2-input hf2-date" style="width:148px">
-  <button type="submit" class="btn btn-primary btn-sm">Filter</button>
-  <a href="{% url 'finance:expense_list' %}" class="btn btn-secondary btn-sm">Clear</a>
+<form method="get" class="hf-filterbar">
+    <div class="hf-filters">
+      <div class="hf-fg wide">
+        <label for="f-q">Search</label>
+        <input id="f-q" type="text" name="q" value="{{ q }}" placeholder="Description, vendor or reference">
+      </div>
+      <div class="hf-fg">
+        <label for="f-status">Status</label>
+        <select id="f-status" name="status" onchange="this.form.submit()">
+          <option value="">All statuses</option>
+          {% for code, label in expense_statuses %}
+          <option value="{{ code }}" {% if selected_status == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="hf-fg">
+        <label for="f-cat">Category</label>
+        <select id="f-cat" name="category" onchange="this.form.submit()">
+          <option value="">All categories</option>
+          {% for code, label in categories %}<option value="{{ code }}" {% if selected_category == code %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="hf-fg">
+        <label for="f-from">From</label>
+        <input id="f-from" type="date" name="from" value="{{ date_from }}" onchange="this.form.submit()">
+      </div>
+      <div class="hf-fg">
+        <label for="f-to">To</label>
+        <input id="f-to" type="date" name="to" value="{{ date_to }}" onchange="this.form.submit()">
+      </div>
+    </div>
+    <div class="hf-filterfoot">
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>Filters apply as you choose them &mdash; press Enter to search.</span>
+      <span>
+        <noscript><button type="submit" class="hf-btn hf-btn-primary">Apply</button></noscript>
+        {% if q or selected_status or selected_category or date_from or date_to %}<a class="hf-reset" href="{% url 'finance:expense_list' %}">Clear filters</a>{% endif %}
+      </span>
+    </div>
 </form>
 
 {% if expenses %}

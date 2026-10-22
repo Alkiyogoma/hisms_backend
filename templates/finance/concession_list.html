@@ -14,16 +14,26 @@
   {% endif %}
 </div>
 
-<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
-  <a href="{% url 'finance:concession_list' %}"
-     style="padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;text-decoration:none;
-     {% if not request.GET.status %}background:#023AA5;color:#fff{% else %}background:#F3F4F6;color:var(--text-secondary){% endif %}">All</a>
-  {% for code, label in status_filters %}
-  <a href="{% url 'finance:concession_list' %}?status={{ code }}"
-     style="padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;text-decoration:none;
-     {% if request.GET.status == code %}background:#023AA5;color:#fff{% else %}background:#F3F4F6;color:var(--text-secondary){% endif %}">{{ label }}</a>
-  {% endfor %}
-</div>
+<form method="get" class="hf-filterbar">
+    <div class="hf-filters">
+      <div class="hf-fg">
+        <label for="f-status">Status</label>
+        <select id="f-status" name="status" onchange="this.form.submit()">
+          <option value="">All statuses</option>
+          {% for code, label in status_filters %}
+          <option value="{{ code }}" {% if request.GET.status == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="hf-filterfoot">
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>Filters apply as you choose them.</span>
+      <span>
+        <noscript><button type="submit" class="hf-btn hf-btn-primary">Apply</button></noscript>
+        {% if request.GET.status %}<a class="hf-reset" href="{% url 'finance:concession_list' %}">Clear filters</a>{% endif %}
+      </span>
+    </div>
+</form>
 
 <div class="card">
   <div style="border-top:1px solid var(--border)">

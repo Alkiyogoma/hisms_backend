@@ -8,20 +8,34 @@
 
 
 <!-- Term / Date Selector -->
-<form method="get" class="hf2-toolbar" style="padding:16px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;margin-bottom:20px">
-  <span class="hf2-toolbar-label">Term</span>
-  <select name="term" class="hf2-select" style="min-width:200px">
-    <option value="">Custom range</option>
-    {% for term in terms %}
-    <option value="{{ term.pk }}" {% if selected_term.pk == term.pk %}selected{% endif %}>{{ term.name }} ({{ term.academic_year.name }})</option>
-    {% endfor %}
-  </select>
-  <span class="hf2-toolbar-label">From</span>
-  <input type="date" name="from" value="{{ date_from }}" class="hf2-input hf2-date" style="width:148px">
-  <span class="hf2-toolbar-label">To</span>
-  <input type="date" name="to" value="{{ date_to }}" class="hf2-input hf2-date" style="width:148px">
-  <button type="submit" class="btn btn-primary btn-sm">Update</button>
-  <a href="{% url 'finance:financial_reports' %}?type={{ report_type }}" class="btn btn-secondary btn-sm">Reset</a>
+<form method="get" class="hf-filterbar">
+    <input type="hidden" name="type" value="{{ report_type }}">
+    <div class="hf-filters">
+      <div class="hf-fg">
+        <label for="f-term">Term</label>
+        <select id="f-term" name="term" onchange="this.form.from.disabled=this.form.to.disabled=true;this.form.submit()">
+          <option value="">Custom range</option>
+          {% for term in terms %}
+          <option value="{{ term.pk }}" {% if selected_term.pk == term.pk %}selected{% endif %}>{{ term.name }} ({{ term.academic_year.name }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="hf-fg">
+        <label for="f-from">From</label>
+        <input id="f-from" type="date" name="from" value="{{ date_from }}" onchange="this.form.submit()">
+      </div>
+      <div class="hf-fg">
+        <label for="f-to">To</label>
+        <input id="f-to" type="date" name="to" value="{{ date_to }}" onchange="this.form.submit()">
+      </div>
+    </div>
+    <div class="hf-filterfoot">
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>Choosing a term fills in its dates; change the dates for a custom range.</span>
+      <span>
+        <noscript><button type="submit" class="hf-btn hf-btn-primary">Apply</button></noscript>
+        {% if request.GET.term or request.GET.from or request.GET.to %}<a class="hf-reset" href="{% url 'finance:financial_reports' %}?type={{ report_type }}">Clear filters</a>{% endif %}
+      </span>
+    </div>
 </form>
 
 <!-- Report Navigation -->

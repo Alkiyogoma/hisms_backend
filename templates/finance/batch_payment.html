@@ -14,29 +14,34 @@
 </div>
 
 <!-- Term & Class Selector -->
-<div class="card" style="margin-bottom:20px">
-  <div style="padding:16px 20px">
-    <form method="get" style="display:flex;gap:16px;align-items:end;flex-wrap:wrap">
-      <div>
-        <label class="field-label">Academic Term</label>
-        <select name="term" class="hf2-select" onchange="this.form.submit()" style="min-width:200px">
+<form method="get" class="hf-filterbar">
+    <div class="hf-filters">
+      <div class="hf-fg">
+        <label for="f-term">Term</label>
+        <select id="f-term" name="term" onchange="this.form.submit()">
           {% for t in terms %}
           <option value="{{ t.id }}" {% if t.id == selected_term.id %}selected{% endif %}>{{ t.academic_year.name }} - {{ t.name }}</option>
           {% endfor %}
         </select>
       </div>
-      <div>
-        <label class="field-label">Class</label>
-        <select name="class" class="hf2-select" onchange="this.form.submit()" style="min-width:180px">
+      <div class="hf-fg">
+        <label for="f-class">Class</label>
+        <select id="f-class" name="class" onchange="this.form.submit()">
           <option value="">Select class</option>
           {% for cls in classes %}
           <option value="{{ cls }}" {% if cls == selected_class %}selected{% endif %}>{{ cls }}</option>
           {% endfor %}
         </select>
       </div>
-    </form>
-  </div>
-</div>
+    </div>
+    <div class="hf-filterfoot">
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>Choose a term and class to list its students.</span>
+      <span>
+        <noscript><button type="submit" class="hf-btn hf-btn-primary">Apply</button></noscript>
+        
+      </span>
+    </div>
+</form>
 
 {% if selected_term and selected_class %}
   {% if student_payments %}

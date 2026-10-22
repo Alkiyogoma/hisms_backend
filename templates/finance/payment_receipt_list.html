@@ -37,37 +37,38 @@
 </div>
 
 <!-- Filters -->
-<div class="card" style="margin-bottom:20px">
-  <div style="padding:14px 16px">
-    <form method="get" style="display:flex;gap:12px;flex-wrap:wrap;align-items:end">
-      <div>
-        <label class="field-label">Date From</label>
-        <input type="date" name="from" class="hf2-input" value="{{ date_from }}" style="width:160px;height:34px;font-family:var(--font-mono)">
+<form method="get" class="hf-filterbar">
+    <div class="hf-filters">
+      <div class="hf-fg wide">
+        <label for="f-q">Search</label>
+        <input id="f-q" type="text" name="q" value="{{ q }}" placeholder="Student name, reference or invoice #">
       </div>
-      <div>
-        <label class="field-label">Date To</label>
-        <input type="date" name="to" class="hf2-input" value="{{ date_to }}" style="width:160px;height:34px;font-family:var(--font-mono)">
-      </div>
-      <div>
-        <label class="field-label">Method</label>
-        <select name="method" class="hf2-select" style="height:34px;min-width:150px">
-          <option value="">All Methods</option>
+      <div class="hf-fg">
+        <label for="f-method">Payment method</label>
+        <select id="f-method" name="method" onchange="this.form.submit()">
+          <option value="">All methods</option>
           {% for code, label in payment_methods %}
           <option value="{{ code }}" {% if code == selected_method %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
         </select>
       </div>
-      <div>
-        <label class="field-label">Search</label>
-        <input type="text" name="q" class="hf2-input" placeholder="Name, ref, invoice #" value="{{ q }}" style="width:200px;height:34px;font-size:12px">
+      <div class="hf-fg">
+        <label for="f-from">From</label>
+        <input id="f-from" type="date" name="from" value="{{ date_from }}" onchange="this.form.submit()">
       </div>
-      <div>
-        <button type="submit" class="btn btn-primary" style="height:34px">Filter</button>
-        <a href="{% url 'finance:payment_list' %}" class="btn btn-secondary" style="height:34px">Clear</a>
+      <div class="hf-fg">
+        <label for="f-to">To</label>
+        <input id="f-to" type="date" name="to" value="{{ date_to }}" onchange="this.form.submit()">
       </div>
-    </form>
-  </div>
-</div>
+    </div>
+    <div class="hf-filterfoot">
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>Filters apply as you choose them &mdash; press Enter to search.</span>
+      <span>
+        <noscript><button type="submit" class="hf-btn hf-btn-primary">Apply</button></noscript>
+        {% if q or selected_method or request.GET.from or request.GET.to %}<a class="hf-reset" href="{% url 'finance:payment_list' %}">Clear filters</a>{% endif %}
+      </span>
+    </div>
+</form>
 
 <!-- Receipts Table -->
 <div class="card" style="padding:0;overflow:hidden">
