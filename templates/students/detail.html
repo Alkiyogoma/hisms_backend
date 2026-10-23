@@ -399,11 +399,6 @@
           <div class="sp-sub">{% if record_term %}{{ record_term.name }}, {{ record_term.academic_year.name }} · {% endif %}attendance {{ attendance.period.label }}</div>
         </div>
         <div class="sp-actions">
-          {% if not academic_summary.is_ecd and perf_has_acad %}
-          <a class="hf-btn hf-btn-primary" target="_blank" rel="noopener" href="{% url 'academics:learner_report' student.pk %}?{% if record_term %}term={{ record_term.pk }}&{% endif %}autoprint=1">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z"/></svg>
-            Print progress report</a>
-          {% endif %}
           {% if perf_has_att %}<a class="hf-btn hf-btn-secondary" target="_blank" rel="noopener" href="{% url 'attendance:print' %}?kind=student&student={{ student.pk }}&start={{ att_start|date:'Y-m-d' }}&end={{ att_end|date:'Y-m-d' }}&autoprint=1">Print attendance</a>{% endif %}
         </div>
       </div>
