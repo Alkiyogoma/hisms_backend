@@ -3,180 +3,166 @@
 {% block title %}Welfare notes &mdash; {{ brand.school_name }}{% endblock %}
 {% block topbar_greeting %}Welfare notes{% endblock %}
 {% block extra_head %}
-{% include "includes/hodari_print_styles.html" %}
 <style>
-  .print-only { display: none; }
-  @media print {
-    .print-only { display: block !important; }
-    .sidebar, .topbar, header, .hf2-actions, .btn-primary, .btn-secondary,
-    .hf-btn, .hf-btn-primary, .hf-btn-secondary, .hf-btn-danger,
-    form, .filter-bar, .no-print, .no-print-area, .print-hide,
-    .card-title-row { display: none !important; }
-    .main { margin-left: 0 !important; }
-    .content { padding: 0 !important; }
-    .card { border: none !important; box-shadow: none !important; padding: 0 !important; }
-    body { background: #fff !important; }
-  }
+  .wl-grid { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 20px; align-items: start; }
+  .wl-callout { border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; }
+  .wl-callout-draft { border: 1px dashed var(--border-strong, #CBD5E1); background: #fff; }
+  .wl-callout-sg { border: 1px solid rgba(220,38,38,.25); background: #FEF2F2; }
+  .wl-callout-t { font-weight: 700; margin-bottom: 6px; }
+  .wl-callout-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); }
+  .wl-callout-sg .wl-callout-row { border-top-color: rgba(220,38,38,.15); }
+  .wl-callout-row .hf-btn { padding: 6px 12px; font-size: 12px; flex-shrink: 0; }
+  .wl-student { font-weight: 600; color: var(--text-primary); text-decoration: none; }
+  .wl-student:hover { color: var(--hodari-blue); text-decoration: underline; }
+  .wl-sub { font-size: 11.5px; color: var(--text-muted); }
+  .wl-side-h { padding: 14px 18px; border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: .05em; background: #F8FAFC; }
+  .wl-side-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 11px 18px; border-bottom: 1px solid #F1F5F9; text-decoration: none; color: inherit; }
+  .wl-side-item:last-child { border-bottom: none; }
+  .wl-side-item:hover { background: #F8FAFC; }
+  .wl-show-sm { display: none; }
+  @media (max-width: 1100px) { .wl-grid { grid-template-columns: minmax(0,1fr); } }
+  @media (max-width: 640px) { .wl-hide-sm { display: none !important; } .table-wrap .h-table.wl-table { min-width: 0; } .h-table.wl-table th, .h-table.wl-table td { padding-left: 8px; padding-right: 8px; } .wl-show-sm { display: inline; } }
 </style>
 {% endblock %}
 
 {% block content %}
 {% include "welfare/_top_tabs.html" %}
-<!-- Print-only branded header -->
-<div class="print-only doc-container" style="max-width:900px;margin:0 auto 20px;background:#fff;padding:24px 28px;border:1px solid #DDE3EE;border-radius:12px">
-  {% include "includes/hodari_print_header.html" %}
-  <div style="height:1px;background:var(--border);margin:16px 0"></div>
-  <div style="display:flex;justify-content:space-between;align-items:center">
-    <div>
-      <div style="font-family:var(--font-display);font-size:18pt;font-weight:bold;color:var(--hodari-blue);text-transform:uppercase">Welfare notes</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Generated {% now "d M Y" %}</div>
-    </div>
+
+{% if drafts %}
+<div class="wl-callout wl-callout-draft">
+  <div class="wl-callout-t">Your drafts <span class="wl-sub" style="font-weight:400">&middot; only you can see these until you submit them</span></div>
+  {% for d in drafts %}
+  <div class="wl-callout-row">
+    <span><b>{{ d.student.first_name }} {{ d.student.last_name }}</b> <span class="wl-sub">{{ d.student.class_name }} &middot; {{ d.type_label }} &middot; saved {{ d.updated_at|date:"d M, H:i" }}</span></span>
+    <a href="{% url 'welfare:edit' d.pk %}" class="hf-btn hf-btn-secondary">Continue</a>
   </div>
+  {% endfor %}
 </div>
-<div class="card">
-  <div class="card-title-row">
-    <div class="card-title" style="margin:0">Welfare notes</div>
-  </div>
+{% endif %}
 
-  {% if drafts %}
-  <div class="no-print" style="margin-top:16px;border:1px dashed var(--border-strong,var(--border));border-radius:10px;padding:14px 16px">
-    <div style="font-size:13px;font-weight:700;margin-bottom:8px">Your drafts <span class="muted" style="font-weight:400">&middot; only you can see these until you submit them</span></div>
-    {% for d in drafts %}
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border);font-size:13px">
-        <span><b>{{ d.student.first_name }} {{ d.student.last_name }}</b> <span class="muted">{{ d.student.class_name }} &middot; {{ d.type_label }} &middot; saved {{ d.updated_at|date:"d M, H:i" }}</span></span>
-        <a href="{% url 'welfare:edit' d.pk %}" class="btn-secondary btn-sm">Continue</a>
-      </div>
-    {% endfor %}
+{% if sent_safeguarding %}
+<div class="wl-callout wl-callout-sg">
+  <div class="wl-callout-t" style="color:#B91C1C">Safeguarding notes you have sent</div>
+  {% for sg in sent_safeguarding %}
+  <div class="wl-callout-row">
+    <span>{{ sg.student.first_name }} {{ sg.student.last_name }} <span class="wl-sub">&middot; {{ sg.created_at|date:"d M Y" }}</span></span>
+    <a href="{% url 'welfare:detail' sg.pk %}" class="hf-btn hf-btn-secondary">Add follow-up</a>
   </div>
-  {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
 
-  {% if sent_safeguarding %}
-  <div class="no-print" style="margin-top:16px;border:1px solid rgba(220,38,38,.25);background:#FEF2F2;border-radius:10px;padding:14px 16px">
-    <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#B91C1C">Safeguarding notes you have sent</div>
-    {% for sg in sent_safeguarding %}
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid rgba(220,38,38,.15);font-size:13px">
-        <span>{{ sg.student.first_name }} {{ sg.student.last_name }} <span class="muted">&middot; {{ sg.created_at|date:"d M Y" }}</span></span>
-        <a href="{% url 'welfare:detail' sg.pk %}" class="btn-secondary btn-sm">Add follow-up</a>
-      </div>
-    {% endfor %}
-  </div>
-  {% endif %}
-
-  <!-- Filters -->
-  <form method="get" class="hf2-toolbar" style="margin-bottom:20px;margin-top:20px">
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <span class="hf2-toolbar-label">Severity:</span>
-      <select name="severity" class="hf2-select" style="min-width:140px">
-        <option value="">All severities</option>
-        {% for val, lbl in severity_choices %}
-          <option value="{{ val }}" {% if request.GET.severity == val %}selected{% endif %}>{{ lbl }}</option>
-        {% endfor %}
+<form method="get" class="hf-filterbar" id="welfare-filters">
+  <div class="hf-filters">
+    <div class="hf-fg wide">
+      <label for="wf-q">Search</label>
+      <input type="text" id="wf-q" name="q" value="{{ request.GET.q }}" placeholder="Student name or admission no…" autocomplete="off">
+    </div>
+    <div class="hf-fg">
+      <label for="wf-type">Note type</label>
+      <select id="wf-type" name="note_type" onchange="this.form.submit()">
+        <option value="">All types</option>
+        {% for val, lbl in note_type_choices %}<option value="{{ val }}" {% if request.GET.note_type == val %}selected{% endif %}>{{ lbl }}</option>{% endfor %}
       </select>
-      {% if is_unified_welfare %}
-      <span class="hf2-toolbar-label" style="margin-left:8px">Department:</span>
-      <select name="department" class="hf2-select" style="min-width:140px">
+    </div>
+    <div class="hf-fg">
+      <label for="wf-sev">Level</label>
+      <select id="wf-sev" name="severity" onchange="this.form.submit()">
+        <option value="">All levels</option>
+        {% for val, lbl in severity_choices %}<option value="{{ val }}" {% if request.GET.severity == val %}selected{% endif %}>{{ lbl }}</option>{% endfor %}
+      </select>
+    </div>
+    {% if is_unified_welfare %}
+    <div class="hf-fg">
+      <label for="wf-dept">Department</label>
+      <select id="wf-dept" name="department" onchange="this.form.submit()">
         <option value="">All departments</option>
         <option value="ecd" {% if request.GET.department == 'ecd' %}selected{% endif %}>ECD</option>
         <option value="primary" {% if request.GET.department == 'primary' %}selected{% endif %}>Primary</option>
         <option value="lower_secondary" {% if request.GET.department == 'lower_secondary' %}selected{% endif %}>Lower Secondary</option>
       </select>
-      {% endif %}
     </div>
-    <button type="submit" class="btn-primary btn-sm">Filter</button>
-    <a href="{% url 'welfare:list' %}" class="btn-secondary btn-sm">Reset</a>
-  </form>
+    {% endif %}
+  </div>
+  <div class="hf-filterfoot">
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>Filters apply as you choose them; press Enter to search.</span>
+    <span style="display:flex;gap:8px;align-items:center">
+      <noscript><button type="submit" class="hf-btn hf-btn-primary">Apply</button></noscript>
+      {% if has_filters %}<a class="hf-reset" href="{% url 'welfare:list' %}">Clear filters</a>{% endif %}
+    </span>
+  </div>
+</form>
 
-  <!-- Dashboard Layout -->
-  <div style="display:grid; grid-template-columns: 1fr 340px; gap:24px; margin-top:24px; align-items:start">
-
-    <!-- Left Section (Active Queue) -->
-    <div class="card" style="margin:0">
-      <div class="card-title">Open notes</div>
-      <div style="border-top:1px solid var(--border)">
-        <table style="width:100%;border-collapse:collapse">
-          <thead>
-            <tr style="text-align:left;border-bottom:2px solid #F3F4F6">
-              <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Date</th>
-              <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Student</th>
-              <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Class</th>
-              <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Type</th>
-              <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600">Status</th>
-              <th style="padding:12px 8px;font-size:12px;color:var(--text-muted);font-weight:600"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for obs in active_observations %}
-            <tr style="border-bottom:1px solid #F3F4F6;font-size:13px">
-              <td style="padding:12px 8px;color:var(--text-muted)">{{ obs.observation_date|date:"d M" }}</td>
-              <td style="padding:12px 8px">
-                <a href="{% url 'students:detail' obs.student.pk %}" style="font-weight:600;color:var(--hodari-blue);text-decoration:none">{{ obs.student }}</a>
-              </td>
-              <td style="padding:12px 8px;color:var(--text-muted)">{{ obs.student.class_name }}</td>
-              <td style="padding:12px 8px">
-                <span class="chip {% if obs.is_safeguarding %}chip-red{% elif obs.note_type == 'concern' %}chip-amber{% elif obs.note_type == 'positive' %}chip-green{% else %}chip-blue{% endif %}">
-                  {{ obs.type_label }}{% if obs.note_type == 'concern' %} &middot; {{ obs.severity|capfirst }}{% endif %}
-                </span>
-              </td>
-              <td style="padding:12px 8px">
-                <span class="chip chip-grey">
-                  {{ obs.get_hod_status_display }}
-                </span>
-              </td>
-              <td style="padding:12px 8px;text-align:right">
-                <a href="{% url 'welfare:detail' obs.pk %}" class="btn-secondary btn-sm">Details</a>
-              </td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="6" style="padding:32px;text-align:center">{% include '_partials/empty_state.html' with icon='inbox' title='No welfare notes yet' desc='Add a note to get started.' action_url='/welfare/submit/' action_text='+ Add note' %}</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-      {% if page_obj.has_other_pages %}
-      <div style="display:flex;align-items:center;justify-content:center;gap:6px;padding:16px;border-top:1px solid var(--border)">
-        {% if page_obj.has_previous %}
-          <a href="?page={{ page_obj.previous_page_number }}&severity={{ request.GET.severity }}&department={{ request.GET.department }}" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-weight:600;color:#4B5563;background:#fff;text-decoration:none">&laquo; Prev</a>
-        {% endif %}
-        {% for num in page_obj.paginator.page_range %}
-          {% if page_obj.number == num %}
-            <span style="padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;color:#fff;background:var(--hodari-blue)">{{ num }}</span>
-          {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
-            <a href="?page={{ num }}&severity={{ request.GET.severity }}&department={{ request.GET.department }}" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-weight:600;color:#4B5563;background:#fff;text-decoration:none">{{ num }}</a>
-          {% endif %}
-        {% endfor %}
-        {% if page_obj.has_next %}
-          <a href="?page={{ page_obj.next_page_number }}&severity={{ request.GET.severity }}&department={{ request.GET.department }}" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-weight:600;color:#4B5563;background:#fff;text-decoration:none">Next &raquo;</a>
-        {% endif %}
-      </div>
-      {% endif %}
+<div class="wl-grid">
+  <div class="card" style="margin:0">
+    <div class="card-title-row">
+      <div class="card-title" style="margin:0">Open notes</div>
+      <c-badge variant="blue">{{ page_obj.paginator.count }}</c-badge>
     </div>
-
-    <!-- Right Section (Resolved Sidebar) -->
-    <div style="display:flex; flex-direction:column; gap:24px">
-      <div class="card" style="margin:0; padding:0">
-        <div style="padding:16px 20px; border-bottom:1px solid var(--border); background:var(--bg-page); border-radius:12px 12px 0 0">
-          <div style="font-size:14px; font-weight:700">Recently Resolved</div>
-        </div>
-        <div style="padding:10px">
-          {% for obs in resolved_observations %}
-            <div style="padding:12px; border:1px solid #f1f5f9; border-radius:8px; margin-bottom:8px; background:white">
-              <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px">
-                <a href="{% url 'students:detail' obs.student.pk %}" style="font-weight:600; font-size:13px;color:var(--hodari-blue);text-decoration:none">{{ obs.student }}</a>
-                <div class="chip chip-green" style="font-size:10px">Resolved</div>
+    <div class="table-wrap">
+      <table class="h-table wl-table">
+        <thead>
+          <tr>
+            <th class="wl-hide-sm">Date</th>
+            <th>Student</th>
+            <th>Type</th>
+            <th class="wl-hide-sm">Status</th>
+            <th class="col-actions">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for obs in active_observations %}
+          <tr>
+            <td class="wl-hide-sm" style="white-space:nowrap;color:var(--text-muted)">{{ obs.observation_date|date:"d M Y" }}</td>
+            <td>
+              <a href="{% url 'students:detail' obs.student.pk %}" class="wl-student">{{ obs.student.first_name }} {{ obs.student.last_name }}</a>
+              <div class="wl-sub">{{ obs.student.class_name }}<span class="wl-show-sm"> &middot; {{ obs.observation_date|date:"d M Y" }}</span></div>
+            </td>
+            <td>
+              <c-badge variant="{% if obs.is_safeguarding %}red{% elif obs.note_type == 'concern' %}amber{% elif obs.note_type == 'positive' %}green{% else %}blue{% endif %}">{{ obs.type_label }}{% if obs.note_type == 'concern' %} &middot; {{ obs.severity|capfirst }}{% endif %}</c-badge>
+            </td>
+            <td class="wl-hide-sm"><c-badge variant="{% if obs.hod_status == 'in_progress' %}blue{% else %}grey{% endif %}">{{ obs.get_hod_status_display|default:"Pending" }}</c-badge></td>
+            <td class="col-actions">
+              <div class="hf-acts">
+                <a class="hf-act" href="{% url 'welfare:detail' obs.pk %}" title="View note" aria-label="View note">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </a>
+                {% if can_see_hod_dashboard %}
+                <a class="hf-act wl-hide-sm" href="{% url 'welfare:detail' obs.pk %}#review-form" title="Review" aria-label="Review">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+                </a>
+                {% endif %}
               </div>
-              <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px">
-                {{ obs.type_label }} &middot; {{ obs.observation_date|date:"d M" }} &middot; {{ obs.student.class_name }}
-              </div>
-              <a href="{% url 'welfare:detail' obs.pk %}" style="font-size:11px; font-weight:600; color:var(--hodari-blue); text-decoration:none">View Details &rarr;</a>
-            </div>
+            </td>
+          </tr>
           {% empty %}
-            {% include '_partials/empty_state.html' with icon='check' icon_color='green' title='No resolved cases found' desc='Resolved cases will appear here.' %}
+          <tr><td colspan="5">
+            {% if has_filters %}
+              {% include '_partials/empty_state.html' with icon='search' icon_color='grey' title='No notes match these filters' desc='Try a different search or clear the filters.' %}
+            {% else %}
+              {% include '_partials/empty_state.html' with icon='inbox' title='No open welfare notes' desc='New notes appear here until they are resolved.' %}
+            {% endif %}
+          </td></tr>
           {% endfor %}
-        </div>
-      </div>
+        </tbody>
+      </table>
     </div>
+    <c-pagination :page_obj="page_obj" label="notes" />
+  </div>
 
+  <div class="card" style="margin:0;padding:0;overflow:hidden">
+    <div class="wl-side-h">Recently resolved</div>
+    {% for obs in resolved_observations %}
+    <a href="{% url 'welfare:detail' obs.pk %}" class="wl-side-item">
+      <div style="min-width:0">
+        <div style="font-weight:600;font-size:13px;color:var(--text-primary)">{{ obs.student.first_name }} {{ obs.student.last_name }}</div>
+        <div class="wl-sub">{{ obs.type_label }} &middot; {{ obs.observation_date|date:"d M" }} &middot; {{ obs.student.class_name }}</div>
+      </div>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2.5" style="flex-shrink:0"><path d="M9 18l6-6-6-6"/></svg>
+    </a>
+    {% empty %}
+    <div style="padding:12px">{% include '_partials/empty_state.html' with icon='check' icon_color='green' title='Nothing resolved yet' desc='Resolved notes will appear here.' %}</div>
+    {% endfor %}
   </div>
 </div>
 {% endblock %}

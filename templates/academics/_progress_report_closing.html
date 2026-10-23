@@ -1,0 +1,32 @@
+{# Comments, reading notes and signatures at the end of the progress report. #}
+{% load static %}
+{% if report.teacher_comments or report.hos_comments %}
+<h2>Comments</h2>
+{% if report.teacher_comments %}<div class="comment filled"><b>Class teacher</b>{{ report.teacher_comments }}</div>{% endif %}
+{% if report.hos_comments %}<div class="comment filled"><b>Head of School</b>{{ report.hos_comments }}</div>{% endif %}
+{% endif %}
+
+<div class="notes">
+  <b>How to read this report</b>
+  <ul>
+    <li>Each assessment column shows weighted points: {% for c in exam_columns %}{{ c }}{% if not forloop.last %}, {% endif %}{% endfor %}. They add up to the subject TOTAL out of 100.</li>
+    <li>Only marks that have been entered <b>and approved</b> are included, never counted as zero when missing. A subject's total and grade are given once all its assessments are approved; the overall average and grade once every mark-bearing subject is.</li>
+    <li>Remark-only subjects take a remark once per term and no marks, so they are not part of the average. Pass mark {{ pass_mark }}% (grade C).</li>
+    <li>Attendance = days in school ÷ days marked. Late counts as in school; excused counts as absent but authorised; unmarked days are left out.</li>
+  </ul>
+</div>
+
+<div class="signatures">
+  <div><div class="sig-line"></div><div class="sig-label">Class teacher<br><span>{{ class_teacher|default:"Signature and date" }}</span></div></div>
+  <div class="sig-hos">
+    <div class="sig-line"></div>
+    <div class="sig-label">Head of School<br><span>{% if report.signed_off_by %}{{ report.signed_off_by.get_full_name|default:report.signed_off_by.username }}{% else %}Signature and date{% endif %}</span></div>
+    {% if report.status == 'published' and report.signed_off_at %}
+    <div class="stamp-container">
+      <img src="{% static 'branding/hodari_school_stamp.png' %}" alt="School stamp" class="stamp-img">
+      <div class="stamp-date">{{ report.signed_off_at|date:"d M Y"|upper }}</div>
+    </div>
+    {% endif %}
+  </div>
+  <div><div class="sig-line"></div><div class="sig-label">Parent<br><span>Signature and date</span></div></div>
+</div>

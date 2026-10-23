@@ -429,6 +429,12 @@ def _build_report_card_context(report):
         ctx["ecd"] = build_ecd_report_context(report)
         return ctx
 
+    # Official report card = the Student Progress Report for the term, plus
+    # the report's general traits, class teacher remark and sign-off.
+    from academics.views.learner_report import build_learner_report
+    learner = build_learner_report(report.student, term)
+    learner.pop("class_teacher")
+    ctx.update(learner)
     ctx["trait_groups"] = _trait_groups(report.general_traits or {})
 
     # Subject scores with weighted averages and gap detection
@@ -458,13 +464,6 @@ def _build_report_card_context(report):
         subjects[subj]["redistributed_weights"] = grade_result["redistributed_weights"]
         subjects[subj]["makeup_required"] = grade_result["makeup_required"]
     ctx["subjects"] = subjects
-    ctx["remark_rows"] = _remark_rows(report.student, report.term)
-
-    # ACADEMIC PROGRESS table: approved, mark-bearing subjects only. The exam
-    # average and grade appear only once the term is fully assessed  never
-    # the stored average, which may predate later scores.
-    from academics.score_progress import exam_summary
-    ctx["exam"] = exam_summary(report.student, report.term)
 
     # Cambridge Checkpoint (FR-ACAD-005) -- Grades 6, 7, 8, and 9
     if report.student.class_name in ["Grade 6", "Grade 7", "Grade 8", "Grade 9"]:
@@ -567,7 +566,7 @@ class ClassReportPrintView(HOSReportPreviewView):
         ctx = super().get_context_data(**kwargs)
         from django.template.loader import render_to_string
         report = ctx["report"]
-        partial = "academics/_ecd_report_body.html" if report.is_ecd_report else "academics/_report_card_sheets.html"
+        partial = "academics/_ecd_report_body.html" if report.is_ecd_report else "academics/_progress_report_body.html"
         reports = (
             self.class_report_queryset(report)
             .select_related("student", "term__academic_year", "signed_off_by")

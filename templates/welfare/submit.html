@@ -83,6 +83,7 @@
   .mismatch-box { padding: 12px 14px; border-radius: 8px; margin-bottom: 18px; font-size: 13px; background: #FFFBEB; color: #92400E; border: 1px solid rgba(217,119,6,.35); display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
   .mode-banner { padding: 12px 14px; border-radius: 8px; margin-bottom: 18px; font-size: 13px; background: var(--bg-page); border: 1px solid var(--border); color: var(--text-secondary); }
   .type-card[hidden] { display: none; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
   @media (max-width: 1000px) {
     .note-grid { grid-template-columns: 1fr; }
@@ -90,6 +91,8 @@
   }
   @media (max-width: 640px) {
     .type-cards { grid-template-columns: 1fr; }
+    .two-col { grid-template-columns: 1fr; }
+    .note-form { padding: 18px 16px; }
   }
 </style>
 {% endblock %}
@@ -163,7 +166,7 @@
       <div id="studentInputs"></div>
       <div id="tagInputs"></div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="two-col">
         <!-- Child search -->
         <div class="hf2-group" style="position:relative">
           <label class="hf2-label" for="kidInput">Child <span style="color:var(--red)">*</span></label>
@@ -196,7 +199,7 @@
       <!-- Concern-specific fields -->
       <div id="concernBox" style="display:none">
         <div class="reveal-box">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="two-col">
             <div class="hf2-group">
               <label class="hf2-label" for="severitySelect">Level</label>
               <select name="severity" class="hf2-select" id="severitySelect">
@@ -267,10 +270,10 @@
 
       <div class="hf2-actions" style="margin-top:28px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
         {% if note_mode == "new" %}
-          <a href="{% url 'welfare:list' %}" class="hf-btn hf-btn-secondary" style="text-decoration:none">Clear</a>
+          <a href="{% url 'welfare:list' %}" class="hf-btn hf-btn-secondary" style="text-decoration:none">Cancel</a>
         {% elif note_mode == "draft" %}
           <button type="submit" name="action" value="delete_draft" class="hf-btn hf-btn-secondary" formnovalidate
-                  onclick="return confirm('Delete this draft? This cannot be undone.')">Delete draft</button>
+                  onclick="var b=this; if (b.dataset.ok) return true; confirmDeleteModal({title:'Delete this draft?',body:'The draft will be removed. This cannot be undone.',confirmText:'Delete draft',onConfirm:function(){ b.dataset.ok='1'; b.click(); }}); return false;">Delete draft</button>
         {% else %}
           <a href="{% url 'welfare:detail' obs.pk %}" class="hf-btn hf-btn-secondary" style="text-decoration:none">Cancel</a>
         {% endif %}

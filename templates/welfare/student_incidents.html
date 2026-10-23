@@ -20,48 +20,25 @@
   .si-card-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #F3F4F6; }
   .si-card-title { font-size: 14px; font-weight: 700; color: #1E293B; }
   .si-card-body { padding: 20px; }
-  .si-filters { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; }
-  .si-filters-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
-  .si-filter-group { display: flex; flex-direction: column; gap: 4px; }
-  .si-filter-group label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
-  .si-filter-group input, .si-filter-group select { border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px; font-size: 13px; color: #1E293B; background: #fff; min-width: 150px; }
-  .si-filter-group input:focus, .si-filter-group select:focus { outline: none; border-color: var(--hodari-blue); box-shadow: 0 0 0 3px rgba(2,58,165,0.08); }
-  .si-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: background .15s; }
-  .si-btn-primary { background: var(--hodari-blue); color: #fff; }
-  .si-btn-primary:hover { background: #012A80; }
-  .si-btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
-  .si-btn-ghost:hover { background: #F9FAFB; }
-  .si-table { width: 100%; border-collapse: collapse; }
-  .si-table th { padding: 12px 14px; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; text-align: left; border-bottom: 2px solid #F3F4F6; background: #FAFBFC; }
-  .si-table td { padding: 12px 14px; font-size: 13px; color: #1E293B; border-bottom: 1px solid #F3F4F6; }
-  .si-table tr:hover td { background: #F8FAFC; }
-  .si-chip { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 99px; font-size: 11px; font-weight: 600; white-space: nowrap; }
-  .si-chip-red { background: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }
-  .si-chip-amber { background: #FFFBEB; color: #D97706; border: 1px solid #FDE68A; }
-  .si-chip-blue { background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; }
-  .si-chip-grey { background: #F3F4F6; color: #6B7280; border: 1px solid #E5E7EB; }
-  .si-chip-green { background: #F0FDF4; color: #16A34A; border: 1px solid #BBF7D0; }
   .si-empty { text-align: center; padding: 48px 20px; color: var(--text-muted); }
   .si-top-students { list-style: none; padding: 0; margin: 0; }
   .si-top-students li { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #F3F4F6; font-size: 13px; }
   .si-top-students li:last-child { border-bottom: none; }
   .si-student-name { font-weight: 600; color: #1E293B; }
   .si-student-class { font-size: 11px; color: var(--text-muted); }
-  .si-observation-text { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #4B5563; }
-  .si-pagination { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 20px; }
-  .si-page-btn { padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; font-weight: 600; color: #4B5563; background: #fff; cursor: pointer; text-decoration: none; }
-  .si-page-btn:hover { background: #F9FAFB; }
-  .si-page-btn.active { background: var(--hodari-blue); color: #fff; border-color: var(--hodari-blue); }
-  .si-page-btn:disabled { opacity: .4; cursor: not-allowed; }
+  .si-observation-text { display: block; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #4B5563; }
+  .si-student { font-weight: 600; color: var(--text-primary); text-decoration: none; }
+  .si-student:hover { color: var(--hodari-blue); text-decoration: underline; }
+  .si-sub { font-size: 11.5px; color: var(--text-muted); }
+  .si-show-sm { display: none; }
   @media (max-width: 1100px) {
     .si-grid { grid-template-columns: repeat(2, 1fr); }
     .si-charts { grid-template-columns: 1fr; }
     .si-charts-row { grid-template-columns: 1fr; }
   }
   @media (max-width: 640px) {
-    .si-grid { grid-template-columns: 1fr; }
-    .si-filters-row { flex-direction: column; }
-    .si-filter-group input, .si-filter-group select { min-width: 100%; }
+    .si-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .h-table .si-hide-sm { display: none; } .table-wrap .h-table.si-table { min-width: 0; } .h-table.si-table th, .h-table.si-table td { padding-left: 8px; padding-right: 8px; } .si-show-sm { display: inline; }
   }
 </style>
 {% endblock %}
@@ -103,18 +80,17 @@
   </div>
 </div>
 
-<!-- Search Filters -->
-<form method="get" class="si-filters">
-  <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px">Filters</div>
-  <div class="si-filters-row">
-    <div class="si-filter-group" style="flex:1;min-width:200px">
-      <label>Search</label>
-      <input type="text" name="q" placeholder="Student name, admission no, or keyword" value="{{ filter_q }}">
+<!-- Filters -->
+<form method="get" class="hf-filterbar" id="welfare-overview-filters">
+  <div class="hf-filters">
+    <div class="hf-fg wide">
+      <label for="si-q">Search</label>
+      <input type="text" id="si-q" name="q" placeholder="Student name, admission no or keyword…" value="{{ filter_q }}" autocomplete="off">
     </div>
     {% if is_unified_welfare %}
-    <div class="si-filter-group">
-      <label>Department</label>
-      <select name="department">
+    <div class="hf-fg">
+      <label for="si-dept">Department</label>
+      <select id="si-dept" name="department" onchange="this.form.submit()">
         <option value="">All departments</option>
         <option value="ecd" {% if filter_department == 'ecd' %}selected{% endif %}>ECD</option>
         <option value="primary" {% if filter_department == 'primary' %}selected{% endif %}>Primary</option>
@@ -122,45 +98,42 @@
       </select>
     </div>
     {% endif %}
-    <div class="si-filter-group">
-      <label>Note Type</label>
-      <select name="note_type">
-        <option value="">All note types</option>
-        {% for val, label in note_type_choices %}
-          <option value="{{ val }}" {% if filter_note_type == val %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
+    <div class="hf-fg">
+      <label for="si-type">Note type</label>
+      <select id="si-type" name="note_type" onchange="this.form.submit()">
+        <option value="">All types</option>
+        {% for val, label in note_type_choices %}<option value="{{ val }}" {% if filter_note_type == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
       </select>
     </div>
-    <div class="si-filter-group">
-      <label>Status</label>
-      <select name="status">
+    <div class="hf-fg">
+      <label for="si-status">Status</label>
+      <select id="si-status" name="status" onchange="this.form.submit()">
         <option value="">All statuses</option>
-        {% for val, label in status_choices %}
-          <option value="{{ val }}" {% if filter_status == val %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
+        {% for val, label in status_choices %}<option value="{{ val }}" {% if filter_status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
       </select>
     </div>
-    <div class="si-filter-group">
-      <label>Class</label>
-      <select name="class_name">
+    <div class="hf-fg">
+      <label for="si-class">Class</label>
+      <select id="si-class" name="class_name" onchange="this.form.submit()">
         <option value="">All classes</option>
-        {% for cls in available_classes %}
-          <option value="{{ cls }}" {% if filter_class == cls %}selected{% endif %}>{{ cls }}</option>
-        {% endfor %}
+        {% for cls in available_classes %}<option value="{{ cls }}" {% if filter_class == cls %}selected{% endif %}>{{ cls }}</option>{% endfor %}
       </select>
     </div>
-    <div class="si-filter-group">
-      <label>From</label>
-      <input type="date" name="date_from" value="{{ filter_date_from }}">
+    <div class="hf-fg">
+      <label for="si-from">From</label>
+      <input type="date" id="si-from" name="date_from" value="{{ filter_date_from }}" onchange="this.form.submit()">
     </div>
-    <div class="si-filter-group">
-      <label>To</label>
-      <input type="date" name="date_to" value="{{ filter_date_to }}">
+    <div class="hf-fg">
+      <label for="si-to">To</label>
+      <input type="date" id="si-to" name="date_to" value="{{ filter_date_to }}" onchange="this.form.submit()">
     </div>
-    <div style="display:flex;gap:8px;align-self:flex-end">
-      <button type="submit" class="si-btn si-btn-primary">Apply</button>
-      <a href="{% url 'welfare:student_incidents' %}" class="si-btn si-btn-ghost">Clear</a>
-    </div>
+  </div>
+  <div class="hf-filterfoot">
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>Cards, charts and the table all follow these filters.</span>
+    <span style="display:flex;gap:8px;align-items:center">
+      <noscript><button type="submit" class="hf-btn hf-btn-primary">Apply</button></noscript>
+      {% if filter_q or filter_note_type or filter_status or filter_class or filter_department or filter_date_from or filter_date_to %}<a class="hf-reset" href="{% url 'welfare:student_incidents' %}">Clear filters</a>{% endif %}
+    </span>
   </div>
 </form>
 
@@ -209,7 +182,7 @@
                 <a href="{% url 'students:detail' s.student_pk %}" class="si-student-name" style="text-decoration:none;color:#1E293B;cursor:pointer">{{ s.student__first_name }} {{ s.student__last_name }}</a>
                 <span class="si-student-class">{{ s.student__class_name }}</span>
               </div>
-              <span class="si-chip si-chip-blue">{{ s.incident_count }}</span>
+              <c-badge variant="blue">{{ s.incident_count }}</c-badge>
             </li>
           {% endfor %}
         </ul>
@@ -226,76 +199,49 @@
     <span class="si-card-title">Recent notes</span>
     <span class="chip chip-blue">{{ total_filtered }} record{{ total_filtered|pluralize }}</span>
   </div>
-  {% if recent_incidents %}
-  <div style="overflow-x:auto">
-    <table class="si-table">
+  <div class="table-wrap">
+    <table class="h-table si-table">
       <thead>
         <tr>
-          <th>Date</th>
+          <th class="si-hide-sm">Date</th>
           <th>Student</th>
-          <th>Class</th>
           <th>Type</th>
-          <th>Tags</th>
-          <th>Observation</th>
-          <th>Status</th>
-          <th></th>
+          <th class="si-hide-sm">Observation</th>
+          <th class="si-hide-sm">Status</th>
+          <th class="col-actions">Action</th>
         </tr>
       </thead>
       <tbody>
         {% for inc in recent_incidents %}
         <tr>
-          <td style="white-space:nowrap">{{ inc.observation_date|date:"d M Y" }}</td>
-          <td style="font-weight:600"><a href="{% url 'students:detail' inc.student.pk %}" style="text-decoration:none;color:var(--hodari-blue)">{{ inc.student.first_name }} {{ inc.student.last_name }}</a></td>
-          <td>{{ inc.student.class_name }}</td>
+          <td class="si-hide-sm" style="white-space:nowrap;color:var(--text-muted)">{{ inc.observation_date|date:"d M Y" }}</td>
           <td>
-            <span class="si-chip {% if inc.is_safeguarding %}si-chip-red{% elif inc.note_type == 'concern' %}si-chip-amber{% elif inc.note_type == 'positive' %}si-chip-green{% else %}si-chip-blue{% endif %}">{{ inc.type_label }}{% if inc.note_type == 'concern' %} &middot; {{ inc.severity|capfirst }}{% endif %}</span>
+            <a href="{% url 'students:detail' inc.student.pk %}" class="si-student">{{ inc.student.first_name }} {{ inc.student.last_name }}</a>
+            <div class="si-sub">{{ inc.student.class_name }}<span class="si-show-sm"> &middot; {{ inc.observation_date|date:"d M Y" }}</span></div>
           </td>
-          <td>{{ inc.tags|join:", "|default:"—" }}</td>
-          <td><span class="si-observation-text" title="{{ inc.observation_text }}">{{ inc.observation_text|truncatewords:15 }}</span></td>
           <td>
-            {% if inc.hod_status == 'resolved' %}
-              <span class="si-chip si-chip-green">Resolved</span>
-            {% elif inc.hod_status == 'in_progress' %}
-              <span class="si-chip si-chip-amber">In progress</span>
-            {% else %}
-              <span class="si-chip si-chip-grey">Pending</span>
-            {% endif %}
+            <c-badge variant="{% if inc.is_safeguarding %}red{% elif inc.note_type == 'concern' %}amber{% elif inc.note_type == 'positive' %}green{% else %}blue{% endif %}">{{ inc.type_label }}{% if inc.note_type == 'concern' %} &middot; {{ inc.severity|capfirst }}{% endif %}</c-badge>
           </td>
-          <td style="text-align:right"><a href="{% url 'welfare:detail' pk=inc.pk %}" class="btn-secondary btn-sm" style="font-size:11px">View</a></td>
+          <td class="si-hide-sm">
+            <span class="si-observation-text" title="{{ inc.observation_text }}">{{ inc.observation_text|truncatewords:15 }}</span>
+            {% if inc.tags %}<div class="si-sub">{{ inc.tags|join:", " }}</div>{% endif %}
+          </td>
+          <td class="si-hide-sm"><c-badge variant="{% if inc.hod_status == 'resolved' %}green{% elif inc.hod_status == 'in_progress' %}blue{% else %}grey{% endif %}">{{ inc.get_hod_status_display|default:"Pending" }}</c-badge></td>
+          <td class="col-actions">
+            <div class="hf-acts">
+              <a class="hf-act" href="{% url 'welfare:detail' pk=inc.pk %}" title="View note" aria-label="View note">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </a>
+            </div>
+          </td>
         </tr>
+        {% empty %}
+        <tr><td colspan="6">{% include '_partials/empty_state.html' with icon='search' icon_color='grey' title='No notes match your filters' desc='Try a different search or clear the filters.' %}</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-
-  <!-- Pagination -->
-  {% if total_pages > 1 %}
-  <div class="si-pagination">
-    {% if page > 1 %}
-      <a class="si-page-btn" href="?page={{ page|add:"-1" }}&q={{ filter_q }}&note_type={{ filter_note_type }}&status={{ filter_status }}&class_name={{ filter_class }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">Previous</a>
-    {% endif %}
-    {% if show_first_ellipsis %}
-      <a class="si-page-btn" href="?page=1&q={{ filter_q }}&note_type={{ filter_note_type }}&status={{ filter_status }}&class_name={{ filter_class }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">1</a>
-      <span style="padding:0 4px;color:var(--text-muted)">...</span>
-    {% endif %}
-    {% for pnum in page_range %}
-      <a class="si-page-btn {% if pnum == page %}active{% endif %}" href="?page={{ pnum }}&q={{ filter_q }}&note_type={{ filter_note_type }}&status={{ filter_status }}&class_name={{ filter_class }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">{{ pnum }}</a>
-    {% endfor %}
-    {% if show_last_ellipsis %}
-      <span style="padding:0 4px;color:var(--text-muted)">...</span>
-      <a class="si-page-btn" href="?page={{ total_pages }}&q={{ filter_q }}&note_type={{ filter_note_type }}&status={{ filter_status }}&class_name={{ filter_class }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">{{ total_pages }}</a>
-    {% endif %}
-    {% if page < total_pages %}
-      <a class="si-page-btn" href="?page={{ page|add:"1" }}&q={{ filter_q }}&note_type={{ filter_note_type }}&status={{ filter_status }}&class_name={{ filter_class }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">Next</a>
-    {% endif %}
-  </div>
-  {% endif %}
-
-  {% else %}
-  <div class="si-empty">
-    {% include '_partials/empty_state.html' with icon='search' icon_color='grey' title='No notes match your filters' desc='Try adjusting your search criteria.' %}
-  </div>
-  {% endif %}
+  <c-pagination :page_obj="page_obj" label="notes" />
 </div>
 
 {% endblock %}

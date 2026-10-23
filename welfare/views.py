@@ -153,13 +153,10 @@ class WelfareStudentIncidentsView(DepartmentScopedMixin, RoleRequiredMixin, Temp
             qs = qs.filter(observation_date__lte=date_to)
 
         # Pagination
-        page = int(request.GET.get('page', 1))
-        per_page = 25
-        total_filtered = qs.count()
-        total_pages = max(1, (total_filtered + per_page - 1) // per_page)
-        page = min(page, total_pages)
-        offset = (page - 1) * per_page
-        recent_incidents = qs[offset:offset + per_page]
+        from django.core.paginator import Paginator
+        page_obj = Paginator(qs, 25).get_page(request.GET.get('page'))
+        recent_incidents = page_obj
+        total_filtered = page_obj.paginator.count
 
         # Stats from filtered queryset so cards/charts respond to filters
         today = timezone.now().date()
@@ -230,11 +227,6 @@ class WelfareStudentIncidentsView(DepartmentScopedMixin, RoleRequiredMixin, Temp
         resolved_pct = round((resolved_count / total_count * 100) if total_count else 0)
         month_change = this_month_count - last_month_count
 
-        # Pagination range
-        page_range = list(range(max(1, page - 2), min(total_pages, page + 2) + 1))
-        show_first_ellipsis = page_range[0] > 2
-        show_last_ellipsis = page_range[-1] < total_pages - 1
-
         # Department context for _top_tabs.html include
         ctx['department'] = department
         ctx['is_unified_welfare'] = is_unified
@@ -244,8 +236,7 @@ class WelfareStudentIncidentsView(DepartmentScopedMixin, RoleRequiredMixin, Temp
         ctx.update({
             'recent_incidents': recent_incidents,
             'total_filtered': total_filtered,
-            'page': page,
-            'total_pages': total_pages,
+            'page_obj': page_obj,
             'total_count': total_count,
             'this_month_count': this_month_count,
             'last_month_count': last_month_count,
@@ -270,9 +261,6 @@ class WelfareStudentIncidentsView(DepartmentScopedMixin, RoleRequiredMixin, Temp
             'filter_department': dept_filter,
             'filter_date_from': date_from,
             'filter_date_to': date_to,
-            'page_range': page_range,
-            'show_first_ellipsis': show_first_ellipsis,
-            'show_last_ellipsis': show_last_ellipsis,
         })
         return ctx
 
@@ -316,6 +304,17 @@ class WelfareListView(DepartmentScopedMixin, RoleRequiredMixin, ListView):
         severity = self.request.GET.get("severity")
         if severity:
             qs = qs.filter(severity=severity)
+        note_type = self.request.GET.get("note_type", "")
+        if note_type in WelfareNoteType.values:
+            qs = qs.filter(note_type=note_type)
+        q = self.request.GET.get("q", "").strip()
+        if q:
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(student__first_name__icontains=q)
+                | Q(student__last_name__icontains=q)
+                | Q(student__admission_no__icontains=q)
+            )
         # Department filter (for unified mode)
         dept_filter = self.request.GET.get("department", "")
         if dept_filter and is_unified:
@@ -369,6 +368,10 @@ class WelfareListView(DepartmentScopedMixin, RoleRequiredMixin, ListView):
 
         ctx["resolved_observations"] = qs.filter(hod_status="resolved")[:15]
         ctx["severity_choices"] = WelfareSeverity.choices
+        ctx["note_type_choices"] = WelfareNoteType.choices
+        ctx["has_filters"] = any(
+            self.request.GET.get(k) for k in ("q", "note_type", "severity", "department")
+        )
         ctx["today_date"] = date.today().strftime("%d %B %Y")
         return ctx
 

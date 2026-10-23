@@ -515,123 +515,96 @@
 
     <!-- 2. Welfare -->
     {% if can_view_welfare and welfare_stats.total %}
-    <div class="card" style="padding:0">
-      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-        <div style="font-size:11px;font-weight:700;letter-spacing:.7px;color:var(--text-muted);text-transform:uppercase">Welfare</div>
-        {% has_perm user "welfare.add_welfareobservation" as can_report_welfare %}
-        {% if can_report_welfare %}
-          <a href="{% url 'welfare:submit' %}?student={{ student.pk }}" class="hf-btn hf-btn-primary" style="padding:6px 14px;font-size:12px">+ Add note</a>
+    {% has_perm user "welfare.add_welfareobservation" as can_report_welfare %}
+    {% has_perm user "welfare.can_review_observation" as can_review_welfare %}
+    <div class="card" id="welfare">
+      <div class="card-title-row">
+        <h2 class="card-title" style="margin:0">Welfare</h2>
+        {% if can_report_welfare and not student.is_archived %}
+          <a href="{% url 'welfare:submit' %}?student={{ student.pk }}" class="hf-btn hf-btn-secondary" style="padding:6px 12px;font-size:12px">+ Add note</a>
         {% endif %}
       </div>
 
-      <!-- Note type counts (only notes this user may see) -->
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--border)">
-        <div style="text-align:center;padding:16px;border-right:1px solid var(--border)">
-          <div style="font-size:22px;font-weight:800;color:#16A34A">{{ welfare_stats.positive }}</div>
-          <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Positive</div>
-        </div>
-        <div style="text-align:center;padding:16px;border-right:1px solid var(--border)">
-          <div style="font-size:22px;font-weight:800;color:#2563EB">{{ welfare_stats.observation }}</div>
-          <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Observation</div>
-        </div>
-        <div style="text-align:center;padding:16px">
-          <div style="font-size:22px;font-weight:800;color:#D97706">{{ welfare_stats.concern }}</div>
-          <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Concern</div>
-        </div>
+      <!-- Note type counts double as filters (only notes this user may see) -->
+      <div class="wf-filters" role="group" aria-label="Filter welfare notes">
+        <button type="button" class="wf-filter active" data-filter="all" aria-pressed="true"><b>{{ welfare_stats.total }}</b>All notes</button>
+        <button type="button" class="wf-filter" data-filter="positive" aria-pressed="false"><b style="color:#16A34A">{{ welfare_stats.positive }}</b>Positive</button>
+        <button type="button" class="wf-filter" data-filter="observation" aria-pressed="false"><b style="color:#2563EB">{{ welfare_stats.observation }}</b>Observation</button>
+        <button type="button" class="wf-filter" data-filter="concern" aria-pressed="false"><b style="color:#D97706">{{ welfare_stats.concern }}</b>Concern</button>
       </div>
 
-      <!-- Filter Tabs -->
-      <div style="display:flex;gap:6px;padding:16px 24px;border-bottom:1px solid var(--border)" id="welfareTabs">
-        <button type="button" class="welfare-tab active" data-filter="all" onclick="filterWelfare('all',this)">All notes</button>
-        <button type="button" class="welfare-tab" data-filter="positive" onclick="filterWelfare('positive',this)">Positive</button>
-        <button type="button" class="welfare-tab" data-filter="observation" onclick="filterWelfare('observation',this)">Observation</button>
-        <button type="button" class="welfare-tab" data-filter="concern" onclick="filterWelfare('concern',this)">Concern</button>
-      </div>
-
-      <!-- Timeline Feed -->
-      <div style="padding:20px 24px">
-        {% has_perm user "welfare.can_review_observation" as can_review_welfare %}
-        <div class="welfare-timeline" id="welfareTimeline">
-          {% for inc in welfare_incidents %}
-            <div class="welfare-entry" data-type="{{ inc.note_type|default:'observation' }}">
-              <div class="welfare-dot" style="background:{% if inc.note_type == 'concern' %}#D97706{% elif inc.note_type == 'positive' %}#16A34A{% else %}#2563EB{% endif %}"></div>
-              <div class="welfare-entry-content">
-                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
-                  <span class="welfare-pill" style="background:{% if inc.note_type == 'concern' %}#FFFBEB;color:#B45309{% elif inc.note_type == 'positive' %}#F0FDF4;color:#16A34A{% else %}#EFF6FF;color:#2563EB{% endif %}">
-                    {{ inc.type_label }}
-                  </span>
-                  <span style="font-size:13px;font-weight:600;color:var(--text-primary)">{{ inc.observation_date|date:"d M Y" }}</span>
-                  {% if inc.hod_status %}
-                    <span style="font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);color:var(--text-muted)">{{ inc.get_hod_status_display }}</span>
-                  {% endif %}
-                  {% if inc.was_edited %}<span style="font-size:11px;color:var(--text-muted)">Edited</span>{% endif %}
-                  <span style="margin-left:auto;font-size:12px;color:var(--text-muted)">{% if inc.submitted_by.staff_profile %}{{ inc.submitted_by.staff_profile.full_name }}{% else %}{{ inc.submitted_by.get_full_name|default:inc.submitted_by.username }}{% endif %}</span>
-                  <div style="display:flex;gap:6px;flex-shrink:0">
-                    <a href="{% url 'welfare:detail' inc.pk %}" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);color:var(--text-secondary);text-decoration:none;font-weight:600;white-space:nowrap">View</a>
-                    {% if can_review_welfare and inc.hod_status != 'resolved' %}
-                      <a href="{% url 'welfare:detail' inc.pk %}#review-form" style="font-size:11px;padding:4px 10px;border-radius:6px;background:var(--hodari-blue);color:#fff;text-decoration:none;font-weight:600;white-space:nowrap">Review</a>
-                    {% endif %}
-                  </div>
-                </div>
-                <div style="font-size:13px;color:#475569;line-height:1.5;margin-bottom:6px">{{ inc.observation_text }}</div>
-                {% if inc.severity == 'high' or inc.severity == 'critical' %}
-                  <div style="font-size:12px;color:var(--text-muted)">Owner: {% if inc.reviewed_by %}{% if inc.reviewed_by.staff_profile %}{{ inc.reviewed_by.staff_profile.full_name }}{% else %}{{ inc.reviewed_by.get_full_name }}{% endif %}{% else %}Unassigned{% endif %}{% if inc.follow_up_date %}. Review by {{ inc.follow_up_date|date:"d M Y" }}.{% endif %}</div>
-                {% endif %}
-                {% if inc.tags %}
-                  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-                    {% for t in inc.tags %}<span style="font-size:11px;background:var(--bg-page);border:1px solid var(--border);padding:2px 8px;border-radius:10px;color:var(--text-muted)">{{ t }}</span>{% endfor %}
-                  </div>
-                {% endif %}
-              </div>
+      <div class="wf-list" id="welfareTimeline">
+        {% for inc in welfare_incidents %}
+        <div class="wf-entry wf-{{ inc.note_type|default:'observation' }}" data-type="{{ inc.note_type|default:'observation' }}">
+          <div class="wf-entry-head">
+            <c-badge variant="{% if inc.is_safeguarding %}red{% elif inc.note_type == 'concern' %}amber{% elif inc.note_type == 'positive' %}green{% else %}blue{% endif %}">{{ inc.type_label }}{% if inc.note_type == 'concern' %} &middot; {{ inc.severity|capfirst }}{% endif %}</c-badge>
+            <span class="wf-date">{{ inc.observation_date|date:"d M Y" }}</span>
+            {% if inc.hod_status %}<c-badge variant="{% if inc.hod_status == 'resolved' %}green{% elif inc.hod_status == 'in_progress' %}blue{% else %}grey{% endif %}">{{ inc.get_hod_status_display }}</c-badge>{% endif %}
+            <div class="hf-acts" style="margin-left:auto">
+              <a class="hf-act" href="{% url 'welfare:detail' inc.pk %}" title="View note" aria-label="View note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></a>
+              {% if can_review_welfare and inc.hod_status != 'resolved' %}
+              <a class="hf-act" href="{% url 'welfare:detail' inc.pk %}#review-form" title="Review" aria-label="Review"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></a>
+              {% endif %}
             </div>
-          {% empty %}
-            <div style="padding:40px;text-align:center;color:var(--text-muted);font-size:13px;background:var(--bg-page);border-radius:8px">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:8px;color:var(--faint)"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
-              <div>No welfare notes you can view.</div>
-            </div>
-          {% endfor %}
+          </div>
+          <div class="wf-text">{{ inc.observation_text|truncatechars:240 }}</div>
+          <div class="wf-meta">
+            {% if inc.submitted_by.staff_profile %}{{ inc.submitted_by.staff_profile.full_name }}{% else %}{{ inc.submitted_by.get_full_name|default:inc.submitted_by.username }}{% endif %}
+            {% if inc.severity == 'high' or inc.severity == 'critical' %} &middot; Owner: {% if inc.reviewed_by %}{% if inc.reviewed_by.staff_profile %}{{ inc.reviewed_by.staff_profile.full_name }}{% else %}{{ inc.reviewed_by.get_full_name }}{% endif %}{% else %}Unassigned{% endif %}{% if inc.follow_up_date %} &middot; Review by {{ inc.follow_up_date|date:"d M Y" }}{% endif %}{% endif %}
+            {% if inc.was_edited %} &middot; Edited{% endif %}
+            {% for t in inc.tags %}<span class="wf-tag">{{ t }}</span>{% endfor %}
+          </div>
         </div>
+        {% empty %}
+        {% include '_partials/empty_state.html' with icon='doc' icon_color='grey' title='No welfare notes you can view' %}
+        {% endfor %}
+        <div class="wf-none" id="welfareNone" hidden>No notes of this type in the latest {{ welfare_incidents|length }}.</div>
       </div>
+      {% if welfare_stats.total > welfare_incidents|length and perms.welfare.view_welfareobservation %}
+      <a class="section-link" style="display:inline-block;margin-top:12px" href="{% url 'welfare:student_incidents' %}?q={{ student.admission_no|urlencode }}">All {{ welfare_stats.total }} notes →</a>
+      {% endif %}
     </div>
     {% endif %}
 
     <style>
-      .welfare-tab {
-        border: 1px solid var(--border); background: var(--bg-card); border-radius: 16px;
-        padding: 5px 14px; font-size: 12.5px; cursor: pointer; font-weight: 600; color: var(--text-muted);
-        transition: all .15s;
-      }
-      .welfare-tab:hover { border-color: var(--hodari-blue); color: var(--hodari-blue); }
-      .welfare-tab.active { background: var(--hodari-blue); border-color: var(--hodari-blue); color: #fff; }
-      .welfare-timeline { position: relative; padding-left: 22px; }
-      .welfare-timeline::before {
-        content: ""; position: absolute; left: 6px; top: 6px; bottom: 6px;
-        width: 2px; background: var(--border);
-      }
-      .welfare-entry { position: relative; margin-bottom: 16px; padding: 14px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; }
-      .welfare-entry:last-child { margin-bottom: 0; }
-      .welfare-dot {
-        position: absolute; left: -21px; top: 18px; width: 12px; height: 12px;
-        border-radius: 50%; border: 2px solid var(--bg-card);
-      }
-      .welfare-pill {
-        font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px;
-      }
-      .welfare-entry.hidden { display: none; }
+      .wf-filters { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0 16px; }
+      .wf-filter { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 6px; border: 1px solid var(--border); border-radius: 10px; background: #fff; cursor: pointer; font-size: 10.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; font-family: inherit; }
+      .wf-filter b { font-size: 20px; font-weight: 800; color: var(--text-primary); letter-spacing: 0; }
+      .wf-filter:hover { border-color: #B9C4D6; }
+      .wf-filter.active { border-color: var(--hodari-blue); background: var(--hodari-blue-light, #EFF6FF); color: var(--hodari-blue); box-shadow: inset 0 0 0 1px var(--hodari-blue); }
+      .wf-filter:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(2,58,165,.18); }
+      .wf-list { display: flex; flex-direction: column; gap: 10px; }
+      .wf-entry { border: 1px solid var(--border); border-left: 3px solid #2563EB; border-radius: 10px; padding: 12px 14px; }
+      .wf-entry.wf-positive { border-left-color: #16A34A; }
+      .wf-entry.wf-concern { border-left-color: #D97706; }
+      .wf-entry.wf-safeguarding { border-left-color: #DC2626; }
+      .wf-entry[hidden] { display: none; }
+      .wf-entry-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+      .wf-date { font-size: 12.5px; font-weight: 600; color: var(--text-primary); }
+      .wf-entry .hf-act { width: 30px; height: 30px; }
+      .wf-text { font-size: 13px; color: #475569; line-height: 1.5; }
+      .wf-meta { font-size: 11.5px; color: var(--text-muted); margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
+      .wf-tag { font-size: 11px; background: var(--bg-page); border: 1px solid var(--border); padding: 1px 8px; border-radius: 10px; }
+      .wf-none { font-size: 13px; color: var(--text-muted); text-align: center; padding: 16px; background: #F8FAFC; border-radius: 8px; }
+      @media (max-width: 480px) { .wf-filter b { font-size: 17px; } .wf-filter { font-size: 9.5px; } }
     </style>
 
     <script>
-    function filterWelfare(type, btn) {
-      document.querySelectorAll('.welfare-tab').forEach(function(b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      document.querySelectorAll('.welfare-entry').forEach(function(entry) {
-        if (type === 'all' || entry.dataset.type === type) {
-          entry.classList.remove('hidden');
-        } else {
-          entry.classList.add('hidden');
-        }
+    (function () {
+      var btns = document.querySelectorAll('.wf-filter');
+      btns.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var type = btn.dataset.filter, shown = 0;
+          btns.forEach(function (b) { var on = b === btn; b.classList.toggle('active', on); b.setAttribute('aria-pressed', on); });
+          document.querySelectorAll('.wf-entry').forEach(function (e) {
+            var show = type === 'all' || e.dataset.type === type;
+            e.hidden = !show; if (show) shown++;
+          });
+          var none = document.getElementById('welfareNone');
+          if (none) none.hidden = shown > 0;
+        });
       });
-    }
+    })();
     </script>
 
     <!-- 3. Parents & Family -->
