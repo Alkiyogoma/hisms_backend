@@ -1,0 +1,154 @@
+{% comment %}The official Student Progress Report for one learner and term. Used by the
+   progress report (academics:learner_report) and the report card preview,
+   class print and PDF (with `report`: general traits, remarks and sign-off).{% endcomment %}
+{% load static %}
+<div class="report-wrapper">
+<main class="sheet">
+  {% include "includes/hodari_print_header.html" %}
+
+  <div class="doc-title"><h1>Student Progress Report</h1><span class="scope">{% if term %}{{ term.name }} · {{ term.academic_year.name }}{% else %}No term{% endif %}</span></div>
+  <div class="meta">
+    <div><span>Student</span><b>{{ student.first_name }} {{ student.last_name }}</b></div>
+    <div><span>Admission no.</span><b>{{ student.admission_no }}</b></div>
+    <div><span>Class</span><b>{{ class_name }}</b></div>
+    <div><span>Class teacher</span><b>{{ class_teacher|default:"—" }}</b></div>
+  </div>
+
+  {% with a=attendance.row %}
+  {% if not term_complete %}
+  <div class="awaiting-note">Awaiting end of term: {% if exam %}{{ exam.assessed }} of {{ exam.total_subjects }} mark-bearing subject{{ exam.total_subjects|pluralize }} fully assessed{% else %}no term selected{% endif %}. No overall average or grade is given until every subject's assessments are approved.</div>
+  {% endif %}
+  <div class="kpis">
+    {% if term_complete %}
+    <div class="kpi"><span>Average mark</span><b class="b-{{ record.band|default:'none' }}">{% if record.average is not None %}{{ record.average }}%{% else %}—{% endif %}</b><small>{% if record.grade %}grade {{ record.grade }} · {{ grade_label }}{% else %}no approved marks{% endif %}</small></div>
+    <div class="kpi"><span>Class average</span><b>{% if record.class_average is not None %}{{ record.class_average }}%{% else %}—{% endif %}</b><small>{{ class_name }}</small></div>
+    {% else %}
+    <div class="kpi"><span>Average mark</span><b class="b-none">—</b><small>awaiting end of term</small></div>
+    <div class="kpi"><span>Class average</span><b class="b-none">—</b><small>awaiting end of term</small></div>
+    {% endif %}
+    <div class="kpi"><span>Below pass</span><b class="{% if record.below_pass %}b-critical{% endif %}">{{ record.below_pass|length }}</b><small>subject{{ record.below_pass|length|pluralize }} under {{ pass_mark }}%</small></div>
+    <div class="kpi"><span>Attendance</span><b class="b-{{ a.band|default:'none' }}">{% if a.rate is not None %}{{ a.rate }}%{% else %}—{% endif %}</b><small>{% if a %}{{ a.in_school }} of {{ a.marked }} days{% else %}no days marked{% endif %}</small></div>
+  </div>
+
+  {% comment %}Mark-bearing subjects, approved scores only. Each assessment
+     column is weighted points, so TOTAL is out of 100. A subject's total and
+     grade, and the exam average, appear only once fully assessed.{% endcomment %}
+  <h2>ACADEMIC PROGRESS <small>approved marks only · weighted points, total out of 100</small></h2>
+  {% if academic_rows %}
+  <div class="scroll"><table class="t ap">
+    <thead><tr>
+      <th>Subject</th>
+      {% for c in exam_columns %}<th class="ctr">{{ c }}</th>{% endfor %}
+      <th class="ctr">TOTAL/100</th><th class="ctr">Grade</th><th class="ctr">Class avg</th><th>Remarks</th>
+    </tr></thead>
+    <tbody>
+    {% for row in academic_rows %}
+      <tr>
+        <td><b>{{ row.subject }}</b></td>
+        {% for c in row.cells %}<td class="ctr mono">{% if c is not None %}{{ c|floatformat:"-1" }}{% else %}<span class="na">–</span>{% endif %}</td>{% endfor %}
+        {% if row.complete %}
+        <td class="ctr mono"><b>{{ row.total|floatformat:"-1" }}</b></td>
+        <td class="ctr"><span class="g">{{ row.grade }}</span></td>
+        <td class="ctr mono">{{ row.class_average|default:"–" }}</td>
+        <td>{{ row.label }}</td>
+        {% else %}
+        <td class="ctr na">–</td><td class="ctr na">–</td><td class="ctr na">–</td>
+        <td><span class="st await">Awaiting end of term</span></td>
+        {% endif %}
+      </tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr>
+      <td>Exam average</td>
+      {% if exam.complete %}
+      {% for c in exam.column_averages %}<td>{{ c|floatformat:"-1" }}</td>{% endfor %}
+      <td>{{ exam.average|floatformat:"-2" }}</td>
+      <td>{{ exam.grade }}</td>
+      <td>{{ record.class_average|default:"–" }}</td>
+      <td>{{ exam.label }}</td>
+      {% else %}
+      <td colspan="{{ exam_columns|length|add:4 }}" class="await-cell">Awaiting end of term &middot; {{ exam.assessed }} of {{ exam.total_subjects }} mark-bearing subject{{ exam.total_subjects|pluralize }} assessed</td>
+      {% endif %}
+    </tr></tfoot>
+  </table></div>
+  {% else %}
+    <div class="empty">No approved marks for {{ student.first_name }} {% if term %}in {{ term.name }}, {{ term.academic_year.name }}{% endif %} yet. Marks appear once they are entered and approved.</div>
+  {% endif %}
+
+  {% if remark_rows %}
+  <h2>Subjects assessed by remark <small>once per term · no marks</small></h2>
+  <table class="t">
+    <thead><tr><th>Subject</th><th style="width:40%">Remark</th></tr></thead>
+    <tbody>{% for subj, remark in remark_rows %}
+      <tr><td><b>{{ subj }}</b></td><td>{% if remark %}{{ remark }}{% else %}<span class="na">Not entered</span>{% endif %}</td></tr>
+    {% endfor %}</tbody>
+  </table>
+  {% endif %}
+
+  <table class="scale">
+    <thead><tr><th colspan="6">GRADING SCALE</th></tr></thead>
+    <tbody>
+      <tr class="bold">{% for g, r, l in scale %}<td>{{ g }}</td>{% endfor %}</tr>
+      <tr>{% for g, r, l in scale %}<td>{{ r }}</td>{% endfor %}</tr>
+      <tr>{% for g, r, l in scale %}<td>{{ l }}</td>{% endfor %}</tr>
+    </tbody>
+  </table>
+
+  <div>
+      <h2>Attendance <small>{{ attendance.period.label }}</small></h2>
+      {% if a and a.marked %}
+      <table class="t">
+        <thead><tr><th>In school</th><th>Late</th><th>Absent</th><th>Excused</th><th>Not marked</th><th class="r">Rate</th></tr></thead>
+        <tbody><tr><td class="mono">{{ a.in_school }}</td><td class="mono">{{ a.late }}</td><td class="mono">{{ a.absent }}</td><td class="mono">{{ a.excused }}</td><td class="mono">{{ a.unmarked }}</td><td class="r mono b-{{ a.band }}">{{ a.rate }}%</td></tr></tbody>
+      </table>
+      <div class="days">{% for d, c in attendance.strip %}<i class="d-{{ c }}"></i>{% endfor %}</div>
+      <div class="legend"><span><i style="background:#2FA866"></i>Present</span><span><i style="background:#E39A3B"></i>Late</span><span><i style="background:#C8302A"></i>Absent</span><span><i style="background:#7E73E0"></i>Excused</span><span><i style="background:#E2E8F0"></i>Not marked</span><span>· last {{ attendance.strip|length }} school days</span></div>
+      {% else %}<div class="empty">No attendance marked in this term yet.</div>{% endif %}
+    </div>
+
+  {% if not report %}
+  {% include "academics/_progress_report_closing.html" %}
+  {% endif %}
+</main>
+
+{% if report %}
+<section class="sheet sheet-2">
+  <!-- PAGE 2: school name and the learner it belongs to; no second photo -->
+  <div class="page2-head">
+    <div class="page2-school">
+      <img src="{% static 'branding/hodari_school_logo.jpg' %}" alt="Hodari Christian School">
+      <div><b>HODARI CHRISTIAN SCHOOL</b><br>Student Progress Report &middot; page 2</div>
+    </div>
+    <div class="page2-learner">
+      {{ student.first_name }} {{ student.last_name }}<br>
+      {{ class_name }} &middot; {{ student.admission_no }}<br>
+      {{ term.name }}, {{ term.academic_year.name }}
+    </div>
+  </div>
+
+  <h2>GENERAL TRAITS <small>E Excellent · G Good · S Satisfactory · N Needs improvement</small></h2>
+  {# Two sections per row (the last spans the row), two traits per line. #}
+  <div class="traits-container">
+    {% for title, rows in trait_groups %}
+    <table class="traits-table{% if forloop.last %} traits-full{% endif %}">
+      <tr><th colspan="4">{{ title }}</th></tr>
+      {% for a, b in rows %}
+      <tr>
+        <td>{{ a.0 }}</td><td class="g">{{ a.1 }}</td>
+        <td>{% if b %}{{ b.0 }}{% endif %}</td><td class="g">{% if b %}{{ b.1 }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endfor %}
+  </div>
+
+  <div class="info-row">
+    <div><b>Days Absent : {{ a.absent|default:0|add:a.excused|default:0 }}</b><small>{% if a.excused %}incl. {{ a.excused }} excused &middot; {% endif %}of {{ a.marked|default:0 }} school day{{ a.marked|pluralize }} marked &middot; unmarked days not counted</small></div>
+    <div><b>School Reopens on: {% if reopens_on %}{{ reopens_on|date:"jS F Y" }}{% else %}To be announced{% endif %}</b></div>
+  </div>
+
+  {% include "academics/_progress_report_closing.html" %}
+</section>
+{% endif %}
+{% endwith %}
+</div>

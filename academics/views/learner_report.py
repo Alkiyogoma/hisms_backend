@@ -15,8 +15,6 @@ class LearnerReportView(StudentDetailView):
 
     def get_context_data(self, **kwargs):
         from academics import performance
-        from academics.grading_utils import get_grade_label
-        from attendance import analytics
 
         ctx = super(StudentDetailView, self).get_context_data(**kwargs)
         student = self.object
@@ -24,41 +22,18 @@ class LearnerReportView(StudentDetailView):
         term_param = self.request.GET.get("term", "")
         term = next((t for t in terms if str(t.pk) == term_param), None) \
             or performance.default_learner_term(student, terms)
-        record = performance.learner_record(student, term)
-        # Same rule as the printed report card: a subject's mark and grade only
-        # once all its assessments are approved; the overall average, grade,
-        # position and trend only once every mark-bearing subject is.
-        from academics.score_progress import exam_summary
-        exam = exam_summary(student, term) if term else None
-        done = {r["subject"] for r in exam["rows"] if r["complete"]} if exam else set()
-        for r in record["subjects"]:
-            r["awaiting"] = r["subject"] not in done
-        record["below_pass"] = [r for r in record["below_pass"] if not r["awaiting"]]
-        term_complete = bool(exam and exam["complete"])
-        for h in record["history"]:
-            h["awaiting"] = h["current"] and not term_complete
-        start, end = analytics.term_range(term)
-        attendance = analytics.learner_attendance(student, start, end)
-        class_name = record.get("class_name") or student.class_name
-        from academics.views.reports import _photo_data_uri, _remark_rows
-        ctx.update({
-            "remark_rows": _remark_rows(student, term) if term else [],
-            "photo_src": _photo_data_uri(student),
-            "photo_checked": True,
-            "exam": exam,
-            "term_complete": term_complete,
-            "term": term,
-            "record": record,
-            "grade_label": get_grade_label(record["grade"]) if record["grade"] else "",
-            "attendance": attendance,
-            "class_name": class_name,
-            "class_teacher": analytics.class_teachers().get(class_name, ""),
-            "pass_mark": int(performance.PASS_MARK),
-            "generated_at": timezone.localtime(),
-            "is_pdf": self.request.GET.get("format") == "pdf",
-            "scale": [("A+", "90–100", "Outstanding"), ("A", "80–89", "High"), ("B", "70–79", "Good"),
-                      ("C", "60–69", "Aspiring"), ("D", "50–59", "Basic"), ("E", "0–49", "Needs Improvement")],
-        })
+        ctx.update(build_learner_report(student, term))
+        # The term's report card adds its general traits and class teacher
+        # remark, for staff who may see report cards.
+        if term and self.request.user.has_perm("academics.view_reportcard"):
+            from academics.models import ReportCard
+            from academics.views.reports import _class_teacher_name, _reopens_on, _trait_groups
+            report = ReportCard.objects.filter(student=student, term=term, is_ecd_report=False).first()
+            if report:
+                ctx.update({"report": report, "trait_groups": _trait_groups(report.general_traits or {}),
+                            "reopens_on": _reopens_on(term),
+                            "class_teacher": ctx["class_teacher"] or _class_teacher_name(report)})
+        ctx["is_pdf"] = self.request.GET.get("format") == "pdf"
         return ctx
 
     def render_to_response(self, context, **kwargs):
@@ -77,3 +52,63 @@ class LearnerReportView(StudentDetailView):
         resp = HttpResponse(pdf, content_type="application/pdf")
         resp["Content-Disposition"] = f'attachment; filename="{name}.pdf"'
         return resp
+
+
+# Assessment columns of the official report card, by exam type code.
+_COLUMN_LABELS = {"quiz": "Quiz", "mid_term": "Mid-Term", "end_of_term": "End of Term"}
+
+
+def build_learner_report(student, term):
+    """Everything the official progress report / report card shows for one
+    learner and term: approved results, class comparison, attendance and
+    progress across terms. Shared by the progress report and the report card."""
+    from academics import performance
+    from academics.grading_utils import get_grade_label
+    from academics.score_progress import exam_summary
+    from academics.views.reports import _photo_data_uri, _remark_rows
+    from attendance import analytics
+
+    record = performance.learner_record(student, term)
+    # Same rule as the printed report card: a subject's mark and grade only
+    # once all its assessments are approved; the overall average, grade,
+    # position and trend only once every mark-bearing subject is.
+    exam = exam_summary(student, term) if term else None
+    done = {r["subject"] for r in exam["rows"] if r["complete"]} if exam else set()
+    for r in record["subjects"]:
+        r["awaiting"] = r["subject"] not in done
+    record["below_pass"] = [r for r in record["below_pass"] if not r["awaiting"]]
+    term_complete = bool(exam and exam["complete"])
+    for h in record["history"]:
+        h["awaiting"] = h["current"] and not term_complete
+
+    # ACADEMIC PROGRESS: weighted points per assessment (TOTAL out of 100),
+    # with the class average for the subject.
+    class_avgs = {r["subject"]: r["class_average"] for r in record["subjects"]}
+    columns, academic_rows = [], []
+    if exam:
+        columns = [f"{_COLUMN_LABELS.get(t.code, t.name)} ({t.weight_percentage:.0f})" for t in exam["types"]]
+        academic_rows = [{**r, "class_average": class_avgs.get(r["subject"])} for r in exam["rows"]]
+
+    start, end = analytics.term_range(term)
+    attendance = analytics.learner_attendance(student, start, end)
+    class_name = record.get("class_name") or student.class_name
+    return {
+        "student": student,
+        "remark_rows": _remark_rows(student, term) if term else [],
+        "photo_src": _photo_data_uri(student),
+        "photo_checked": True,
+        "exam": exam,
+        "exam_columns": columns,
+        "academic_rows": academic_rows,
+        "term_complete": term_complete,
+        "term": term,
+        "record": record,
+        "grade_label": get_grade_label(record["grade"]) if record["grade"] else "",
+        "attendance": attendance,
+        "class_name": class_name,
+        "class_teacher": analytics.class_teachers().get(class_name, ""),
+        "pass_mark": int(performance.PASS_MARK),
+        "generated_at": timezone.localtime(),
+        "scale": [("A*", "90–100", "Outstanding"), ("A", "80–89", "High"), ("B", "70–79", "Good"),
+                  ("C", "60–69", "Aspiring"), ("D", "50–59", "Basic"), ("E", "0–49", "Needs Improvement")],
+    }
