@@ -12,7 +12,7 @@ from django.core.exceptions import ValidationError
 
 from users.models import UserRole
 
-from .models import OtpCode, Message, NotificationLog, AttendanceEntry, AttendanceStatus
+from .models import OtpCode, Message, NotificationLog, AttendanceEntry, AttendanceStatus, PRESENT_STATUSES
 from students.models import Student, ParentGuardian, LaravelParent
 
 from audit.models import log_event
@@ -182,6 +182,10 @@ class AttendanceService:
         if timestamp is None:
             timestamp = timezone.now()
         
+        # Stored times are school (local) time; a UTC timestamp would save the
+        # time-of-day hours off.
+        if timezone.is_aware(timestamp):
+            timestamp = timezone.localtime(timestamp)
         # Validate timestamp is not in the future
         if timestamp > timezone.now():
             return {
@@ -335,6 +339,10 @@ class AttendanceService:
         if timestamp is None:
             timestamp = timezone.now()
         
+        # Stored times are school (local) time; a UTC timestamp would save the
+        # time-of-day hours off.
+        if timezone.is_aware(timestamp):
+            timestamp = timezone.localtime(timestamp)
         # Validate timestamp is not in the future
         if timestamp > timezone.now():
             return {
@@ -375,8 +383,9 @@ class AttendanceService:
                     student=student,
                     date=today,
                     defaults={
-                        'status': 'present',  # If no prior entry, assume they were present
-                        'check_in_time': timestamp.time(),  # Assume check-in at same time if no prior entry
+                        'status': 'present',  # They were in school, so not absent
+                        # No check-in time: the learner was never scanned in, and
+                        # inventing one made every check-out count as a check-in.
                         'check_out_time': timestamp.time(),
                         'marked_by': user,
                         'checkout_by': user,
@@ -402,16 +411,13 @@ class AttendanceService:
                     entry.reason = reason.strip()
                     entry.is_early_departure = is_early_departure
                     
-                    # If no check-in time exists, record checkout-only
-                    if not entry.check_in_time:
-                        entry.check_in_time = timestamp.time()
-                        entry.marked_by = user
-                        entry.marked_at = timestamp
+                    # Leaving school means they were there; never invent a check-in time.
+                    if entry.status not in PRESENT_STATUSES:
                         entry.status = 'present'
                     
                     entry.save(update_fields=[
                         'check_out_time', 'checkout_by', 'parent_name', 'reason', 
-                        'is_early_departure', 'check_in_time', 'marked_by', 'marked_at', 'status'
+                        'is_early_departure', 'status'
                     ])
             
             # Send parent notifications asynchronously (deferred to Celery)

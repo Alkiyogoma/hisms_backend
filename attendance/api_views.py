@@ -15,7 +15,7 @@ import json
 from datetime import datetime, timedelta
 
 from .services import OTPService, AttendanceService, StudentSearchService, QRCodeService, correct_attendance
-from .models import PRESENT_STATUSES, AttendanceEntry, Message
+from .models import PRESENT_STATUSES, AttendanceEntry, Message, has_real_check_in, is_present
 from students.models import Student, ParentGuardian
 from core.teacher_context import get_teacher_assigned_classes
 from core.utils import is_school_day
@@ -409,10 +409,11 @@ def attendance_statistics(request):
         
         total_students = student_qs.count()
         
+        # A check-in time equal to the check-out time was copied by check-out, not scanned.
         checkin_count = entry_qs.filter(
             status__in=PRESENT_STATUSES,
             check_in_time__isnull=False
-        ).count()
+        ).exclude(check_in_time=models.F('check_out_time')).count()
         
         checkout_count = entry_qs.filter(
             check_out_time__isnull=False
@@ -465,68 +466,84 @@ def scans_today(request):
                 'error_code': 'INVALID_DATE_FORMAT'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Build query
-        queryset = AttendanceEntry.objects.select_related('student').filter(date=date)
-        
-        # Auto-scope to teacher's classes if no explicit class_id
-        allowed = _get_api_allowed_classes(request.user)
+        # Build query. The gate screen shows the whole school to everyone who
+        # checks learners in or out, so this is not limited to a teacher's classes.
+        queryset = AttendanceEntry.objects.select_related(
+            'student', 'marked_by', 'checkout_by').filter(date=date)
         if class_id:
             queryset = queryset.filter(class_name=class_id)
-        elif allowed is not None:
-            queryset = queryset.filter(class_name__in=allowed)
         
         # Order by check-in time (most recent first)
         queryset = queryset.order_by('-check_in_time', '-created_at')
         
+        def _student_fields(entry):
+            student = entry.student
+            return {
+                'id': entry.id,
+                'student_id': student.laravel_student_id or student.admission_no,
+                'student_name': student.get_full_name(),
+                'student_photo': student.image.url if student.image else (student.photo.url if student.photo else None),
+                'class': entry.class_name,
+                'status': entry.status,
+            }
+
         # Format response data
         scans = []
+        present = []
+        checked_in = checked_out = 0
         for entry in queryset:
-            student = entry.student
-            
-            # Determine scan type based on what times exist
-            if entry.check_in_time:
+            real_check_in = has_real_check_in(entry)
+            if real_check_in:
+                checked_in += 1
                 # Only add if scan_type filter is not set or matches 'IN'
                 if not scan_type or scan_type == 'IN':
                     scans.append({
-                        'id': entry.id,
-                        'student_id': student.laravel_student_id or student.admission_no,
-                        'student_name': student.get_full_name(),
-                        'student_photo': student.image.url if student.image else (student.photo.url if student.photo else None),
-                        'class': entry.class_name,
+                        **_student_fields(entry),
                         'scan_type': 'IN',
                         'scan_time': entry.check_in_time.strftime('%H:%M:%S'),
                         'scan_timestamp': entry.check_in_time.strftime('%H:%M:%S'),
                         'marked_by': entry.marked_by.get_full_name() if entry.marked_by else 'System',
-                        'status': entry.status,
                         'is_early_departure': entry.is_early_departure,
                         'parent_name': entry.parent_name or None,
                         'reason': entry.reason or None
                     })
             
             if entry.check_out_time:
+                checked_out += 1
                 # Only add if scan_type filter is not set or matches 'OUT'
                 if not scan_type or scan_type == 'OUT':
                     scans.append({
-                        'id': entry.id,
-                        'student_id': student.laravel_student_id or student.admission_no,
-                        'student_name': student.get_full_name(),
-                        'student_photo': student.image.url if student.image else (student.photo.url if student.photo else None),
-                        'class': entry.class_name,
+                        **_student_fields(entry),
                         'scan_type': 'OUT',
                         'scan_time': entry.check_out_time.strftime('%H:%M:%S'),
                         'scan_timestamp': entry.check_out_time.strftime('%H:%M:%S'),
                         'marked_by': entry.checkout_by.get_full_name() if entry.checkout_by else 'System',
-                        'status': entry.status,
                         'is_early_departure': entry.is_early_departure,
                         'parent_name': entry.parent_name or None,
                         'reason': entry.reason or None
                     })
-        
+
+            if is_present(entry):
+                present.append({
+                    **_student_fields(entry),
+                    # None when marked present on the class register rather than scanned in
+                    'check_in_time': entry.check_in_time.strftime('%H:%M:%S') if real_check_in else None,
+                    'check_out_time': entry.check_out_time.strftime('%H:%M:%S') if entry.check_out_time else None,
+                })
+        present.sort(key=lambda p: (p['class'] or '', p['student_name']))
+
         return Response({
             'date': date_str,
             'scan_type': scan_type or 'ALL',
             'total_scans': len(scans),
-            'data': scans
+            'data': scans,
+            'summary': {
+                'present': len(present),
+                'checked_in': checked_in,
+                'checked_out': checked_out,
+                'still_in_school': sum(1 for p in present if not p['check_out_time']),
+            },
+            'present': present,
         }, status=status.HTTP_200_OK)
         
     except Exception as e:
@@ -574,7 +591,7 @@ def scans_statistics(request):
         
         # Calculate statistics
         total_entries = queryset.count()
-        check_in_count = queryset.filter(check_in_time__isnull=False).count()
+        check_in_count = queryset.filter(check_in_time__isnull=False).exclude(check_in_time=models.F("check_out_time")).count()
         check_out_count = queryset.filter(check_out_time__isnull=False).count()
         early_departure_count = queryset.filter(is_early_departure=True).count()
         
@@ -597,7 +614,7 @@ def scans_statistics(request):
             for class_entry in classes:
                 class_name = class_entry['class_name']
                 class_count = queryset.filter(class_name=class_name).count()
-                class_checkin = queryset.filter(class_name=class_name, check_in_time__isnull=False).count()
+                class_checkin = queryset.filter(class_name=class_name, check_in_time__isnull=False).exclude(check_in_time=models.F("check_out_time")).count()
                 class_checkout = queryset.filter(class_name=class_name, check_out_time__isnull=False).count()
                 
                 class_breakdown[class_name] = {
