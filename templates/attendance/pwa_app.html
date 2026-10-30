@@ -471,13 +471,13 @@ body{
       <div class="stat-checkin" onclick="goToCheckinReport()">
         <div class="sc-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg></div>
         <div class="sc-value" id="checkinToday">0</div>
-        <div class="sc-label">Check-In Today</div>
+        <div class="sc-label">Present Today</div>
         <span class="pending-tag" id="pendingInTag" style="display:none">+<span id="pendingInCount">0</span> pending</span>
       </div>
       <div class="stat-checkin" onclick="goToCheckoutReport()">
         <div class="sc-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></div>
         <div class="sc-value" id="checkoutToday">0</div>
-        <div class="sc-label">Check-Out Today</div>
+        <div class="sc-label">Checked Out Today</div>
         <span class="pending-tag" id="pendingOutTag" style="display:none">+<span id="pendingOutCount">0</span> pending</span>
       </div>
     </div>
@@ -535,13 +535,13 @@ body{
 <div class="page" id="page-checkin-report">
   <div class="header-report header-checkin-report">
     <button class="back-btn" onclick="goToCheckin()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>
-    <h1>Check-In Report</h1>
+    <h1>Present Today</h1>
     <button class="refresh-btn" onclick="loadCheckinReport()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
   </div>
   <div class="report-stats">
-    <div class="report-stat report-stat-green"><div class="rs-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><div class="rs-value" id="crTotal">0</div><div class="rs-label">Total</div></div>
-    <div class="report-stat report-stat-green"><div class="rs-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/></svg></div><div class="rs-value" id="crFiltered">0</div><div class="rs-label">Filtered</div></div>
-    <div class="report-stat report-stat-green"><div class="rs-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div><div class="rs-value" id="crClasses">0</div><div class="rs-label">Classes</div></div>
+    <div class="report-stat report-stat-green"><div class="rs-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><div class="rs-value" id="crTotal">0</div><div class="rs-label">Present</div></div>
+    <div class="report-stat report-stat-green"><div class="rs-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/></svg></div><div class="rs-value" id="crStill">0</div><div class="rs-label">Still in school</div></div>
+    <div class="report-stat report-stat-green"><div class="rs-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div><div class="rs-value" id="crOut">0</div><div class="rs-label">Checked out</div></div>
   </div>
   <div class="report-search"><div class="search-box"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="crSearch" placeholder="Search by name or student ID..." oninput="filterCR()"></div></div>
   <div class="report-list" id="crList"><div class="loading">Loading...</div></div>
@@ -787,15 +787,16 @@ body{
   window.goToCheckoutReport=function(){showPage('page-checkout-report');loadCheckoutReport()};
 
   // ── Stats ──
+  // Present = checked in or marked present on the register (whole school);
+  // a check-out alone doesn't make a learner "present".
   function loadCheckinStats(){
     apiGet('/attendance/api/scans/today/').then(function(d){
-      var arr=Array.isArray(d)?d:(d.results||d.scans||d.data||[]);
-      var ci=arr.filter(function(s){return s.scan_type==='IN'}).length;
-      var co=arr.filter(function(s){return s.scan_type==='OUT'}).length;
-      document.getElementById('checkinToday').textContent=ci;
-      document.getElementById('checkoutToday').textContent=co;
+      var sm=(d&&d.summary)||{};
+      document.getElementById('checkinToday').textContent=sm.present||0;
+      document.getElementById('checkoutToday').textContent=sm.checked_out||0;
     }).catch(function(){});
   }
+  function escH(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
   window.refreshCheckin=function(){loadCheckinStats();showToast('Refreshed')};
 
   // ── Pending Scans ──
@@ -1295,22 +1296,25 @@ body{
   window.loadCheckinReport=function(){
     document.getElementById('crList').innerHTML='<div class="loading">Loading...</div>';
     apiGet('/attendance/api/scans/today/').then(function(d){
-      var arr=Array.isArray(d)?d:(d.results||d.scans||d.data||[]);
-      checkinData=arr.filter(function(s){return s.scan_type==='IN'});renderCR(checkinData);
+      checkinData=(d&&d.present)||[];renderCR(checkinData);
     }).catch(function(e){if(e.message!=='auth_redirect')document.getElementById('crList').innerHTML='<div class="report-empty"><p>Failed to load</p></div>'});
   };
   function renderCR(data){
     var q=(document.getElementById('crSearch').value||'').toLowerCase();
     var f=q?data.filter(function(s){return(s.student_name||'').toLowerCase().includes(q)||(s.student_id||'').toLowerCase().includes(q)||(s.class||'').toLowerCase().includes(q)}):data;
-    var c={};data.forEach(function(s){if(s.class)c[s.class]=1});
+    var out=data.filter(function(s){return s.check_out_time}).length;
     document.getElementById('crTotal').textContent=data.length;
-    document.getElementById('crFiltered').textContent=f.length;
-    document.getElementById('crClasses').textContent=Object.keys(c).length;
+    document.getElementById('crStill').textContent=data.length-out;
+    document.getElementById('crOut').textContent=out;
     var el=document.getElementById('crList');
     if(!f.length){el.innerHTML='<div class="report-empty"><p>No students found</p></div>';return}
     el.innerHTML=f.map(function(s){
-      var n=s.student_name||'Unknown',cl=s.class||'',t=s.scan_time||s.time||'--:--',adm=s.student_id||'',i=n.charAt(0).toUpperCase();
-      return '<div class="student-card"><div class="student-avatar" style="background:var(--green-light);color:var(--green)">'+i+'</div><div class="student-info"><div class="student-name">'+n+'</div><div class="student-meta">'+cl+' | '+adm+'</div></div><div class="student-time"><div class="st-time">'+t+'</div><span class="student-badge badge-in">IN</span></div></div>';
+      var n=s.student_name||'Unknown',i=n.charAt(0).toUpperCase();
+      var when=s.check_in_time?s.check_in_time.slice(0,5):'Register';
+      var badge=s.check_out_time
+        ?'<span class="student-badge badge-out">OUT '+escH(s.check_out_time.slice(0,5))+'</span>'
+        :'<span class="student-badge badge-in">IN</span>';
+      return '<div class="student-card"><div class="student-avatar" style="background:var(--green-light);color:var(--green)">'+escH(i)+'</div><div class="student-info"><div class="student-name">'+escH(n)+'</div><div class="student-meta">'+escH(s.class||'')+' | '+escH(s.student_id||'')+'</div></div><div class="student-time"><div class="st-time">'+escH(when)+'</div>'+badge+'</div></div>';
     }).join('');
   }
   window.filterCR=function(){renderCR(checkinData)};

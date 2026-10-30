@@ -24,6 +24,33 @@ class AttendanceStatus(models.TextChoices):
 PRESENT_STATUSES = (AttendanceStatus.PRESENT, AttendanceStatus.LATE)
 
 
+def has_real_check_in(entry):
+    """True when the learner was actually checked in. Check-out used to copy its
+    own time into an empty check_in_time; those copies are not check-ins."""
+    return bool(entry.check_in_time) and entry.check_in_time != entry.check_out_time
+
+
+def _created_by_check_out(entry):
+    """The record exists only because the learner was checked out: no real
+    check-in, and it was created at the moment of check-out (a class register
+    or check-in creates it earlier in the day)."""
+    if not entry.check_out_time or has_real_check_in(entry) or not entry.created_at:
+        return False
+    created = timezone.localtime(entry.created_at)
+    if created.date() != entry.date:
+        return False
+    checked_out = timezone.make_aware(datetime.combine(entry.date, entry.check_out_time),
+                                      timezone.get_current_timezone())
+    return abs(created - checked_out) <= timedelta(minutes=2)
+
+
+def is_present(entry):
+    """Present that day: checked in, or marked present/late on the class
+    register. A check-out alone doesn't count, so 'present' never just mirrors
+    the check-outs."""
+    return entry.status in PRESENT_STATUSES and not _created_by_check_out(entry)
+
+
 class AttendanceEntry(TimeStampedModel):
     date = models.DateField(db_index=True)
     student = models.ForeignKey("students.Student", on_delete=models.PROTECT, related_name="attendance_entries")

@@ -38,10 +38,11 @@ def _unique_parent_email(guardian):
     return candidate
 
 
-def send_portal_credentials(guardian, username, raw_password, actor, reset=False):
-    """Send parent portal login details by email (when the parent has one) and
-    by SMS (when they have a phone and an SMS provider is set up). Returns the
-    list of places the details went; see describe_delivery()."""
+def send_portal_credentials(guardian, username, actor, reset=False):
+    """Tell a parent their portal is ready: by email (when they have one) and by
+    SMS (when they have a phone and an SMS provider is set up). Parents sign in
+    with their phone number and an SMS code, so no password is sent. Returns
+    the list of places the message went; see describe_delivery()."""
     from django.conf import settings
     from django.template.loader import render_to_string
 
@@ -53,11 +54,13 @@ def send_portal_credentials(guardian, username, raw_password, actor, reset=False
     school_name = SchoolSettings.get_settings().school_name or "Hodari School"
     site_url = getattr(settings, "SITE_URL", "http://127.0.0.1:8000").rstrip("/")
     login_url = site_url + "/parent/"
+    how_to = (f"Open {login_url}, choose Parent Login, enter your phone number "
+              f"({guardian.phone}) and type in the code we send you by SMS. No password is needed.")
     delivered = []
 
     if guardian.email:
         intro = (
-            "Your parent portal password has been reset."
+            "Here is how to sign in to the parent portal."
             if reset else
             "Your parent portal account has been created. You can now access your child's "
             "attendance records, report cards, invoices, and school communications."
@@ -66,7 +69,9 @@ def send_portal_credentials(guardian, username, raw_password, actor, reset=False
             "guardian_name": guardian.full_name,
             "email": guardian.email,
             "username": username,
-            "temp_password": raw_password,
+            "phone": guardian.phone,
+            # Kept for admin-customised templates that still mention a password.
+            "temp_password": "Not needed: sign in with your phone number",
             "login_url": login_url,
             "portal_link": login_url,
             "school_name": school_name,
@@ -81,13 +86,9 @@ def send_portal_credentials(guardian, username, raw_password, actor, reset=False
             })
             send_parent_notification(
                 guardian=guardian,
-                title="Your Parent Portal Login Details" if reset else "Your Parent Portal Account Has Been Created",
+                title="How to Sign In to the Parent Portal" if reset else "Your Parent Portal Account Has Been Created",
                 message=(
-                    f"Dear {guardian.full_name},\n\n{intro}\n\n"
-                    f"Username: {username}\n"
-                    f"Password: {raw_password}\n\n"
-                    f"IMPORTANT: You will be required to change your password on first login.\n\n"
-                    f"Parent Portal: {login_url}\n\n"
+                    f"Dear {guardian.full_name},\n\n{intro}\n\n{how_to}\n\n"
                     f"Thank you for choosing {school_name}."
                 ),
                 html_body=html_body, actor=actor, action_type="PARENT_PORTAL_ACCOUNT",
@@ -98,8 +99,8 @@ def send_portal_credentials(guardian, username, raw_password, actor, reset=False
 
     if guardian.phone and sms_status()["configured"]:
         sms = (
-            f"{school_name} parent portal. Username: {username} Password: {raw_password} "
-            f"Change the password when you first log in: {login_url}"
+            f"{school_name} parent portal is ready: {login_url} "
+            f"Choose Parent Login, enter this phone number and we'll text you a sign-in code."
         )
         if NotificationService.send_sms(guardian.phone, sms).get("success"):
             delivered.append(f"sent by SMS to {guardian.phone}")
@@ -115,16 +116,14 @@ def describe_delivery(delivered):
 
 
 def grant_portal_access(guardian, actor):
-    """Give a parent portal access, or reissue it. Creates a PARENT login when
-    the parent has none; otherwise sets a new temporary password. Either way
-    the parent must change the password on first login. Returns
+    """Give a parent portal access, or resend how to sign in. Creates a PARENT
+    login when the parent has none. Parents sign in with their phone number and
+    an SMS code, so the account has no usable password. Returns
     (created, username, delivered) where delivered lists where the details went."""
     from django.contrib.auth.models import Group
-    from django.utils.crypto import get_random_string
 
     from users.models import User, UserRole
 
-    raw_password = get_random_string(length=10)
     user = guardian.user
     created = user is None
     if created:
@@ -142,14 +141,16 @@ def grant_portal_access(guardian, actor):
             first_name=name_parts[0] if name_parts else "",
             last_name=name_parts[1] if len(name_parts) > 1 else "",
         )
-    user.must_change_password = True
     user.is_active = True
-    user.set_password(raw_password)
+    if user.role == UserRole.PARENT:
+        # Parents sign in with their phone and an SMS code, never a password.
+        user.set_unusable_password()
+        user.must_change_password = False
     user.save()
     if created:
         Group.objects.get_or_create(name="role_parent")[0].user_set.add(user)
         guardian.user = user
         guardian.save(update_fields=["user", "updated_at"])
 
-    delivered = send_portal_credentials(guardian, user.username, raw_password, actor, reset=not created)
+    delivered = send_portal_credentials(guardian, user.username, actor, reset=not created)
     return created, user.username, delivered

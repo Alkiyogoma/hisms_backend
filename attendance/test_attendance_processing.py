@@ -243,7 +243,7 @@ class AttendanceProcessingLogicTest(TestCase):
         self.assertIn('existing_checkout_time', result2)
     
     def test_checkout_without_checkin(self):
-        """Test checkout without prior check-in creates both timestamps"""
+        """Checkout without prior check-in records the check-out only (no invented check-in)"""
         weekday = _past_weekday()
         checkout_time = timezone.make_aware(
             timezone.datetime.combine(weekday, time(15, 0))
@@ -257,12 +257,10 @@ class AttendanceProcessingLogicTest(TestCase):
         
         self.assertTrue(result['success'])
         
-        # Verify both check-in and check-out times are set
         entry = AttendanceEntry.objects.get(student=self.student1)
-        self.assertIsNotNone(entry.check_in_time)
-        self.assertIsNotNone(entry.check_out_time)
-        self.assertEqual(entry.check_in_time, checkout_time.time())
+        self.assertIsNone(entry.check_in_time)
         self.assertEqual(entry.check_out_time, checkout_time.time())
+        self.assertEqual(entry.status, 'present')
         self.assertEqual(entry.parent_name, 'Mr. Doe')
     
     def test_batch_checkin_processing(self):

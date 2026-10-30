@@ -3,7 +3,10 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from users.views import HISMSLoginView, HISMSLogoutView
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.views import TokenRefreshView
+from users.api import (
+    ParentPhoneCodeRequestAPIView, ParentPhoneCodeVerifyAPIView, StaffTokenObtainPairView,
+)
 
 admin.site.site_header = "Hodari Integrated School Management System"
 admin.site.site_title = "HISMS Admin"
@@ -14,9 +17,12 @@ urlpatterns = [
     path("parent/", include("parent_portal.urls")),
 
     # JWT Authentication endpoints for Flutter app
-    path("api/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    # Staff: username/email + password. Parents: phone number + SMS code.
+    path("api/token/", StaffTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
-    path("api/login/", TokenObtainPairView.as_view(), name="api_login"),
+    path("api/login/", StaffTokenObtainPairView.as_view(), name="api_login"),
+    path("api/parent/login/send-code/", ParentPhoneCodeRequestAPIView.as_view(), name="api_parent_send_code"),
+    path("api/parent/login/verify/", ParentPhoneCodeVerifyAPIView.as_view(), name="api_parent_verify_code"),
 
     # Custom auth (login with lockout) overrides django.contrib.auth.urls login
     path("accounts/", include("users.urls")),
