@@ -401,6 +401,16 @@ CSRF_TRUSTED_ORIGINS = [
 if not DEBUG and not os.getenv("SITE_URL") and CSRF_TRUSTED_ORIGINS:
     SITE_URL = CSRF_TRUSTED_ORIGINS[0].rstrip("/")
 
+# connect.hodari.ac.tz (production) and testing.hodari.ac.tz share one VPS and
+# may share one Redis. Name each site's Celery queue and cache keys after its
+# own address so one site's worker never runs the other's jobs (which sent
+# production emails with testing links) and caches never mix.
+from urllib.parse import urlparse as _urlparse
+SITE_KEY = (_urlparse(SITE_URL).hostname or "local").replace(".", "-")
+CELERY_TASK_DEFAULT_QUEUE = os.getenv("CELERY_TASK_DEFAULT_QUEUE") or f"hisms-{SITE_KEY}"
+if "CACHES" in globals():
+    CACHES["default"]["KEY_PREFIX"] = f"hodari-{SITE_KEY}"
+
 # Browser security headers
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True

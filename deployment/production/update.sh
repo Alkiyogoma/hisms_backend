@@ -97,6 +97,10 @@ if [[ -z "$MEDIA" ]]; then
   mkdir -p "$MEDIA"
 fi
 [[ -d "$MEDIA" ]] || fail "Upload directory does not exist: $MEDIA. Check MEDIA_ROOT before deploying."
+# Every link and logo in production emails is built from SITE_URL; a missing
+# or copied testing value sends parents to the testing site.
+ENV_SITE_URL="$(read_env SITE_URL)"
+[[ "${ENV_SITE_URL%/}" == "${SITE_URL%/}" ]] || fail "SITE_URL in $APP/.env is '${ENV_SITE_URL:-<missing>}' but must be ${SITE_URL%/} (emails link to it). No deployment changes were made."
 
 BEFORE="$(git -C "$APP" rev-parse --short HEAD)"
 BRANCH="$(git -C "$APP" branch --show-current)"
