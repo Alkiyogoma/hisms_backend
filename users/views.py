@@ -92,6 +92,12 @@ def _sync_user_role_group(user):
 
 
 
+PARENT_PHONE_LOGIN_MESSAGE = (
+    "Parents sign in with their phone number. Choose Parent Login, enter your "
+    "phone number and type in the code we send you by SMS."
+)
+
+
 class HISMSAuthenticationForm(AuthenticationForm):
 
     """FRD: custom login error message."""
@@ -143,6 +149,10 @@ class HISMSLoginView(LoginView):
         """Called when credentials are correct."""
 
         user = form.get_user()
+
+        if user.role == UserRole.PARENT:
+            form.add_error(None, PARENT_PHONE_LOGIN_MESSAGE)
+            return self.form_invalid(form)
 
         # Check lockout first
 
@@ -254,6 +264,13 @@ class HISMSLoginView(LoginView):
                 if user is None:
 
                     raise User.DoesNotExist
+
+                # Parents have no password: point them to phone sign-in and
+                # don't count this toward a lockout.
+                if user.role == UserRole.PARENT:
+                    form.errors.pop('__all__', None)
+                    form.add_error(None, PARENT_PHONE_LOGIN_MESSAGE)
+                    return super().form_invalid(form)
 
                 # FRD: deactivated accounts must not be counted toward lockout
 
@@ -449,7 +466,6 @@ class HISMSLoginAPIView(View):
 
         email = (body.get("email") or "").strip()
         password = body.get("password", "")
-        login_type = body.get("type", "staff")  # "staff" or "parent"
 
         if not email or not password:
             return JsonResponse({"ok": False, "error": "Email and password are required."}, status=400)
@@ -460,11 +476,9 @@ class HISMSLoginAPIView(View):
         if user_obj is None:
             return JsonResponse({"ok": False, "error": "Email or password incorrect."}, status=401)
 
-        # Role gate
-        if login_type == "parent" and user_obj.role != UserRole.PARENT:
-            return JsonResponse({"ok": False, "error": "This account is not a parent account. Please use Staff Login."}, status=403)
-        if login_type == "staff" and user_obj.role == UserRole.PARENT:
-            return JsonResponse({"ok": False, "error": "This account is a parent account. Please use Parent Login."}, status=403)
+        # Parents never sign in with a password (phone + SMS code instead).
+        if user_obj.role == UserRole.PARENT:
+            return JsonResponse({"ok": False, "error": PARENT_PHONE_LOGIN_MESSAGE}, status=403)
 
         # Check lockout
         if user_obj.is_locked_out:
@@ -530,9 +544,7 @@ class HISMSLoginAPIView(View):
             return JsonResponse({"ok": True, "redirect": "/accounts/password-change/"})
 
         next_url = body.get("next") or request.POST.get("next") or request.GET.get("next") or "/"
-        if authed.role == UserRole.PARENT and next_url in ("/", ""):
-            next_url = "/parent/"
-        elif not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+        if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
             next_url = settings.LOGIN_REDIRECT_URL or "/"
         return JsonResponse({"ok": True, "redirect": next_url})
 
@@ -586,8 +598,6 @@ class ParentOTPVerifyView(View):
         user.clear_failed_logins()
         login(request, user, backend="users.backends.EmailOrUsernameBackend")
         request.session[SESSION_ROLE_KEY] = user.role
-        # The parent proved they hold the phone, so the temporary-password
-        # change (MustChangePasswordMiddleware) doesn't apply to this session.
         request.session[SESSION_LOGIN_METHOD_KEY] = LOGIN_METHOD_SMS
         _audit_log(
             actor=user, action_type="LOGIN", model_name="User", object_id=user.pk,
@@ -1128,7 +1138,7 @@ class HISMSPasswordChangeView(RoleRequiredMixin, PasswordChangeView):
 
         UserRole.ECD_HOD, UserRole.ADMIN_OFFICER, UserRole.FINANCE_OFFICER,
 
-        UserRole.TEACHER, UserRole.PARENT]
+        UserRole.TEACHER]  # parents have no password: they sign in by SMS code
 
     template_name = "registration/password_change_form.html"
 
@@ -1184,7 +1194,7 @@ class HISMSPasswordChangeDoneView(RoleRequiredMixin, PasswordChangeDoneView):
 
         UserRole.ECD_HOD, UserRole.ADMIN_OFFICER, UserRole.FINANCE_OFFICER,
 
-        UserRole.TEACHER, UserRole.PARENT]
+        UserRole.TEACHER]
 
     template_name = "registration/password_change_done.html"
 
@@ -2722,7 +2732,8 @@ class PasswordResetRequestView(FormView):
 
         try:
 
-            user = User.objects.get(email__iexact=email)
+            # Parents have no password (phone + SMS code), so nothing to reset.
+            user = User.objects.exclude(role=UserRole.PARENT).get(email__iexact=email)
 
             # Generate token
 

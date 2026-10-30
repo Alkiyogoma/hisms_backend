@@ -36,30 +36,29 @@ class GuardianPortalAccessTests(TestCase):
         self.assertIn("Resend Login Details", content)
         self.assertIn("parent_255767000001", content)
 
-    def test_creates_parent_login_and_emails_username(self):
+    def test_creates_parent_login_and_emails_phone_sign_in(self):
         resp = self.client.post(self.url)
         self.assertEqual(resp.status_code, 302)
         self.guardian.refresh_from_db()
         user = self.guardian.user
         self.assertEqual(user.role, UserRole.PARENT)
-        self.assertTrue(user.must_change_password)
+        # Parents sign in with phone + SMS code: no password to set or change.
+        self.assertFalse(user.has_usable_password())
+        self.assertFalse(user.must_change_password)
         self.assertTrue(user.groups.filter(name="role_parent").exists())
         self.assertEqual(len(mail.outbox), 1)
-        self.assertIn(user.username, mail.outbox[0].body)
+        self.assertIn(self.guardian.phone, mail.outbox[0].body)
+        self.assertIn("No password is needed", mail.outbox[0].body)
         self.assertEqual(mail.outbox[0].to, ["mary@example.com"])
 
-    def test_resend_sets_new_password_on_same_login(self):
+    def test_resend_keeps_same_login_and_resends_instructions(self):
         self.client.post(self.url)
         self.guardian.refresh_from_db()
         user = self.guardian.user
-        old_hash = user.password
-        user.must_change_password = False
-        user.save()
 
         self.client.post(self.url)
         user.refresh_from_db()
-        self.assertNotEqual(user.password, old_hash)
-        self.assertTrue(user.must_change_password)
+        self.assertFalse(user.has_usable_password())
         self.assertEqual(User.objects.filter(role=UserRole.PARENT).count(), 1)
         self.assertEqual(len(mail.outbox), 2)
 

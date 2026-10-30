@@ -134,3 +134,105 @@ class ParentOTPLoginTests(TestCase):
     def test_unavailable_when_sms_not_configured(self, send_sms):
         self.assertEqual(self._send().status_code, 503)
         send_sms.assert_not_called()
+
+
+@override_settings(DEBUG=True, SMS_PROVIDER="console")
+@patch("attendance.notification_service.NotificationService.send_sms", return_value=SMS_OK)
+class ParentPhoneLoginAPITests(TestCase):
+    """Mobile app: parents get JWT tokens from phone + SMS code."""
+
+    def setUp(self):
+        cache.clear()
+        self.parent = User.objects.create_user(username="parent_1", email="p1@x.test",
+                                               role=UserRole.PARENT)
+        ParentGuardian.objects.create(full_name="Asha M", phone="0712 345 678", user=self.parent)
+
+    def test_send_and_verify_returns_tokens(self, send_sms):
+        resp = self.client.post(reverse("api_parent_send_code"), {"phone": "0712345678"},
+                                content_type="application/json")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["resend_after"], 60)
+        code = re.search(r"\b(\d{6})\b", send_sms.call_args[0][1]).group(1)
+
+        resp = self.client.post(reverse("api_parent_verify_code"), {"phone": "0712345678", "code": "000000"
+                                if code != "000000" else "111111"}, content_type="application/json")
+        self.assertEqual(resp.status_code, 401)
+        resp = self.client.post(reverse("api_parent_verify_code"), {"phone": "0712345678", "code": code},
+                                content_type="application/json")
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertTrue(body["access"] and body["refresh"])
+        self.assertEqual(body["user"]["role"], UserRole.PARENT)
+
+
+class ParentsHaveNoPasswordTests(TestCase):
+    """Every password route refuses parents; staff are unaffected."""
+
+    def setUp(self):
+        cache.clear()
+        # A parent created before phone sign-in, still holding a password.
+        self.parent = User.objects.create_user(username="parent_old", email="old@x.test",
+                                               password="Old-pass-123", role=UserRole.PARENT)
+        self.teacher = User.objects.create_user(username="teach", email="teach@x.test",
+                                                password="Teach-pass-123", role=UserRole.TEACHER)
+
+    def test_staff_form_refuses_parent_even_with_right_password(self):
+        resp = self.client.post(reverse("users:login"), {"username": "parent_old", "password": "Old-pass-123"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Parents sign in with their phone number")
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_staff_form_wrong_password_does_not_lock_parent(self):
+        for _ in range(6):
+            self.client.post(reverse("users:login"), {"username": "parent_old", "password": "nope"})
+        self.parent.refresh_from_db()
+        self.assertEqual(self.parent.failed_login_attempts, 0)
+        self.assertIsNone(self.parent.locked_until)
+
+    def test_json_password_login_refuses_parent(self):
+        resp = self.client.post(reverse("users:login_api"),
+                                json.dumps({"email": "old@x.test", "password": "Old-pass-123"}),
+                                content_type="application/json")
+        self.assertEqual(resp.status_code, 403)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_jwt_refuses_parent_allows_staff(self):
+        resp = self.client.post(reverse("token_obtain_pair"),
+                                {"username": "parent_old", "password": "Old-pass-123"},
+                                content_type="application/json")
+        self.assertEqual(resp.status_code, 401)
+        self.assertNotIn("access", resp.json())
+        resp = self.client.post(reverse("token_obtain_pair"),
+                                {"username": "teach", "password": "Teach-pass-123"},
+                                content_type="application/json")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("access", resp.json())
+
+    def test_staff_password_login_still_works(self):
+        resp = self.client.post(reverse("users:login"), {"username": "teach", "password": "Teach-pass-123"})
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(int(self.client.session["_auth_user_id"]), self.teacher.pk)
+
+    def test_no_password_reset_email_for_parent(self):
+        from django.core import mail
+        self.client.post(reverse("users:password_reset_request"), {"email": "old@x.test"})
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_parent_cannot_open_password_change(self):
+        self.parent.must_change_password = True
+        self.parent.save(update_fields=["must_change_password"])
+        self.client.force_login(self.parent)
+        resp = self.client.get(reverse("users:password_change"))
+        self.assertRedirects(resp, "/parent/", fetch_redirect_response=False)
+        # And they aren't bounced to it from the portal (no redirect loop).
+        self.assertEqual(self.client.get("/parent/").status_code, 200)
+
+    def test_portal_access_gives_no_usable_password(self):
+        from students.services import grant_portal_access
+        guardian = ParentGuardian.objects.create(full_name="New Parent", phone="0755 000 111")
+        with patch("students.services.send_portal_credentials", return_value=[]):
+            created, _username, _ = grant_portal_access(guardian, actor=self.teacher)
+        guardian.refresh_from_db()
+        self.assertTrue(created)
+        self.assertFalse(guardian.user.has_usable_password())
+        self.assertFalse(guardian.user.must_change_password)
