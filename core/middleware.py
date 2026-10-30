@@ -180,6 +180,8 @@ class MustChangePasswordMiddleware:
             request.user.is_authenticated
             and request.user.must_change_password
             and not any(request.path.startswith(p) for p in self.EXEMPT_PATHS)
+            # Parents who signed in with an SMS code never need the temporary password.
+            and request.session.get("_login_method") != "sms_code"
         ):
             from django.urls import reverse
             from django.shortcuts import redirect as http_redirect

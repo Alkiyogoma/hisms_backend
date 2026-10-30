@@ -98,8 +98,8 @@ def send_portal_credentials(guardian, username, raw_password, actor, reset=False
 
     if guardian.phone and sms_status()["configured"]:
         sms = (
-            f"{school_name} parent portal. Username: {username} Password: {raw_password} "
-            f"Change the password when you first log in: {login_url}"
+            f"{school_name} parent portal is ready: {login_url} "
+            f"Choose Parent Login, enter this phone number and we'll text you a sign-in code."
         )
         if NotificationService.send_sms(guardian.phone, sms).get("success"):
             delivered.append(f"sent by SMS to {guardian.phone}")

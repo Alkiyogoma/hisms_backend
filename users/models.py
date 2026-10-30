@@ -227,3 +227,23 @@ class User(AbstractUser):
             )
         cls._admin_delete_allowed = False
         return super().delete(*args, **kwargs)
+
+
+class ParentLoginCode(models.Model):
+    """One-time SMS code a parent uses to sign in with their phone number.
+
+    Only an HMAC of the code is stored; the code itself exists only in the SMS.
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="login_codes")
+    phone = models.CharField(max_length=16, db_index=True, help_text="Normalised 255XXXXXXXXX")
+    code_hash = models.CharField(max_length=128)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"Login code for {self.user} ({self.phone})"

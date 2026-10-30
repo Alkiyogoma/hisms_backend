@@ -537,6 +537,70 @@ class HISMSLoginAPIView(View):
         return JsonResponse({"ok": True, "redirect": next_url})
 
 
+def _json_body(request):
+    import json
+    try:
+        return json.loads(request.body or b"{}")
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+
+class ParentOTPRequestView(View):
+    """Parent sign-in step 1: text a one-time code to the parent's phone.
+
+    Replies the same way whether or not the number is registered."""
+
+    def post(self, request):
+        from users.otp import OTPError, request_code
+        body = _json_body(request)
+        if body is None:
+            return JsonResponse({"ok": False, "error": "Invalid request body."}, status=400)
+        try:
+            request_code(body.get("phone"))
+        except OTPError as exc:
+            return JsonResponse({"ok": False, "error": exc.message}, status=exc.status)
+        from users.otp import CODE_TTL_SECONDS, RESEND_COOLDOWN_SECONDS
+        return JsonResponse({
+            "ok": True,
+            "message": "If this number is registered with the school, a sign-in code is on its way by SMS.",
+            "resend_after": RESEND_COOLDOWN_SECONDS,
+            "expires_in": CODE_TTL_SECONDS,
+        })
+
+
+class ParentOTPVerifyView(View):
+    """Parent sign-in step 2: check the SMS code and open the session."""
+
+    def post(self, request):
+        from users.otp import LOGIN_METHOD_SMS, SESSION_LOGIN_METHOD_KEY, OTPError, verify_code
+        from users.middleware import SESSION_ROLE_KEY
+        from audit.models import log_event as _audit_log
+        body = _json_body(request)
+        if body is None:
+            return JsonResponse({"ok": False, "error": "Invalid request body."}, status=400)
+        try:
+            user = verify_code(body.get("phone"), body.get("code"))
+        except OTPError as exc:
+            return JsonResponse({"ok": False, "error": exc.message}, status=exc.status)
+
+        user.clear_failed_logins()
+        login(request, user, backend="users.backends.EmailOrUsernameBackend")
+        request.session[SESSION_ROLE_KEY] = user.role
+        # The parent proved they hold the phone, so the temporary-password
+        # change (MustChangePasswordMiddleware) doesn't apply to this session.
+        request.session[SESSION_LOGIN_METHOD_KEY] = LOGIN_METHOD_SMS
+        _audit_log(
+            actor=user, action_type="LOGIN", model_name="User", object_id=user.pk,
+            description=f"Successful login by {user.get_full_name() or user.username} (SMS code)",
+            request=request,
+        )
+        next_url = body.get("next") or ""
+        if not next_url or next_url == "/" or not url_has_allowed_host_and_scheme(
+                next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+            next_url = "/parent/"
+        return JsonResponse({"ok": True, "redirect": next_url})
+
+
 class StartImpersonationView(RoleRequiredMixin, View):
 
     """FR-DASH-008: Super Admin 'View As'  start impersonation.

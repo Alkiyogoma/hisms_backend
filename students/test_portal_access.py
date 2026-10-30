@@ -102,7 +102,9 @@ class GuardianPortalAccessTests(TestCase):
         send_sms.assert_called_once()
         phone, text = send_sms.call_args.args
         self.assertEqual(phone, "+255767000001")
-        self.assertIn(self.guardian.user.username, text)
+        # Parents sign in with their phone + SMS code, so no password goes by SMS.
+        self.assertIn("enter this phone number", text)
+        self.assertNotIn(self.guardian.user.username, text)
         message = self._message(resp)
         self.assertIn("emailed to mary@example.com", message)
         self.assertIn("sent by SMS to +255767000001", message)
