@@ -35,6 +35,7 @@ def children_for(user):
         return Student.objects.none()
     return (Student.objects
             .filter(guardians__user=user, status=StudentStatus.ACTIVE, is_archived=False)
+            .select_related("from_applicant")  # photo_file() falls back to the admission photo
             .distinct().order_by("first_name", "last_name"))
 
 
@@ -45,6 +46,26 @@ def child_or_404(user, student_id):
     if child is None:
         raise Http404("No such learner.")
     return child
+
+
+def learner_photo(student):
+    """The learner's photo file (Student.photo_file(): profile photo, else the
+    admission photo), or None when there is no usable image."""
+    import mimetypes
+    f = student.photo_file()
+    if not f or not (mimetypes.guess_type(f.name)[0] or "").startswith("image/"):
+        return None
+    return f
+
+
+def attach_photos(students):
+    """Mark each learner with photo_version (None = show initials). The version
+    changes when the photo does, so browsers don't keep showing an old one."""
+    import hashlib
+    for s in students:
+        f = learner_photo(s)
+        s.photo_version = hashlib.sha1(f.name.encode()).hexdigest()[:10] if f else None
+    return students
 
 
 def published_report_or_404(user, student_id, report_id):

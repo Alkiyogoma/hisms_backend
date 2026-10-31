@@ -1,1 +1,2 @@
-<span class="pp-avatar{% if large %} pp-avatar-lg{% endif %}" aria-hidden="true">{{ student.first_name|first|upper }}{{ student.last_name|first|upper }}</span>
+{# Learner photo when one is on file (via the ownership-checked photo URL), otherwise initials. Decorative: the name is always shown next to it. #}
+<span class="pp-avatar{% if large %} pp-avatar-lg{% endif %}" aria-hidden="true">{% if student.photo_version %}<img src="{% url 'parent_portal:learner_photo' student.pk %}?v={{ student.photo_version }}" alt="" loading="lazy" decoding="async">{% else %}{{ student.first_name|first|upper }}{{ student.last_name|first|upper }}{% endif %}</span>

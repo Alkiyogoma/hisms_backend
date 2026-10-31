@@ -8,6 +8,7 @@ urlpatterns = [
     # v1: Home, learner progress (with published report cards) and the school calendar.
     path("", views.ParentDashboardView.as_view(), name="dashboard"),
     path("learner/<int:student_id>/", views.ParentLearnerProgressView.as_view(), name="progress"),
+    path("learner/<int:student_id>/photo/", views.ParentLearnerPhotoView.as_view(), name="learner_photo"),
     path("learner/<int:student_id>/reports/<int:report_id>/", views.ParentReportCardView.as_view(),
          name="report_card"),
     path("learner/<int:student_id>/reports/<int:report_id>/download/",

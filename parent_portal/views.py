@@ -84,7 +84,7 @@ class ParentDashboardView(ParentOnlyMixin, TemplateView):
         ctx = super().get_context_data(**kwargs)
         today = timezone.localdate()
         user = self.request.user
-        children = list(services.children_for(user))
+        children = services.attach_photos(list(services.children_for(user)))
         term = services.current_term()
         guardian = _get_parent_guardian(user)
         name = (user.first_name or (guardian.full_name.split()[0] if guardian and guardian.full_name else "")
@@ -127,6 +127,7 @@ class ParentLearnerProgressView(ParentOnlyMixin, TemplateView):
         student = next((c for c in children if c.pk == kwargs["student_id"]), None)
         if student is None:
             raise Http404("No such learner.")
+        services.attach_photos([student])
         term = services.current_term()
         academic = services.academic_progress(student, term, today)
         month = services.parse_month(self.request.GET.get("month"), today)
@@ -144,6 +145,26 @@ class ParentLearnerProgressView(ParentOnlyMixin, TemplateView):
             "reports": services.published_reports(student),
         })
         return ctx
+
+
+class ParentLearnerPhotoView(ParentOnlyMixin, View):
+    """The learner's photo, only for their own parent."""
+
+    def get(self, request, *args, **kwargs):
+        import mimetypes
+        from django.http import FileResponse
+        student = services.child_or_404(request.user, kwargs["student_id"])
+        f = services.learner_photo(student)
+        if f is None:
+            raise Http404("No photo.")
+        try:
+            handle = f.open("rb")
+        except (OSError, ValueError):
+            raise Http404("No photo.")
+        response = FileResponse(handle, content_type=mimetypes.guess_type(f.name)[0])
+        response["Cache-Control"] = "private, max-age=86400"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
 
 
 # ---------------------------------------------------------------------------
