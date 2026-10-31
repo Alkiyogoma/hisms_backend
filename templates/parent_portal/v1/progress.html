@@ -1,0 +1,100 @@
+{% extends "parent_portal/v1/base.html" %}
+{% block title %}{{ student.first_name }}&rsquo;s progress{% endblock %}
+
+{% block subnav %}
+<div class="pp-subnav">
+  <div class="pp-wrap pp-subnav-inner">
+    <a class="pp-btn pp-btn-small" href="{% url 'parent_portal:dashboard' %}"><span aria-hidden="true">&larr;</span> All children</a>
+    <nav aria-label="Breadcrumb" class="pp-crumbs">
+      <ol>
+        <li><a href="{% url 'parent_portal:dashboard' %}">Home</a></li>
+        <li aria-current="page">{{ student.first_name }}&rsquo;s progress</li>
+      </ol>
+    </nav>
+    {% if siblings %}
+      <nav class="pp-siblings" aria-label="Other children">
+        <span>Switch to</span>
+        {% for sib in siblings %}<a href="{% url 'parent_portal:progress' sib.pk %}">{{ sib.first_name }}</a>{% endfor %}
+      </nav>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<section class="pp-card pp-lhero" aria-labelledby="learner-name">
+  {% include "parent_portal/v1/includes/avatar.html" with student=student large=True %}
+  <div class="pp-lhero-id">
+    <p class="pp-eyebrow pp-eyebrow-muted">Learner</p>
+    <h1 id="learner-name">{{ student.first_name }} {{ student.last_name }}</h1>
+    <p class="pp-muted">{{ student.class_name|default:"Class not set" }} &middot; {{ student.admission_no }}{% if term %} &middot; {{ term.name }}{% if term.academic_year %} {{ term.academic_year.name }}{% endif %}{% endif %}</p>
+  </div>
+  <div class="pp-rings">
+    {% if term %}{% with label=term.name|add:" average" %}
+      {% include "parent_portal/v1/includes/ring.html" with ring=average_ring label=label note=academic.complete|yesno:",running" tone="gold" precision="-2" %}
+    {% endwith %}{% else %}
+      {% include "parent_portal/v1/includes/ring.html" with ring=average_ring label="Term average" tone="gold" precision="-2" %}
+    {% endif %}
+    {% include "parent_portal/v1/includes/ring.html" with ring=attendance_ring label="Attendance" note="this term" tone="blue" precision="-1" %}
+  </div>
+</section>
+
+<nav class="pp-jump" aria-label="On this page">
+  <a href="#today">Today</a>
+  <a href="#performance">Performance</a>
+  {% if reports %}<a href="#report-cards">Report cards</a>{% endif %}
+  <a href="#attendance">Attendance</a>
+</nav>
+
+<section id="today" class="pp-section" aria-labelledby="today-heading">
+  <div class="pp-section-head"><h2 id="today-heading">Today</h2><span class="pp-muted">{{ today|date:"l j F" }}</span></div>
+  <div class="pp-card">
+    {% include "parent_portal/v1/includes/today.html" with info=today_info %}
+  </div>
+</section>
+
+<section id="performance" class="pp-section" aria-labelledby="performance-heading">
+  <div class="pp-section-head">
+    <h2 id="performance-heading">Performance</h2>
+    {% if term %}<span class="pp-muted">{% if term.academic_year %}{{ term.academic_year.name }} &middot; {% endif %}by term</span>{% endif %}
+  </div>
+  {% if academic %}
+    {% if not academic.complete %}
+      <p class="pp-banner">{{ term.name }} is in progress. Marks appear once each assessment is approved and are labelled &ldquo;running&rdquo; until the term&rsquo;s assessments are complete.</p>
+    {% endif %}
+    <div class="pp-charts">
+      {% for chart in academic.charts %}
+        {% include "parent_portal/v1/includes/assessment_chart.html" with chart=chart %}
+      {% endfor %}
+    </div>
+    {% include "parent_portal/v1/includes/subject_table.html" with academic=academic %}
+  {% else %}
+    {% include "parent_portal/v1/includes/empty.html" with title="No term in progress" text="Performance appears here once the school opens a term." hide_phone=True %}
+  {% endif %}
+</section>
+
+{% if reports %}
+<section id="report-cards" class="pp-section" aria-labelledby="reports-heading">
+  <div class="pp-section-head"><h2 id="reports-heading">Report cards</h2><span class="pp-muted">Published by the Head of School</span></div>
+  <ul class="pp-card pp-reports" role="list">
+    {% for report in reports %}
+      <li class="pp-report">
+        <div>
+          <p class="pp-report-title">{{ report.term.name }}{% if report.term.academic_year %} &middot; {{ report.term.academic_year.name }}{% endif %}</p>
+          {% if report.published_at %}<p class="pp-muted">Published {{ report.published_at|date:"j F Y" }}</p>{% endif %}
+        </div>
+        <div class="pp-report-actions">
+          <a class="pp-btn pp-btn-small" href="{% url 'parent_portal:report_card' student.pk report.pk %}">View<span class="pp-sr"> {{ report.term.name }} report card</span></a>
+          <a class="pp-btn pp-btn-small pp-btn-primary" href="{% url 'parent_portal:report_download' student.pk report.pk %}">Download PDF<span class="pp-sr"> of the {{ report.term.name }} report card</span></a>
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section id="attendance" class="pp-section" aria-labelledby="attendance-heading">
+  <div class="pp-section-head"><h2 id="attendance-heading">Attendance</h2><span class="pp-muted">Checked in and out by card</span></div>
+  {% include "parent_portal/v1/includes/attendance_month.html" with month=month %}
+</section>
+{% endblock %}

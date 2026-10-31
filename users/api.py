@@ -47,29 +47,31 @@ class _PhoneLoginAPIView(APIView):
 
 
 class ParentPhoneCodeRequestAPIView(_PhoneLoginAPIView):
-    """POST {"phone": "0712345678"} -> texts a sign-in code if the number is registered."""
+    """POST {"phone": "0712345678"} or {"contact": "name@example.com"} -> sends a sign-in code
+    if the contact is registered (same reply either way)."""
 
     def post(self, request):
-        from users.otp import CODE_TTL_SECONDS, RESEND_COOLDOWN_SECONDS, OTPError, request_code
+        from users.otp import CODE_LENGTH, CODE_TTL_SECONDS, RESEND_COOLDOWN_SECONDS, OTPError, request_code
         try:
-            request_code(request.data.get("phone"))
+            request_code(request.data.get("contact") or request.data.get("phone"))
         except OTPError as exc:
             return Response({"detail": exc.message}, status=exc.status)
         return Response({
-            "detail": "If this number is registered with the school, a sign-in code is on its way by SMS.",
+            "detail": "If this phone number or email is registered with the school, a sign-in code is on its way.",
+            "code_length": CODE_LENGTH,
             "resend_after": RESEND_COOLDOWN_SECONDS,
             "expires_in": CODE_TTL_SECONDS,
         })
 
 
 class ParentPhoneCodeVerifyAPIView(_PhoneLoginAPIView):
-    """POST {"phone": "...", "code": "123456"} -> {"access", "refresh", "user"}."""
+    """POST {"phone"|"contact": "...", "code": "1234"} -> {"access", "refresh", "user"}."""
 
     def post(self, request):
         from audit.models import log_event
         from users.otp import OTPError, verify_code
         try:
-            user = verify_code(request.data.get("phone"), request.data.get("code"))
+            user = verify_code(request.data.get("contact") or request.data.get("phone"), request.data.get("code"))
         except OTPError as exc:
             return Response({"detail": exc.message}, status=exc.status)
 

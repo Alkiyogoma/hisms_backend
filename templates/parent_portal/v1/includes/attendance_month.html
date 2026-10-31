@@ -1,0 +1,43 @@
+{# One month of attendance, Mon-Fri. Excused shows the status only, never the reason. #}
+<div class="pp-card">
+  <div class="pp-month-nav">
+    <a class="pp-btn pp-btn-small" href="?month={{ month.prev|date:'Y-m' }}#attendance" aria-label="Previous month, {{ month.prev|date:'F Y' }}"><span aria-hidden="true">&larr;</span> {{ month.prev|date:"M" }}</a>
+    <h3 class="pp-card-title" id="att-month">{{ month.month|date:"F Y" }}</h3>
+    {% if month.next %}
+      <a class="pp-btn pp-btn-small" href="?month={{ month.next|date:'Y-m' }}#attendance" aria-label="Next month, {{ month.next|date:'F Y' }}">{{ month.next|date:"M" }} <span aria-hidden="true">&rarr;</span></a>
+    {% else %}<span class="pp-month-spacer"></span>{% endif %}
+  </div>
+  <dl class="pp-stats">
+    <div><dt>Present</dt><dd class="pp-c-ok">{{ month.present }}</dd></div>
+    <div><dt>Late</dt><dd class="pp-c-warn">{{ month.late }}</dd></div>
+    <div><dt>Absent</dt><dd class="pp-c-bad">{{ month.absent }}</dd></div>
+    <div><dt>Excused</dt><dd class="pp-c-purple">{{ month.excused }}</dd></div>
+    <div><dt>Rate</dt><dd class="pp-c-blue">{% if month.rate is not None %}{{ month.rate|floatformat:"-1" }}%{% else %}&ndash;{% endif %}</dd></div>
+  </dl>
+  {% if month.weeks %}
+  <table class="pp-cal" aria-labelledby="att-month">
+    <thead><tr><th scope="col" abbr="Monday">Mon</th><th scope="col" abbr="Tuesday">Tue</th><th scope="col" abbr="Wednesday">Wed</th><th scope="col" abbr="Thursday">Thu</th><th scope="col" abbr="Friday">Fri</th></tr></thead>
+    <tbody>
+      {% for week in month.weeks %}
+        <tr>
+          {% for day in week %}
+            {% if day %}
+              <td class="pp-day pp-day-{{ day.code|default:'none' }}{% if day.is_today %} pp-day-today{% endif %}">
+                <span class="pp-day-num"><time datetime="{{ day.date|date:'Y-m-d' }}">{{ day.date|date:"j" }}</time></span>
+                {% if day.label %}<span class="pp-day-s">{{ day.label }}</span>{% endif %}
+                {% if day.is_today %}<span class="pp-sr">(today)</span>{% endif %}
+              </td>
+            {% else %}<td class="pp-day pp-day-blank"></td>{% endif %}
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  <ul class="pp-legend" role="list" aria-label="Key">
+    <li><i class="pp-day-P"></i>Present</li><li><i class="pp-day-L"></i>Late</li>
+    <li><i class="pp-day-A"></i>Absent</li><li><i class="pp-day-E"></i>Excused</li>
+    <li><i class="pp-day-H"></i>No school</li><li><i class="pp-day-U"></i>Not yet marked</li>
+  </ul>
+  <p class="pp-note">Rate = days in school (present or late) &divide; days marked. Days not yet marked are left out.</p>
+</div>

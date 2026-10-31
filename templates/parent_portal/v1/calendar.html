@@ -1,0 +1,46 @@
+{% extends "parent_portal/v1/base.html" %}
+{% block title %}School calendar{% endblock %}
+
+{% block subnav %}
+<div class="pp-subnav">
+  <div class="pp-wrap pp-subnav-inner">
+    <a class="pp-btn pp-btn-small" href="{% url 'parent_portal:dashboard' %}"><span aria-hidden="true">&larr;</span> Home</a>
+    <nav aria-label="Breadcrumb" class="pp-crumbs">
+      <ol>
+        <li><a href="{% url 'parent_portal:dashboard' %}">Home</a></li>
+        <li aria-current="page">School calendar</li>
+      </ol>
+    </nav>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="pp-section-head">
+  <h1>School calendar</h1>
+  <span class="pp-muted">Whole school</span>
+</div>
+{% if event_groups %}
+  {% for group in event_groups %}
+    <section class="pp-section" aria-labelledby="month-{{ forloop.counter }}">
+      <h2 class="pp-month-title" id="month-{{ forloop.counter }}">{{ group.month|date:"F Y" }}</h2>
+      <ul class="pp-card pp-events" role="list">
+        {% for ev in group.events %}
+          <li class="pp-event{% if ev.past %} pp-event-past{% endif %}">
+            <span class="pp-event-date" aria-hidden="true"><b>{{ ev.start|date:"j" }}</b>{{ ev.start|date:"M" }}</span>
+            <div>
+              <p class="pp-event-title">{{ ev.title }}</p>
+              <p class="pp-muted">
+                <time datetime="{{ ev.start|date:'Y-m-d' }}">{{ ev.start|date:"l j F" }}</time>{% if ev.end %} to <time datetime="{{ ev.end|date:'Y-m-d' }}">{{ ev.end|date:"l j F" }}</time>{% endif %}
+                <span class="pp-chip pp-chip-kind-{{ ev.kind }}">{{ ev.category }}</span>
+              </p>
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endfor %}
+{% else %}
+  {% include "parent_portal/v1/includes/empty.html" with title="No upcoming events" text="School events will appear here once they are published." %}
+{% endif %}
+{% endblock %}

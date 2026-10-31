@@ -1,0 +1,52 @@
+{# Parent sign-in: one phone/email field, then a 4-digit code. Real server-side OTP (users/otp.py). #}
+{% load static %}
+<div id="parentSignin"
+     data-request-url="{% url 'users:parent_otp_request' %}"
+     data-verify-url="{% url 'users:parent_otp_verify' %}">
+  {% csrf_token %}
+
+  {# Step 1: phone number or email #}
+  <form class="login-form ps-step" id="psStep1" novalidate>
+    <div class="field-group">
+      <label for="ps-contact">Phone number or email</label>
+      <input id="ps-contact" name="contact" type="text" class="field-input"
+             placeholder="e.g. 0712 345 678 or name@email.com"
+             autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="email"
+             aria-describedby="ps-contact-hint ps-step1-error" required>
+      <div class="t-hint" id="ps-contact-hint">Use the mobile number or email the school has on record. We'll send you a 4-digit code.</div>
+    </div>
+    <div id="ps-step1-error" class="alert alert-error ps-alert" role="alert" hidden></div>
+    <button type="submit" class="btn-login" id="psLogin">
+      <span class="btn-text">Log in</span>
+      <div class="spinner" aria-hidden="true"></div>
+      <svg class="btn-arrow" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3.75 9h10.5M9.75 4.5L14.25 9l-4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </form>
+
+  {# Step 2: the code #}
+  <form class="login-form ps-step" id="psStep2" novalidate hidden>
+    <button type="button" class="link-btn ps-back" id="psChange">&larr; Change phone or email</button>
+    <h3 class="ps-title" id="ps-code-title" tabindex="-1">Enter your code</h3>
+    <p class="ps-instr" id="ps-instr" aria-live="polite"></p>
+    <fieldset class="ps-otp" aria-describedby="ps-instr ps-step2-error">
+      <legend class="ps-sr">4-digit sign-in code</legend>
+      {% for i in "1234" %}
+        <input class="ps-digit" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1"
+               {% if forloop.first %}autocomplete="one-time-code"{% else %}autocomplete="off"{% endif %}
+               aria-label="Digit {{ i }} of 4" data-index="{{ forloop.counter0 }}">
+      {% endfor %}
+    </fieldset>
+    <div id="ps-step2-error" class="alert ps-alert" role="alert" hidden></div>
+    <button type="submit" class="btn-login" id="psVerify">
+      <span class="btn-text">Verify and sign in</span>
+      <div class="spinner" aria-hidden="true"></div>
+      <svg class="btn-arrow" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3.75 9h10.5M9.75 4.5L14.25 9l-4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <p class="ps-resend"><span id="ps-timer" aria-live="off"></span> <button type="button" class="link-btn" id="psResend" disabled>Resend code</button></p>
+    <div class="ps-dev" id="ps-dev" hidden>
+      <p class="ps-dev-tag">Local development preview &middot; not shown on the live site</p>
+      <p id="ps-dev-msg"></p>
+    </div>
+  </form>
+</div>
+<script src="{% static 'parent_portal/signin.js' %}?v=1" defer></script>

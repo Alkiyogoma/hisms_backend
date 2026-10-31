@@ -230,12 +230,20 @@ class User(AbstractUser):
 
 
 class ParentLoginCode(models.Model):
-    """One-time SMS code a parent uses to sign in with their phone number.
+    """One-time code a parent uses to sign in with their phone number (SMS)
+    or email address.
 
-    Only an HMAC of the code is stored; the code itself exists only in the SMS.
+    Only an HMAC of the code is stored; the code itself exists only in the
+    message sent to the parent.
     """
+    CHANNEL_SMS = "sms"
+    CHANNEL_EMAIL = "email"
+    CHANNEL_CHOICES = [(CHANNEL_SMS, "SMS"), (CHANNEL_EMAIL, "Email")]
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="login_codes")
-    phone = models.CharField(max_length=16, db_index=True, help_text="Normalised 255XXXXXXXXX")
+    contact = models.CharField(max_length=254, db_index=True,
+                               help_text="Normalised phone (255XXXXXXXXX) or lower-case email")
+    channel = models.CharField(max_length=8, choices=CHANNEL_CHOICES, default=CHANNEL_SMS)
     code_hash = models.CharField(max_length=128)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
@@ -246,4 +254,4 @@ class ParentLoginCode(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
-        return f"Login code for {self.user} ({self.phone})"
+        return f"Login code for {self.user} ({self.channel})"

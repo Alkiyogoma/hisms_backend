@@ -194,13 +194,24 @@
     .login-form { display: flex; flex-direction: column; gap: 16px; }
     .login-tab-panel { display: none; }
     .t-hint { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
-    .otp-code-input { letter-spacing: 0.4em; font-size: 18px; font-weight: 600; text-align: center; }
-    .otp-actions { display: flex; justify-content: space-between; }
+    .ps-step[hidden], .ps-alert[hidden], .ps-dev[hidden] { display: none !important; }
+    .ps-back { align-self: flex-start; }
+    .ps-title { font-size: 18px; margin: 4px 0 0; outline: none; }
+    .ps-instr { background: #F7F9FF; border: 1px solid #DFE6F7; border-radius: var(--radius); padding: 10px 12px; font-size: 14px; color: var(--text); }
+    .ps-otp { border: 0; padding: 0; margin: 4px 0; display: flex; gap: 12px; justify-content: center; }
+    .ps-digit { width: 56px; height: 62px; border: 1px solid var(--border); border-radius: var(--radius); text-align: center; font-size: 26px; font-weight: 700; color: var(--blue-dark); background: #fff; }
+    .ps-digit:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 4px rgba(251,188,5,.3); }
+    .ps-digit[aria-invalid="true"] { border-color: var(--red); }
+    .ps-resend { text-align: center; font-size: 14px; color: var(--text-muted); }
+    .ps-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .ps-dev { border: 1px dashed #C8D3EE; border-radius: var(--radius); background: #F3F6FD; padding: 10px 12px; font-size: 13px; }
+    .ps-dev-tag { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--blue); margin-bottom: 4px; }
+    .login-tab:focus-visible, .link-btn:focus-visible, .btn-login:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
     .link-btn {
       background: none; border: 0; padding: 0; font: inherit; font-size: 13px; font-weight: 600;
       color: var(--blue); cursor: pointer;
     }
-    .link-btn:disabled { color: var(--text-secondary); cursor: default; }
+    .link-btn:disabled { color: var(--text-muted); font-weight: 400; cursor: default; text-decoration: none; }
     .login-tab-panel.active { display: block; }
 
     .field-group { display: flex; flex-direction: column; gap: 5px; }
@@ -435,43 +446,9 @@
         </div>
       </div>
 
-      {# ── PARENT LOGIN: phone number + SMS code, no password ── #}
+      {# ── PARENT LOGIN: phone number or email + one-time code, no password ── #}
       <div class="login-tab-panel" id="panel-parent">
-        {# Step 1: phone number #}
-        <form class="login-form" id="otpPhoneForm" onsubmit="return otpSendCode(event)">
-          {% csrf_token %}
-          <div class="field-group">
-            <label for="otp-phone">Phone number</label>
-            <input id="otp-phone" name="phone" type="tel" class="field-input" placeholder="e.g. 0712 345 678" inputmode="tel" autocomplete="tel" required>
-            <div class="t-hint">Use the number the school has for you. We'll text you a sign-in code.</div>
-          </div>
-          <div id="otp-phone-alert" style="display:none"></div>
-          <button type="submit" class="btn-login" id="otpSendBtn">
-            <span class="btn-text">Send code</span>
-            <div class="spinner"></div>
-            <svg class="btn-arrow" viewBox="0 0 18 18" fill="none"><path d="M3.75 9h10.5M9.75 4.5L14.25 9l-4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-        </form>
-
-        {# Step 2: the code from the SMS #}
-        <form class="login-form" id="otpCodeForm" onsubmit="return otpVerify(event)" style="display:none">
-          <div class="field-group">
-            <label for="otp-code">Sign-in code</label>
-            <input id="otp-code" name="code" type="text" class="field-input otp-code-input" placeholder="6-digit code" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" required>
-            <div class="t-hint" id="otp-sent-to"></div>
-          </div>
-          <div id="otp-code-alert" style="display:none"></div>
-          <button type="submit" class="btn-login" id="otpVerifyBtn">
-            <span class="btn-text">Verify and sign in</span>
-            <div class="spinner"></div>
-            <svg class="btn-arrow" viewBox="0 0 18 18" fill="none"><path d="M3.75 9h10.5M9.75 4.5L14.25 9l-4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-          <div class="otp-actions">
-            <button type="button" class="link-btn" id="otpResendBtn" onclick="otpResend()" disabled>Resend code</button>
-            <button type="button" class="link-btn" onclick="otpChangeNumber()">Change number</button>
-          </div>
-        </form>
-
+        {% include "registration/_parent_signin.html" %}
       </div>
 
       <div class="login-footer">
@@ -492,145 +469,11 @@ function switchTab(tab) {
   if (firstInput) firstInput.focus();
 }
 
-// ── Parent sign-in with phone number + SMS code ──
-var OTP_ALERT_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0;margin-top:1px"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.3"/><path d="M8 5v3.5M8 10.5v.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
-var otpPhone = '';
-var otpTimer = null;
-
-function otpAlert(id, kind, text) {
-  var el = document.getElementById(id);
-  if (!text) { el.style.display = 'none'; return; }
-  el.className = 'alert alert-' + kind;
-  el.style.display = 'flex';
-  el.innerHTML = OTP_ALERT_ICON + '<div></div>';
-  el.lastChild.textContent = text;  // server text is never parsed as HTML
-}
-
-function otpBusy(btn, busy) {
-  btn.disabled = busy;
-  btn.querySelector('.btn-text').style.display = busy ? 'none' : '';
-  btn.querySelector('.btn-arrow').style.display = busy ? 'none' : '';
-  btn.querySelector('.spinner').style.display = busy ? 'block' : 'none';
-}
-
-function otpPost(url, payload) {
-  return fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': document.querySelector('#otpPhoneForm input[name="csrfmiddlewaretoken"]').value
-    },
-    body: JSON.stringify(payload)
-  }).then(function(r) { return r.json(); });
-}
-
-function otpStartResendTimer(seconds) {
-  var btn = document.getElementById('otpResendBtn');
-  clearInterval(otpTimer);
-  btn.disabled = true;
-  var left = seconds;
-  btn.textContent = 'Resend code in ' + left + 's';
-  otpTimer = setInterval(function() {
-    left -= 1;
-    if (left <= 0) {
-      clearInterval(otpTimer);
-      btn.disabled = false;
-      btn.textContent = 'Resend code';
-    } else {
-      btn.textContent = 'Resend code in ' + left + 's';
-    }
-  }, 1000);
-}
-
-function otpRequest(phone, btn, alertId, onSent) {
-  otpBusy(btn, true);
-  otpAlert(alertId, '', '');
-  otpPost("{% url 'users:parent_otp_request' %}", { phone: phone })
-    .then(function(data) {
-      otpBusy(btn, false);
-      if (!data.ok) { otpAlert(alertId, 'error', data.error || 'Could not send the code.'); return; }
-      otpPhone = phone;
-      onSent(data);
-    })
-    .catch(function() {
-      otpBusy(btn, false);
-      otpAlert(alertId, 'error', 'Network error. Please try again.');
-    });
-}
-
-function otpSendCode(e) {
-  e.preventDefault();
-  var phone = document.getElementById('otp-phone').value.trim();
-  if (!phone) { otpAlert('otp-phone-alert', 'error', 'Enter your phone number.'); return false; }
-  otpRequest(phone, document.getElementById('otpSendBtn'), 'otp-phone-alert', function(data) {
-    document.getElementById('otpPhoneForm').style.display = 'none';
-    document.getElementById('otpCodeForm').style.display = '';
-    document.getElementById('otp-sent-to').textContent = data.message + ' (' + otpPhone + ')';
-    otpAlert('otp-code-alert', '', '');
-    otpStartResendTimer(data.resend_after || 60);
-    document.getElementById('otp-code').value = '';
-    document.getElementById('otp-code').focus();
-  });
-  return false;
-}
-
-function otpResend() {
-  var btn = document.getElementById('otpResendBtn');
-  btn.disabled = true;
-  otpPost("{% url 'users:parent_otp_request' %}", { phone: otpPhone })
-    .then(function(data) {
-      if (data.ok) {
-        otpAlert('otp-code-alert', 'success', 'A new code has been sent. Earlier codes no longer work.');
-        otpStartResendTimer(data.resend_after || 60);
-      } else {
-        otpAlert('otp-code-alert', 'error', data.error || 'Could not send the code.');
-        btn.disabled = false;
-      }
-    })
-    .catch(function() {
-      otpAlert('otp-code-alert', 'error', 'Network error. Please try again.');
-      btn.disabled = false;
-    });
-}
-
-function otpChangeNumber() {
-  clearInterval(otpTimer);
-  document.getElementById('otpCodeForm').style.display = 'none';
-  document.getElementById('otpPhoneForm').style.display = '';
-  otpAlert('otp-phone-alert', '', '');
-  document.getElementById('otp-phone').focus();
-}
-
-function otpVerify(e) {
-  e.preventDefault();
-  var code = document.getElementById('otp-code').value.replace(/\D/g, '');
-  if (code.length !== 6) { otpAlert('otp-code-alert', 'error', 'Enter the 6-digit code from the SMS.'); return false; }
-  var btn = document.getElementById('otpVerifyBtn');
-  otpBusy(btn, true);
-  var nextParam = new URLSearchParams(window.location.search).get('next') || '';
-  otpPost("{% url 'users:parent_otp_verify' %}", { phone: otpPhone, code: code, next: nextParam })
-    .then(function(data) {
-      if (data.ok) {
-        otpAlert('otp-code-alert', 'success', 'Signing you in...');
-        window.location.href = data.redirect;
-        return;
-      }
-      otpBusy(btn, false);
-      otpAlert('otp-code-alert', 'error', data.error || 'Sign-in failed.');
-      document.getElementById('otp-code').select();
-    })
-    .catch(function() {
-      otpBusy(btn, false);
-      otpAlert('otp-code-alert', 'error', 'Network error. Please try again.');
-    });
-  return false;
-}
-
-// Auto-submit once all six digits are in (typed, pasted or filled from the SMS).
-document.getElementById('otp-code').addEventListener('input', function() {
-  this.value = this.value.replace(/\D/g, '').slice(0, 6);
-  if (this.value.length === 6) document.getElementById('otpCodeForm').requestSubmit();
-});
+// Open the Parent tab for parent links (?parent=1 or a /parent/ next URL).
+(function () {
+  var q = new URLSearchParams(window.location.search);
+  if (q.get('parent') === '1' || (q.get('next') || '').indexOf('/parent/') === 0) switchTab('parent');
+})();
 
 // Staff form loading state
 document.getElementById('staffForm').addEventListener('submit', function() {

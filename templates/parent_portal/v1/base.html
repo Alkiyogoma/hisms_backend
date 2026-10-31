@@ -1,0 +1,44 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Parent Portal{% endblock %} &middot; {{ school_name }}</title>
+  <link rel="icon" type="image/x-icon" href="{% static 'branding/favicon.ico' %}">
+  <link rel="stylesheet" href="{% static 'parent_portal/portal.css' %}?v=5">
+</head>
+<body class="pp">
+  <a class="pp-skip" href="#main">Skip to content</a>
+  <header class="pp-top">
+    <div class="pp-wrap pp-top-inner">
+      <a class="pp-brand" href="{% url 'parent_portal:dashboard' %}" aria-label="{{ school_name }} parent portal home">
+        <img src="{% static 'branding/hodari-logo-white.png' %}" alt="" class="pp-logo" width="120" height="36">
+        <span class="pp-brand-text">{{ school_name }}<small>Parent Portal</small></span>
+      </a>
+      <nav class="pp-nav" aria-label="Main">
+        <a href="{% url 'parent_portal:dashboard' %}"{% if portal_nav == "home" %} aria-current="page"{% endif %}>Home</a>
+      </nav>
+      <form method="post" action="{% url 'users:logout' %}" class="pp-signout">
+        {% csrf_token %}
+        <button type="submit" class="pp-btn pp-btn-ghost">Sign out</button>
+      </form>
+    </div>
+  </header>
+
+  {% block subnav %}{% endblock %}
+
+  <main id="main" class="pp-wrap pp-main" tabindex="-1">
+    {% if messages %}
+      <div class="pp-messages" role="status">
+        {% for m in messages %}<p class="pp-alert pp-alert-{{ m.tags|default:'info' }}">{{ m }}</p>{% endfor %}
+      </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="pp-footer pp-wrap">
+    {{ school_name }}{% if school_phone %} &middot; Questions? Call the school on <a href="tel:{{ school_phone|cut:' ' }}">{{ school_phone }}</a>{% endif %}
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

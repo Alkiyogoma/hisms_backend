@@ -558,50 +558,67 @@ def _json_body(request):
 
 
 class ParentOTPRequestView(View):
-    """Parent sign-in step 1: text a one-time code to the parent's phone.
-
-    Replies the same way whether or not the number is registered."""
+    """Parent sign-in step 1: send a one-time code to the parent's phone (SMS)
+    or email. An unknown contact is told so, with the school's number."""
 
     def post(self, request):
-        from users.otp import OTPError, request_code
+        from core.utils import get_client_ip
+        from users.otp import CODE_LENGTH, CODE_TTL_SECONDS, RESEND_COOLDOWN_SECONDS, SMS, OTPError, request_code
         body = _json_body(request)
         if body is None:
             return JsonResponse({"ok": False, "error": "Invalid request body."}, status=400)
+        raw = body.get("contact") or body.get("phone")
         try:
-            request_code(body.get("phone"))
+            sent = request_code(raw, reveal_unregistered=True, client_ip=get_client_ip(request))
         except OTPError as exc:
-            return JsonResponse({"ok": False, "error": exc.message}, status=exc.status)
-        from users.otp import CODE_TTL_SECONDS, RESEND_COOLDOWN_SECONDS
-        return JsonResponse({
+            return JsonResponse({"ok": False, "error": exc.message, "code": exc.code}, status=exc.status)
+        if sent["channel"] == SMS:
+            message = (f"We've sent a {CODE_LENGTH}-digit code by SMS to {sent['masked']}. "
+                       f"It usually arrives within a minute. Check your messages and enter the code below.")
+        else:
+            message = (f"We've sent a {CODE_LENGTH}-digit code to {sent['masked']}. Check your inbox, "
+                       f"and your spam folder if you can't see it. Enter the code below.")
+        data = {
             "ok": True,
-            "message": "If this number is registered with the school, a sign-in code is on its way by SMS.",
+            "channel": sent["channel"],
+            "masked": sent["masked"],
+            "message": message,
+            "code_length": CODE_LENGTH,
             "resend_after": RESEND_COOLDOWN_SECONDS,
             "expires_in": CODE_TTL_SECONDS,
-        })
+        }
+        if sent["preview"]:  # DEBUG + PARENT_OTP_DEV_PREVIEW only
+            data["dev_preview"] = sent["preview"]
+        return JsonResponse(data)
 
 
 class ParentOTPVerifyView(View):
-    """Parent sign-in step 2: check the SMS code and open the session."""
+    """Parent sign-in step 2: check the code and open the session."""
 
     def post(self, request):
-        from users.otp import LOGIN_METHOD_SMS, SESSION_LOGIN_METHOD_KEY, OTPError, verify_code
+        from users.otp import (
+            EMAIL, LOGIN_METHOD_EMAIL, LOGIN_METHOD_SMS, SESSION_LOGIN_METHOD_KEY, OTPError, verify_code,
+        )
         from users.middleware import SESSION_ROLE_KEY
         from audit.models import log_event as _audit_log
         body = _json_body(request)
         if body is None:
             return JsonResponse({"ok": False, "error": "Invalid request body."}, status=400)
         try:
-            user = verify_code(body.get("phone"), body.get("code"))
+            user = verify_code(body.get("contact") or body.get("phone"), body.get("code"))
         except OTPError as exc:
             return JsonResponse({"ok": False, "error": exc.message}, status=exc.status)
 
         user.clear_failed_logins()
+        # login() rotates the session key (no session fixation).
         login(request, user, backend="users.backends.EmailOrUsernameBackend")
         request.session[SESSION_ROLE_KEY] = user.role
-        request.session[SESSION_LOGIN_METHOD_KEY] = LOGIN_METHOD_SMS
+        by_email = getattr(user, "otp_channel", "") == EMAIL
+        request.session[SESSION_LOGIN_METHOD_KEY] = LOGIN_METHOD_EMAIL if by_email else LOGIN_METHOD_SMS
         _audit_log(
             actor=user, action_type="LOGIN", model_name="User", object_id=user.pk,
-            description=f"Successful login by {user.get_full_name() or user.username} (SMS code)",
+            description=f"Successful login by {user.get_full_name() or user.username} "
+                        f"({'email' if by_email else 'SMS'} code)",
             request=request,
         )
         next_url = body.get("next") or ""
