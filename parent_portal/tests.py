@@ -2,10 +2,12 @@
 Parent portal v1: ownership, report publication, converted/weighted marks,
 attendance rules and the school calendar.
 """
+import tempfile
 from datetime import date, time, timedelta
 from decimal import Decimal
 
-from django.test import TestCase
+from django.core.files.base import ContentFile
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -461,3 +463,58 @@ class DeploymentAndStaffViewTests(PortalTestBase):
         self.assertIn(reverse("users:impersonate_stop"), page)
         self.assertNotIn(">Sign out<", page)
         self.assertNotIn("Viewing as", page)
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix="pp-media-"))
+class LearnerPhotoTests(PortalTestBase):
+    JPEG = b"\xff\xd8\xff\xe0fakejpeg"
+
+    def test_photo_shown_when_available_and_only_to_own_parent(self):
+        self.child.photo.save("sherissa.jpg", ContentFile(self.JPEG), save=True)
+        self.other_child.photo.save("baraka.jpg", ContentFile(self.JPEG), save=True)
+        photo_url = reverse("parent_portal:learner_photo", args=[self.child.pk])
+        self.client.force_login(self.parent)
+        for url in (reverse("parent_portal:dashboard"), reverse("parent_portal:progress", args=[self.child.pk])):
+            page = self.client.get(url).content.decode()
+            self.assertIn(f'src="{photo_url}?v=', page)
+            self.assertNotIn("/media/", page)       # served through the ownership check only
+        resp = self.client.get(photo_url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "image/jpeg")
+        self.assertEqual(b"".join(resp.streaming_content), self.JPEG)
+        self.assertIn("private", resp["Cache-Control"])
+        # Someone else's child: not found.
+        self.assertEqual(self.client.get(reverse("parent_portal:learner_photo",
+                                                 args=[self.other_child.pk])).status_code, 404)
+        self.client.force_login(self.teacher)
+        self.assertEqual(self.client.get(photo_url).status_code, 403)
+
+    def test_admission_photo_is_used_when_profile_has_none(self):
+        from admissions.models import Applicant
+        applicant = Applicant.objects.create(child_full_name="Sherissa Kimaro", parent_full_name="Parent",
+                                             parent_phone="0700000000", grade_applying_for="Grade 5",
+                                             enrolled_student=self.child)
+        applicant.photo.save("passport.png", ContentFile(b"\x89PNG\r\n\x1a\nfake"), save=True)
+        self.client.force_login(self.parent)
+        resp = self.client.get(reverse("parent_portal:learner_photo", args=[self.child.pk]))
+        self.assertEqual((resp.status_code, resp["Content-Type"]), (200, "image/png"))
+
+    def test_initials_when_no_usable_photo(self):
+        self.client.force_login(self.parent)
+        photo_url = reverse("parent_portal:learner_photo", args=[self.child.pk])
+        # No photo at all.
+        page = self.client.get(reverse("parent_portal:dashboard")).content.decode()
+        self.assertNotIn(photo_url, page)
+        self.assertIn(">SK<", page)
+        self.assertEqual(self.client.get(photo_url).status_code, 404)
+        # Record points at a file that is gone, or at something that isn't an image.
+        for name in ("students/photos/gone.jpg", None):
+            if name:
+                self.child.photo.name = name
+                self.child.save(update_fields=["photo"])
+            else:
+                self.child.photo.save("scan.pdf", ContentFile(b"%PDF-1.4"), save=True)
+            page = self.client.get(reverse("parent_portal:progress", args=[self.child.pk])).content.decode()
+            self.assertNotIn(photo_url, page)
+            self.assertIn(">SK<", page)
+            self.assertEqual(self.client.get(photo_url).status_code, 404)
