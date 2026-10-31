@@ -9,6 +9,7 @@ Welfare, discipline and finance are not part of v1.
 """
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils import timezone
@@ -122,7 +123,10 @@ class ParentLearnerProgressView(ParentOnlyMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         today = timezone.localdate()
-        student = services.child_or_404(self.request.user, kwargs["student_id"])
+        children = list(services.children_for(self.request.user))
+        student = next((c for c in children if c.pk == kwargs["student_id"]), None)
+        if student is None:
+            raise Http404("No such learner.")
         term = services.current_term()
         academic = services.academic_progress(student, term, today)
         month = services.parse_month(self.request.GET.get("month"), today)
@@ -130,6 +134,7 @@ class ParentLearnerProgressView(ParentOnlyMixin, TemplateView):
         ctx.update({
             "today": today,
             "student": student,
+            "siblings": [c for c in children if c.pk != student.pk],
             "term": term,
             "academic": academic,
             "average_ring": _ring(academic["average"] if academic else None),

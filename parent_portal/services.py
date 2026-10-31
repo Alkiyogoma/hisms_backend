@@ -179,6 +179,9 @@ def academic_progress(student, term, today):
                 "pct": round(v / chart["max"] * 100, 1) if v is not None and chart["max"] else 0,
             })
 
+    for chart in charts:
+        chart["has_marks"] = any(b["value"] is not None for b in chart["bars"])
+
     rows = []
     for r in current["rows"]:
         rows.append({

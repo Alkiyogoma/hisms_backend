@@ -11,6 +11,12 @@
         <li aria-current="page">{{ student.first_name }}&rsquo;s progress</li>
       </ol>
     </nav>
+    {% if siblings %}
+      <nav class="pp-siblings" aria-label="Other children">
+        <span>Switch to</span>
+        {% for sib in siblings %}<a href="{% url 'parent_portal:progress' sib.pk %}">{{ sib.first_name }}</a>{% endfor %}
+      </nav>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

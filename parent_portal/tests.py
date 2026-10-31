@@ -405,3 +405,18 @@ class QueryBudgetTests(PortalTestBase):
                                          class_name="Grade 5", academic_year=self.year, status=StudentStatus.ACTIVE)
             StudentGuardian.objects.create(student=kid, guardian=guardian, relationship="mother")
         self.assertEqual(self._count(url), one)
+
+
+class NavigationTests(PortalTestBase):
+    def test_switch_between_own_children_only_and_empty_chart_message(self):
+        sibling = Student.objects.create(admission_no="G5-003", first_name="Neema", last_name="Kimaro",
+                                         class_name="Grade 5", academic_year=self.year, status=StudentStatus.ACTIVE)
+        StudentGuardian.objects.create(student=sibling, guardian=ParentGuardian.objects.get(user=self.parent),
+                                       relationship="mother")
+        self.client.force_login(self.parent)
+        page = self._progress().content.decode()
+        self.assertIn(reverse("parent_portal:progress", args=[sibling.pk]), page)
+        self.assertNotIn(reverse("parent_portal:progress", args=[self.other_child.pk]), page)
+        # No approved marks at all this year: a short message, no empty bars.
+        self.assertIn("No approved Quiz marks yet this year.", page)
+        self.assertNotIn('class="pp-bar', page)

@@ -27,7 +27,8 @@
       </tbody>
       <tfoot>
         <tr>
-          <th scope="row" colspan="{{ academic.types|length|add:1 }}">{% if academic.complete %}Term average{% else %}Running average{% endif %}</th>
+          <th scope="row">{% if academic.complete %}Term average{% else %}Running average{% endif %}</th>
+          <td colspan="{{ academic.types|length }}"></td>
           <td class="num"><b>{% if academic.average is not None %}{{ academic.average|floatformat:"-2" }}%{% else %}&ndash;{% endif %}</b></td>
           <td>{% if academic.grade %}<span class="pp-chip pp-chip-gold">{{ academic.grade }}</span>{% endif %}</td>
         </tr>
