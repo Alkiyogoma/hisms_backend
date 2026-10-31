@@ -351,6 +351,14 @@ SMS_MAX_AGE_MINUTES = int(os.getenv('SMS_MAX_AGE_MINUTES', '15'))
 # SMS Provider selection: 'darsms', 'cloudservice', 'hodari' or 'console' (log only)
 SMS_PROVIDER = os.getenv('SMS_PROVIDER', 'darsms')
 
+# Parent portal sign-in codes (users/otp.py). Limits are enforced server-side.
+PARENT_OTP_CODE_LENGTH = int(os.getenv('PARENT_OTP_CODE_LENGTH', '4'))
+PARENT_OTP_TTL_SECONDS = int(os.getenv('PARENT_OTP_TTL_SECONDS', '600'))
+PARENT_OTP_RESEND_SECONDS = int(os.getenv('PARENT_OTP_RESEND_SECONDS', '45'))
+# Local development only: show the sent message on the sign-in screen.
+# Ignored unless DEBUG is on as well; never set it on a server.
+PARENT_OTP_DEV_PREVIEW = DEBUG and os.getenv('PARENT_OTP_DEV_PREVIEW', '0') == '1'
+
 # Admissions contact details  stored in SchoolSettings model, env vars are fallback only
 ADMISSIONS_PHONE = os.getenv('ADMISSIONS_PHONE', '')
 ADMISSIONS_EMAIL = os.getenv('ADMISSIONS_EMAIL', '')

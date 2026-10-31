@@ -1,64 +1,24 @@
 """
-Parent Portal views for viewing children's attendance and grades.
+Parent portal (v1): Home, learner progress and the school calendar.
 
-FR-PARENT-001: Parent/guardian portal for viewing attendance and grades.
+Parents see only their own active children (parent_portal.services.children_for);
+every page, endpoint and download looks the learner up through it, so changing
+an id in the URL gives a 404. Marks come from the report card calculation and
+attendance from the approved attendance rules, both via parent_portal.services.
+Welfare, discipline and finance are not part of v1.
 """
-import calendar
-from datetime import date, timedelta
-
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
-from core.permissions import RoleRequiredMixin
-from django.db.models import Q, Avg, Count, Sum
+from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
 from django.utils import timezone
-from django.views.generic import TemplateView
 from django.views import View
+from django.views.generic import TemplateView
 
-from academics.models import (
-    GradeClass, ExamScore, ReportCard, ReportCardStatus, ExamTypeConfiguration, Subject, Term,
-)
-from attendance.models import PRESENT_STATUSES, AttendanceEntry, AttendanceStatus
-from core.models import TimeStampedModel
-from students.models import Student, StudentStatus, StudentGuardian, ParentGuardian, GuardianRelationship
+from core.permissions import RoleRequiredMixin
+from parent_portal import services
+from students.models import StudentGuardian, ParentGuardian, GuardianRelationship
 from users.models import User, UserRole
-
-
-_COLUMN = {"quiz": "quiz", "mid_term": "mid", "end_of_term": "end"}
-
-
-def _approved_term_results(student, term):
-    """What parents see for a term: HOD-approved marks of mark-bearing subjects
-    only (never drafts, submissions or remark-only subjects). A subject's
-    average (its weighted total out of 100) appears only once all its
-    assessments are approved, and the overall average only once the whole
-    term is, exactly as on the printed report card.
-
-    Returns ({subject: data}, summary) where summary is exam_summary() or None.
-    """
-    from academics.models import ScoreStatus
-    from academics.score_progress import exam_summary
-    if not student or not term:
-        return {}, None
-    summary = exam_summary(student, term)
-    rows = {r["subject"]: r for r in summary["rows"]}
-    grouped = {}
-    for sc in (ExamScore.objects.filter(student=student, term=term, status=ScoreStatus.APPROVED)
-               .mark_bearing().select_related("exam_type_config")
-               .order_by("subject_name", "exam_type_config__display_order", "exam_type")):
-        d = grouped.setdefault(sc.subject_name, {
-            "subject_name": sc.subject_name, "subject": sc.subject_name, "scores": [],
-            "quiz": None, "mid": None, "end": None, "average": None, "grade": None,
-        })
-        sc.type_name = sc.exam_type_config.name if sc.exam_type_config else sc.exam_type.replace("_", " ").title()
-        d["scores"].append(sc)
-        if sc.exam_type in _COLUMN:
-            d[_COLUMN[sc.exam_type]] = float(sc.score)
-    for subject, d in grouped.items():
-        row = rows.get(subject)
-        if row and row["complete"]:
-            d["average"], d["grade"] = row["total"], row["grade"]
-    return grouped, summary
 
 
 def _get_parent_guardian(user):
@@ -67,46 +27,30 @@ def _get_parent_guardian(user):
 
 
 def _get_children(user):
-    """Return all students linked to this parent/guardian."""
-    guardian = _get_parent_guardian(user)
-    if not guardian:
-        return Student.objects.none()
-    return Student.objects.filter(
-        guardians=guardian,
-        status=StudentStatus.ACTIVE,
-    )
+    """All active learners linked to this parent."""
+    return services.children_for(user)
 
 
 def _base_ctx(user):
-    """Shared context for all parent portal views."""
-    now = timezone.now()
+    """Shared context for the parent pages that still use the staff layout."""
     return {
         "initials": (user.first_name[0] + user.last_name[0]).upper() if user.first_name and user.last_name else user.username[:2].upper(),
-        "today_display": now.strftime("%A, %B %d, %Y"),
-        "greeting": _greeting(),
+        "today_display": timezone.localtime().strftime("%A, %B %d, %Y"),
+        "greeting": services.greeting(),
     }
-
-
-def _greeting():
-    hour = timezone.now().hour
-    if hour < 12:
-        return "Good Morning"
-    elif hour < 17:
-        return "Good Afternoon"
-    return "Good Evening"
 
 
 class ParentOnlyMixin(RoleRequiredMixin):
     """Parent portal pages are Parent/Guardian-role pages.
 
-    Super Admin is also allowed (for testing/support purposes).
+    Super Admin is also allowed (for testing/support purposes); they have no
+    linked learners, so they see the empty states.
     """
 
     allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
 
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated and request.user.role not in (UserRole.PARENT, UserRole.SUPER_ADMIN):
-            from django.core.exceptions import PermissionDenied
             raise PermissionDenied("Parent portal access is restricted to the Parent role.")
         return super().dispatch(request, *args, **kwargs)
 
@@ -117,636 +61,155 @@ def _valid_relationship(value):
     return value if value in valid else GuardianRelationship.OTHER
 
 
+def _portal_ctx(request, active):
+    from core.models import SchoolSettings
+    settings_obj = SchoolSettings.get_settings()
+    return {
+        "portal_nav": active,
+        "school_name": settings_obj.school_name or "Hodari Christian School",
+        "school_phone": settings_obj.get_parent_contact_phone(),
+    }
+
+
 # ---------------------------------------------------------------------------
-# Dashboard
+# Home
 # ---------------------------------------------------------------------------
 
-class ParentDashboardView(RoleRequiredMixin, TemplateView):
-    allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
-    """Parent portal main dashboard showing children overview."""
-    template_name = "parent_portal/dashboard.html"
-
-    def dispatch(self, request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return super().dispatch(request, *args, **kwargs)
-        if request.user.role not in (UserRole.PARENT, UserRole.SUPER_ADMIN):
-            return self.handle_no_permission()
-        return super().dispatch(request, *args, **kwargs)
+class ParentDashboardView(ParentOnlyMixin, TemplateView):
+    """Home: greeting, current term context and one card per learner. No marks."""
+    template_name = "parent_portal/v1/home.html"
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx.update(_base_ctx(self.request.user))
-
-        from decimal import Decimal
-        children = _get_children(self.request.user)
-        today = date.today()
-
-        # Attendance today for each child
-        today_entries = AttendanceEntry.objects.filter(
-            student__in=children, date=today
-        ).select_related("student")
-        attendance_map = {e.student_id: e for e in today_entries}
-
-        # Attendance summary (last 30 days)
-        thirty_days_ago = today - timedelta(days=30)
-        recent_entries = AttendanceEntry.objects.filter(
-            student__in=children,
-            date__gte=thirty_days_ago,
-            date__lte=today,
-        ).values("student_id", "status")
-        attendance_summary = {}
-        for entry in recent_entries:
-            sid = entry["student_id"]
-            if sid not in attendance_summary:
-                attendance_summary[sid] = {"present": 0, "absent": 0, "late": 0, "excused": 0, "total": 0}
-            status = entry["status"]
-            attendance_summary[sid]["total"] += 1
-            if status in PRESENT_STATUSES:  # late learners are present too
-                attendance_summary[sid]["present"] += 1
-            if status == AttendanceStatus.ABSENT:
-                attendance_summary[sid]["absent"] += 1
-            elif status == AttendanceStatus.LATE:
-                attendance_summary[sid]["late"] += 1
-            elif status == AttendanceStatus.EXCUSED:
-                attendance_summary[sid]["excused"] += 1
-
-        # Calculate attendance rates
-        for sid, stats in attendance_summary.items():
-            if stats["total"] > 0:
-                stats["rate"] = round((stats["present"] + stats["late"]) / stats["total"] * 100, 1)
-            else:
-                stats["rate"] = 0
-
-        # Latest grades for each child
-        latest_scores = {}
-
-        # Outstanding fees per child
-        from finance.models import Invoice
-        fee_summary = {}
-        for child in children:
-            invoices = Invoice.objects.filter(student=child)
-            total_outstanding = Decimal(0)
-            for inv in invoices:
-                total_paid = inv.payments.filter(is_reversal=False).aggregate(t=Sum("amount"))["t"] or 0
-                bal = inv.total_due - total_paid
-                if bal > 0:
-                    total_outstanding += bal
-            fee_summary[child.id] = total_outstanding
-        for child in children:
-            # Parents only ever see HOD-approved marks of mark-bearing subjects.
-            scores = ExamScore.objects.filter(
-                student=child, status="approved",
-            ).mark_bearing().select_related("term").order_by("-term__start_date", "subject_name")
-            # Deduplicate by subject  keep latest score per subject
-            seen_subjects = set()
-            deduped = []
-            for s in scores:
-                if s.subject_name not in seen_subjects:
-                    seen_subjects.add(s.subject_name)
-                    deduped.append(s)
-                if len(deduped) >= 5:
-                    break
-            latest_scores[child.id] = deduped
-
-        # Active term
-        from academics.utils import get_current_term
-        active_term = get_current_term()
-
-        # Performance trend data (overall averages per term per child)
-        import json
-
-        performance_trend = {}
-        for child in children:
-            reports = ReportCard.objects.filter(
-                student=child,
-                status=ReportCardStatus.PUBLISHED,
-            ).select_related("term", "term__academic_year").order_by("term__start_date")
-            trend = []
-            for r in reports:
-                avg = r.overall_average
-                # Not stored: only a fully assessed term has an average.
-                if avg is None:
-                    from academics.score_progress import exam_summary
-                    avg = exam_summary(child, r.term)["average"]
-
-                if avg is not None:
-                    trend.append({
-                        "term": r.term.name if r.term else "?",
-                        "year": r.term.academic_year.name if r.term and r.term.academic_year else "",
-                        "average": round(float(avg), 1),
-                    })
-            performance_trend[child.id] = trend
-
-        # Parent tasks (about their children: welfare, attendance, finance, discipline, reports)
-        from tasks.models import Task
-        from django.contrib.contenttypes.models import ContentType
-        from finance.models import Invoice
-        student_ct = ContentType.objects.get_for_model(Student)
-        child_names = [c.get_full_name() for c in children]
-        child_pks = list(children.values_list('pk', flat=True))
-        parent_tasks = Task.objects.filter(
-            Q(assigned_to=self.request.user) | Q(created_by=self.request.user)
-            | (
-                Q(task_type__in=[
-                    'welfare_alert', 'welfare_followup', 'attendance_alert',
-                    'fee_payment_reminder', 'overdue_collection',
-                    'discipline_contact', 'report_card_ready', 'open_invoice',
-                ])
-                & (
-                    Q(content_type=student_ct, object_id__in=child_pks)
-                    | Q(metadata__student_name__in=child_names)
-                    | Q(metadata__student_id__in=child_pks)
-                )
-            )
-        ).filter(status__in=['pending', 'in_progress']).order_by('-priority', '-created_at')[:15]
-
-        # Open invoices summary for parent (included as tasks, not separate section)
-        open_invoices = Invoice.objects.filter(
-            student__in=children,
-            status__in=['unpaid', 'partial', 'overdue'],
-        ).select_related('term', 'student').order_by('due_date')
-
+        today = timezone.localdate()
+        user = self.request.user
+        children = list(services.children_for(user))
+        term = services.current_term()
+        guardian = _get_parent_guardian(user)
+        name = (user.first_name or (guardian.full_name.split()[0] if guardian and guardian.full_name else "")
+                or user.get_username())
+        today_map = services.today_statuses(children, today)
+        ctx.update(_portal_ctx(self.request, "home"))
         ctx.update({
-            "children": children,
-            "attendance_map": attendance_map,
-            "attendance_summary": attendance_summary,
-            "latest_scores": latest_scores,
-            "active_term": active_term,
             "today": today,
-            "performance_trend": performance_trend,
-            "performance_trend_json": json.dumps(performance_trend),
-            "fee_summary": fee_summary,
-            "parent_tasks": parent_tasks,
-            "open_invoices": open_invoices,
+            "greeting": services.greeting(),
+            "parent_name": name,
+            "term_info": services.term_context(term, today),
+            "learners": [{"student": c, "today": today_map[c.pk]} for c in children],
         })
         return ctx
 
 
+RING_CIRCUMFERENCE = 251.33  # 2 * pi * r for the r=40 ring in includes/ring.html
+
+
+def _ring(value):
+    """SVG ring geometry for a percentage (None draws an empty ring)."""
+    pct = max(0.0, min(100.0, float(value))) if value is not None else 0.0
+    return {"value": value, "dash": RING_CIRCUMFERENCE,
+            "offset": round(RING_CIRCUMFERENCE * (1 - pct / 100), 2)}
+
+
 # ---------------------------------------------------------------------------
-# Attendance History
+# Learner progress
 # ---------------------------------------------------------------------------
 
-class ParentAttendanceView(RoleRequiredMixin, TemplateView):
-    allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
-    """Calendar-style attendance history for parent's children."""
-    template_name = "parent_portal/attendance.html"
-
-    def dispatch(self, request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return super().dispatch(request, *args, **kwargs)
-        if request.user.role not in (UserRole.PARENT, UserRole.SUPER_ADMIN):
-            return self.handle_no_permission()
-        return super().dispatch(request, *args, **kwargs)
+class ParentLearnerProgressView(ParentOnlyMixin, TemplateView):
+    """One learner: rings, today, assessment charts, subject marks, published
+    report cards and attendance."""
+    template_name = "parent_portal/v1/progress.html"
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx.update(_base_ctx(self.request.user))
-
-        children = _get_children(self.request.user)
-        today = date.today()
-
-        # Parse year/month from query params
-        try:
-            year = int(self.request.GET.get("year", today.year))
-            month = int(self.request.GET.get("month", today.month))
-        except (ValueError, TypeError):
-            year, month = today.year, today.month
-
-        month = max(1, min(12, month))
-
-        # Selected child
-        selected_student_id = self.request.GET.get("student")
-        if selected_student_id:
-            selected_student = children.filter(id=selected_student_id).first()
-        else:
-            selected_student = children.first()
-
-        # Calendar grid
-        cal = calendar.Calendar(firstweekday=0)  # Monday first
-        month_days = cal.monthdayscalendar(year, month)
-
-        # Fetch attendance for the month
-        month_start = date(year, month, 1)
-        if month == 12:
-            month_end = date(year + 1, 1, 1) - timedelta(days=1)
-        else:
-            month_end = date(year, month + 1, 1) - timedelta(days=1)
-
-        attendance_map = {}
-        if selected_student:
-            entries = AttendanceEntry.objects.filter(
-                student=selected_student,
-                date__gte=month_start,
-                date__lte=month_end,
-            )
-            for entry in entries:
-                attendance_map[entry.date.day] = entry
-
-        # Navigation months
-        if month == 1:
-            prev_month, prev_year = 12, year - 1
-        else:
-            prev_month, prev_year = month - 1, year
-
-        if month == 12:
-            next_month, next_year = 1, year + 1
-        else:
-            next_month, next_year = month + 1, year
-
-        # Monthly stats
-        stats = {"present": 0, "absent": 0, "late": 0, "excused": 0, "total": 0}
-        for entry in attendance_map.values():
-            stats["total"] += 1
-            status_key = entry.status.lower() if hasattr(entry.status, 'lower') else str(entry.status).lower()
-            if "present" in status_key:
-                stats["present"] += 1
-            elif "absent" in status_key:
-                stats["absent"] += 1
-            elif "late" in status_key:
-                stats["late"] += 1
-            elif "excus" in status_key:
-                stats["excused"] += 1
-
-        if stats["total"] > 0:
-            stats["rate"] = round((stats["present"] + stats["late"]) / stats["total"] * 100, 1)
-        else:
-            stats["rate"] = 0
-
+        today = timezone.localdate()
+        student = services.child_or_404(self.request.user, kwargs["student_id"])
+        term = services.current_term()
+        academic = services.academic_progress(student, term, today)
+        month = services.parse_month(self.request.GET.get("month"), today)
+        ctx.update(_portal_ctx(self.request, "progress"))
         ctx.update({
-            "children": children,
-            "selected_student": selected_student,
-            "month_days": month_days,
-            "attendance_map": attendance_map,
-            "year": year,
-            "month": month,
-            "month_name": calendar.month_name[month],
-            "prev_month": prev_month,
-            "prev_year": prev_year,
-            "next_month": next_month,
-            "next_year": next_year,
-            "stats": stats,
             "today": today,
-            "day_names": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-        })
-        return ctx
-
-
-# ---------------------------------------------------------------------------
-# Grades
-# ---------------------------------------------------------------------------
-
-class ParentGradesView(RoleRequiredMixin, TemplateView):
-    allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
-    """Exam scores and report cards."""
-    template_name = "parent_portal/grades.html"
-
-    def dispatch(self, request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return super().dispatch(request, *args, **kwargs)
-        if request.user.role not in (UserRole.PARENT, UserRole.SUPER_ADMIN):
-            return self.handle_no_permission()
-        return super().dispatch(request, *args, **kwargs)
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx.update(_base_ctx(self.request.user))
-
-        children = _get_children(self.request.user)
-
-        # Selected child
-        selected_student_id = self.request.GET.get("student")
-        if selected_student_id:
-            selected_student = children.filter(id=selected_student_id).first()
-        else:
-            selected_student = children.first()
-
-        # Active term
-        from academics.utils import get_current_term
-        active_term = get_current_term()
-
-        # Approved marks only; averages only once assessments are complete.
-        grouped, summary = _approved_term_results(selected_student, active_term)
-        exam_scores = list(grouped.values())
-        subject_averages = {k: d["average"] for k, d in grouped.items() if d["average"] is not None}
-
-        # Report cards
-        report_cards = []
-        if selected_student:
-            report_cards = ReportCard.objects.filter(
-                student=selected_student,
-                status=ReportCardStatus.PUBLISHED,
-            ).select_related("term").order_by("-term__start_date")
-
-        # Cambridge Checkpoint scores
-        checkpoint_scores = []
-        if selected_student and active_term:
-            from academics.models import CambridgeCheckpointScore, AcademicYear
-            academic_year = active_term.academic_year
-            if academic_year:
-                cp_scores = CambridgeCheckpointScore.objects.filter(
-                    student=selected_student,
-                    academic_year=academic_year,
-                ).order_by("subject_name")
-                # Group by subject
-                cp_grouped = {}
-                for cs in cp_scores:
-                    subj = cs.subject_name
-                    if subj not in cp_grouped:
-                        cp_grouped[subj] = {"subject_name": subj, "scores": []}
-                    cp_grouped[subj]["scores"].append(cs)
-                checkpoint_scores = list(cp_grouped.values())
-
-        overall_average = summary["average"] if summary else None
-
-        ctx.update({
-            "children": children,
-            "selected_student": selected_student,
-            "active_term": active_term,
-            "exam_scores": exam_scores,
-            "subject_averages": subject_averages,
-            "overall_average": overall_average,
-            "exam_summary": summary,
-            "report_cards": report_cards,
-            "checkpoint_scores": checkpoint_scores,
-        })
-        return ctx
-
-
-class ParentChildDetailView(RoleRequiredMixin, TemplateView):
-    allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
-    """Comprehensive single-child view: attendance, grades, comments, attributes."""
-    template_name = "parent_portal/child_detail.html"
-
-    def dispatch(self, request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return super().dispatch(request, *args, **kwargs)
-        if request.user.role not in (UserRole.PARENT, UserRole.SUPER_ADMIN):
-            return self.handle_no_permission()
-        return super().dispatch(request, *args, **kwargs)
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        from academics.models import Term
-        ctx.update(_base_ctx(self.request.user))
-
-        children = _get_children(self.request.user)
-        student_id = self.kwargs.get("student_id")
-        student = children.filter(id=student_id).first()
-        if not student:
-            ctx["error"] = "Student not found or not linked to your account."
-            ctx["children"] = children
-            return ctx
-
-        from academics.utils import get_current_term
-        today = date.today()
-        active_term = get_current_term()
-
-        # Attendance: last 6 months
-        six_months_ago = today - timedelta(days=180)
-        attendance_entries = AttendanceEntry.objects.filter(
-            student=student, date__gte=six_months_ago, date__lte=today
-        ).order_by("-date")
-
-        # Attendance stats
-        att_stats = {"present": 0, "absent": 0, "late": 0, "excused": 0, "total": 0}
-        for e in attendance_entries:
-            att_stats["total"] += 1
-            s = str(e.status).lower()
-            if "present" in s: att_stats["present"] += 1
-            elif "absent" in s: att_stats["absent"] += 1
-            elif "late" in s: att_stats["late"] += 1
-            elif "excus" in s: att_stats["excused"] += 1
-        att_stats["rate"] = round((att_stats["present"] + att_stats["late"]) / max(att_stats["total"], 1) * 100, 1)
-
-        # Attendance by month (last 6 months)
-        monthly_attendance = []
-        for i in range(5, -1, -1):
-            m = today.month - i
-            y = today.year
-            while m <= 0: m += 12; y -= 1
-            month_entries = [e for e in attendance_entries if e.date.month == m and e.date.year == y]
-            present = sum(1 for e in month_entries if "present" in str(e.status).lower() or "late" in str(e.status).lower())
-            total = len(month_entries)
-            rate = round(present / max(total, 1) * 100, 1)
-            monthly_attendance.append({"month": calendar.month_abbr[m], "year": y, "rate": rate, "total": total})
-
-        # Approved marks only; averages only once assessments are complete.
-        grouped_scores, summary = _approved_term_results(student, active_term)
-        overall = summary["average"] if summary else None
-
-        # Report cards
-        report_cards = ReportCard.objects.filter(student=student, status=ReportCardStatus.PUBLISHED).select_related("term").order_by("-term__start_date")
-
-        # Recent attendance (last 10)
-        recent_attendance = attendance_entries[:10]
-
-        ctx.update({
-            "children": children,
             "student": student,
-            "active_term": active_term,
-            "attendance_entries": recent_attendance,
-            "att_stats": att_stats,
-            "monthly_attendance": monthly_attendance,
-            "grouped_scores": grouped_scores,
-            "overall_average": overall,
-            "exam_summary": summary,
-            "report_cards": report_cards,
-            "today": today,
+            "term": term,
+            "academic": academic,
+            "average_ring": _ring(academic["average"] if academic else None),
+            "attendance_ring": _ring(services.term_attendance_rate(student, term, today)),
+            "today_info": services.today_status(student, today),
+            "month": services.month_attendance(student, month, today),
+            "reports": services.published_reports(student),
         })
         return ctx
 
 
 # ---------------------------------------------------------------------------
-# Invoices / Fees
+# Report cards (published only)
 # ---------------------------------------------------------------------------
 
-class ParentInvoicesView(RoleRequiredMixin, TemplateView):
-    allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
-    """Parent portal: view invoices and payment history for linked children.
-    FR-PARENT-001: Parents can view fee invoices and payment status.
-    """
-    template_name = "parent_portal/invoices.html"
+class ParentReportCardView(ParentOnlyMixin, TemplateView):
+    """A published report card of the parent's own child, in the school's
+    report layout."""
 
-    def dispatch(self, request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return super().dispatch(request, *args, **kwargs)
-        if request.user.role not in (UserRole.PARENT, UserRole.SUPER_ADMIN):
-            return self.handle_no_permission()
-        return super().dispatch(request, *args, **kwargs)
+    def get_template_names(self):
+        return ["academics/ecd_report_preview.html" if self.report.is_ecd_report
+                else "academics/report_card_print.html"]
+
+    def get(self, request, *args, **kwargs):
+        self.report = services.published_report_or_404(request.user, kwargs["student_id"], kwargs["report_id"])
+        return super().get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
+        from academics.views.reports import _build_report_card_context
         ctx = super().get_context_data(**kwargs)
-        ctx.update(_base_ctx(self.request.user))
-
-        children = _get_children(self.request.user)
-
-        # Selected child
-        selected_student_id = self.request.GET.get("student")
-        if selected_student_id:
-            selected_student = children.filter(id=selected_student_id).first()
-        else:
-            selected_student = children.first()
-
-        from finance.models import Invoice, InvoiceStatus
-
-        invoices = []
-        total_outstanding = 0
-        if selected_student:
-            invoices = Invoice.objects.filter(
-                student=selected_student,
-            ).select_related("term").order_by("-created_at")
-
-            for inv in invoices:
-                total_paid = inv.payments.filter(is_reversal=False).aggregate(t=Sum("amount"))["t"] or 0
-                inv.balance = inv.total_due - total_paid
-                inv.total_paid = total_paid
-                total_outstanding += inv.balance
-
-        ctx.update({
-            "children": children,
-            "selected_student": selected_student,
-            "invoices": invoices,
-            "total_outstanding": total_outstanding,
-            "invoice_statuses": InvoiceStatus,
-        })
+        ctx.update(_build_report_card_context(self.report))
+        ctx["back_url"] = reverse("parent_portal:progress", args=[self.report.student_id]) + "#report-cards"
+        ctx["download_url"] = reverse("parent_portal:report_download",
+                                      args=[self.report.student_id, self.report.pk])
         return ctx
 
 
-# ---------------------------------------------------------------------------
-# Communications / Notifications
-# ---------------------------------------------------------------------------
+class ParentReportCardDownloadView(ParentOnlyMixin, View):
+    """PDF of a published report card of the parent's own child."""
 
-class ParentCommunicationsView(RoleRequiredMixin, TemplateView):
-    allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
-    """Parent portal: view school communications and notifications.
-    FR-PARENT-001: Parents can view school broadcasts and notifications.
-    """
-    template_name = "parent_portal/communications.html"
-
-    def dispatch(self, request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return super().dispatch(request, *args, **kwargs)
-        if request.user.role not in (UserRole.PARENT, UserRole.SUPER_ADMIN):
-            return self.handle_no_permission()
-        return super().dispatch(request, *args, **kwargs)
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx.update(_base_ctx(self.request.user))
-
-        # In-app notifications for this user
-        from communications.models import Notification
-
-        notif_qs = Notification.objects.filter(
-            recipient=self.request.user,
-        )
-
-        # Unread count (before slicing)
-        unread_count = notif_qs.filter(is_read=False).count()
-
-        notifications = notif_qs.order_by("-created_at")[:30]
-
-        # Published broadcasts
-        from communications.models import Broadcast, BroadcastStatus
-        from django.utils import timezone
-        today = timezone.now().date()
-
-        broadcasts = Broadcast.objects.filter(
-            status=BroadcastStatus.SENT,
-            sent_at__date__lte=today,
-        ).order_by("-sent_at")[:20]
-
-        ctx.update({
-            "notifications": notifications,
-            "broadcasts": broadcasts,
-            "unread_count": unread_count,
-        })
-        return ctx
+    def get(self, request, *args, **kwargs):
+        from academics.views.reports import render_report_pdf_response
+        report = services.published_report_or_404(request.user, kwargs["student_id"], kwargs["report_id"])
+        return render_report_pdf_response(request, report)
 
 
 # ---------------------------------------------------------------------------
-# Calendar
+# School calendar (school-wide, no learner data)
 # ---------------------------------------------------------------------------
 
 class ParentCalendarView(ParentOnlyMixin, TemplateView):
-    allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
-    """Parent portal: school calendar with events and term dates."""
-    template_name = "parent_portal/calendar.html"
+    template_name = "parent_portal/v1/calendar.html"
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx.update(_base_ctx(self.request.user))
-
-        import calendar as cal_mod
-        from events.models import CalendarEvent, EventAcknowledgement
-
-        today = date.today()
-        year = int(self.request.GET.get("year", today.year))
-        month = int(self.request.GET.get("month", today.month))
-
-        # Clamp month
-        month = max(1, min(12, month))
-
-        # Build calendar grid
-        cal = cal_mod.Calendar(firstweekday=0)
-        month_days = cal.monthdayscalendar(year, month)
-
-        # Events for this month
-        from datetime import date as date_cls
-        month_start = date_cls(year, month, 1)
-        if month == 12:
-            month_end = date_cls(year + 1, 1, 1)
-        else:
-            month_end = date_cls(year, month + 1, 1)
-
-        events = CalendarEvent.objects.filter(
-            is_published=True,
-            start_date__gte=month_start,
-            start_date__lt=month_end,
-        ).order_by("start_date")
-
-        # Group events by day
-        events_by_day = {}
-        for ev in events:
-            day = ev.start_date.day
-            if day not in events_by_day:
-                events_by_day[day] = []
-            events_by_day[day].append(ev)
-
-        # Upcoming events (next 30 days)
-        upcoming = CalendarEvent.objects.filter(
-            is_published=True,
-            start_date__gte=today,
-            start_date__lte=today + timedelta(days=30),
-        ).order_by("start_date")[:10]
-
-        # Navigation
-        if month == 1:
-            prev_month, prev_year = 12, year - 1
-        else:
-            prev_month, prev_year = month - 1, year
-
-        if month == 12:
-            next_month, next_year = 1, year + 1
-        else:
-            next_month, next_year = month + 1, year
-
-        ctx.update({
-            "year": year,
-            "month": month,
-            "month_name": cal_mod.month_name[month],
-            "month_days": month_days,
-            "events_by_day": events_by_day,
-            "events": events,
-            "upcoming": upcoming,
-            "today": today,
-            "prev_month": prev_month,
-            "prev_year": prev_year,
-            "next_month": next_month,
-            "next_year": next_year,
-        })
+        today = timezone.localdate()
+        ctx.update(_portal_ctx(self.request, "calendar"))
+        ctx.update({"today": today, "event_groups": services.school_events(today)})
         return ctx
 
+
+# ---------------------------------------------------------------------------
+# Earlier portal pages: kept as redirects so old links and emails still work.
+# ---------------------------------------------------------------------------
+
+class LegacyRedirectView(ParentOnlyMixin, View):
+    """Send an old portal URL to its v1 page. A learner id goes through the
+    ownership check on the progress page itself."""
+
+    def get(self, request, *args, **kwargs):
+        student_id = kwargs.get("student_id") or request.GET.get("student")
+        if student_id and str(student_id).isdigit():
+            return redirect("parent_portal:progress", student_id=int(student_id))
+        return redirect("parent_portal:dashboard")
+
+
+
+# ---------------------------------------------------------------------------
+# Guardians linked to a child
+# ---------------------------------------------------------------------------
 
 class ParentGuardianListView(ParentOnlyMixin, TemplateView):
     """List all guardians linked to a specific child."""
@@ -902,130 +365,6 @@ class ParentGuardianUnlinkView(ParentOnlyMixin, View):
         sg.delete()
         messages.success(request, f"{guardian_name} unlinked from {student.first_name}.")
         return redirect("parent_portal:guardian_list", student_id=student_id)
-
-
-class ParentChildrenListView(ParentOnlyMixin, TemplateView):
-    """List of children for the logged-in parent, styled like the teacher student list."""
-    allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
-    template_name = "parent_portal/children_list.html"
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx.update(_base_ctx(self.request.user))
-        children = _get_children(self.request.user)
-        q = self.request.GET.get("q", "").strip()
-        if q:
-            children = children.filter(
-                Q(first_name__icontains=q) | Q(last_name__icontains=q) | Q(admission_no__icontains=q)
-            )
-        ctx["students"] = children.order_by("class_name", "last_name")
-        ctx["q"] = q
-        return ctx
-
-
-class ParentStudentDetailView(ParentOnlyMixin, TemplateView):
-    """Student detail for parents  same layout as teacher detail, filtered to own children."""
-    allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
-    template_name = "parent_portal/child_detail_full.html"
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx.update(_base_ctx(self.request.user))
-
-        children = _get_children(self.request.user)
-        student_id = self.kwargs.get("student_id")
-        student = children.filter(id=student_id).first()
-        if not student:
-            ctx["error"] = "Student not found or not linked to your account."
-            ctx["children"] = children
-            return ctx
-
-        from academics.utils import get_current_term
-        today = date.today()
-        active_term = get_current_term()
-
-        # Attendance: last 30 days
-        thirty_days_ago = today - timedelta(days=30)
-        attendance_entries = AttendanceEntry.objects.filter(
-            student=student, date__gte=thirty_days_ago, date__lte=today
-        ).order_by("-date")
-
-        att_stats = {"present": 0, "absent": 0, "late": 0, "excused": 0, "total": 0}
-        for e in attendance_entries:
-            att_stats["total"] += 1
-            s = str(e.status).lower()
-            if "present" in s: att_stats["present"] += 1
-            elif "absent" in s: att_stats["absent"] += 1
-            elif "late" in s: att_stats["late"] += 1
-            elif "excus" in s: att_stats["excused"] += 1
-        att_stats["rate"] = round((att_stats["present"] + att_stats["late"]) / max(att_stats["total"], 1) * 100, 1)
-
-        # Approved marks only; averages only once assessments are complete.
-        grouped_scores, summary = _approved_term_results(student, active_term)
-        overall = summary["average"] if summary else None
-
-        # Report cards
-        report_cards = ReportCard.objects.filter(student=student, status=ReportCardStatus.PUBLISHED).select_related("term").order_by("-term__start_date")
-
-        # Guardian links
-        guardian_links = StudentGuardian.objects.filter(student=student).select_related("guardian").order_by("-is_primary", "guardian__full_name")
-
-        # Recent attendance (last 7)
-        recent_attendance = attendance_entries[:7]
-
-        ctx.update({
-            "student": student,
-            "active_term": active_term,
-            "attendance_entries": recent_attendance,
-            "att_stats": att_stats,
-            "grouped_scores": grouped_scores,
-            "overall_average": overall,
-            "exam_summary": summary,
-            "report_cards": report_cards,
-            "guardian_links": guardian_links,
-            "today": today,
-        })
-        return ctx
-
-
-# ---------------------------------------------------------------------------
-# Welfare Observations (read-only for parents)
-# ---------------------------------------------------------------------------
-
-class ParentWelfareView(ParentOnlyMixin, TemplateView):
-    """Read-only welfare observations for a parent's children."""
-    allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
-    template_name = "parent_portal/welfare.html"
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx.update(_base_ctx(self.request.user))
-
-        children = _get_children(self.request.user)
-
-        # Optionally filter by student
-        student_id = self.request.GET.get("student")
-        if student_id:
-            children = children.filter(id=student_id)
-
-        from welfare.models import WelfareObservation, WelfareNoteType
-        # Safeguarding notes are for the Safeguarding Lead and HOS only.
-        observations = WelfareObservation.objects.filter(
-            student__in=children
-        ).exclude(note_type=WelfareNoteType.SAFEGUARDING).select_related(
-            "student", "submitted_by"
-        ).order_by("-observation_date")
-
-        active = observations.exclude(hod_status="resolved")
-        resolved = observations.filter(hod_status="resolved")[:20]
-
-        ctx.update({
-            "children": children,
-            "active_observations": active,
-            "resolved_observations": resolved,
-            "selected_student_id": int(student_id) if student_id else None,
-        })
-        return ctx
 
 
 # ── Parent Admission Form + Invoice Generation (Spec Step 10) ──────────────

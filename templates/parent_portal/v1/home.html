@@ -1,0 +1,40 @@
+{% extends "parent_portal/v1/base.html" %}
+{% block title %}Home{% endblock %}
+{% block content %}
+<section class="pp-hero" aria-labelledby="greeting">
+  <p class="pp-eyebrow">{{ today|date:"l j F Y" }}</p>
+  <h1 id="greeting">{{ greeting }}, {{ parent_name }}</h1>
+  {% if term_info %}
+    <p class="pp-term">
+      <span class="pp-pill">{{ term_info.term.name }}{% if term_info.year %} &middot; {{ term_info.year }}{% endif %}</span>
+      {% if term_info.status %}<span class="pp-term-status">{{ term_info.status }}</span>{% endif %}
+    </p>
+  {% else %}
+    <p class="pp-term"><span class="pp-term-status">Term dates have not been published yet.</span></p>
+  {% endif %}
+</section>
+
+<section aria-labelledby="children-heading">
+  <div class="pp-section-head">
+    <h2 id="children-heading">My children</h2>
+    {% if learners %}<span class="pp-muted">{{ learners|length }} learner{{ learners|length|pluralize }}</span>{% endif %}
+  </div>
+  {% if learners %}
+    <ul class="pp-learners" role="list">
+      {% for item in learners %}
+        {% include "parent_portal/v1/includes/learner_card.html" with student=item.student today=item.today %}
+      {% endfor %}
+    </ul>
+  {% else %}
+    {% include "parent_portal/v1/includes/empty.html" with title="No learners linked yet" text="We couldn't find any learners linked to your account." %}
+  {% endif %}
+</section>
+
+<section class="pp-calcard" aria-labelledby="calendar-heading">
+  <div>
+    <h2 id="calendar-heading">School calendar</h2>
+    <p class="pp-muted">Term dates, holidays and events for the whole school.</p>
+  </div>
+  <a class="pp-btn pp-btn-primary" href="{% url 'parent_portal:calendar' %}">View school calendar <span aria-hidden="true">&rarr;</span></a>
+</section>
+{% endblock %}

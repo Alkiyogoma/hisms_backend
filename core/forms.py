@@ -43,6 +43,7 @@ class SchoolSettingsMessagingForm(forms.ModelForm):
             "whatsapp_sender_id",
             "admissions_phone",
             "admissions_email",
+            "parent_contact_phone",
             "admissions_whatsapp",
         ]
 

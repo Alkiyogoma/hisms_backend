@@ -1,0 +1,43 @@
+{# Converted marks only (e.g. Quiz /20, Mid-Term /30, End-Term /50); never raw /100 marks. #}
+<div class="pp-card">
+  <h3 class="pp-card-title">{{ academic.term.name }} &middot; by subject{% if not academic.complete %} (running){% endif %}</h3>
+  {% if academic.rows %}
+  <div class="pp-table-wrap" role="region" aria-label="{{ academic.term.name }} marks by subject" tabindex="0">
+    <table class="pp-table">
+      <caption class="pp-sr">{{ academic.term.name }} approved marks by subject, converted to each assessment's weight</caption>
+      <thead>
+        <tr>
+          <th scope="col">Subject</th>
+          {% for t in academic.types %}<th scope="col" class="num">{{ t.type.name }} /{{ t.max }}</th>{% endfor %}
+          <th scope="col" class="num">Mark</th>
+          <th scope="col">Grade</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in academic.rows %}
+          <tr>
+            <th scope="row">{{ row.subject }}</th>
+            {% for cell, max in row.cells %}
+              <td class="num">{% if cell is not None %}{{ cell|floatformat:"-1" }}{% else %}<span class="pp-missing">Not yet<span class="pp-sr"> marked</span></span>{% endif %}</td>
+            {% endfor %}
+            <td class="num">{% if row.running is not None %}{{ row.running|floatformat:"-1" }}%{% else %}&ndash;{% endif %}</td>
+            <td>{% if row.grade %}<span class="pp-chip pp-chip-blue">{{ row.grade }}</span>{% endif %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <th scope="row" colspan="{{ academic.types|length|add:1 }}">{% if academic.complete %}Term average{% else %}Running average{% endif %}</th>
+          <td class="num"><b>{% if academic.average is not None %}{{ academic.average|floatformat:"-2" }}%{% else %}&ndash;{% endif %}</b></td>
+          <td>{% if academic.grade %}<span class="pp-chip pp-chip-gold">{{ academic.grade }}</span>{% endif %}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  <p class="pp-note">
+    Approved marks only. {% if not academic.complete %}Missing assessments are left out, not counted as zero, and their weight is shared across the assessments taken so far. {% endif %}The average is the mean of the subject marks, the same calculation as the printed report.
+  </p>
+  {% else %}
+    {% include "parent_portal/v1/includes/empty.html" with title="No marks yet" text="Marks appear here once each assessment is approved." hide_phone=True %}
+  {% endif %}
+</div>

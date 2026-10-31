@@ -1128,71 +1128,82 @@ class ReportPDFDownloadView(RoleRequiredMixin, View):
             raise PermissionDenied()
 
         report = get_object_or_404(ReportCard, pk=pk)
-        student = report.student
 
-        # GRD-014: Parent can only download after HOS sign-off
+        # GRD-014: Parent can only download after HOS sign-off, and only their
+        # own child's. Applies to the parent role even without a guardian
+        # record, and to anyone else who is linked as a guardian.
         from students.models import ParentGuardian, Student
-        guardian = ParentGuardian.objects.filter(user=request.user).first()
-        if guardian is not None:
+        guardian_ids = list(ParentGuardian.objects.filter(user=request.user).values_list("pk", flat=True))
+        if request.user.role == UserRole.PARENT or guardian_ids:
             if report.status != ReportCardStatus.PUBLISHED:
                 raise PermissionDenied("Report not yet signed off by HOS.")
-            if not Student.objects.filter(studentguardian__guardian=guardian, pk=report.student_id).exists():
+            if not Student.objects.filter(studentguardian__guardian_id__in=guardian_ids,
+                                          pk=report.student_id).exists():
                 raise PermissionDenied()
+        return render_report_pdf_response(request, report)
 
-        # Build filename: StudentName_Class_Term_AcademicYear_Report.pdf
-        safe_name = f"{student.first_name}_{student.last_name}".replace(" ", "_")
-        class_name = student.class_name.replace(" ", "_")
-        term_name = report.term.name.replace(" ", "_") if report.term else "NoTerm"
-        ac_year = report.term.academic_year.name.replace(" ", "_") if report.term and report.term.academic_year else ""
-        filename = f"{safe_name}_{class_name}_{term_name}_{ac_year}_Report.pdf"
 
-        # Pick the right template
-        if report.is_ecd_report:
-            template_name = "academics/ecd_report_preview.html"
-        else:
-            template_name = "academics/report_card_print.html"
+def render_report_pdf_response(request, report):
+    """The report card as a PDF download (HTML page if WeasyPrint is missing).
 
-        ctx = _build_report_card_context(report)
+    Callers do the access checks first.
+    """
+    student = report.student
 
-        rendered = render(request, template_name, ctx)
-        html = rendered.content.decode("utf-8")
+    # Build filename: StudentName_Class_Term_AcademicYear_Report.pdf
+    safe_name = f"{student.first_name}_{student.last_name}".replace(" ", "_")
+    class_name = student.class_name.replace(" ", "_")
+    term_name = report.term.name.replace(" ", "_") if report.term else "NoTerm"
+    ac_year = report.term.academic_year.name.replace(" ", "_") if report.term and report.term.academic_year else ""
+    filename = f"{safe_name}_{class_name}_{term_name}_{ac_year}_Report.pdf"
 
-        from audit.models import log_event
-        log_event(
-            actor=request.user,
-            action_type="REPORT_PDF_DOWNLOADED",
-            model_name="ReportCard",
-            object_id=report.pk,
-            description=f"Report PDF downloaded for {student.admission_no} ({report.term.name if report.term else 'N/A'})",
-            request=request
-        )
+    # Pick the right template
+    if report.is_ecd_report:
+        template_name = "academics/ecd_report_preview.html"
+    else:
+        template_name = "academics/report_card_print.html"
 
-        try:
-            from weasyprint import HTML
-            import time
-            from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
-            start = time.monotonic()
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(
-                    lambda: HTML(string=html, base_url=request.build_absolute_uri("/")).write_pdf()
-                )
-                pdf_bytes = future.result(timeout=10)
-            elapsed = round(time.monotonic() - start, 2)
-            if elapsed > 5:
-                import logging
-                logging.getLogger(__name__).warning("Report PDF slow: %.2fs for %s", filename, elapsed)
-            response = HttpResponse(content_type="application/pdf")
-            response["Content-Disposition"] = f'attachment; filename="{filename}"'
-            response.write(pdf_bytes)
-            response["X-PDF-Gen-Time"] = str(elapsed)
-            return response
-        except FuturesTimeout:
+    ctx = _build_report_card_context(report)
+
+    rendered = render(request, template_name, ctx)
+    html = rendered.content.decode("utf-8")
+
+    from audit.models import log_event
+    log_event(
+        actor=request.user,
+        action_type="REPORT_PDF_DOWNLOADED",
+        model_name="ReportCard",
+        object_id=report.pk,
+        description=f"Report PDF downloaded for {student.admission_no} ({report.term.name if report.term else 'N/A'})",
+        request=request
+    )
+
+    try:
+        from weasyprint import HTML
+        import time
+        from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+        start = time.monotonic()
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(
+                lambda: HTML(string=html, base_url=request.build_absolute_uri("/")).write_pdf()
+            )
+            pdf_bytes = future.result(timeout=10)
+        elapsed = round(time.monotonic() - start, 2)
+        if elapsed > 5:
             import logging
-            logging.getLogger(__name__).error("Report PDF timed out: %s", filename)
-            return rendered
-        except (ImportError, OSError):
-            # Fallback: WeasyPrint not available (missing package or native deps like GTK)
-            # Renders the report card page normally in the browser
-            return rendered
+            logging.getLogger(__name__).warning("Report PDF slow: %.2fs for %s", filename, elapsed)
+        response = HttpResponse(content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        response.write(pdf_bytes)
+        response["X-PDF-Gen-Time"] = str(elapsed)
+        return response
+    except FuturesTimeout:
+        import logging
+        logging.getLogger(__name__).error("Report PDF timed out: %s", filename)
+        return rendered
+    except (ImportError, OSError):
+        # Fallback: WeasyPrint not available (missing package or native deps like GTK)
+        # Renders the report card page normally in the browser
+        return rendered
 
 
