@@ -10,13 +10,13 @@
         {% if bar.value is not None %}
           <span class="pp-bar-val">{{ bar.value|floatformat:"-1" }}</span>
           <span class="pp-bar{% if bar.state == 'running' %} pp-bar-running{% endif %}" style="height:{{ bar.pct|stringformat:'s' }}%"></span>
-          <span class="pp-sr">{{ bar.term.name }}: {{ bar.value|floatformat:"-1" }} out of {{ chart.max }}{% if bar.state == 'running' %}, running{% endif %}</span>
+          <span class="pp-sr">{{ bar.term.short_name }}: {{ bar.value|floatformat:"-1" }} out of {{ chart.max }}{% if bar.state == 'running' %}, running{% endif %}</span>
         {% elif bar.state == 'upcoming' %}
           <span class="pp-bar-none">Upcoming</span>
         {% else %}
           <span class="pp-bar-none">No marks yet</span>
         {% endif %}
-        <span class="pp-bar-lbl" aria-hidden="{% if bar.value is not None %}true{% else %}false{% endif %}">{{ bar.term.name }}{% if bar.state == 'running' %}<em>Running</em>{% elif bar.state == 'final' %}<em>Final</em>{% endif %}</span>
+        <span class="pp-bar-lbl" aria-hidden="{% if bar.value is not None %}true{% else %}false{% endif %}">{{ bar.term.short_name }}{% if bar.state == 'running' %}<em>Running</em>{% elif bar.state == 'final' %}<em>Final</em>{% endif %}</span>
       </li>
     {% endfor %}
   </ul>

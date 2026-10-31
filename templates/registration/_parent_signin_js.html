@@ -1,3 +1,5 @@
+{# Parent sign-in behaviour, inlined (like the rest of login.html) so sign-in never depends on collectstatic. #}
+<script>
 /* Parent sign-in (phone or email + 4-digit code). Talks to users/views.py
    ParentOTPRequestView / ParentOTPVerifyView; the server checks every code. */
 (function () {
@@ -209,3 +211,4 @@
     contactInput.focus();
   });
 })();
+</script>

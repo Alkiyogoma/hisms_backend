@@ -1,5 +1,4 @@
 {# Parent sign-in: one phone/email field, then a 4-digit code. Real server-side OTP (users/otp.py). #}
-{% load static %}
 <div id="parentSignin"
      data-request-url="{% url 'users:parent_otp_request' %}"
      data-verify-url="{% url 'users:parent_otp_verify' %}">
@@ -49,4 +48,4 @@
     </div>
   </form>
 </div>
-<script src="{% static 'parent_portal/signin.js' %}?v=1" defer></script>
+{% include "registration/_parent_signin_js.html" %}

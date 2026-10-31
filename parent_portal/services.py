@@ -61,7 +61,23 @@ def published_report_or_404(user, student_id, report_id):
 
 def current_term():
     from academics.utils import get_current_term
-    return get_current_term()
+    return with_short_name(get_current_term())
+
+
+def short_term_name(term):
+    """Term name without its academic year ("Term 1 - 2026/2027" -> "Term 1"),
+    so labels don't repeat the year shown next to them."""
+    name = term.name or ""
+    year = term.academic_year.name if term.academic_year_id else ""
+    if year and year in name:
+        name = name.replace(year, "").strip(" -–—·:/()")
+    return name or term.name
+
+
+def with_short_name(term):
+    if term is not None:
+        term.short_name = short_term_name(term)
+    return term
 
 
 def term_state(term, current, today):
@@ -78,7 +94,7 @@ def year_terms(term):
         return []
     qs = Term.objects.filter(academic_year_id=term.academic_year_id) if term.academic_year_id else \
         Term.objects.filter(pk=term.pk)
-    return list(qs.select_related("academic_year").order_by("start_date", "name"))
+    return [with_short_name(t) for t in qs.select_related("academic_year").order_by("start_date", "name")]
 
 
 def term_context(term, today):
@@ -278,8 +294,11 @@ def month_attendance(student, month_start, today):
 # -- reports and calendar ------------------------------------------------------
 
 def published_reports(student):
-    return list(ReportCard.objects.filter(student=student, status=ReportCardStatus.PUBLISHED)
-                .select_related("term", "term__academic_year").order_by("-term__start_date"))
+    reports = list(ReportCard.objects.filter(student=student, status=ReportCardStatus.PUBLISHED)
+                   .select_related("term", "term__academic_year").order_by("-term__start_date"))
+    for r in reports:
+        with_short_name(r.term)
+    return reports
 
 
 def school_events(today, months=6):

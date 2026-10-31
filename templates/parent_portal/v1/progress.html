@@ -27,10 +27,10 @@
   <div class="pp-lhero-id">
     <p class="pp-eyebrow pp-eyebrow-muted">Learner</p>
     <h1 id="learner-name">{{ student.first_name }} {{ student.last_name }}</h1>
-    <p class="pp-muted">{{ student.class_name|default:"Class not set" }} &middot; {{ student.admission_no }}{% if term %} &middot; {{ term.name }}{% if term.academic_year %} {{ term.academic_year.name }}{% endif %}{% endif %}</p>
+    <p class="pp-muted">{{ student.class_name|default:"Class not set" }} &middot; {{ student.admission_no }}{% if term %} &middot; {{ term.short_name }}{% if term.academic_year %} {{ term.academic_year.name }}{% endif %}{% endif %}</p>
   </div>
   <div class="pp-rings">
-    {% if term %}{% with label=term.name|add:" average" %}
+    {% if term %}{% with label=term.short_name|add:" average" %}
       {% include "parent_portal/v1/includes/ring.html" with ring=average_ring label=label note=academic.complete|yesno:",running" tone="gold" precision="-2" %}
     {% endwith %}{% else %}
       {% include "parent_portal/v1/includes/ring.html" with ring=average_ring label="Term average" tone="gold" precision="-2" %}
@@ -60,7 +60,7 @@
   </div>
   {% if academic %}
     {% if not academic.complete %}
-      <p class="pp-banner">{{ term.name }} is in progress. Marks appear once each assessment is approved and are labelled &ldquo;running&rdquo; until the term&rsquo;s assessments are complete.</p>
+      <p class="pp-banner">{{ term.short_name }} is in progress. Marks appear once each assessment is approved and are labelled &ldquo;running&rdquo; until the term&rsquo;s assessments are complete.</p>
     {% endif %}
     <div class="pp-charts">
       {% for chart in academic.charts %}
@@ -80,12 +80,12 @@
     {% for report in reports %}
       <li class="pp-report">
         <div>
-          <p class="pp-report-title">{{ report.term.name }}{% if report.term.academic_year %} &middot; {{ report.term.academic_year.name }}{% endif %}</p>
+          <p class="pp-report-title">{{ report.term.short_name }}{% if report.term.academic_year %} &middot; {{ report.term.academic_year.name }}{% endif %}</p>
           {% if report.published_at %}<p class="pp-muted">Published {{ report.published_at|date:"j F Y" }}</p>{% endif %}
         </div>
         <div class="pp-report-actions">
-          <a class="pp-btn pp-btn-small" href="{% url 'parent_portal:report_card' student.pk report.pk %}">View<span class="pp-sr"> {{ report.term.name }} report card</span></a>
-          <a class="pp-btn pp-btn-small pp-btn-primary" href="{% url 'parent_portal:report_download' student.pk report.pk %}">Download PDF<span class="pp-sr"> of the {{ report.term.name }} report card</span></a>
+          <a class="pp-btn pp-btn-small" href="{% url 'parent_portal:report_card' student.pk report.pk %}">View<span class="pp-sr"> {{ report.term.short_name }} report card</span></a>
+          <a class="pp-btn pp-btn-small pp-btn-primary" href="{% url 'parent_portal:report_download' student.pk report.pk %}">Download PDF<span class="pp-sr"> of the {{ report.term.short_name }} report card</span></a>
         </div>
       </li>
     {% endfor %}
