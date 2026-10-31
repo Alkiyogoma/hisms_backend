@@ -10,6 +10,7 @@
   --pp-focus: 0 0 0 3px #fff, 0 0 0 5px var(--pp-blue);
   --pp-serif: Merriweather, Georgia, "Times New Roman", serif;
   --pp-radius: 12px;
+  --pp-header-h: 63px; /* .pp-top: 60px row + 3px gold rule */
   margin: 0; background: var(--pp-bg); color: var(--pp-ink);
   font: 15px/1.5 Arial, Helvetica, system-ui, sans-serif;
   -webkit-text-size-adjust: 100%;
@@ -25,10 +26,10 @@
 .pp-muted { color: var(--pp-muted); font-size: 13px; }
 
 .pp-wrap { width: 100%; max-width: 1240px; margin: 0 auto; padding: 0 24px; }
-.pp-main { padding-top: 20px; padding-bottom: 40px; outline: none; }
+.pp-main { padding-top: 20px; padding-bottom: 40px; outline: none; scroll-margin-top: var(--pp-header-h); }
 
 /* header */
-.pp-top { background: linear-gradient(110deg, var(--pp-navy), var(--pp-blue)); color: #fff; border-bottom: 3px solid var(--pp-gold); }
+.pp-top { position: sticky; top: 0; z-index: 20; background: linear-gradient(110deg, var(--pp-navy), var(--pp-blue)); color: #fff; border-bottom: 3px solid var(--pp-gold); }
 .pp-top-inner { display: flex; align-items: center; gap: 20px; min-height: 60px; }
 .pp-brand { display: flex; align-items: center; gap: 12px; color: #fff; text-decoration: none; min-width: 0; }
 .pp-logo { height: 32px; width: auto; flex: none; }
@@ -53,7 +54,7 @@
 .pp-btn[disabled], .pp-btn[aria-disabled="true"] { opacity: .6; cursor: default; }
 
 /* sub navigation */
-.pp-subnav { position: sticky; top: 0; z-index: 10; background: rgba(255,255,255,.96); border-bottom: 1px solid var(--pp-line); backdrop-filter: blur(6px); }
+.pp-subnav { position: sticky; top: var(--pp-header-h); z-index: 10; background: rgba(255,255,255,.96); border-bottom: 1px solid var(--pp-line); backdrop-filter: blur(6px); }
 .pp-siblings { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--pp-muted); }
 .pp-siblings a { padding: 5px 10px; border-radius: 999px; border: 1px solid var(--pp-line); text-decoration: none; color: var(--pp-navy); white-space: nowrap; }
 .pp-siblings a:hover { border-color: var(--pp-gold); background: var(--pp-gold-soft); }
@@ -65,7 +66,7 @@
 /* cards and sections */
 .pp-card { position: relative; background: var(--pp-card); border: 1px solid var(--pp-line); border-radius: var(--pp-radius); padding: 16px 18px; }
 .pp-card-title { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--pp-blue2); margin-bottom: 10px; }
-.pp-section { margin-top: 24px; scroll-margin-top: 68px; }
+.pp-section { margin-top: 24px; scroll-margin-top: calc(var(--pp-header-h) + 68px); }
 .pp-section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
 .pp-section-head h1, .pp-section-head h2 { font-family: var(--pp-serif); font-size: 19px; }
 .pp-section-head h1 { font-size: 22px; }
@@ -239,7 +240,7 @@
   .pp-day-s { font-size: 9px; padding: 2px 1px; }
   .pp-crumbs { display: none; }
   .pp-siblings > span { display: none; }
-  .pp-section { scroll-margin-top: 60px; }
+  .pp-section { scroll-margin-top: calc(var(--pp-header-h) + 60px); }
   .pp-event { gap: 12px; }
 }
 @media (prefers-reduced-motion: no-preference) {
