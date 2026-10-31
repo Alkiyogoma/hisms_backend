@@ -1,10 +1,10 @@
 {# Converted marks only (e.g. Quiz /20, Mid-Term /30, End-Term /50); never raw /100 marks. #}
 <div class="pp-card">
-  <h3 class="pp-card-title">{{ academic.term.name }} &middot; by subject{% if not academic.complete %} (running){% endif %}</h3>
+  <h3 class="pp-card-title">{{ academic.term.short_name }} &middot; by subject{% if not academic.complete %} (running){% endif %}</h3>
   {% if academic.rows %}
-  <div class="pp-table-wrap" role="region" aria-label="{{ academic.term.name }} marks by subject" tabindex="0">
+  <div class="pp-table-wrap" role="region" aria-label="{{ academic.term.short_name }} marks by subject" tabindex="0">
     <table class="pp-table">
-      <caption class="pp-sr">{{ academic.term.name }} approved marks by subject, converted to each assessment's weight</caption>
+      <caption class="pp-sr">{{ academic.term.short_name }} approved marks by subject, converted to each assessment's weight</caption>
       <thead>
         <tr>
           <th scope="col">Subject</th>

@@ -420,3 +420,44 @@ class NavigationTests(PortalTestBase):
         # No approved marks at all this year: a short message, no empty bars.
         self.assertIn("No approved Quiz marks yet this year.", page)
         self.assertNotIn('class="pp-bar', page)
+
+
+class DeploymentAndStaffViewTests(PortalTestBase):
+    def test_pages_do_not_depend_on_collected_static_files(self):
+        """Styles and the sign-in script are inline, so a deploy without
+        collectstatic can't leave the portal unstyled or sign-in broken."""
+        self.client.force_login(self.parent)
+        for url in (reverse("parent_portal:dashboard"), reverse("parent_portal:progress", args=[self.child.pk]),
+                    reverse("parent_portal:calendar")):
+            page = self.client.get(url).content.decode()
+            self.assertIn("<style>", page)
+            self.assertIn(".pp-btn-primary", page)
+            self.assertNotIn("/static/parent_portal/", page)
+        self.client.logout()
+        login = self.client.get(reverse("users:login")).content.decode()
+        self.assertIn("getElementById('parentSignin')", login)
+        self.assertNotIn("/static/parent_portal/", login)
+
+    def test_term_year_is_not_repeated(self):
+        Term.objects.filter(pk=self.t2.pk).update(name="Term 2 - 2026/2027")
+        self.client.force_login(self.parent)
+        home = self.client.get(reverse("parent_portal:dashboard")).content.decode()
+        self.assertIn("Term 2 &middot; 2026/2027", home)
+        self.assertNotIn("2026/2027 &middot; 2026/2027", home)
+        resp = self._progress()
+        self.assertEqual([b["term"].short_name for b in resp.context["academic"]["charts"][0]["bars"]],
+                         ["Term 1", "Term 2", "Term 3"])
+        self.assertIn("Term 2 average", resp.content.decode())
+
+    def test_staff_viewing_as_parent_get_exit_not_banner(self):
+        admin = User.objects.create_user(username="sa", email="sa@x.test", password="x", role=UserRole.SUPER_ADMIN)
+        self.client.force_login(admin)
+        session = self.client.session
+        session["impersonate_user_id"] = self.parent.pk
+        session.save()
+        page = self.client.get(reverse("parent_portal:dashboard")).content.decode()
+        self.assertIn("Sherissa", page)
+        self.assertIn("Exit parent view", page)
+        self.assertIn(reverse("users:impersonate_stop"), page)
+        self.assertNotIn(">Sign out<", page)
+        self.assertNotIn("Viewing as", page)

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Parent Portal{% endblock %} &middot; {{ school_name }}</title>
   <link rel="icon" type="image/x-icon" href="{% static 'branding/favicon.ico' %}">
-  <link rel="stylesheet" href="{% static 'parent_portal/portal.css' %}?v=5">
+  {% include "parent_portal/v1/_styles.html" %}
 </head>
 <body class="pp">
   <a class="pp-skip" href="#main">Skip to content</a>
@@ -18,10 +18,18 @@
       <nav class="pp-nav" aria-label="Main">
         <a href="{% url 'parent_portal:dashboard' %}"{% if portal_nav == "home" %} aria-current="page"{% endif %}>Home</a>
       </nav>
-      <form method="post" action="{% url 'users:logout' %}" class="pp-signout">
-        {% csrf_token %}
-        <button type="submit" class="pp-btn pp-btn-ghost">Sign out</button>
-      </form>
+      {% if request.is_impersonating %}
+        {# Staff viewing as this parent: their way back, instead of a banner. #}
+        <form method="post" action="{% url 'users:impersonate_stop' %}" class="pp-signout">
+          {% csrf_token %}
+          <button type="submit" class="pp-btn pp-btn-ghost">Exit parent view</button>
+        </form>
+      {% else %}
+        <form method="post" action="{% url 'users:logout' %}" class="pp-signout">
+          {% csrf_token %}
+          <button type="submit" class="pp-btn pp-btn-ghost">Sign out</button>
+        </form>
+      {% endif %}
     </div>
   </header>
 

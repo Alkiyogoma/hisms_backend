@@ -6,7 +6,7 @@
   <h1 id="greeting">{{ greeting }}, {{ parent_name }}</h1>
   {% if term_info %}
     <p class="pp-term">
-      <span class="pp-pill">{{ term_info.term.name }}{% if term_info.year %} &middot; {{ term_info.year }}{% endif %}</span>
+      <span class="pp-pill">{{ term_info.term.short_name }}{% if term_info.year %} &middot; {{ term_info.year }}{% endif %}</span>
       {% if term_info.status %}<span class="pp-term-status">{{ term_info.status }}</span>{% endif %}
     </p>
   {% else %}
