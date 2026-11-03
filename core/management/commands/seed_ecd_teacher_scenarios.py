@@ -22,8 +22,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         from academics.ecd_utils import ecd_template_type_from_class_name
-        from academics.models import AcademicYear, Department, ECDEvaluation, GradeClass, ReportCard, ReportCardStatus, Term
-        from academics.views import ECDEvaluationEntryView
+        from academics.models import AcademicYear, Department, GradeClass, ReportCard, ReportCardStatus, Term
+        from academics import ecd_report
         from students.models import Student, StudentStatus
         from timetable.models import TimetableSlot, Weekday
         from users.models import User, UserRole
@@ -171,7 +171,7 @@ class Command(BaseCommand):
         # Create ECD ReportCards + ECDEvaluations for 1 student per ECD class
         for cls in ecd_classes:
             tpl = ecd_template_type_from_class_name(cls) or "pre_k"
-            domains = ECDEvaluationEntryView.get_flat_domains(tpl)
+            structure = ecd_report.ReportStructure(tpl, ecd_report.term_number_of(term))
             student = Student.objects.filter(class_name=cls, is_archived=False).order_by("admission_no").first()
             if not student:
                 continue
@@ -201,18 +201,14 @@ class Command(BaseCommand):
                 rc.teacher_comments = f"{student.first_name} is progressing well across the term and participates actively in class activities."
                 rc.save(update_fields=["teacher_comments", "updated_at"])
 
-            existing = set(
-                ECDEvaluation.objects.filter(report_card=rc).values_list("domain", flat=True)
-            )
-            to_create = []
-            for d in domains:
-                if d in existing:
-                    continue
-                to_create.append(
-                    ECDEvaluation(report_card=rc, domain=d, rating=random.choice(["E", "G", "S", "N"]))
-                )
-            if to_create:
-                ECDEvaluation.objects.bulk_create(to_create)
+            values = {}
+            for item in structure.items:
+                if item.section.style == "marks":
+                    values[item.pk] = {"score": random.randint(50, 100)}
+                else:
+                    options = [v for v in structure.allowed_ratings(item) if v != ecd_report.NA]
+                    values[item.pk] = {"rating": random.choice(sorted(options))}
+            ecd_report.save_values(rc, structure, values)
 
         self.stdout.write(self.style.SUCCESS("--- Done ---"))
         self.stdout.write("Login credentials for testing:")

@@ -104,7 +104,7 @@ class ReportPreviewAccessTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
-            [tab["class_name"] for tab in response.context["ecd_tabs"]],
+            [value for value, _ in response.context["pf"]["class_options"]],
             ["KG"],
         )
         self.assertEqual(response.context["ecd_class_name"], "KG")

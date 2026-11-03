@@ -1,10 +1,12 @@
-"""ECD class name ↔ template key helpers (aligned with ECDEvaluationEntryView.DOMAIN_GROUPS)."""
+"""ECD class name ↔ class type helpers, and the context for printing an ECD report."""
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 
 def ecd_template_type_from_class_name(class_name: str | None) -> str | None:
-    """Return DOMAIN_GROUPS key for this class, or None if not a known ECD class."""
+    """Return the ECD class type (pre_k, kindergarten, pre_school, abc) for this class, or None."""
     if not class_name:
         return None
     cn = class_name.strip().lower()
@@ -42,89 +44,60 @@ ECD_CLASS_LABELS = {
     "abc": "ABC Class",
 }
 
-ECD_RATING_MAP = {"E": 4, "G": 3, "S": 2, "N": 1, "4": 4, "3": 3, "2": 2, "1": 1}
+def build_ecd_report_context(report, shared=None):
+    """The ``ecd`` context for ``_ecd_report_body.html``: the term's report lines
+    laid out as on the school's Word template, with this learner's ratings.
 
-
-def compute_ecd_average_and_remarks(evaluations, report):
-    """Compute average score and auto-remarks label across all ECD domains.
-
-    Maps E/G/S/N (or 4/3/2/1) ratings → numeric values, then determines
-    a remarks label.  If ``report.ecd_remarks`` is set (teacher override)
-    it is used instead of the auto label.
-
-    Returns ``(avg_score, remarks_label)``.
+    Reports rated before the per-term templates (``legacy``) list their stored
+    ratings as recorded. ``shared`` (a dict) reuses the report lines across a class print.
     """
-    scores = []
-    for ev in evaluations:
-        numeric = ECD_RATING_MAP.get(ev.rating)
-        if numeric is not None:
-            scores.append(numeric)
+    from academics import ecd_report
+    from academics.models import ECDEvaluation
 
-    if not scores:
-        return None, ""
-
-    avg = round(sum(scores) / len(scores), 2)
-
-    if avg >= 3.5:
-        auto_remarks = "Outstanding"
-    elif avg >= 2.5:
-        auto_remarks = "Good"
-    elif avg >= 1.5:
-        auto_remarks = "Satisfactory"
+    class_type = report.ecd_template_type or ecd_template_type_from_class_name(report.student.class_name) or "pre_k"
+    term_number = ecd_report.term_number_of(report.term)
+    key = ("ecd_structure", class_type, term_number)
+    if shared is not None and key in shared:
+        structure = shared[key]
     else:
-        auto_remarks = "Needs Improvement"
-
-    # Teacher override via report.ecd_remarks
-    remarks = report.ecd_remarks.strip() if report.ecd_remarks else ""
-    if not remarks:
-        remarks = auto_remarks
-
-    return avg, remarks
-
-
-def build_ecd_report_context(report):
-    """Build the ``ecd`` context dict expected by ``ecd_report_preview.html``.
-
-    Returns a dict with keys ``template_type``, ``class_label``, ``domain_groups``,
-    ``teacher_comments``  or raises ``ReportCard.DoesNotExist`` if ``report``
-    is not an ECD report.
-    """
-    from academics.models import ECDEvaluation, ABCPaceProgress, ABCScripture, ABCReadingProgramme, ABCGeneralAssignment, ABCInternalExam
-    from academics.views import ECDEvaluationEntryView
-
-    tpl = report.ecd_template_type or ecd_template_type_from_class_name(report.student.class_name) or "pre_k"
-    domain_groups = ECDEvaluationEntryView._load_domain_groups().get(tpl, [])
-    evaluations = ECDEvaluation.objects.filter(report_card=report)
-
-    # Build maps: individual competency -> rating, and group name -> rating
-    eval_map = {ev.domain: ev.rating for ev in evaluations}
-
-    grouped_rows = []
-    for section_title, items in domain_groups:
-        row_items = []
-        for d in items:
-            rating = eval_map.get(d, "")
-            # If no individual rating, fall back to group-level rating
-            if not rating:
-                rating = eval_map.get(section_title, "")
-            row_items.append({"domain": d, "rating": rating})
-        grouped_rows.append({"section": section_title, "items": row_items})
-    avg_score, remarks_label = compute_ecd_average_and_remarks(evaluations, report)
-
+        structure = ecd_report.ReportStructure(class_type, term_number)
+        if shared is not None:
+            shared[key] = structure
     ctx = {
-        "template_type": tpl,
-        "class_label": ECD_CLASS_LABELS.get(tpl, report.student.class_name),
-        "domain_groups": grouped_rows,
+        "class_type": class_type,
+        "class_label": ECD_CLASS_LABELS.get(class_type, report.student.class_name),
+        "layout": structure.layout,
         "teacher_comments": (report.teacher_comments or "").strip(),
-        "avg_score": avg_score,
-        "remarks_label": remarks_label,
     }
+    evaluations = list(ECDEvaluation.objects.filter(report_card=report).order_by("pk"))
+    # Rated before the per-term templates: only old-style rows, none linked to a line.
+    ctx["legacy"] = bool(evaluations) and all(ev.item_id is None for ev in evaluations)
+    if ctx["legacy"]:
+        ctx["legacy_rows"] = [(ev.domain, ev.rating) for ev in evaluations]
+        return ctx
 
-    if tpl == "abc":
-        ctx["abc_pace_progress"] = ABCPaceProgress.objects.filter(report_card=report)
-        ctx["abc_scripture"] = {s.quarter: s.verse for s in ABCScripture.objects.filter(report_card=report)}
-        ctx["abc_reading"] = {r.quarter: r for r in ABCReadingProgramme.objects.filter(report_card=report)}
-        ctx["abc_assignments"] = {a.quarter: a for a in ABCGeneralAssignment.objects.filter(report_card=report)}
-        ctx["abc_internal_exams"] = ABCInternalExam.objects.filter(report_card=report)
-
+    rows = {ev.item_id: ev for ev in evaluations if ev.item_id}
+    values = {}
+    printed = {}  # section pk -> this learner's copy of the section, with its lines
+    for section in structure.sections:
+        lines = []
+        for item in section.term_items:
+            ev = rows.get(item.pk)
+            lines.append({
+                "label": ev.domain if ev else item.label,
+                "rating": "N/A" if ev and ev.rating == ecd_report.NA else (ev.rating if ev else ""),
+                "score": ev.score if ev else None,
+                "note": ev.note if ev else "",
+            })
+            if ev:
+                values[item.pk] = {"rating": ev.rating, "score": ev.score, "note": ev.note}
+        printed[section.pk] = SimpleNamespace(
+            title=section.title, style=section.style, column=section.column, lines=lines,
+        )
+    parts = [
+        {**part, **{place: [printed[s.pk] for s in part[place]] for place in ("sections", "top", "left", "right", "bottom")}}
+        for part in structure.parts
+    ]
+    info = ecd_report.summary(report, structure, values)
+    ctx.update({"parts": parts, "avg_score": info["average"], "remarks_label": info["remarks"]})
     return ctx

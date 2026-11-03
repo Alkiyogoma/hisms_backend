@@ -1,0 +1,541 @@
+{% extends "base.html" %}
+{% block title %}ECD Reports{% if ecd_class_name %} | {{ ecd_class_name }}{% endif %} | {{ brand.school_name }}{% endblock %}
+{% block extra_head %}{{ block.super }}
+<style>
+  .ee-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 16px; }
+  .ee-top-title { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+  .ee-top-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .ee-progress { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .ee-progress-track { width: 160px; height: 8px; background: #EDF1F7; border-radius: 99px; overflow: hidden; }
+  .ee-progress-fill { height: 100%; width: 0; background: var(--green); border-radius: 99px; transition: width .3s; }
+  .ee-progress-text { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+
+  .ee-shell { container-type: inline-size; }
+  .ee-layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 16px; align-items: start; }
+  .ee-list { padding: 8px 0; position: sticky; top: calc(var(--ee-top, 0px) + 16px); max-height: calc(100vh - var(--ee-top, 0px) - 32px); overflow-y: auto; }
+  .ee-list-head { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); padding: 4px 14px 8px; }
+  .ee-learner { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 8px 14px; border: 0;
+    background: none; text-align: left; cursor: pointer; border-left: 3px solid transparent; font: inherit; }
+  .ee-learner:hover { background: var(--hodari-blue-pale); }
+  .ee-learner.active { background: var(--hodari-blue-light); border-left-color: var(--hodari-blue); }
+  .ee-learner-name { font-size: 13px; color: var(--text-primary); }
+  .ee-learner.active .ee-learner-name { font-weight: 600; }
+  .ee-learner-meta { font-size: 11px; color: var(--text-muted); }
+  .ee-learner .chip { font-size: 10.5px; padding: 2px 8px; flex-shrink: 0; }
+  .ee-warn { color: var(--red); margin-left: 4px; }
+  .ee-picker { display: none; }
+
+  .ee-form { position: relative; }
+  /* .main clips sideways with overflow-x: hidden, which also stops sticky headers;
+     clip cuts the same way without making it a scroll container. */
+  #mainContent { overflow-x: clip; }
+  /* Pinned while scrolling a long report: who, how far, saved or not. */
+  .ee-form-head { position: sticky; top: var(--ee-top, 0px); z-index: 5; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px;
+    margin: -4px -4px 0; padding: 10px 4px 12px; background: var(--bg-card, #fff); border-bottom: 1px solid var(--border); }
+  .ee-form-head.stuck { box-shadow: 0 6px 12px -10px rgba(15,35,95,.35); }
+  .ee-mini { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  .ee-mini b { color: var(--text-primary); }
+  .ee-jump { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 4px; }
+  .ee-jump a { font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 99px; background: var(--bg-metric); color: var(--text-secondary);
+    text-decoration: none; border: 1px solid var(--border); }
+  .ee-jump a:hover { border-color: var(--hodari-blue); color: var(--hodari-blue); }
+  .ee-jump a.done { background: var(--green-bg); border-color: var(--green-bd); color: var(--green); }
+  .ee-sec { scroll-margin-top: calc(var(--ee-top, 0px) + 90px); }
+  .ee-row.current { box-shadow: inset 3px 0 0 var(--hodari-blue); background: var(--hodari-blue-pale); }
+  .ee-tip { font-size: 12px; color: var(--text-muted); margin: 0 0 12px; }
+  .ee-tip kbd { font: 600 11px/1 var(--font-mono, monospace); padding: 2px 5px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; background: #fff; color: var(--text-primary); }
+  @media (pointer: coarse) { .ee-tip { display: none; } }
+  .ee-name { font-size: 17px; font-weight: 700; color: var(--text-primary); }
+  .ee-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .ee-head-tools { display: flex; align-items: center; gap: 8px; }
+  .ee-save-state { font-size: 12px; color: var(--text-muted); min-width: 70px; text-align: right; }
+  .ee-save-state.err { color: var(--red); }
+
+  .ee-banner { margin-top: 12px; padding: 10px 14px; border-radius: 8px; font-size: 12.5px; }
+  .ee-banner.lock { background: var(--red-bg); border: 1px solid var(--red-bd); color: var(--red); }
+  .ee-banner.welfare { background: var(--amber-bg); border: 1px solid var(--amber-bd); color: var(--amber); }
+
+  .ee-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 10px; margin: 16px 0; }
+  .ee-stat { background: var(--bg-metric); border-radius: 10px; padding: 10px 12px; min-width: 0; }
+  .ee-stat-label { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
+  .ee-stat-value { font-size: 20px; font-weight: 700; color: var(--hodari-blue); margin-top: 2px; }
+  .ee-stat select { width: 100%; margin-top: 4px; height: 32px; font-size: 13px; }
+
+  .ee-part { margin-top: 18px; }
+  .ee-part-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+  .ee-part-title { font-size: 14px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: .03em; }
+  .ee-key { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--text-muted); }
+  .ee-key b { color: var(--text-primary); }
+  .ee-cols-wrap { container-type: inline-size; }
+  .ee-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }
+  @container (max-width: 760px) { .ee-cols { grid-template-columns: 1fr; } }
+  .ee-col, .ee-full { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .ee-full { margin-bottom: 14px; }
+  .ee-full.after { margin: 14px 0 0; }
+
+  .ee-sec { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .ee-sec-head { display: flex; justify-content: space-between; gap: 8px; padding: 8px 12px; background: #1F3864; color: #fff;
+    font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+  .ee-sec-head span { font-weight: 500; text-transform: none; letter-spacing: 0; opacity: .8; }
+  .ee-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 8px 7px 12px; border-top: 1px solid #EEF2F7; }
+  .ee-row:first-of-type { border-top: 0; }
+  .ee-row.missing { background: #FFFBEB; }
+  .ee-label { flex: 1; min-width: 0; font-size: 13px; color: var(--text-primary); overflow-wrap: anywhere; }
+  .ee-note { margin-top: 6px; height: 32px; font-size: 13px; width: 100%; }
+  .ee-scale { display: inline-flex; gap: 4px; flex-shrink: 0; }
+  .ee-opt { min-width: 34px; height: 32px; padding: 0 6px; border-radius: 8px; border: 1.5px solid var(--border); background: #fff;
+    font-size: 13px; font-weight: 700; color: var(--text-secondary); cursor: pointer; transition: background .12s, border-color .12s, color .12s; }
+  .ee-opt:hover { border-color: var(--border-strong); }
+  .ee-opt:focus-visible { outline: 2px solid var(--hodari-blue); outline-offset: 1px; }
+  .ee-opt.ee-na { font-size: 11px; }
+  .ee-opt.on.ee-l1 { background: var(--green); border-color: var(--green); color: #fff; }
+  .ee-opt.on.ee-l2 { background: var(--hodari-blue); border-color: var(--hodari-blue); color: #fff; }
+  .ee-opt.on.ee-l3 { background: #D97706; border-color: #D97706; color: #fff; }
+  .ee-opt.on.ee-l4 { background: var(--red); border-color: var(--red); color: #fff; }
+  .ee-opt.on.ee-na { background: #64748B; border-color: #64748B; color: #fff; }
+  .ee-marks { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
+  .ee-marks input { width: 76px; height: 32px; text-align: center; }
+  .ee-sec-verse .ee-row { align-items: flex-start; }
+
+  .ee-comment { margin-top: 18px; }
+  .ee-comment textarea { width: 100%; min-height: 96px; resize: vertical; font-size: 13px; line-height: 1.5; }
+  .ee-count { font-size: 11.5px; margin-top: 4px; color: var(--text-muted); }
+  .ee-count.ok { color: var(--green); }
+  .ee-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .ee-actions-hint { font-size: 12px; color: var(--text-muted); }
+  .ee-actions-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .ee-form.locked .ee-opt, .ee-form.locked input, .ee-form.locked textarea, .ee-form.locked select { pointer-events: none; }
+  .ee-form.locked .ee-opt:not(.on) { opacity: .45; }
+  .ee-form.loading { opacity: .55; pointer-events: none; }
+  .ee-readonly-note { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; font-size: 12.5px; color: var(--text-muted); }
+
+  /* Narrow content area: the learner list becomes a picker above the form. */
+  @container (max-width: 860px) {
+    .ee-layout { grid-template-columns: 1fr; }
+    .ee-list { display: none; }
+    .ee-picker { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+    .ee-picker select { flex: 1; min-width: 0; }
+    #eePrev, #eeNext { display: none; }
+  }
+  @media (max-width: 520px) {
+    .ee-row { flex-direction: column; align-items: stretch; }
+    .ee-scale { justify-content: flex-end; }
+    .ee-progress-track { width: 100px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "academics/_top_tabs_progress.html" %}
+
+{% if no_class_assigned %}
+  <c-empty-state title="No ECD classes assigned" desc="You have no ECD class assignments. Ask your administrator to assign a class." icon="users" />
+{% else %}
+  {% include "academics/_progress_filters.html" %}
+
+  {% if ecd_read_only %}
+  <div class="ee-readonly-note"><span class="chip chip-grey">Read only</span>{{ pf.term.name }} &middot; the learners who were in {{ ecd_class_name }} that term, with the reports as recorded.</div>
+  {% endif %}
+
+  {% if not structure %}
+    <c-empty-state title="Pick a class and term" desc="Choose an ECD class and term above to start rating learners." icon="search" />
+  {% elif not structure.items %}
+    {% if perms.academics.view_ecdsection %}{% url 'academics:ecd_report_setup' as setup_url %}{% endif %}
+    <c-empty-state title="This report has no lines yet" desc="Set up what the {{ ecd_class_name }} report contains for Term {{ term_number }} first." icon="doc"
+      action_url="{% if setup_url %}{{ setup_url }}?class={{ ecd_class_type }}&term={{ term_number }}{% endif %}" action_text="Open ECD Report Setup" />
+  {% else %}
+
+  <div class="ee-top">
+    <div>
+      <div class="ee-top-title">{{ structure.layout.title|title }}</div>
+      <div class="ee-top-sub">{{ ecd_class_name }} &middot; {{ current_term.name }} &middot; {{ current_term.academic_year.name }} &middot; {{ structure.items|length }} lines</div>
+    </div>
+    <div class="ee-progress">
+      <div class="ee-progress-track" aria-hidden="true"><div class="ee-progress-fill" id="eeProgressFill"></div></div>
+      <span class="ee-progress-text" id="eeProgressText">Loading…</span>
+      {% if perms.academics.view_ecdsection %}<c-button variant="secondary" size="sm" href="{% url 'academics:ecd_report_setup' %}?class={{ ecd_class_type }}&term={{ term_number }}">Report setup</c-button>{% endif %}
+      {% if not ecd_read_only %}<c-button variant="success" size="sm" id="eeSubmitAll">Submit all ready</c-button>{% endif %}
+    </div>
+  </div>
+
+  <div class="ee-shell"><div class="ee-layout">
+    <nav class="card ee-list" aria-label="Learners">
+      <div class="ee-list-head" id="eeListHead">Learners</div>
+      <div id="eeList"></div>
+    </nav>
+
+    <div>
+      <div class="ee-picker">
+        <c-button variant="secondary" size="sm" id="eePrevM" aria-label="Previous learner">&lsaquo;</c-button>
+        <select class="hf-select" id="eePicker" aria-label="Learner"></select>
+        <c-button variant="secondary" size="sm" id="eeNextM" aria-label="Next learner">&rsaquo;</c-button>
+      </div>
+
+      <section class="card ee-form" id="eeForm" aria-live="polite">
+        <div class="ee-form-head">
+          <div>
+            <div class="ee-name" id="eeName">Select a learner</div>
+            <div class="ee-meta" id="eeMeta"></div>
+          </div>
+          <div class="ee-head-tools">
+            <span class="ee-mini" id="eeMini"></span>
+            <span class="ee-save-state" id="eeSaveState"></span>
+            <span class="chip chip-grey" id="eeStatus">—</span>
+            <c-button variant="secondary" size="sm" id="eePrev" aria-label="Previous learner">&lsaquo; Prev</c-button>
+            <c-button variant="secondary" size="sm" id="eeNext" aria-label="Next learner">Next &rsaquo;</c-button>
+          </div>
+        </div>
+        <div class="ee-banner lock" id="eeLock" hidden>This report has been submitted and is locked. Ask the HOD if it needs a correction.</div>
+        <div class="ee-banner welfare" id="eeWelfare" hidden></div>
+
+        <div class="ee-summary">
+          <div class="ee-stat"><div class="ee-stat-label">Average point</div><div class="ee-stat-value" id="eeAvg">–</div></div>
+          <div class="ee-stat">
+            <label class="ee-stat-label" for="eeRemarks">Remarks</label>
+            <select class="hf-select" id="eeRemarks">
+              <option value="" id="eeRemarksAuto">Auto</option>
+              {% for v, label in structure.academic_key %}<option value="{{ label }}">{{ label }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="ee-stat"><div class="ee-stat-label">Rated</div><div class="ee-stat-value" id="eeRated">–</div></div>
+          <div class="ee-stat"><div class="ee-stat-label">Days absent</div><div class="ee-stat-value" id="eeAbsent">–</div></div>
+        </div>
+
+        <nav class="ee-jump" aria-label="Sections">
+          {% for part in structure.parts %}{% for section in part.sections %}<a href="#ee-sec-{{ section.pk }}" data-sec="{{ section.pk }}">{{ section.title|title }}</a>{% endfor %}{% endfor %}
+        </nav>
+        {% if not ecd_read_only %}<p class="ee-tip">Keyboard: <kbd>&uarr;</kbd> <kbd>&darr;</kbd> move between lines, {% for opt in structure.parts.0.options %}<kbd>{{ opt.value }}</kbd> {% endfor %}or <kbd>0</kbd> (N/A) for Academic Progress, {% for opt in structure.parts.1.options %}<kbd>{{ opt.value }}</kbd> {% endfor %}for General Traits &mdash; the next line is picked automatically.</p>{% endif %}
+
+        {% for part in structure.parts %}{% if part.sections %}
+        <div class="ee-part">
+          <div class="ee-part-head">
+            <div class="ee-part-title">{{ part.label }}</div>
+            <div class="ee-key">{% for opt in part.options %}<span><b>{{ opt.value }}</b> {{ opt.label }}</span>{% endfor %}{% if part.na %}<span><b>N/A</b> Not applicable</span>{% endif %}</div>
+          </div>
+          {% if part.top %}<div class="ee-full">{% for section in part.top %}{% include "academics/_ecd_entry_section.html" %}{% endfor %}</div>{% endif %}
+          {% if part.left or part.right %}
+          <div class="ee-cols-wrap"><div class="ee-cols">
+            <div class="ee-col">{% for section in part.left %}{% include "academics/_ecd_entry_section.html" %}{% endfor %}</div>
+            <div class="ee-col">{% for section in part.right %}{% include "academics/_ecd_entry_section.html" %}{% endfor %}</div>
+          </div></div>
+          {% endif %}
+          {% if part.bottom %}<div class="ee-full after">{% for section in part.bottom %}{% include "academics/_ecd_entry_section.html" %}{% endfor %}</div>{% endif %}
+        </div>
+        {% endif %}{% endfor %}
+
+        <div class="ee-comment">
+          <label class="form-label" for="eeComment">Class teacher's comment <span class="req">*</span></label>
+          <textarea id="eeComment" class="hf-input" maxlength="2000" placeholder="At least 50 characters about the learner's progress this term."></textarea>
+          <div class="ee-count" id="eeCount">0 / 50 minimum</div>
+        </div>
+
+        {% if not ecd_read_only %}
+        <div class="ee-actions">
+          <span class="ee-actions-hint">Changes save automatically.</span>
+          <div class="ee-actions-btns">
+            <c-button variant="secondary" id="eePreview" href="#" target="_blank" rel="noopener" hidden>Preview report</c-button>
+            <c-button variant="secondary" id="eeSaveNext">Save &amp; next learner</c-button>
+            <c-button variant="success" id="eeSubmit">Submit to HOD</c-button>
+          </div>
+        </div>
+        {% endif %}
+      </section>
+    </div>
+  </div></div>
+  {{ welfare_flags|json_script:"ee-welfare" }}
+  {% endif %}
+{% endif %}
+
+{% if structure and structure.items %}
+<script>
+(function () {
+  'use strict';
+  var API = '/academics/api/ecd/';
+  var QS = 'term={{ current_term.pk }}&class_name={{ ecd_class_name|urlencode }}';
+  var CSRF = '{{ csrf_token }}';
+  var READ_ONLY = {{ ecd_read_only|yesno:"true,false" }};
+  var CLASS_LABEL = '{{ ecd_class_name|escapejs }} · {{ current_term.name|escapejs }}';
+  var WELFARE = JSON.parse(document.getElementById('ee-welfare').textContent);
+  var STATUS = { draft: ['Draft', 'chip-amber'], pending_sign_off: ['Submitted', 'chip-green'], published: ['Published', 'chip-blue'] };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var form = $('eeForm'), students = [], current = null, locked = false, pending = {}, timer = null, saving = null;
+
+  function url(path) { return API + path + (path.indexOf('?') === -1 ? '?' : '&') + QS; }
+  function post(path, body) {
+    return fetch(url(path), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF }, body: JSON.stringify(body || {}) })
+      .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || 'Could not save'); return d; }); });
+  }
+  function toast(msg, level) { if (typeof showToast === 'function') showToast(msg, level || 'info'); }
+  function name(s) { return s.first_name + ' ' + s.last_name; }
+
+  // ── learners ──
+  function chip(s) {
+    if (s.status && STATUS[s.status] && s.status !== 'draft') return STATUS[s.status];
+    if (!s.total) return ['—', 'chip-grey'];
+    return s.rated >= s.total ? ['Rated', 'chip-blue'] : [s.rated + '/' + s.total, s.rated ? 'chip-amber' : 'chip-grey'];
+  }
+  function renderList() {
+    $('eeListHead').textContent = 'Learners (' + students.length + ')';
+    var list = $('eeList'); list.textContent = '';
+    var picker = $('eePicker'); picker.textContent = '';
+    students.forEach(function (s) {
+      var c = chip(s);
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'ee-learner' + (current && current.id === s.id ? ' active' : '');
+      if (current && current.id === s.id) b.setAttribute('aria-current', 'true');
+      b.innerHTML = '<span><span class="ee-learner-name"></span><span class="ee-warn" hidden title="Open welfare concern">&#9888;</span><br><span class="ee-learner-meta"></span></span><span class="chip"></span>';
+      b.querySelector('.ee-learner-name').textContent = name(s);
+      b.querySelector('.ee-learner-meta').textContent = s.admission_no || '';
+      b.querySelector('.ee-warn').hidden = !WELFARE[s.id];
+      var ch = b.querySelector('.chip'); ch.textContent = c[0]; ch.classList.add(c[1]);
+      b.addEventListener('click', function () { open(s.id); });
+      list.appendChild(b);
+      var o = new Option(name(s) + ' — ' + c[0], s.id, false, current && current.id === s.id);
+      picker.appendChild(o);
+    });
+    var done = students.filter(function (s) { return s.status === 'pending_sign_off' || s.status === 'published'; }).length;
+    $('eeProgressFill').style.width = (students.length ? Math.round(done * 100 / students.length) : 0) + '%';
+    $('eeProgressText').textContent = done + ' of ' + students.length + ' submitted';
+  }
+  function loadStudents() {
+    return fetch(url('students/')).then(function (r) { return r.json(); }).then(function (d) {
+      students = d.students || []; renderList();
+    });
+  }
+
+  // ── one learner's report ──
+  function rows() { return form.querySelectorAll('.ee-row'); }
+  function clear() {
+    rows().forEach(function (row) {
+      row.classList.remove('missing');
+      row.querySelectorAll('.ee-opt').forEach(function (b) { b.classList.remove('on'); b.setAttribute('aria-checked', 'false'); });
+      row.querySelectorAll('input').forEach(function (i) { i.value = ''; });
+    });
+  }
+  function fill(d) {
+    clear();
+    rows().forEach(function (row) {
+      var v = d.values[row.dataset.item]; if (!v) return;
+      if (row.dataset.kind === 'marks') { row.querySelector('.ee-marks input').value = v.score == null ? '' : v.score; }
+      else row.querySelectorAll('.ee-opt').forEach(function (b) { var on = b.dataset.value === v.rating; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+      var note = row.querySelector('.ee-note'); if (note) note.value = v.note || '';
+    });
+    $('eeComment').value = d.teacher_comments || ''; count();
+    $('eeRemarks').value = d.ecd_remarks || '';
+    stats(d);
+  }
+  function stats(d) {
+    $('eeAvg').textContent = d.average == null ? '–' : d.average;
+    $('eeRemarksAuto').textContent = d.remarks_auto ? d.remarks_auto + ' (auto)' : 'Auto';
+    $('eeRated').textContent = d.rated + ' / ' + d.total;
+    $('eeAbsent').textContent = d.days_absent == null ? '–' : d.days_absent;
+    $('eeMini').innerHTML = '';
+    $('eeMini').append('Avg ', Object.assign(document.createElement('b'), { textContent: d.average == null ? '–' : d.average }),
+      ' · ', Object.assign(document.createElement('b'), { textContent: d.rated + '/' + d.total }), ' rated');
+    markSections();
+    if ($('eePreview')) {
+      $('eePreview').hidden = !d.report_card_id;
+      if (d.report_card_id) $('eePreview').href = '/academics/reports/' + d.report_card_id + '/preview/';
+    }
+    var s = STATUS[d.status] || ['No report', 'chip-grey'];
+    $('eeStatus').textContent = s[0]; $('eeStatus').className = 'chip ' + s[1];
+    if (current) { current.rated = d.rated; current.total = d.total; current.status = d.status; renderList(); }
+  }
+  function setLocked(on) {
+    locked = on || READ_ONLY;
+    form.classList.toggle('locked', locked);
+    $('eeLock').hidden = !(on && !READ_ONLY);
+    form.querySelectorAll('input, textarea, select').forEach(function (el) { el.disabled = locked; });
+    ['eeSubmit', 'eeSaveNext'].forEach(function (id) { if ($(id)) $(id).disabled = locked; });
+  }
+  function open(id) {
+    flush().then(function () {
+      current = students.find(function (s) { return s.id === id; }) || null;
+      if (!current) return;
+      renderList();
+      $('eeName').textContent = name(current);
+      $('eeMeta').textContent = (current.admission_no ? current.admission_no + ' · ' : '') + CLASS_LABEL;
+      var w = WELFARE[current.id];
+      $('eeWelfare').hidden = !w; if (w) $('eeWelfare').textContent = 'Welfare: ' + w.join('; ');
+      form.classList.add('loading'); $('eeSaveState').textContent = '';
+      return fetch(url('evaluation/' + id + '/')).then(function (r) { return r.json(); }).then(function (d) {
+        form.classList.remove('loading');
+        if (d.error) { toast(d.error, 'error'); return; }
+        fill(d); setLocked(d.is_locked);
+        if (!locked) focusRow(firstEmpty(), false);
+      });
+    });
+  }
+  function step(delta) {
+    if (!current) return;
+    var i = students.findIndex(function (s) { return s.id === current.id; }) + delta;
+    if (i >= 0 && i < students.length) open(students[i].id);
+  }
+
+  // ── saving (debounced; only changed lines are sent) ──
+  function queue(key, value) {
+    if (locked || !current) return;
+    pending[key] = value;
+    $('eeSaveState').className = 'ee-save-state'; $('eeSaveState').textContent = 'Editing…';
+    clearTimeout(timer); timer = setTimeout(flush, 700);
+  }
+  function flush() {
+    clearTimeout(timer);
+    if (saving) return saving.then(flush);
+    var keys = Object.keys(pending);
+    if (!keys.length || !current) return Promise.resolve();
+    var body = { values: {} }, who = current;
+    keys.forEach(function (k) {
+      if (k === 'comment') body.teacher_comments = pending.comment;
+      else if (k === 'remarks') body.overall_remarks = pending.remarks;
+      else body.values[k] = pending[k];
+    });
+    pending = {};
+    $('eeSaveState').textContent = 'Saving…';
+    saving = post('evaluation/' + who.id + '/', body).then(function (d) {
+      $('eeSaveState').textContent = 'Saved';
+      if (current && current.id === who.id) stats(d);
+    }).catch(function (e) {
+      $('eeSaveState').className = 'ee-save-state err'; $('eeSaveState').textContent = 'Not saved';
+      toast(e.message, 'error');
+    }).then(function () { saving = null; });
+    return saving;
+  }
+  function rowValue(row) {
+    var v = {};
+    if (row.dataset.kind === 'marks') v.score = row.querySelector('.ee-marks input').value;
+    else { var on = row.querySelector('.ee-opt.on'); v.rating = on ? on.dataset.value : ''; }
+    var note = row.querySelector('.ee-note'); if (note) v.note = note.value;
+    return v;
+  }
+
+  form.addEventListener('click', function (e) {
+    var b = e.target.closest('.ee-opt'); if (!b || locked) return;
+    var row = b.closest('.ee-row'), wasOn = b.classList.contains('on');
+    row.querySelectorAll('.ee-opt').forEach(function (x) { x.classList.remove('on'); x.setAttribute('aria-checked', 'false'); });
+    if (!wasOn) { b.classList.add('on'); b.setAttribute('aria-checked', 'true'); }
+    row.classList.remove('missing');
+    queue(row.dataset.item, rowValue(row));
+    markSections();
+  });
+  form.addEventListener('input', function (e) {
+    var row = e.target.closest('.ee-row');
+    if (row) { row.classList.remove('missing'); queue(row.dataset.item, rowValue(row)); }
+  });
+  function count() {
+    var n = $('eeComment').value.trim().length;
+    $('eeCount').textContent = n + ' / 50 minimum'; $('eeCount').classList.toggle('ok', n >= 50);
+  }
+  $('eeComment').addEventListener('input', function () { count(); queue('comment', this.value); });
+  $('eeRemarks').addEventListener('change', function () { queue('remarks', this.value); flush(); });
+  $('eePrev').addEventListener('click', function () { step(-1); });
+  $('eeNext').addEventListener('click', function () { step(1); });
+  $('eePrevM').addEventListener('click', function () { step(-1); });
+  $('eeNextM').addEventListener('click', function () { step(1); });
+  $('eePicker').addEventListener('change', function () { open(+this.value); });
+  window.addEventListener('beforeunload', function (e) { if (Object.keys(pending).length) { flush(); e.preventDefault(); } });
+
+  function markMissing() {
+    var first = null;
+    rows().forEach(function (row) {
+      var v = rowValue(row), empty = row.dataset.kind === 'marks' ? v.score === '' : !v.rating;
+      row.classList.toggle('missing', empty); if (empty && !first) first = row;
+    });
+    return first;
+  }
+  if ($('eeSaveNext')) $('eeSaveNext').addEventListener('click', function () { flush().then(function () { step(1); }); });
+  if ($('eeSubmit')) $('eeSubmit').addEventListener('click', function () {
+    var first = markMissing();
+    if (first) { first.scrollIntoView({ behavior: 'smooth', block: 'center' }); toast('Rate the highlighted lines first.', 'warning'); return; }
+    if ($('eeComment').value.trim().length < 50) { $('eeComment').focus(); toast("The class teacher's comment needs at least 50 characters.", 'warning'); return; }
+    flush().then(function () { return post('submit/' + current.id + '/'); }).then(function () {
+      toast(name(current) + ' submitted to the HOD.', 'success'); return open(current.id);
+    }).catch(function (e) { toast(e.message, 'error'); });
+  });
+  if ($('eeSubmitAll')) $('eeSubmitAll').addEventListener('click', function () {
+    var ready = students.filter(function (s) { return s.status !== 'pending_sign_off' && s.status !== 'published' && s.total && s.rated >= s.total; });
+    if (!ready.length) { toast('No learner is fully rated yet.', 'info'); return; }
+    confirmDeleteModal({
+      title: 'Submit ' + ready.length + ' report' + (ready.length > 1 ? 's' : '') + '?',
+      body: 'Send every fully rated learner in <strong>' + CLASS_LABEL + '</strong> to the HOD.',
+      detail: 'Learners whose comment is shorter than 50 characters are skipped.',
+      confirmText: 'Submit', type: 'info',
+      onConfirm: function () {
+        flush().then(function () {
+          return Promise.all(ready.map(function (s) { return post('submit/' + s.id + '/').then(function () { return true; }, function () { return false; }); }));
+        }).then(function (res) {
+          var ok = res.filter(Boolean).length;
+          toast(ok + ' submitted' + (res.length - ok ? ', ' + (res.length - ok) + ' skipped (comment too short or lines missing)' : '') + '.', ok ? 'success' : 'warning');
+          return loadStudents().then(function () { if (current) open(current.id); });
+        });
+      }
+    });
+  });
+
+  // ── sections: green once every line in them is rated ──
+  function isEmpty(row) { var v = rowValue(row); return row.dataset.kind === 'marks' ? v.score === '' : !v.rating; }
+  function markSections() {
+    form.querySelectorAll('.ee-sec').forEach(function (sec) {
+      var done = Array.prototype.every.call(sec.querySelectorAll('.ee-row'), function (r) { return !isEmpty(r); });
+      var link = form.querySelector('.ee-jump a[data-sec="' + sec.dataset.sec + '"]');
+      if (link) link.classList.toggle('done', done);
+    });
+  }
+
+  // ── keyboard rating: the current line takes the key, then the next line is picked ──
+  var currentRow = null;
+  function firstEmpty() { return Array.prototype.find.call(rows(), isEmpty) || rows()[0]; }
+  function focusRow(row, scroll) {
+    if (currentRow) currentRow.classList.remove('current');
+    currentRow = row || null;
+    if (!row) return;
+    row.classList.add('current');
+    if (scroll !== false) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (row.dataset.kind === 'marks') row.querySelector('.ee-marks input').focus({ preventScroll: true });
+  }
+  function moveRow(delta) {
+    var all = Array.prototype.slice.call(rows()), i = all.indexOf(currentRow) + delta;
+    if (i >= 0 && i < all.length) focusRow(all[i]);
+  }
+  form.addEventListener('focusin', function (e) { var row = e.target.closest('.ee-row'); if (row && row !== currentRow) focusRow(row, false); });
+  form.addEventListener('mousedown', function (e) { var row = e.target.closest('.ee-row'); if (row) focusRow(row, false); });
+  document.addEventListener('keydown', function (e) {
+    if (locked || !currentRow || e.ctrlKey || e.metaKey || e.altKey) return;
+    var typing = !!(e.target.closest && e.target.closest('input, textarea, select'));
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || (typing && e.key === 'Enter' && currentRow.dataset.kind === 'marks')) {
+      if (typing && e.target.closest('.ee-row') !== currentRow) return;  // e.g. arrows inside the comment box
+      e.preventDefault(); moveRow(e.key === 'ArrowUp' ? -1 : 1); return;
+    }
+    if (typing || currentRow.dataset.kind === 'marks') return;
+    var key = e.key.toUpperCase(), want = key === '0' || key === '-' ? 'NA' : key;
+    var btn = currentRow.querySelector('.ee-opt[data-value="' + want + '"]');
+    if (!btn) return;
+    e.preventDefault();
+    if (!btn.classList.contains('on')) btn.click();
+    moveRow(1);
+  });
+  // Pin below the app's own sticky top bar and tabs.
+  function pinOffset() {
+    var bottom = 0;
+    document.querySelectorAll('.topbar, .sub-nav').forEach(function (el) {
+      var cs = getComputedStyle(el);
+      if (cs.position === 'sticky' || cs.position === 'fixed') bottom = Math.max(bottom, (parseFloat(cs.top) || 0) + el.offsetHeight);
+    });
+    document.querySelector('.ee-shell').style.setProperty('--ee-top', bottom + 'px');
+  }
+  pinOffset(); window.addEventListener('resize', pinOffset);
+  // A shadow under the pinned header once the page scrolls past it.
+  if ('IntersectionObserver' in window) {
+    var sentinel = document.createElement('div');
+    form.insertBefore(sentinel, form.firstChild);
+    new IntersectionObserver(function (es) { form.querySelector('.ee-form-head').classList.toggle('stuck', !es[0].isIntersecting); }).observe(sentinel);
+  }
+
+  setLocked(READ_ONLY);
+  loadStudents().then(function () { if (students.length) open(students[0].id); else $('eeName').textContent = 'No learners in this class'; });
+})();
+</script>
+{% endif %}
+{% endblock %}

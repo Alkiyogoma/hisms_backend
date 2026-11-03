@@ -5,6 +5,9 @@
   {% if can_ecd and perms.academics.view_examscore %}
   <a href="{% url 'academics:ecd_assessment' %}" class="sub-tab {% if academics_tab == 'ecd_evaluations' %}active{% endif %}">ECD Evaluation</a>
   {% endif %}
+  {% if can_ecd and perms.academics.view_ecdsection %}
+  <a href="{% url 'academics:ecd_report_setup' %}" class="sub-tab {% if academics_tab == 'ecd_setup' %}active{% endif %}">ECD Report Setup</a>
+  {% endif %}
   {% has_dept user "PRIMARY" as can_primary %}
   {% if can_primary and perms.academics.change_examscore %}
   <a href="{% url 'academics:primary_assessment' %}" class="sub-tab {% if academics_tab == 'primary_assessment' %}active{% endif %}">Primary Assessment</a>

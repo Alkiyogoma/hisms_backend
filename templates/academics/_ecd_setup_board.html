@@ -1,0 +1,78 @@
+{# The ECD report setup for one class and term; re-rendered after every edit (htmx swaps the whole board). #}
+<div id="ecd-board" data-class="{{ class_type }}" data-term="{{ term_number }}"
+     hx-target="this" hx-swap="outerHTML"
+     hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+     hx-vals='{"class": "{{ class_type }}", "term": "{{ term_number }}"}'>
+  {{ layout_json|json_script:"es-layout-data" }}
+
+  <div class="es-toolbar">
+    <nav class="es-terms" aria-label="Term">
+      {% for t in terms %}
+      <a class="es-term{% if t.active %} active{% endif %}" href="?class={{ class_type }}&term={{ t.n }}" hx-boost="false"{% if t.active %} aria-current="page"{% endif %}>
+        Term {{ t.n }} <span class="es-term-count" title="Lines on the Term {{ t.n }} report">{{ t.count }}</span>
+      </a>
+      {% endfor %}
+    </nav>
+    {% if can_edit %}
+    <div class="es-toolbar-actions">
+      <div class="hf-menu">
+        <c-button variant="secondary" size="sm" data-hf-menu aria-haspopup="menu" aria-expanded="false">Copy from&hellip;</c-button>
+        <div class="hf-menu-list" role="menu">
+          {% for n in other_terms %}
+          <button type="button" class="hf-menu-item" role="menuitem" hx-post="{{ request.path }}" hx-vals='{"action": "copy_term", "from": "{{ n }}"}'
+            data-confirm-title="Copy Term {{ n }} into Term {{ term_number }}?"
+            data-confirm-body="Term {{ term_number }} of <strong>{{ class_label }}</strong> will show the same lines, keys and title as Term {{ n }}."
+            data-confirm-detail="Lines only used in other terms are kept; nothing is deleted."
+            data-confirm-text="Copy" data-confirm-type="warning">Term {{ n }}</button>
+          {% endfor %}
+        </div>
+      </div>
+      <c-button variant="secondary" size="sm" href="{% url 'academics:ecd_report_setup_preview' %}?class={{ class_type }}&term={{ term_number }}" target="_blank" rel="noopener">Preview</c-button>
+      <c-button size="sm" onclick="esOpenLayout()">Report settings</c-button>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="es-summary">
+      <div>
+        <div class="es-summary-title">
+          <span class="es-swatch es-swatch-{{ layout.accent }}" title="{{ layout.get_accent_display }} rating columns"></span>
+          {{ layout.title }}
+        </div>
+        <div class="es-keys">
+          <span><strong>Academic Progress</strong>{% for v, label in layout.academic_key %}<span class="es-key"><b>{{ v }}</b> {{ label }}</span>{% endfor %}</span>
+          <span><strong>General Traits</strong>{% for v, label in layout.traits_key %}<span class="es-key"><b>{{ v }}</b> {{ label }}</span>{% endfor %}</span>
+        </div>
+      </div>
+      <span class="chip chip-grey" title="Rating column heading">Column: {{ layout.column_label }}</span>
+    </div>
+  </div>
+
+  {% for part in parts %}
+  <section class="card es-part" aria-labelledby="es-part-{{ part.key }}">
+    <div class="es-part-head">
+      <div>
+        <div class="es-part-title" id="es-part-{{ part.key }}">{{ part.label }}</div>
+        <div class="es-part-sub">Rated {{ part.scale }} · {{ part.board.count }} line{{ part.board.count|pluralize }} on the Term {{ term_number }} report</div>
+      </div>
+      {% if can_edit %}
+      <c-button variant="secondary" size="sm" data-part="{{ part.key }}" onclick="esOpenSection(this)">+ Add section</c-button>
+      {% endif %}
+    </div>
+
+    {% if part.board.empty %}
+      <div class="es-part-empty">No sections yet.{% if can_edit %} Add one to start building this part of the report.{% endif %}</div>
+    {% else %}
+      {% if part.board.top %}<div class="es-full">{% for section in part.board.top %}{% include "academics/_ecd_setup_section.html" %}{% endfor %}</div>{% endif %}
+      {% if part.board.left or part.board.right %}
+      <div class="es-cols-wrap"><div class="es-cols">
+        <div class="es-col">{% for section in part.board.left %}{% include "academics/_ecd_setup_section.html" %}{% endfor %}</div>
+        <div class="es-col">{% for section in part.board.right %}{% include "academics/_ecd_setup_section.html" %}{% endfor %}</div>
+      </div></div>
+      {% endif %}
+      {% if part.board.bottom %}<div class="es-full after">{% for section in part.board.bottom %}{% include "academics/_ecd_setup_section.html" %}{% endfor %}</div>{% endif %}
+    {% endif %}
+  </section>
+  {% endfor %}
+</div>

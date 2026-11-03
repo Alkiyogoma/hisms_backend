@@ -2050,6 +2050,7 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
                         Term.objects.create(
                             academic_year=ay,
                             name=term_names.get(i + 1, f"Term {i + 1}"),
+                            term_number=i + 1 if i < 3 else None,
                             start_date=t_start,
                             end_date=t_end,
                         )
@@ -2148,8 +2149,12 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
                 gm_mt_days = request.POST.get("midterm_grade_marking_days") or 10
                 gm_et_days = request.POST.get("endterm_grade_marking_days") or 10
                 gm_q_days = request.POST.get("quiz_grade_marking_days") or 5
-                if not (ay_pk and term_name and start_date_str and end_date_str):
-                    messages.error(request, "Academic year, term name, and dates are required.")
+                term_number = request.POST.get("term_number", "").strip()
+                term_number = int(term_number) if term_number in ("1", "2", "3") else None
+                if term_number and not term_name:
+                    term_name = f"Term {term_number}"
+                if not (ay_pk and term_number and start_date_str and end_date_str):
+                    messages.error(request, "Academic year, term number (1, 2 or 3), and dates are required.")
                     return redirect(f"{reverse_lazy('core:school_settings')}?tab=academic_year")
                 ay = get_object_or_404(AcademicYear, pk=ay_pk)
                 if ay.is_published and not self._is_super_admin(request):
@@ -2190,7 +2195,7 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
                     gm_q_days = 5
 
                 term = Term(
-                    academic_year=ay, name=term_name,
+                    academic_year=ay, name=term_name, term_number=term_number,
                     start_date=sd, end_date=ed, grading_deadline=grading_deadline,
                     midterm_exam_start_date=_parse_date(midterm_start),
                     midterm_exam_end_date=_parse_date(midterm_end),
@@ -2249,6 +2254,9 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
                 term_name_new = request.POST.get("term_name", "").strip()
                 if term_name_new:
                     term.name = term_name_new
+                term_number_new = request.POST.get("term_number", "").strip()
+                if term_number_new in ("1", "2", "3"):
+                    term.term_number = int(term_number_new)
                 term.grading_deadline = _parse_date(request.POST.get("grading_deadline")) if request.POST.get("grading_deadline") else term.grading_deadline
                 term.midterm_exam_start_date = _parse_date(request.POST.get("midterm_exam_start_date"))
                 term.midterm_exam_end_date = _parse_date(request.POST.get("midterm_exam_end_date"))

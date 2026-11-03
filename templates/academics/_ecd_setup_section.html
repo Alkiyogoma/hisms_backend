@@ -1,0 +1,44 @@
+{# One ECD report section on the setup board: its lines for this term, then lines used only in other terms. #}
+<div class="es-sec">
+  <div class="es-sec-head">
+    <div class="es-sec-title">
+      {{ section.title }}{% if section.style != "table" %}<span class="es-sec-style">{{ section.get_style_display }}</span>{% endif %}
+    </div>
+    {% if can_edit %}
+    <div class="es-sec-tools">
+      <button type="button" class="es-ico" title="Move up" aria-label="Move {{ section.title }} up"
+        hx-post="{{ request.path }}" hx-vals='{"action": "move_section", "section": "{{ section.pk }}", "dir": "up"}'><svg aria-hidden="true"><use href="#es-up"/></svg></button>
+      <button type="button" class="es-ico" title="Move down" aria-label="Move {{ section.title }} down"
+        hx-post="{{ request.path }}" hx-vals='{"action": "move_section", "section": "{{ section.pk }}", "dir": "down"}'><svg aria-hidden="true"><use href="#es-down"/></svg></button>
+      <button type="button" class="es-ico" title="Edit section" aria-label="Edit {{ section.title }}" onclick="esOpenSection(this)"
+        data-section="{{ section.pk }}" data-part="{{ section.part }}" data-title="{{ section.title }}" data-column="{{ section.column }}"
+        data-style="{{ section.style }}" data-avg="{% if section.counts_in_average %}1{% endif %}"><svg aria-hidden="true"><use href="#es-edit"/></svg></button>
+      <button type="button" class="es-ico danger" title="Delete section" aria-label="Delete {{ section.title }}"
+        hx-post="{{ request.path }}" hx-vals='{"action": "delete_section", "section": "{{ section.pk }}"}'
+        data-confirm-title="Delete section?" data-confirm-body="Delete <strong>{{ section.title }}</strong> and all {{ section.items.all|length }} of its lines?"
+        data-confirm-detail="This removes it from every term." data-confirm-text="Delete section"><svg aria-hidden="true"><use href="#es-del"/></svg></button>
+    </div>
+    {% endif %}
+  </div>
+
+  <div>
+    {% for item in section.term_items %}{% include "academics/_ecd_setup_item.html" %}
+    {% empty %}<div class="es-empty-sec">No lines in Term {{ term_number }}{% if section.other_items %} — add one below or switch one on from another term{% endif %}.</div>
+    {% endfor %}
+  </div>
+
+  {% if section.other_items %}
+  <details class="es-other">
+    <summary>{{ section.other_items|length }} line{{ section.other_items|length|pluralize }} only in other terms</summary>
+    {% for item in section.other_items %}{% include "academics/_ecd_setup_item.html" with off=True %}{% endfor %}
+  </details>
+  {% endif %}
+
+  {% if can_edit %}
+  <form class="es-add" hx-post="{{ request.path }}" hx-vals='{"action": "add_item", "section": "{{ section.pk }}"}'>
+    <input type="text" id="es-add-{{ section.pk }}" name="label" class="hf-input" maxlength="200" required
+      placeholder="Add a line to Term {{ term_number }}…" aria-label="New line for {{ section.title }}" autocomplete="off">
+    <c-button type="submit" variant="secondary" size="sm">Add</c-button>
+  </form>
+  {% endif %}
+</div>

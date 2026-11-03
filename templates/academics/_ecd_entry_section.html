@@ -1,0 +1,20 @@
+{# One section of the ECD entry form: a line per item with its rating buttons (or a marks box). #}
+<div class="ee-sec{% if section.style == 'verse' %} ee-sec-verse{% endif %}" id="ee-sec-{{ section.pk }}" data-sec="{{ section.pk }}">
+  <div class="ee-sec-head">{{ section.title }}<span>{% if section.style == "marks" %}Marks{% else %}{{ structure.layout.column_label }}{% endif %}</span></div>
+  {% for item in section.term_items %}
+  <div class="ee-row" data-item="{{ item.pk }}" data-kind="{% if section.style == 'marks' %}marks{% else %}rating{% endif %}">
+    <div class="ee-label">
+      {{ item.label }}
+      {% if item.allows_text %}<input type="text" class="hf-input ee-note" maxlength="255" placeholder="{% if section.style == 'verse' %}Verse, e.g. Psalms 1:1-6{% else %}Note{% endif %}" aria-label="Note for {{ item.label }}">{% endif %}
+    </div>
+    {% if section.style == "marks" %}
+    <div class="ee-marks"><input type="number" class="hf-input" min="0" max="100" step="1" inputmode="numeric" aria-label="Marks for {{ item.label }}"><span>/ 100</span></div>
+    {% else %}
+    <div class="ee-scale" role="radiogroup" aria-label="{{ item.label }}">
+      {% for opt in part.options %}<button type="button" class="ee-opt ee-l{{ forloop.counter }}" data-value="{{ opt.value }}" role="radio" aria-checked="false" title="{{ opt.label }}">{{ opt.value }}</button>{% endfor %}
+      {% if part.na %}<button type="button" class="ee-opt ee-na" data-value="NA" role="radio" aria-checked="false" title="Not applicable">N/A</button>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>

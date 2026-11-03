@@ -94,8 +94,9 @@ from academics.views.admin import (
     SubjectDeleteView,
     SubjectsPerGradeView,
     SubjectClassesAPIView,
-    ECDDomainConfigListView,
 )
+
+from academics.views.ecd_setup import ECDReportSetupPreviewView, ECDReportSetupView
 
 from academics.views.progression import (
     StudentAcademicRecordView,

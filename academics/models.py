@@ -362,9 +362,24 @@ class TimetableEntry(TimeStampedModel):
         self.full_clean()
         super().save(*args, **kwargs)
 
+class TermNumber(models.IntegerChoices):
+    TERM_1 = 1, "Term 1"
+    TERM_2 = 2, "Term 2"
+    TERM_3 = 3, "Term 3"
+
+
+def term_number_from_name(name: str | None) -> int | None:
+    """Best guess of the term number (1-3) from a name like "Term 2" or "T3"."""
+    import re
+    m = re.search(r"([1-3])\b", name or "")
+    return int(m.group(1)) if m else None
+
+
 class Term(TimeStampedModel):
     academic_year = models.ForeignKey(AcademicYear, on_delete=models.PROTECT, related_name="terms")
     name = models.CharField(max_length=40)
+    # Which term of the year this is; drives per-term configuration (e.g. ECD report layouts).
+    term_number = models.PositiveSmallIntegerField(choices=TermNumber.choices, null=True, blank=True)
     is_locked = models.BooleanField(default=False)
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
@@ -393,6 +408,14 @@ class Term(TimeStampedModel):
 
     class Meta:
         unique_together = ("academic_year", "name")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["academic_year", "term_number"],
+                condition=models.Q(term_number__isnull=False),
+                name="unique_term_number_per_year",
+                violation_error_message="That term number is already used by another term in this academic year.",
+            ),
+        ]
 
     def clean(self):
         super().clean()
@@ -460,6 +483,16 @@ class Term(TimeStampedModel):
                         f"latest grade marking window ends ({latest_marking}). "
                         f"Adjust the marking days or set a later deadline."
                     )
+
+    def save(self, *args, **kwargs):
+        # Terms created without an explicit number (scripts, seeders) take it from the name.
+        if self.term_number is None and self.academic_year_id:
+            guess = term_number_from_name(self.name)
+            if guess and not Term.objects.filter(
+                academic_year_id=self.academic_year_id, term_number=guess,
+            ).exclude(pk=self.pk).exists():
+                self.term_number = guess
+        super().save(*args, **kwargs)
 
     def compute_grade_marking_end_date(self, exam_type):
         """Compute grade marking end date by adding N working days (Mon-Fri) to exam end date.
@@ -1062,25 +1095,126 @@ class ECDDomainConfig(TimeStampedModel):
         return f"{self.get_class_type_display()} - {self.domain_name}"
 
 
-class ECDEvaluation(TimeStampedModel):
+class ECDClassType(models.TextChoices):
+    PRE_K = "pre_k", "Pre-Kindergarten"
+    KINDERGARTEN = "kindergarten", "Kindergarten"
+    PRE_SCHOOL = "pre_school", "Pre-School"
+    ABC = "abc", "ABC Class"
+
+
+class ECDReportLayout(TimeStampedModel):
+    """Per class type and term: the report's title, rating keys and look.
+
+    Academic Progress is rated 4/3/2/1 and General Traits E/G/S/N; only the
+    wording of each key changes between classes and terms.
     """
-    Evaluations for ECD specific domains (Numeracy, Communication, etc.)
-    Graded as E (Excellent), G (Good), S (Satisfactory), N (Needs Improvement).
-    """
-    report_card = models.ForeignKey(ReportCard, on_delete=models.CASCADE, related_name="ecd_evaluations")
-    domain = models.CharField(max_length=100)
-    rating = models.CharField(
-        max_length=2,
-        choices=[
-            ("E", "Excellent"),
-            ("G", "Good"),
-            ("S", "Satisfactory"),
-            ("N", "Needs Improvement"),
-        ]
-    )
+    class Accent(models.TextChoices):
+        YELLOW = "yellow", "Yellow"
+        BLUE = "blue", "Light blue"
+
+    class_type = models.CharField(max_length=20, choices=ECDClassType.choices)
+    term_number = models.PositiveSmallIntegerField(choices=TermNumber.choices)
+    title = models.CharField(max_length=80, help_text='e.g. "KINDERGARTEN PROGRESS REPORT"')
+    academic_key = models.JSONField(default=list, help_text='[["4", "Outstanding"], ["3", "Good"], ...]')
+    traits_key = models.JSONField(default=list, help_text='[["E", "Excellent"], ["G", "Good"], ...]')
+    column_label = models.CharField(max_length=20, default="Points", help_text='Rating column heading: "Points" or "Evaluation"')
+    accent = models.CharField(max_length=10, choices=Accent.choices, default=Accent.YELLOW)
 
     class Meta:
-        unique_together = ("report_card", "domain")
+        ordering = ["class_type", "term_number"]
+        unique_together = ("class_type", "term_number")
+
+    def __str__(self) -> str:
+        return f"{self.get_class_type_display()} - Term {self.term_number}"
+
+
+class ECDSection(TimeStampedModel):
+    """A titled block of an ECD report (e.g. NUMERACY), holding rated items."""
+    class Part(models.TextChoices):
+        ACADEMIC = "academic", "Academic Progress"
+        TRAITS = "traits", "General Traits"
+
+    class Column(models.TextChoices):
+        LEFT = "left", "Left"
+        RIGHT = "right", "Right"
+        FULL = "full", "Full width"
+
+    class Style(models.TextChoices):
+        TABLE = "table", "Rated list"
+        STRIP = "strip", "Subject points row"
+        MARKS = "marks", "Marks out of 100"
+        VERSE = "verse", "Bible memory row"
+
+    class_type = models.CharField(max_length=20, choices=ECDClassType.choices)
+    part = models.CharField(max_length=10, choices=Part.choices)
+    title = models.CharField(max_length=80)
+    column = models.CharField(max_length=5, choices=Column.choices, default=Column.LEFT)
+    style = models.CharField(max_length=10, choices=Style.choices, default=Style.TABLE)
+    counts_in_average = models.BooleanField(default=True, help_text="Include this section's points in the Average Point.")
+    sort_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["class_type", "part", "sort_order", "pk"]
+
+    def __str__(self) -> str:
+        return f"{self.get_class_type_display()} · {self.get_part_display()} · {self.title}"
+
+
+class ECDItemQuerySet(models.QuerySet):
+    def for_term(self, term_number):
+        return self.filter(**{f"in_term_{term_number}": True}, is_active=True)
+
+
+class ECDItem(TimeStampedModel):
+    """One rated line of an ECD section, flagged for the terms (1, 2, 3) it appears in."""
+    section = models.ForeignKey(ECDSection, on_delete=models.CASCADE, related_name="items")
+    label = models.CharField(max_length=200)
+    in_term_1 = models.BooleanField(default=True)
+    in_term_2 = models.BooleanField(default=True)
+    in_term_3 = models.BooleanField(default=True)
+    allows_text = models.BooleanField(default=False, help_text="Teacher also types a note, e.g. the Bible verse.")
+    sort_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    objects = ECDItemQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["section", "sort_order", "pk"]
+
+    @property
+    def terms(self):
+        return [n for n in (1, 2, 3) if getattr(self, f"in_term_{n}")]
+
+    def __str__(self) -> str:
+        return f"{self.label} (T{','.join(map(str, self.terms))})"
+
+
+class ECDEvaluation(TimeStampedModel):
+    """
+    One rated line of a learner's ECD report.
+
+    Linked to the configured ``ECDItem``; ``domain`` and ``section_title`` keep
+    the wording as it was rated, so later setup edits never change a past report.
+    Academic Progress lines hold 4/3/2/1 or "NA", General Traits lines the
+    layout's letters (E/G/S/N or M); marks lines hold ``score`` (0-100) instead.
+    Rows without an item are from the old fixed lists (before term templates).
+    """
+    report_card = models.ForeignKey(ReportCard, on_delete=models.CASCADE, related_name="ecd_evaluations")
+    item = models.ForeignKey(ECDItem, on_delete=models.SET_NULL, null=True, blank=True, related_name="evaluations")
+    section_title = models.CharField(max_length=80, blank=True)
+    domain = models.CharField(max_length=200)
+    rating = models.CharField(max_length=2, blank=True)
+    score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    note = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["report_card", "item"], condition=models.Q(item__isnull=False),
+                name="unique_ecd_evaluation_per_item",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.report_card_id} | {self.domain} | {self.rating}"
