@@ -671,6 +671,33 @@ body{
   function loadPending(){try{var d=localStorage.getItem('hodari_pending');if(d){pendingScans=JSON.parse(d);pendingScans.forEach(function(s){s.time=new Date(s.time)})}}catch(e){pendingScans=[]}}
   loadPending();
 
+  // Scans already recorded on the server today, keyed "MODE|studentId".
+  var recordedToday={}, recordedDay=new Date().toDateString();
+  function scanKey(mode,id){return mode+'|'+String(id)}
+  function isToday(d){var n=new Date();d=new Date(d);return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate()}
+
+  // Pending scans never carry over to another day: submitting them later would
+  // stamp them with the wrong date. Drop anything scanned before today.
+  function dropStaleScans(){
+    var before=pendingScans.length;
+    pendingScans=pendingScans.filter(function(s){return s.time&&!isNaN(new Date(s.time))&&isToday(s.time)});
+    var dropped=before-pendingScans.length;
+    if(dropped)savePending();
+    var day=new Date().toDateString();
+    if(day!==recordedDay){recordedDay=day;recordedToday={}}
+    return dropped;
+  }
+
+  // Remove pending scans the server already has (submitted earlier, by another
+  // device, or by offline sync) so they don't linger in the list.
+  function dropRecordedScans(){
+    var before=pendingScans.length;
+    pendingScans=pendingScans.filter(function(s){return !recordedToday[scanKey(s.mode,s.id)]});
+    var dropped=before-pendingScans.length;
+    if(dropped)savePending();
+    return dropped;
+  }
+
   function localTimestamp(){
     var n=new Date();
     var off=n.getTimezoneOffset();
@@ -788,12 +815,18 @@ body{
 
   // ── Stats ──
   function loadCheckinStats(){
+    var stale=dropStaleScans();
+    if(stale){renderPending();showToast(stale+' scan'+(stale>1?'s':'')+' from a previous day cleared',true)}
     apiGet('/attendance/api/scans/today/').then(function(d){
       var arr=Array.isArray(d)?d:(d.results||d.scans||d.data||[]);
       var ci=arr.filter(function(s){return s.scan_type==='IN'}).length;
       var co=arr.filter(function(s){return s.scan_type==='OUT'}).length;
       document.getElementById('checkinToday').textContent=ci;
       document.getElementById('checkoutToday').textContent=co;
+      // Add-only within the day (reset in dropStaleScans on date change), so
+      // keys learned from a submit response survive a lagging refresh.
+      arr.forEach(function(s){if(s.student_id&&(s.scan_type==='IN'||s.scan_type==='OUT'))recordedToday[scanKey(s.scan_type,s.student_id)]=true});
+      if(dropRecordedScans())renderPending();
     }).catch(function(){});
   }
   window.refreshCheckin=function(){loadCheckinStats();showToast('Refreshed')};
@@ -802,6 +835,9 @@ body{
   function addPending(studentId,mode,studentName,source){
     if(pendingScans.some(function(s){return s.id===studentId&&s.mode===mode})){
       showToast('Already in the list',true);fb.duplicate();return;
+    }
+    if(recordedToday[scanKey(mode,studentId)]){
+      showToast((studentName||studentId)+' already checked '+(mode==='IN'?'in':'out')+' today',true);fb.duplicate();return;
     }
     pendingScans.push({id:studentId,name:studentName||'Unknown',mode:mode,time:new Date(),source:source||'qr'});
     savePending();
@@ -834,7 +870,7 @@ body{
           if(card){card.style.transition='transform .25s ease,opacity .25s ease';card.style.transform='translateX(-300px)';card.style.opacity='0'}
           showToast('Queued: '+(s.name||s.id),'success');
           fb.swipeSave();
-          setTimeout(function(){pendingScans.splice(idx,1);renderPending();savePending();updatePendingBadge()},250);
+          setTimeout(function(){var i=pendingScans.indexOf(s);if(i>-1)pendingScans.splice(i,1);renderPending();savePending();updatePendingBadge()},250);
           if('sync' in navigator.serviceWorker){
             navigator.serviceWorker.ready.then(function(reg){return reg.sync.register('hodari-offline-sync')}).catch(function(){});
           }
@@ -850,12 +886,13 @@ body{
     apiPost(url,body).then(function(d){
       console.log('[PWA] swipeSave response',d);
       var ok=d.summary&&d.summary.successful||0;
-      var fail=d.summary&&d.summary.failed||0;
-      if(ok){
+      var already=isAlreadySubmitted(d.data&&d.data[0]);
+      if(ok||already){
         if(card){card.style.transition='transform .25s ease,opacity .25s ease';card.style.transform='translateX(-300px)';card.style.opacity='0'}
-        showToast('Saved: '+(s.name||s.id),'success');
+        recordedToday[scanKey(s.mode,s.id)]=true;
+        showToast((already?'Already recorded: ':'Saved: ')+(s.name||s.id),'success');
         fb.swipeSave();
-        setTimeout(function(){pendingScans.splice(idx,1);renderPending();savePending();updatePendingBadge();loadCheckinStats()},250);
+        setTimeout(function(){var i=pendingScans.indexOf(s);if(i>-1)pendingScans.splice(i,1);renderPending();savePending();updatePendingBadge();loadCheckinStats()},250);
       } else {
         var errMsg='Failed to save';
         if(d.data&&d.data[0]&&d.data[0].message)errMsg=d.data[0].message;
@@ -1248,48 +1285,63 @@ body{
       return;
     }
 
+    // Each batch resolves to {mode, data} or {mode, error} so one failing
+    // endpoint doesn't discard the other's results.
+    function post(mode,url,body){
+      return apiPost(url,body).then(function(d){return{mode:mode,data:d}},function(e){return{mode:mode,error:e}});
+    }
     var promises=[];
     if(inScans.length){
-      promises.push(apiPost('/attendance/api/checkin/',{students:inScans.map(function(s){return{id:s.id,timestamp:localTimestamp()}})}));
+      promises.push(post('IN','/attendance/api/checkin/',{students:inScans.map(function(s){return{id:s.id,timestamp:localTimestamp()}})}));
     }
     if(outScans.length){
-      promises.push(apiPost('/attendance/api/checkout/',{students:outScans.map(function(s){return{id:s.id,timestamp:localTimestamp(),parent_name:'',reason:''}})}));
+      promises.push(post('OUT','/attendance/api/checkout/',{students:outScans.map(function(s){return{id:s.id,timestamp:localTimestamp(),parent_name:'',reason:''}})}));
     }
     Promise.all(promises).then(function(results){
-      var ok=0,fail=0;
+      var ok=0,already=0,fail=0;
       var failMessages=[];
-      results.forEach(function(d){
-        ok+=d.summary&&d.summary.successful||0;
-        fail+=d.summary&&d.summary.failed||0;
-        if(d.data){
-          d.data.forEach(function(item){
-            if(item.status==='error'&&item.message){
-              failMessages.push(item.message);
-            }
-          });
+      var resolved={}; // "MODE|id" -> true for scans that no longer need submitting
+      var authRedirect=false;
+      results.forEach(function(r){
+        if(r.error){
+          if(r.error.message==='auth_redirect'){authRedirect=true;return}
+          var n=r.mode==='IN'?inScans.length:outScans.length;
+          fail+=n;failMessages.push(r.error.message||'Server error');
+          return;
         }
+        (r.data.data||[]).forEach(function(item){
+          var key=scanKey(r.mode,item.student_id);
+          if(item.status==='success'){ok++;resolved[key]=true}
+          else if(isAlreadySubmitted(item)){already++;resolved[key]=true}
+          else{fail++;if(item.message)failMessages.push(item.message)}
+        });
       });
-      if(ok)showToast(ok+' student'+(ok>1?'s':'')+' submitted','success');
+      if(authRedirect)return;
+
+      // Drop submitted + already-submitted scans; keep real failures (and any
+      // scans added while the request was in flight) so the user can retry.
+      Object.keys(resolved).forEach(function(k){recordedToday[k]=true});
+      pendingScans=pendingScans.filter(function(s){return !resolved[scanKey(s.mode,s.id)]});
+      savePending();renderPending();updatePendingBadge();
+
+      var parts=[];
+      if(ok)parts.push(ok+' submitted');
+      if(already)parts.push(already+' already recorded');
       if(fail){
-        var msg=fail+' failed';
+        var msg=(parts.length?parts.join(', ')+', ':'')+fail+' failed';
         if(failMessages.length)msg+=': '+failMessages[0];
         showToast(msg,true);
+      }else if(parts.length){
+        showToast(parts.join(', '),'success');
       }
-      if(!fail){
-        pendingScans=[];
-      }
-      savePending();renderPending();updatePendingBadge();
-      ok?fb.submitSuccess():fb.submitFail();
+      (ok||already)&&!fail?fb.submitSuccess():fb.submitFail();
       loadCheckinStats();
-    }).catch(function(e){
-      console.error('submitAll failed:',e);
-      if(e.message!=='auth_redirect'){
-        showToast('Submit failed: '+e.message,true);
-        fb.submitFail();
-        // Keep pendingScans intact so user can retry
-      }
     });
   };
+
+  function isAlreadySubmitted(item){
+    return item&&(item.error_code==='ALREADY_CHECKED_IN'||item.error_code==='ALREADY_CHECKED_OUT');
+  }
 
   // ── Reports ──
   window.loadCheckinReport=function(){
@@ -1411,6 +1463,7 @@ body{
   // ── Init ──
   loadCheckinStats();renderPending();
   setInterval(loadCheckinStats,30000);
+  document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')loadCheckinStats()});
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('{% url "attendance:pwa_sw" %}',{scope:'/attendance/pwa/'}).then(function(r){
       console.log('SW registered, scope:',r.scope);
@@ -1418,7 +1471,7 @@ body{
     // Listen for sync completion messages from SW
     navigator.serviceWorker.addEventListener('message',function(e){
       if(e.data&&e.data.type==='SYNC_COMPLETE'){
-        showToast(e.data.synced+' offline submission(s) synced','success');
+        if(e.data.synced)showToast(e.data.synced+' offline submission(s) synced','success');
         loadCheckinStats();
       }
       if(e.data&&e.data.type==='NEW_VERSION'){
