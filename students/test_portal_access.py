@@ -1,123 +1,128 @@
-"""Existing parents can be given portal access, or sent new login details,
-from the parent page."""
+"""Every parent on record can use the parent portal: there is no "Create
+Portal Access" step. Parents sign in at /parent/login/ with their phone or
+email and a one-time code; the login is created on first sign-in."""
+from datetime import date
 from unittest import mock
 
-from django.contrib.messages import get_messages
+from django.contrib.auth.models import Group, Permission
 from django.core import mail
+from django.core.cache import cache
 from django.test import TestCase, override_settings
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 
-from students.models import ParentGuardian
+from academics.models import AcademicYear, Department, GradeClass
+from students.models import ParentGuardian, Student, StudentGuardian, StudentStatus
 from users.models import User, UserRole
 
 
-SMS_ON = mock.patch("attendance.notification_service.sms_status", return_value={"configured": True})
-SMS_OFF = mock.patch("attendance.notification_service.sms_status", return_value={"configured": False})
+def _sign_in_with_code(test, client, who):
+    """Run the parent code sign-in; returns the signed-in user id or None."""
+    sent = []
+    with mock.patch("parent_portal.auth_views._deliver",
+                    side_effect=lambda chan, addr, code: sent.append(code) or True):
+        client.post(reverse("parent_portal:login"), {"action": "lookup", "who": who})
+    test.assertTrue(sent, f"no code was sent for {who}")
+    client.post(reverse("parent_portal:login"), {"action": "verify", "code": sent[-1]})
+    uid = client.session.get("_auth_user_id")
+    return int(uid) if uid else None
 
 
-@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
-class GuardianPortalAccessTests(TestCase):
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend", DEBUG=False)
+class ParentPortalNeedsNoActivationTests(TestCase):
     def setUp(self):
+        cache.clear()
         self.admin = User.objects.create_superuser(
             username="registrar", email="registrar@hodari.edu", password="Pass123!",
             role=UserRole.SUPER_ADMIN,
         )
-        self.client.force_login(self.admin)
+        self.student = Student.objects.create(admission_no="PA-001", first_name="Neema", last_name="Kajeguka",
+                                              class_name="Grade 7", status=StudentStatus.ACTIVE)
         self.guardian = ParentGuardian.objects.create(
             full_name="Mary Kajeguka", phone="+255767000001", email="mary@example.com",
         )
-        self.url = reverse("students:guardian_portal_access", args=[self.guardian.pk])
+        StudentGuardian.objects.create(student=self.student, guardian=self.guardian, relationship="parent")
 
-    def test_detail_page_offers_create_then_resend(self):
-        detail = reverse("students:guardian_detail", args=[self.guardian.pk])
-        self.assertIn("Create Portal Access", self.client.get(detail).content.decode())
-        self.client.post(self.url)
-        content = self.client.get(detail).content.decode()
-        self.assertIn("Resend Login Details", content)
-        self.assertIn("parent_255767000001", content)
+    def test_parent_page_has_no_account_details_or_portal_buttons(self):
+        self.client.force_login(self.admin)
+        page = self.client.get(reverse("students:guardian_detail", args=[self.guardian.pk])).content.decode()
+        for text in ("Account Details", "Create Portal Access", "Resend Login Details", "Portal Login"):
+            self.assertNotIn(text, page)
+        with self.assertRaises(NoReverseMatch):
+            reverse("students:guardian_portal_access", args=[self.guardian.pk])
 
-    def test_creates_parent_login_and_emails_username(self):
-        resp = self.client.post(self.url)
-        self.assertEqual(resp.status_code, 302)
+    def test_add_parent_form_has_no_portal_access_option(self):
+        self.client.force_login(self.admin)
+        page = self.client.get(reverse("students:guardian_create")).content.decode()
+        self.assertNotIn('name="portal_access"', page)
+
+    def test_existing_parent_never_activated_can_sign_in(self):
+        self.assertIsNone(self.guardian.user)
+        uid = _sign_in_with_code(self, self.client, "0767 000 001")
         self.guardian.refresh_from_db()
-        user = self.guardian.user
-        self.assertEqual(user.role, UserRole.PARENT)
-        self.assertTrue(user.must_change_password)
-        self.assertTrue(user.groups.filter(name="role_parent").exists())
-        self.assertEqual(len(mail.outbox), 1)
-        self.assertIn(user.username, mail.outbox[0].body)
-        self.assertEqual(mail.outbox[0].to, ["mary@example.com"])
+        self.assertEqual(uid, self.guardian.user_id)
+        self.assertEqual(self.guardian.user.role, UserRole.PARENT)
+        self.assertTrue(self.guardian.user.groups.filter(name="role_parent").exists())
 
-    def test_resend_sets_new_password_on_same_login(self):
-        self.client.post(self.url)
-        self.guardian.refresh_from_db()
-        user = self.guardian.user
-        old_hash = user.password
-        user.must_change_password = False
-        user.save()
-
-        self.client.post(self.url)
-        user.refresh_from_db()
-        self.assertNotEqual(user.password, old_hash)
-        self.assertTrue(user.must_change_password)
+    def test_existing_parent_with_old_password_login_can_sign_in_by_email(self):
+        old = User.objects.create_user(username="parent_255767000001", email="mary@example.com",
+                                       password="Temp-Pass-1", role=UserRole.PARENT)
+        old.must_change_password = True
+        old.save()
+        self.guardian.user = old
+        self.guardian.save()
+        self.assertEqual(_sign_in_with_code(self, self.client, "mary@example.com"), old.pk)
+        old.refresh_from_db()
+        self.assertFalse(old.must_change_password)
         self.assertEqual(User.objects.filter(role=UserRole.PARENT).count(), 1)
-        self.assertEqual(len(mail.outbox), 2)
 
-    def test_parents_without_email_do_not_collide(self):
-        other = ParentGuardian.objects.create(full_name="John Kajeguka", phone="+255767000002")
-        self.guardian.email = ""
+    def test_parent_whose_login_was_switched_off_can_sign_in(self):
+        off = User.objects.create_user(username="mary", email="mary@example.com", password="x-Pass-123",
+                                       role=UserRole.PARENT, is_active=False)
+        self.guardian.user = off
         self.guardian.save()
-        self.client.post(self.url)
-        self.client.post(reverse("students:guardian_portal_access", args=[other.pk]))
-        self.guardian.refresh_from_db()
-        other.refresh_from_db()
-        self.assertIsNotNone(self.guardian.user)
-        self.assertIsNotNone(other.user)
-        self.assertNotEqual(self.guardian.user.email, other.user.email)
+        self.assertEqual(_sign_in_with_code(self, self.client, "+255767000001"), off.pk)
 
-    def test_archived_parent_is_refused(self):
-        self.guardian.is_archived = True
-        self.guardian.save()
-        self.client.post(self.url)
-        self.guardian.refresh_from_db()
-        self.assertIsNone(self.guardian.user)
+    def test_newly_added_parent_can_sign_in_straight_away(self):
+        self.client.force_login(self.admin)
+        self.client.post(reverse("students:guardian_link", args=[self.student.pk]), {
+            "mode": "new", "full_name": "John Kajeguka", "phone": "0767 000 002",
+            "relationship": "parent", "preferred_language": "en",
+        })
+        john = ParentGuardian.objects.get(full_name="John Kajeguka")
+        self.assertTrue(StudentGuardian.objects.filter(guardian=john, student=self.student).exists())
+        self.client.logout()
+        john_client = self.client_class()
+        self.assertIsNotNone(_sign_in_with_code(self, john_client, "0767000002"))
+        john.refresh_from_db()
+        self.assertIsNotNone(john.user)
 
-    def test_needs_change_permission(self):
-        teacher = User.objects.create_user(username="t1", email="t1@hodari.edu", password="Pass123!",
-                                           role=UserRole.TEACHER)
-        self.client.force_login(teacher)
-        self.client.post(self.url)
-        self.guardian.refresh_from_db()
-        self.assertIsNone(self.guardian.user)
 
-    def _message(self, resp):
-        return " ".join(str(m) for m in get_messages(resp.wsgi_request))
-
-    @SMS_ON
-    @mock.patch("attendance.notification_service.NotificationService.send_sms", return_value={"success": True})
-    def test_sends_email_and_sms_when_sms_is_set_up(self, send_sms, _status):
-        resp = self.client.post(self.url)
-        self.guardian.refresh_from_db()
-        self.assertEqual(len(mail.outbox), 1)
-        send_sms.assert_called_once()
-        phone, text = send_sms.call_args.args
-        self.assertEqual(phone, "+255767000001")
-        self.assertIn(self.guardian.user.username, text)
-        message = self._message(resp)
-        self.assertIn("emailed to mary@example.com", message)
-        self.assertIn("sent by SMS to +255767000001", message)
-
-    @SMS_OFF
-    @mock.patch("attendance.notification_service.NotificationService.send_sms")
-    def test_skips_sms_when_not_set_up(self, send_sms, _status):
-        self.client.post(self.url)
-        self.assertEqual(len(mail.outbox), 1)
-        send_sms.assert_not_called()
-
-    @SMS_OFF
-    def test_warns_when_nothing_could_be_sent(self, _status):
-        self.guardian.email = ""
-        self.guardian.save()
-        resp = self.client.post(self.url)
-        self.assertEqual(len(mail.outbox), 0)
-        self.assertIn("were NOT sent", self._message(resp))
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+class EnrolmentSendsSignInInstructionsTests(TestCase):
+    def test_enrolled_parent_gets_code_sign_in_instructions_not_a_password(self):
+        from users.role_models import ROLE_DEFAULT_PERMISSIONS
+        AcademicYear.objects.create(name=str(date.today().year), is_current=True)
+        GradeClass.objects.create(name="Grade 4", department=Department.PRIMARY, max_capacity=25)
+        officer = User.objects.create_user(username="office", email="office@school.test", password="pw-12345!",
+                                           role=UserRole.ADMIN_OFFICER)
+        group, _ = Group.objects.get_or_create(name=f"role_{UserRole.ADMIN_OFFICER}")
+        group.permissions.add(*Permission.objects.filter(
+            codename__in=ROLE_DEFAULT_PERMISSIONS.get(UserRole.ADMIN_OFFICER, [])))
+        group.user_set.add(officer)
+        self.client.force_login(officer)
+        self.client.post(reverse("admissions:direct_enrol"), {
+            "reason": "transfer", "reason_note": "Family relocated from Arusha",
+            "first_name": "Imani", "last_name": "Mollel", "date_of_birth": "2016-05-04",
+            "gender": "female", "nationality": "Tanzanian", "previous_school": "Arusha Primary",
+            "class_name": "Grade 4", "enrolment_date": date.today().isoformat(),
+            "parent_full_name": "Grace Mollel", "parent_relationship": "mother",
+            "parent_phone": "+255700000001", "parent_email": "grace@example.test",
+            "pdpa_consent": "on",
+        })
+        grace = ParentGuardian.objects.get(full_name="Grace Mollel")
+        self.assertIsNotNone(grace.user)
+        self.assertFalse(grace.user.has_usable_password())
+        self.assertFalse(grace.user.must_change_password)
+        bodies = [m.body for m in mail.outbox if "grace@example.test" in m.to]
+        self.assertTrue(any("/parent/login/" in b and "4-digit code" in b for b in bodies), bodies)
+        self.assertFalse(any("Password:" in b or "/accounts/login/" in b for b in bodies), bodies)

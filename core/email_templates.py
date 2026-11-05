@@ -1185,8 +1185,9 @@ def _build_defaults():
                     ("Term start date", "{{ term_start_date|default:'See school calendar' }}"),
                     ("Reference", "{{ reference_number }}"),
                 ])
-                + _info_card("Your parent portal account is now active. Log in at {{ portal_link|default:'/accounts/login/' }} "
-                             "to view attendance, report cards, invoices, and school communications.")
+                + _info_card("Your parent portal is ready. Sign in at {{ portal_link|default:'/parent/login/' }} with this "
+                             "phone number or email: we send you a 4-digit code, no password needed. There you can "
+                             "view attendance, report cards, invoices, and school communications.")
                 + _info_card("Uniform: {{ uniform_notes|default:'Ensure correct uniform is worn from day one.' }}")
                 + _info_card("Meals: {{ meals|default:'School meals available: see fee schedule.' }}")
                 + _info_card("Transport: {{ transport_notes|default:'Transport available for qualifying zones.' }}")
@@ -1202,8 +1203,9 @@ def _build_defaults():
                 "Academic Year: {{ academic_year }}\n"
                 "Term start date: {{ term_start_date|default:'See school calendar' }}\n"
                 "Reference: {{ reference_number }}\n\n"
-                "Your parent portal account is now active.\n"
-                "Log in at {{ portal_link|default:'/accounts/login/' }} to view attendance, "
+                "Your parent portal is ready.\n"
+                "Sign in at {{ portal_link|default:'/parent/login/' }} with this phone number or email: "
+                "we send you a 4-digit code, no password needed. There you can view attendance, "
                 "report cards, invoices, and school communications.\n\n"
                 "Uniform: {{ uniform_notes|default:'Ensure correct uniform is worn from day one.' }}\n"
                 "Meals: {{ meals|default:'School meals available: see fee schedule.' }}\n"

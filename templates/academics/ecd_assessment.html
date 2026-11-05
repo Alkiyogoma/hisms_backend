@@ -205,7 +205,6 @@
         <nav class="ee-jump" aria-label="Sections">
           {% for part in structure.parts %}{% for section in part.sections %}<a href="#ee-sec-{{ section.pk }}" data-sec="{{ section.pk }}">{{ section.title|title }}</a>{% endfor %}{% endfor %}
         </nav>
-        {% if not ecd_read_only %}<p class="ee-tip">Keyboard: <kbd>&uarr;</kbd> <kbd>&darr;</kbd> move between lines, {% for opt in structure.parts.0.options %}<kbd>{{ opt.value }}</kbd> {% endfor %}or <kbd>0</kbd> (N/A) for Academic Progress, {% for opt in structure.parts.1.options %}<kbd>{{ opt.value }}</kbd> {% endfor %}for General Traits &mdash; the next line is picked automatically.</p>{% endif %}
 
         {% for part in structure.parts %}{% if part.sections %}
         <div class="ee-part">

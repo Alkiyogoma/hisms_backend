@@ -33,34 +33,38 @@
     .school-name { font-family: 'Times New Roman', Times, serif; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; font-size: 13pt; }
     .school-details { font-size: 8.5pt; }
     .student-photo { width: 70px; height: 84px; object-fit: cover; border-radius: 4px; font-size: 8pt; }
-    .student-photo-placeholder, div.student-photo { display: none !important; }  /* no empty "No Photo" box (it has an inline style); a real photo still shows */
+    .student-photo-placeholder, div.student-photo { display: none !important; }
+    /* The setup's layout preview has no learner: show where the photo goes. */
+    .layout-preview div.student-photo { display: flex !important; border: 1px dashed #999 !important; font-size: 8pt; }  /* no empty "No Photo" box (it has an inline style); a real photo still shows */
     .header-separator { border-bottom: 1.5px solid #000; margin-bottom: 10px; }
 
     .ecd-title { text-align: center; font-size: 15pt; font-weight: 700; text-decoration: underline; margin: 6px 0 10px; letter-spacing: .02em; }
     .ecd-name { margin-bottom: 6px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
     .ecd-adm { font-size: 10pt; color: var(--muted); }
-    .ecd-meta { border-collapse: collapse; margin-bottom: 14px; }
-    .ecd-meta td { border: 1px solid var(--line); padding: 4px 10px 12px 6px; min-width: 120px; vertical-align: top; }
+    .ecd-meta { border-collapse: collapse; width: 100%; table-layout: fixed; margin-bottom: 14px; }
+    .ecd-meta td { border: 1px solid var(--line); padding: 4px 10px 12px 6px; vertical-align: top; }
+    .ecd-meta td:first-child { width: 40%; }
     .ecd-h2 { text-align: center; font-size: 12.5pt; font-weight: 700; text-decoration: underline; text-transform: uppercase; margin: 14px 0 6px; }
     .ecd-h3 { font-size: 11.5pt; font-weight: 700; text-transform: uppercase; margin: 12px 0 4px; }
     .ecd-legacy-note { font-size: 9.5pt; color: var(--muted); margin-bottom: 6px; text-align: center; }
 
-    .ecd-key { border-collapse: collapse; margin-bottom: 10px; font-size: 10.5pt; }
+    .ecd-key { border-collapse: collapse; width: 100%; margin-bottom: 10px; font-size: 10.5pt; }
     .ecd-key th, .ecd-key td { border: 1px solid var(--line); padding: 3px 6px; background: var(--accent); }
-    .ecd-key th { background: #fff; font-weight: 700; }
+    .ecd-key th { background: #fff; font-weight: 700; width: 1%; white-space: nowrap; }
 
     table.ecd-table, table.ecd-strip, table.ecd-overall { border-collapse: collapse; width: 100%; font-size: 10.5pt; margin-bottom: 8px; }
     .ecd-table th, .ecd-table td, .ecd-strip th, .ecd-strip td, .ecd-overall th, .ecd-overall td { border: 1px solid var(--line); padding: 3px 6px; text-align: left; vertical-align: top; }
     .ecd-table th { background: var(--navy); color: #fff; font-weight: 700; text-transform: uppercase; }
     .ecd-table th.ecd-val-h { width: 62px; text-transform: none; font-weight: 500; text-align: center; }
     .ecd-val { width: 62px; text-align: center; font-weight: 700; background: var(--accent); }
-    .ecd-strip { width: auto !important; min-width: 50%; }
+    .ecd-strip, .ecd-overall { table-layout: fixed; }
     .ecd-strip th { background: #fff; font-weight: 700; }
     .ecd-strip td.ecd-val { min-width: 48px; }
     .ecd-verse th { text-transform: none; }
     .ecd-verse-text { font-weight: 700; }
-    .ecd-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; align-items: start; }
-    .ecd-overall { width: auto !important; min-width: 40%; }
+    /* The two columns sit flush, sharing one border, as in the school's template. */
+    .ecd-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0; align-items: start; }
+    .ecd-cols > div + div { margin-left: -1px; }
     .ecd-overall th { font-weight: 700; background: #fff; }
     .ecd-overall td { height: 24px; font-weight: 700; }
 
@@ -80,8 +84,9 @@
       .ecd-sheet { padding: 16px 12px; }
       .ecd-cols, .ecd-foot-grid { grid-template-columns: 1fr; }
       .ecd-sig-wide { max-width: none; }
-      .ecd-strip, .ecd-overall { min-width: 0; }
-      .ecd-meta td { min-width: 0; }
+      .ecd-cols > div + div { margin-left: 0; }
+      .ecd-strip, .ecd-overall, .ecd-meta { table-layout: auto; }
+      .ecd-meta td:first-child { width: auto; }
     }
     @page { size: A4; margin: 10mm; }
     @media print {
@@ -92,7 +97,7 @@
     }
   </style>
 </head>
-<body>
+<body{% if layout_preview %} class="layout-preview"{% endif %}>
 {% load static role_tags %}
 {% if layout_preview %}
 <div class="no-print">
