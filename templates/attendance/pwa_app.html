@@ -792,7 +792,7 @@ body{
   function apiFetch(url,opts){
     return fetch(url,opts).then(function(r){
       if(r.ok)return r.json();
-      if(r.status===403||r.status===401){showToast('Session expired: redirecting...',true);setTimeout(function(){window.location.href=API+'/accounts/login/'},1500);throw new Error('auth_redirect')}
+      if(r.status===403||r.status===401){showToast('Session expired: redirecting...',true);setTimeout(function(){window.location.href=API+'/accounts/login/?staff=1'},1500);throw new Error('auth_redirect')}
       return r.json().then(function(d){
         console.error('API error',r.status,url,d);
         throw new Error(d.detail||d.message||JSON.stringify(d)||r.statusText);
@@ -1401,7 +1401,7 @@ body{
   // ── Logout ──
   window.confirmLogout=function(){document.getElementById('logoutOverlay').classList.add('show')};
   window.closeLogout=function(){document.getElementById('logoutOverlay').classList.remove('show')};
-  window.doLogout=function(){closeLogout();fetch(API+'/accounts/logout/',{method:'POST',headers:{'X-CSRFToken':getCSRF()}}).finally(function(){window.location.href=API+'/accounts/login/'})};
+  window.doLogout=function(){closeLogout();fetch(API+'/accounts/logout/',{method:'POST',headers:{'X-CSRFToken':getCSRF()}}).finally(function(){window.location.href=API+'/accounts/login/?staff=1'})};
 
   // ── Generic Confirm Modal ──
   var _confirmCb=null;

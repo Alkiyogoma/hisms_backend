@@ -57,13 +57,19 @@ class SessionTimeoutMiddleware:
                         pass
                     from django.contrib.auth import logout
                     current_path = request.path
+                    from users.models import UserRole
+                    is_parent = getattr(request.user, "role", "") == UserRole.PARENT
                     logout(request)
                     # FR-CAL-003: Use query param instead of messages framework
                     # to avoid stale messages persisting after re-login.
                     # Preserve the next param so user returns to their page after re-login,
                     # except for PWA paths  session expiry should go to dashboard.
                     next_param = "" if current_path.startswith("/attendance/pwa/") else f"&next={current_path}"
-                    return redirect(f"{settings.LOGIN_URL}?session_expired=1{next_param}")
+                    if is_parent:
+                        from urllib.parse import quote
+                        return redirect(f"/parent/login/?next={quote(current_path)}")
+                    # Staff land on the Staff tab (Parent Login is the default tab).
+                    return redirect(f"{settings.LOGIN_URL}?session_expired=1&staff=1{next_param}")
 
                 # Don't reset timestamp for the check API  otherwise the frontend
                 # poll always sees a fresh session and the warning modal never triggers.

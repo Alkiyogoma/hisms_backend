@@ -236,6 +236,18 @@ class ParentOTPLoginTests(TestCase):
         self.assertIn('href="/parent/login/?next=/parent/"', page)
         self.assertNotIn('id="ps-contact"', page)
 
+    def test_parent_tab_is_the_default(self, send_sms):
+        page = self.client.get(reverse("users:login")).content.decode()
+        self.assertIn('class="login-tab-panel active" id="panel-parent"', page)
+        self.assertIn('class="login-tab-panel" id="panel-staff"', page)
+        self.assertLess(page.index('id="tab-parent"'), page.index('id="tab-staff"'))
+
+    def test_staff_tab_opens_with_staff_link_or_after_failed_staff_sign_in(self, send_sms):
+        page = self.client.get(reverse("users:login") + "?staff=1").content.decode()
+        self.assertIn('class="login-tab-panel active" id="panel-staff"', page)
+        resp = self.client.post(reverse("users:login"), {"username": "nobody", "password": "wrong-pass"})
+        self.assertIn('class="login-tab-panel active" id="panel-staff"', resp.content.decode())
+
     def test_signed_out_parent_page_goes_to_parent_sign_in(self, send_sms):
         resp = self.client.get("/parent/")
         self.assertRedirects(resp, "/parent/login/?next=/parent/", fetch_redirect_response=False)
@@ -361,3 +373,29 @@ class ParentsHaveNoPasswordTests(TestCase):
         self.assertTrue(created)
         self.assertFalse(guardian.user.has_usable_password())
         self.assertFalse(guardian.user.must_change_password)
+
+
+class SessionExpiryGoesToTheRightSignInTests(TestCase):
+    """After an idle timeout, parents return to the parent sign-in page and
+    staff to the Staff tab (Parent Login is the default tab)."""
+
+    def _expire(self, user):
+        self.client.force_login(user)
+        session = self.client.session
+        session["_last_activity"] = 0
+        session.save()
+
+    def test_parent_goes_to_parent_sign_in(self):
+        parent = User.objects.create_user(username="exp_parent", email="ep@x.test", role=UserRole.PARENT)
+        self._expire(parent)
+        resp = self.client.get("/parent/calendar/")
+        self.assertRedirects(resp, "/parent/login/?next=/parent/calendar/", fetch_redirect_response=False)
+
+    def test_staff_goes_to_staff_tab(self):
+        teacher = User.objects.create_user(username="exp_teacher", email="et@x.test", password="x-Pass-123",
+                                           role=UserRole.TEACHER)
+        self._expire(teacher)
+        resp = self.client.get("/students/")
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn("staff=1", resp["Location"])
+        self.assertIn("session_expired=1", resp["Location"])
