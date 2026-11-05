@@ -1,6 +1,6 @@
 from django.urls import path
 from users.views import (
-    HISMSLoginView, HISMSLogoutView, HISMSLoginAPIView, StartImpersonationView, StopImpersonationView,
+    HISMSLoginView, HISMSLogoutView, HISMSLoginAPIView, ParentOTPRequestView, ParentOTPVerifyView, StartImpersonationView, StopImpersonationView,
     UserListView, UserProfileView, HISMSPasswordChangeView,
     HISMSPasswordChangeDoneView, UserCreateView, UserUpdateView,
     PasswordResetRequestView, PasswordResetDoneView,
@@ -22,6 +22,8 @@ app_name = "users"
 urlpatterns = [
     path("login/", HISMSLoginView.as_view(), name="login"),
     path("login/api/", HISMSLoginAPIView.as_view(), name="login_api"),
+    path("login/phone/send-code/", ParentOTPRequestView.as_view(), name="parent_otp_request"),
+    path("login/phone/verify/", ParentOTPVerifyView.as_view(), name="parent_otp_verify"),
     path("logout/", HISMSLogoutView.as_view(), name="logout"),
     path("list/", UserListView.as_view(), name="user_list"),
     path("impersonate/start/<int:user_id>/", StartImpersonationView.as_view(), name="impersonate_start"),

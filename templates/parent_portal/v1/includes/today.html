@@ -1,0 +1,17 @@
+{# Today's attendance: status, check-in, check-out. #}
+<dl class="pp-today{% if compact %} pp-today-compact{% endif %}">
+  <div>
+    <dt>{% if compact %}Today{% else %}Status{% endif %}</dt>
+    <dd><span class="pp-chip pp-chip-{{ info.code|default:'U' }}">{{ info.label }}</span></dd>
+  </div>
+  {% if info.school_day or info.check_in %}
+  <div>
+    <dt>Checked in</dt>
+    <dd>{% if info.check_in %}<time>{{ info.check_in|time:"H:i" }}</time>{% else %}<span class="pp-muted">Not checked in</span>{% endif %}</dd>
+  </div>
+  <div>
+    <dt>Checked out</dt>
+    <dd>{% if info.check_out %}<time>{{ info.check_out|time:"H:i" }}</time>{% elif info.not_checked_out %}<span class="pp-chip pp-chip-L">Not checked out</span>{% else %}<span class="pp-muted">&mdash;</span>{% endif %}</dd>
+  </div>
+  {% endif %}
+</dl>

@@ -1,0 +1,14 @@
+{# One learner on Home. Only the button opens the progress page; the card itself is not a link. #}
+<li class="pp-card pp-learner">
+  <div class="pp-learner-head">
+    {% include "parent_portal/v1/includes/avatar.html" with student=student %}
+    <div class="pp-learner-id">
+      <h3 class="pp-learner-name">{{ student.first_name }} {{ student.last_name }}</h3>
+      <p class="pp-muted">{{ student.class_name|default:"Class not set" }} &middot; {{ student.admission_no }}</p>
+    </div>
+  </div>
+  {% include "parent_portal/v1/includes/today.html" with info=today compact=True %}
+  <a class="pp-btn pp-btn-primary pp-btn-block" href="{% url 'parent_portal:progress' student.pk %}">
+    View {{ student.first_name }}&rsquo;s progress <span aria-hidden="true">&rarr;</span>
+  </a>
+</li>

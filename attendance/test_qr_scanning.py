@@ -30,8 +30,8 @@ from core.utils import is_school_day
 
 
 def _past_weekday(hour=15, minute=0):
-    """Return a past weekday (school day) datetime at the given time."""
-    now = timezone.now()
+    """Return a past weekday (school day) datetime at the given school (local) time."""
+    now = timezone.localtime()
     ts = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
     if ts >= now:
         ts -= timedelta(days=1)
@@ -287,7 +287,8 @@ class QRCodeAttendanceMarkingTest(TestCase):
             student=self.student,
             date=checkout_time.date()
         )
-        self.assertIsNotNone(entry.check_in_time)
+        # Check-out alone records no check-in time (it used to copy the check-out time).
+        self.assertIsNone(entry.check_in_time)
         self.assertIsNotNone(entry.check_out_time)
         self.assertEqual(entry.parent_name, 'John Smith')
         self.assertEqual(entry.reason, 'Early departure')

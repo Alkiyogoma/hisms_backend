@@ -1,0 +1,4 @@
+<div class="pp-empty" role="status">
+  <p class="pp-empty-title">{{ title }}</p>
+  <p>{{ text }}{% if school_phone and not hide_phone %} If this looks wrong, call the school on <a href="tel:{{ school_phone|cut:' ' }}">{{ school_phone }}</a>.{% endif %}</p>
+</div>

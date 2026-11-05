@@ -81,7 +81,7 @@ class ProductionUpdateTests(unittest.TestCase):
         self.media = self.app / 'media'
         self.media.mkdir()
         (self.media / 'student-photo.txt').write_text('Preserve this upload')
-        (self.app / '.env').write_text('POSTGRES_DB=hisms_test\nPASSWORD=never-print-this-secret\n')
+        (self.app / '.env').write_text('POSTGRES_DB=hisms_test\nSITE_URL=https://connect.hodari.ac.tz\nPASSWORD=never-print-this-secret\n')
         for name in ('python', 'pip'):
             path = self.venv / 'bin' / name
             path.write_text('#!/bin/sh\nexit 0\n')
@@ -133,10 +133,17 @@ class ProductionUpdateTests(unittest.TestCase):
     def test_quoted_exported_media_path_with_spaces_and_crlf(self):
         media = self.root / 'uploaded files'
         media.mkdir()
-        (self.app / '.env').write_bytes(f'POSTGRES_DB="hisms_test"\r\nexport MEDIA_ROOT="{media}" # outside code\r\n'.encode())
+        (self.app / '.env').write_bytes(f'POSTGRES_DB="hisms_test"\r\nexport MEDIA_ROOT="{media}" # outside code\r\nSITE_URL=https://connect.hodari.ac.tz/\r\n'.encode())
         result = self.run_update(DEPLOY_TEST_MEDIA=str(media))
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn(f'Uploads: {media}', result.stdout)
+
+    def test_testing_site_url_blocks_deployment(self):
+        (self.app / '.env').write_text('POSTGRES_DB=hisms_test\nSITE_URL=https://testing.hodari.ac.tz\n')
+        result = self.run_update()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('must be https://connect.hodari.ac.tz', result.stdout)
+        self.assertFalse((self.root / 'pulled').exists())
 
     def test_missing_database_setting_has_visible_error_before_deployment(self):
         (self.app / '.env').write_text('# POSTGRES_DB is deliberately missing\n')

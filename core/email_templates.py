@@ -389,10 +389,8 @@ def _build_defaults():
                 "Dear {{ guardian_name }},\n\n"
                 "Your parent portal account has been created. You can now access your child's "
                 "attendance records, report cards, invoices, and school communications.\n\n"
-                "Username: {{ username }}\n"
-                "Password: {{ temp_password }}\n\n"
-                "IMPORTANT: You will be required to change your password on first login.\n\n"
-                "Parent Portal: {{ login_url }}\n\n"
+                "To sign in, open {{ login_url }}, choose Parent Login, enter your phone number "
+                "({{ phone }}) and type in the code we send you by SMS. No password is needed.\n\n"
                 "Thank you for choosing {{ school_name }}."
             ),
         },

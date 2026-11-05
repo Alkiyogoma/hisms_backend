@@ -227,3 +227,31 @@ class User(AbstractUser):
             )
         cls._admin_delete_allowed = False
         return super().delete(*args, **kwargs)
+
+
+class ParentLoginCode(models.Model):
+    """One-time code a parent uses to sign in with their phone number (SMS)
+    or email address.
+
+    Only an HMAC of the code is stored; the code itself exists only in the
+    message sent to the parent.
+    """
+    CHANNEL_SMS = "sms"
+    CHANNEL_EMAIL = "email"
+    CHANNEL_CHOICES = [(CHANNEL_SMS, "SMS"), (CHANNEL_EMAIL, "Email")]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="login_codes")
+    contact = models.CharField(max_length=254, db_index=True,
+                               help_text="Normalised phone (255XXXXXXXXX) or lower-case email")
+    channel = models.CharField(max_length=8, choices=CHANNEL_CHOICES, default=CHANNEL_SMS)
+    code_hash = models.CharField(max_length=128)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"Login code for {self.user} ({self.channel})"

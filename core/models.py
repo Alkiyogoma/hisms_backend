@@ -184,6 +184,11 @@ class SchoolSettings(TimeStampedModel):
         blank=True, default="admissions@hodari.ac.tz",
         help_text="Reply-to address for admissions emails.",
     )
+    parent_contact_phone = models.CharField(
+        max_length=32, blank=True, default="",
+        help_text="School phone number shown to parents in the parent portal (e.g. on sign-in). "
+                  "Falls back to the admissions phone when empty.",
+    )
     admissions_whatsapp = models.CharField(
         max_length=32, blank=True, default="+255 700 000 000",
         help_text="WhatsApp number for proof-of-payment submissions.",
@@ -285,6 +290,12 @@ class SchoolSettings(TimeStampedModel):
     def get_settings(cls):
         obj, created = cls.objects.get_or_create(id=1)
         return obj
+
+    def get_parent_contact_phone(self):
+        """The number parents are told to call (parent portal sign-in and pages)."""
+        placeholder = self._meta.get_field("admissions_phone").default
+        admissions = "" if self.admissions_phone == placeholder else self.admissions_phone
+        return (self.parent_contact_phone or admissions or "").strip()
 
     def get_admissions_contact(self):
         """Return admissions contact details from DB settings, with env fallback."""

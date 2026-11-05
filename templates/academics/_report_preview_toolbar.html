@@ -48,7 +48,12 @@
         {% if class_total > 1 %}<a href="{% url 'academics:report_preview_class' report.id %}" class="btn btn-primary">Print all ({{ class_total }})</a>{% endif %}
         {% endif %}
     {% endif %}
-    {% if class_view %}
+    {% if download_url %}
+        <a href="{{ download_url }}" class="btn btn-primary">Download PDF</a>
+    {% endif %}
+    {% if back_url %}
+        <a href="{{ back_url }}" class="btn btn-outline">Back</a>
+    {% elif class_view %}
         <a href="{% url 'academics:report_preview' report.id %}" class="btn btn-outline">Back</a>
     {% elif not perms.academics.change_reportcard %}
         <a href="{% url 'academics:parent_reports' %}" class="btn btn-outline">Back</a>

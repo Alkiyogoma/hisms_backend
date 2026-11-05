@@ -1,0 +1,10 @@
+{# Progress ring. ring = {"value", "dash", "offset"}; value is a percentage or None. #}
+<figure class="pp-ring pp-ring-{{ tone }}">
+  <svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+    <circle class="pp-ring-track" cx="50" cy="50" r="40"/>
+    <circle class="pp-ring-bar" cx="50" cy="50" r="40" stroke-dasharray="{{ ring.dash }}" stroke-dashoffset="{{ ring.offset }}"/>
+  </svg>
+  <span class="pp-ring-value">{% if ring.value is not None %}{{ ring.value|floatformat:precision }}%{% else %}&ndash;{% endif %}</span>
+  <figcaption>{{ label }}{% if note %}<small>{{ note }}</small>{% endif %}</figcaption>
+  <span class="pp-sr">{{ label }}: {% if ring.value is not None %}{{ ring.value|floatformat:precision }} percent{% else %}not available yet{% endif %}{% if note %} ({{ note }}){% endif %}</span>
+</figure>

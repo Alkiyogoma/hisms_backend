@@ -211,14 +211,26 @@ def exam_summary(student, term, expected_subjects=None):
             float(score) / (float(max_score or 100) or 100.0) * float(cfg.weight_percentage)
         )
 
+    weights = {t.code: float(t.weight_percentage) for t in types}
     rows = []
     for subject in sorted(points):
         cells = [round(points[subject][t.code], 1) if t.code in points[subject] else None for t in types]
         complete = bool(types) and all(c is not None for c in cells)
         total = round(sum(points[subject][t.code] for t in types), 1) if complete else None
         grade, label = report_grade(total) if complete else (None, None)
+        # Running mark: the approved assessments so far, with the missing
+        # ones' weight redistributed (the school's gap rule). Missing marks
+        # stay missing, never zero. Equals the total once complete.
+        if complete:
+            running = total
+        else:
+            pct = {t.code: (points[subject][t.code] / weights[t.code] * 100 if weights[t.code] else None)
+                   if t.code in points[subject] else None for t in types}
+            running = compute_grade_with_gaps(scores=pct, weights=weights)["average"]
         rows.append({"subject": subject, "cells": cells, "complete": complete,
-                     "total": total, "grade": grade, "label": label})
+                     "total": total, "grade": grade, "label": label,
+                     "running": running,
+                     "running_grade": report_grade(running)[0] if running is not None else None})
 
     mark_subjects = (set(expected_subjects) | set(points)) - remark_subject_names()
     assessed = sum(1 for r in rows if r["complete"])
@@ -230,6 +242,16 @@ def exam_summary(student, term, expected_subjects=None):
         "complete": bool(mark_subjects) and assessed == len(mark_subjects),
         "column_averages": None, "average": None, "grade": None, "label": None,
     }
+    # Running figures while the term is open: the mean of the subjects'
+    # running marks, and per assessment the mean converted mark of the
+    # subjects that have it (None when no subject has it yet).
+    running = [r["running"] for r in rows if r["running"] is not None]
+    summary["running_average"] = round(sum(running) / len(running), 2) if running else None
+    summary["running_grade"] = report_grade(summary["running_average"])[0] if running else None
+    summary["type_averages"] = []
+    for i in range(len(types)):
+        vals = [r["cells"][i] for r in rows if r["cells"][i] is not None]
+        summary["type_averages"].append(round(sum(vals) / len(vals), 1) if vals else None)
     if summary["complete"]:
         done = [r for r in rows if r["complete"]]
         summary["column_averages"] = [
@@ -237,4 +259,6 @@ def exam_summary(student, term, expected_subjects=None):
         ]
         summary["average"] = round(sum(r["total"] for r in done) / len(done), 2)
         summary["grade"], summary["label"] = report_grade(summary["average"])
+        # Once complete, the running figure is the report's figure.
+        summary["running_average"], summary["running_grade"] = summary["average"], summary["grade"]
     return summary
