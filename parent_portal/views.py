@@ -11,7 +11,7 @@ from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views import View
 from django.views.generic import TemplateView
@@ -49,6 +49,8 @@ class ParentOnlyMixin(RoleRequiredMixin):
     """
 
     allowed_roles = [UserRole.PARENT, UserRole.SUPER_ADMIN]
+    # Signed-out visitors go straight to the parent code sign-in page.
+    login_url = reverse_lazy("parent_portal:login")
 
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated and request.user.role not in (UserRole.PARENT, UserRole.SUPER_ADMIN):
