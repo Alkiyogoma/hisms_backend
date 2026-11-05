@@ -231,13 +231,27 @@ class ParentOTPLoginTests(TestCase):
         self.assertIn("0767 016 940", resp.json()["error"])
         send_sms.assert_not_called()
 
-    def test_sign_in_screen_has_one_field_and_four_digit_boxes(self, send_sms):
-        page = self.client.get(reverse("users:login")).content.decode()
-        self.assertIn('id="ps-contact"', page)
-        self.assertIn(">Log in<", page)
-        self.assertEqual(page.count('class="ps-digit"'), 4)
-        self.assertIn('aria-label="Digit 1 of 4"', page)
-        self.assertNotIn("Simulated for developer", page)
+    def test_staff_login_parent_tab_links_to_parent_sign_in_page(self, send_sms):
+        page = self.client.get(reverse("users:login") + "?next=/parent/").content.decode()
+        self.assertIn('href="/parent/login/?next=/parent/"', page)
+        self.assertNotIn('id="ps-contact"', page)
+
+    def test_signed_out_parent_page_goes_to_parent_sign_in(self, send_sms):
+        resp = self.client.get("/parent/")
+        self.assertRedirects(resp, "/parent/login/?next=/parent/", fetch_redirect_response=False)
+
+    def test_parent_never_given_a_login_gets_one_on_first_code(self, send_sms):
+        from students.models import Student, StudentGuardian, StudentStatus
+        child = Student.objects.create(admission_no="OTP-9", first_name="Baraka", last_name="M",
+                                       class_name="Grade 2", status=StudentStatus.ACTIVE)
+        guardian = ParentGuardian.objects.create(full_name="Rehema M", phone="0744 000 333")
+        StudentGuardian.objects.create(student=child, guardian=guardian, relationship="parent")
+        self.assertEqual(self._send("0744000333").status_code, 200)
+        guardian.refresh_from_db()
+        self.assertEqual(guardian.user.role, UserRole.PARENT)
+        resp = self._verify(self._code_from(send_sms), contact="0744000333")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(int(self.client.session["_auth_user_id"]), guardian.user_id)
 
 
 @override_settings(DEBUG=True, SMS_PROVIDER="console")

@@ -144,15 +144,30 @@ def find_parent_users(contact):
     guardians = (ParentGuardian.objects
                  .filter(user__isnull=False, user__role=UserRole.PARENT, user__is_active=True)
                  .select_related("user"))
-    users = {}
+    # Parents on record who were never given a login (no "portal access" step
+    # any more): a current parent of an active learner gets one on first sign-in.
+    from students.models import StudentStatus
+    from students.services import ensure_parent_user
+    no_login = (ParentGuardian.objects
+                .filter(user__isnull=True, is_archived=False,
+                        studentguardian__student__status=StudentStatus.ACTIVE)
+                .distinct())
+    users, new = {}, []
     if contact.channel == EMAIL:
         for g in guardians.filter(Q(email__iexact=contact.value) | Q(user__email__iexact=contact.value)):
             users[g.user.pk] = g.user
-        return list(users.values())
-    for g in guardians.only("phone", "user").iterator():
-        if normalize_phone(g.phone) == contact.value:
-            users[g.user.pk] = g.user
-    return list(users.values())
+        new = list(no_login.filter(email__iexact=contact.value)[:2])
+    else:
+        for g in guardians.only("phone", "secondary_phone", "user").iterator():
+            if contact.value in (normalize_phone(g.phone), normalize_phone(g.secondary_phone)):
+                users[g.user.pk] = g.user
+        new = [g for g in no_login.only("phone", "secondary_phone")
+               if contact.value in (normalize_phone(g.phone), normalize_phone(g.secondary_phone))][:2]
+    if len(users) + len(new) == 1 and new:
+        user, _created = ensure_parent_user(new[0])
+        return [user]
+    # More than one match: report them all so the caller refuses the shared contact.
+    return list(users.values()) + [None] * len(new)
 
 
 def _throttle(contact):

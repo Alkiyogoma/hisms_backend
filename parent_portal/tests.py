@@ -188,7 +188,7 @@ class OwnershipTests(PortalTestBase):
         url = reverse("parent_portal:progress", args=[self.child.pk])
         resp = self.client.get(url)
         self.assertEqual(resp.status_code, 302)
-        self.assertIn("/accounts/login/", resp["Location"])
+        self.assertIn("/parent/login/", resp["Location"])
         self.client.force_login(self.teacher)
         self.assertEqual(self.client.get(url).status_code, 403)
         self.assertEqual(self.client.get(reverse("parent_portal:dashboard")).status_code, 403)
@@ -436,8 +436,9 @@ class DeploymentAndStaffViewTests(PortalTestBase):
             self.assertIn(".pp-btn-primary", page)
             self.assertNotIn("/static/parent_portal/", page)
         self.client.logout()
-        login = self.client.get(reverse("users:login")).content.decode()
-        self.assertIn("getElementById('parentSignin')", login)
+        login = self.client.get(reverse("parent_portal:login")).content.decode()
+        self.assertIn("<style>", login)
+        self.assertIn("<script>", login)
         self.assertNotIn("/static/parent_portal/", login)
 
     def test_term_year_is_not_repeated(self):
