@@ -137,7 +137,7 @@
     <a href="/tasks/" style="font-size:11px;font-weight:600;color:var(--hodari-blue);text-decoration:none">View All</a>
   </div>
   {% for task in parent_tasks %}
-  <div class="trow" style="padding:8px 0;{% if task.priority == 'urgent' or task.priority == 'high' %}background:#FFFBEB;border-radius:6px;padding:8px 10px;margin-bottom:4px{% endif %}">
+  <div class="trow" style="padding:8px 0;{% if task.priority == 'urgent' or task.priority == 'high' %}background:var(--amber-bg);border-radius:6px;padding:8px 10px;margin-bottom:4px{% endif %}">
     <div style="flex:1;min-width:0">
       <div class="trow-name" style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ task.title }}</div>
       <div class="trow-sub">
@@ -186,7 +186,7 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    background: linear-gradient(135deg, var(--hodari-blue-pale) 0%, #fff 100%);
+    background: var(--hodari-blue-pale);
     border-bottom: 1px solid var(--border);
   }
   .child-avatar {
@@ -201,7 +201,7 @@
   .child-balance {
     text-align: right; flex-shrink: 0;
   }
-  .child-bal-val { font-size: 12px; font-weight: 700; color: #dc2626; }
+  .child-bal-val { font-size: 12px; font-weight: 700; color: var(--red); }
   .child-bal-lbl { font-size: 10px; color: var(--text-muted); }
   .child-body { padding: 10px 12px 12px; }
   .child-section { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }

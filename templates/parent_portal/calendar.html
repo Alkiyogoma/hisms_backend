@@ -50,9 +50,9 @@
 <!-- Event Legend -->
 <div style="display:flex;gap:12px;flex-wrap:wrap;margin:12px 0;font-size:11px;color:var(--text-muted)">
   <span><span class="cal-event-dot" style="background:#023AA5;display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>Academic</span>
-  <span><span class="cal-event-dot" style="background:#16a34a;display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>Social</span>
-  <span><span class="cal-event-dot" style="background:#dc2626;display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>Holiday</span>
-  <span><span class="cal-event-dot" style="background:#9333ea;display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>Other</span>
+  <span><span class="cal-event-dot" style="background:var(--green);display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>Social</span>
+  <span><span class="cal-event-dot" style="background:var(--red);display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>Holiday</span>
+  <span><span class="cal-event-dot" style="background:#C13FBC;display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>Other</span>
 </div>
 
 <!-- Upcoming Events -->
@@ -128,7 +128,7 @@
     border-bottom: 1px solid var(--border); font-size: 10px; vertical-align: top;
   }
   .cal-empty { background: #FAFBFD; }
-  .cal-today { background: #EBF5FF; }
+  .cal-today { background: var(--hodari-blue-light); }
   .cal-day-num { font-weight: 600; color: var(--text-primary); font-size: 10px; }
   .cal-today .cal-day-num {
     background: var(--hodari-blue); color: #fff; border-radius: 50%;
@@ -142,9 +142,9 @@
   .cal-event-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
   .cal-event-text { font-size: 8px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .cal-academic .cal-event-dot { background: #023AA5; }
-  .cal-social .cal-event-dot { background: #16a34a; }
-  .cal-holiday .cal-event-dot { background: #dc2626; }
-  .cal-other .cal-event-dot { background: #9333ea; }
+  .cal-social .cal-event-dot { background: var(--green); }
+  .cal-holiday .cal-event-dot { background: var(--red); }
+  .cal-other .cal-event-dot { background: #C13FBC; }
 
   @media(min-width: 541px) {
     .cal-header { font-size: 10px; padding: 8px 4px; }

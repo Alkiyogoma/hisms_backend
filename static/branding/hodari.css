@@ -43,7 +43,7 @@
   --border: #DDE3EE;
   --border-strong: #B8C4D8;
   --font-ui: 'Roboto', sans-serif;
-  --font-display: 'Merriweather', serif;
+  --font-display: 'Times New Roman', Times, 'Liberation Serif', serif;
   --font-mono: 'Roboto Mono', monospace;
 }
 
@@ -2343,7 +2343,7 @@ body {
 }
 
 .app-name {
-  font-family: 'Merriweather', serif;
+  font-family: var(--font-display);
   font-size: 18px;
   font-weight: 700;
   margin-bottom: 4px

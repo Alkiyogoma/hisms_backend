@@ -30,19 +30,19 @@
 <!-- Stats Summary -->
 <div class="parent-att-grid">
   <div class="parent-att-stat">
-    <div class="parent-att-val" style="color:#16a34a">{{ stats.present }}</div>
+    <div class="parent-att-val" style="color:var(--green)">{{ stats.present }}</div>
     <div class="parent-att-lbl">Present</div>
   </div>
   <div class="parent-att-stat">
-    <div class="parent-att-val" style="color:#dc2626">{{ stats.absent }}</div>
+    <div class="parent-att-val" style="color:var(--red)">{{ stats.absent }}</div>
     <div class="parent-att-lbl">Absent</div>
   </div>
   <div class="parent-att-stat">
-    <div class="parent-att-val" style="color:#d97706">{{ stats.late }}</div>
+    <div class="parent-att-val" style="color:var(--amber)">{{ stats.late }}</div>
     <div class="parent-att-lbl">Late</div>
   </div>
   <div class="parent-att-stat">
-    <div class="parent-att-val" style="{% if stats.rate >= 90 %}color:#16a34a{% elif stats.rate >= 75 %}color:#d97706{% else %}color:#dc2626{% endif %}">{{ stats.rate }}%</div>
+    <div class="parent-att-val" style="{% if stats.rate >= 90 %}color:var(--green){% elif stats.rate >= 75 %}color:var(--amber){% else %}color:var(--red){% endif %}">{{ stats.rate }}%</div>
     <div class="parent-att-lbl">Rate</div>
   </div>
 </div>
@@ -65,13 +65,13 @@
           {% if d == day %}
           <div>
             {% if "present" in entry.status|lower %}
-            <span style="display:block;text-align:center;padding:1px 4px;border-radius:4px;font-size:10px;font-weight:600;background:#dcfce7;color:#166534">P</span>
+            <span style="display:block;text-align:center;padding:1px 4px;border-radius:4px;font-size:10px;font-weight:600;background:var(--green-bg);color:var(--green)">P</span>
             {% elif "absent" in entry.status|lower %}
-            <span style="display:block;text-align:center;padding:1px 4px;border-radius:4px;font-size:10px;font-weight:600;background:#fee2e2;color:#991b1b">A</span>
+            <span style="display:block;text-align:center;padding:1px 4px;border-radius:4px;font-size:10px;font-weight:600;background:var(--red-bg);color:var(--red)">A</span>
             {% elif "late" in entry.status|lower %}
-            <span style="display:block;text-align:center;padding:1px 4px;border-radius:4px;font-size:10px;font-weight:600;background:#fef3c7;color:#92400e">L</span>
+            <span style="display:block;text-align:center;padding:1px 4px;border-radius:4px;font-size:10px;font-weight:600;background:var(--amber-bg);color:var(--amber)">L</span>
             {% elif "excus" in entry.status|lower %}
-            <span style="display:block;text-align:center;padding:1px 4px;border-radius:4px;font-size:10px;font-weight:600;background:#dbeafe;color:#1e40af">E</span>
+            <span style="display:block;text-align:center;padding:1px 4px;border-radius:4px;font-size:10px;font-weight:600;background:var(--hodari-blue-light);color:var(--hodari-blue)">E</span>
             {% else %}
             <span style="display:block;text-align:center;padding:1px 4px;border-radius:4px;font-size:10px;font-weight:600;background:#f3f4f6;color:#4b5563">{{ entry.status|truncatechars:1 }}</span>
             {% endif %}
@@ -89,10 +89,10 @@
 
   <!-- Legend -->
   <div style="padding:10px 14px;background:var(--bg-page);border-top:1px solid var(--border);display:flex;gap:14px;font-size:11px;color:var(--text-muted);flex-wrap:wrap">
-    <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#dcfce7;margin-right:4px;vertical-align:middle"></span> Present</span>
-    <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#fee2e2;margin-right:4px;vertical-align:middle"></span> Absent</span>
-    <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#fef3c7;margin-right:4px;vertical-align:middle"></span> Late</span>
-    <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#dbeafe;margin-right:4px;vertical-align:middle"></span> Excused</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--green-bg);margin-right:4px;vertical-align:middle"></span> Present</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--red-bg);margin-right:4px;vertical-align:middle"></span> Absent</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--amber-bg);margin-right:4px;vertical-align:middle"></span> Late</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--hodari-blue-light);margin-right:4px;vertical-align:middle"></span> Excused</span>
   </div>
 </div>
 

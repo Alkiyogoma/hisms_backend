@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>{% if layout_preview %}Layout Preview &mdash; {{ class_label }} Term {{ term_number }}{% elif class_view %}Term Reports &mdash; {{ class_name }}{% else %}Term Report &mdash; {{ student.get_full_name }}{% endif %}</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Merriweather:wght@700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --hodari-blue: #023AA5; --navy: #1F3864; --ink: #111; --muted: #5A697D; --line: #333;
@@ -30,7 +30,7 @@
     .header-left { display: flex; gap: 14px; align-items: center; }
     .school-logo { width: 64px; }
     .school-info { line-height: 1.15; font-family: var(--font-ui); }
-    .school-name { font-family: 'Merriweather', serif; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; font-size: 13pt; }
+    .school-name { font-family: 'Times New Roman', Times, serif; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; font-size: 13pt; }
     .school-details { font-size: 8.5pt; }
     .student-photo { width: 70px; height: 84px; object-fit: cover; border-radius: 4px; font-size: 8pt; }
     .student-photo-placeholder, div.student-photo { display: none !important; }  /* no empty "No Photo" box (it has an inline style); a real photo still shows */

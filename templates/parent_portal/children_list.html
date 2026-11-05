@@ -46,7 +46,7 @@
       </div>
       <div style="flex:1;padding:10px 16px;border-right:1px solid var(--border)">
         <span style="color:var(--text-muted)">Status</span>
-        <span style="float:right;font-weight:600;color:{% if s.status == 'active' %}#166534{% else %}#991B1B{% endif %}">{{ s.get_status_display }}</span>
+        <span style="float:right;font-weight:600;color:{% if s.status == 'active' %}var(--green){% else %}var(--red){% endif %}">{{ s.get_status_display }}</span>
       </div>
       <div style="flex:1;padding:10px 16px">
         <span style="color:var(--text-muted)">Age</span>

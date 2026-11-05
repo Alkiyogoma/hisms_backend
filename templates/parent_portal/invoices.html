@@ -19,14 +19,14 @@
 
 {% if selected_student %}
 <!-- Summary Card -->
-<div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff);margin-bottom:16px;cursor:default;flex-direction:row;align-items:center;justify-content:space-between">
+<div class="metric-compact" style="background:var(--hodari-blue-pale);margin-bottom:16px;cursor:default;flex-direction:row;align-items:center;justify-content:space-between">
   <div>
     <div class="mc-lbl-row"><span class="mc-lbl">{{ selected_student.get_full_name }}</span></div>
     <div class="mc-sub" style="color:#5A697D;margin-top:2px">{{ selected_student.class_name }}</div>
   </div>
   <div style="text-align:right">
-    <div class="mc-val" style="color:{% if total_outstanding > 0 %}#DC2626{% else %}#059669{% endif %}">TZS {{ total_outstanding|floatformat:0 }}</div>
-    <div class="mc-sub" style="color:{% if total_outstanding > 0 %}#DC2626{% else %}#059669{% endif %};text-align:right">Outstanding</div>
+    <div class="mc-val" style="color:{% if total_outstanding > 0 %}var(--red){% else %}var(--green){% endif %}">TZS {{ total_outstanding|floatformat:0 }}</div>
+    <div class="mc-sub" style="color:{% if total_outstanding > 0 %}var(--red){% else %}var(--green){% endif %};text-align:right">Outstanding</div>
   </div>
 </div>
 
@@ -61,11 +61,11 @@
       </div>
       <div style="text-align:center;padding:4px;background:#F8FAFC;border-radius:4px">
         <div style="font-size:9px;color:var(--text-muted)">Paid</div>
-        <div style="font-size:11px;font-weight:600;color:#16a34a">{{ inv.total_paid|floatformat:0 }}</div>
+        <div style="font-size:11px;font-weight:600;color:var(--green)">{{ inv.total_paid|floatformat:0 }}</div>
       </div>
       <div style="text-align:center;padding:4px;background:#F8FAFC;border-radius:4px">
         <div style="font-size:9px;color:var(--text-muted)">Balance</div>
-        <div style="font-size:11px;font-weight:700;{% if inv.balance > 0 %}color:#dc2626{% else %}color:#16a34a{% endif %}">{{ inv.balance|floatformat:0 }}</div>
+        <div style="font-size:11px;font-weight:700;{% if inv.balance > 0 %}color:var(--red){% else %}color:var(--green){% endif %}">{{ inv.balance|floatformat:0 }}</div>
       </div>
     </div>
   </div>

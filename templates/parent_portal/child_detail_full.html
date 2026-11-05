@@ -19,7 +19,7 @@
 <!-- Profile Header -->
 <div class="card" style="padding:0;overflow:hidden;margin-bottom:24px">
   <div style="display:flex;align-items:stretch">
-    <div style="display:flex;align-items:center;justify-content:center;padding:28px 32px;background:linear-gradient(135deg,#023AA5 0%,#1A56C4 100%);min-width:160px">
+    <div style="display:flex;align-items:center;justify-content:center;padding:28px 32px;background:var(--hodari-blue);min-width:160px">
       <div style="width:100px;height:100px;border-radius:50%;background:rgba(255,255,255,0.15);color:#fff;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:700;border:3px solid rgba(255,255,255,0.3)">
         {% if student.photo %}
           <img src="{{ student.photo.url }}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">
@@ -30,16 +30,16 @@
     </div>
     <div style="flex:1;padding:24px 28px;display:flex;flex-direction:column;justify-content:center">
       <h1 style="margin:0;font-size:22px;font-weight:800;color:#1E293B">{{ student.first_name }} {{ student.last_name }}</h1>
-      <div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:14px;color:#64748B;flex-wrap:wrap">
-        <span style="font-family:monospace;font-weight:700;color:var(--hodari-blue);background:#EFF6FF;padding:2px 8px;border-radius:6px;font-size:12px">{{ student.admission_no }}</span>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:14px;color:var(--text-muted);flex-wrap:wrap">
+        <span style="font-family:monospace;font-weight:700;color:var(--hodari-blue);background:var(--hodari-blue-light);padding:2px 8px;border-radius:6px;font-size:12px">{{ student.admission_no }}</span>
         <span>{{ student.class_name|default:"—" }}</span>
         {% if student.stream_name %}<span>· {{ student.stream_name }}</span>{% endif %}
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">
-        {% if student.gender %}<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:99px;font-size:12px;font-weight:600;background:#F8FAFC;border:1px solid #E2E8F0;color:#475569">{{ student.get_gender_display }}</span>{% endif %}
-        {% if student.date_of_birth %}<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:99px;font-size:12px;font-weight:600;background:#F8FAFC;border:1px solid #E2E8F0;color:#475569">Age {{ student.age }}</span>{% endif %}
-        {% if student.blood_type %}<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:99px;font-size:12px;font-weight:600;background:#F8FAFC;border:1px solid #E2E8F0;color:#475569">{{ student.blood_type }}</span>{% endif %}
-        {% if student.allergies_medical %}<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:99px;font-size:12px;font-weight:700;background:#FEF2F2;border:1px solid #FECACA;color:#9B1C1C">Medical Alert</span>{% endif %}
+        {% if student.gender %}<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:99px;font-size:12px;font-weight:600;background:#F8FAFC;border:1px solid #E2E8F0;color:var(--text-muted)">{{ student.get_gender_display }}</span>{% endif %}
+        {% if student.date_of_birth %}<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:99px;font-size:12px;font-weight:600;background:#F8FAFC;border:1px solid #E2E8F0;color:var(--text-muted)">Age {{ student.age }}</span>{% endif %}
+        {% if student.blood_type %}<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:99px;font-size:12px;font-weight:600;background:#F8FAFC;border:1px solid #E2E8F0;color:var(--text-muted)">{{ student.blood_type }}</span>{% endif %}
+        {% if student.allergies_medical %}<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:99px;font-size:12px;font-weight:700;background:#FEF2F2;border:1px solid var(--red-bd);color:#9B1C1C">Medical Alert</span>{% endif %}
       </div>
     </div>
     <div style="display:flex;flex-direction:column;gap:6px;padding:14px 20px;align-self:flex-start">
@@ -65,9 +65,9 @@
         </div>
         <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:4px">
           <div style="display:flex;gap:8px;font-size:12px">
-            <span style="color:#16A34A;font-weight:600">Present: {{ att_stats.present }}</span>
-            <span style="color:#CA8A04;font-weight:600">Late: {{ att_stats.late }}</span>
-            <span style="color:#DC2626;font-weight:600">Absent: {{ att_stats.absent }}</span>
+            <span style="color:var(--green);font-weight:600">Present: {{ att_stats.present }}</span>
+            <span style="color:var(--amber);font-weight:600">Late: {{ att_stats.late }}</span>
+            <span style="color:var(--red);font-weight:600">Absent: {{ att_stats.absent }}</span>
           </div>
           <div style="height:8px;background:#E2E8F0;border-radius:99px;overflow:hidden">
             <div style="height:100%;width:{{ att_stats.rate }}%;background:var(--hodari-blue);border-radius:99px"></div>
@@ -83,9 +83,9 @@
             <td>{{ e.date|date:"d M Y" }}</td>
             <td>
               {% with s=e.status|lower %}
-              {% if "present" in s %}<span style="color:#16A34A;font-weight:600">Present</span>
-              {% elif "late" in s %}<span style="color:#CA8A04;font-weight:600">Late</span>
-              {% elif "absent" in s %}<span style="color:#DC2626;font-weight:600">Absent</span>
+              {% if "present" in s %}<span style="color:var(--green);font-weight:600">Present</span>
+              {% elif "late" in s %}<span style="color:var(--amber);font-weight:600">Late</span>
+              {% elif "absent" in s %}<span style="color:var(--red);font-weight:600">Absent</span>
               {% else %}<span>{{ e.status }}</span>{% endif %}
               {% endwith %}
             </td>
@@ -120,7 +120,7 @@
             <td style="text-align:center">{% if d.quiz is not None %}{{ d.quiz|floatformat:"-1" }}{% else %}—{% endif %}</td>
             <td style="text-align:center">{% if d.mid is not None %}{{ d.mid|floatformat:"-1" }}{% else %}—{% endif %}</td>
             <td style="text-align:center">{% if d.end is not None %}{{ d.end|floatformat:"-1" }}{% else %}—{% endif %}</td>
-            <td style="text-align:center;font-weight:700">{% if d.average is not None %}{{ d.average|floatformat:1 }} &middot; {{ d.grade }}{% else %}<span style="font-size:11px;font-weight:600;color:#8A6400">Awaiting end of term</span>{% endif %}</td>
+            <td style="text-align:center;font-weight:700">{% if d.average is not None %}{{ d.average|floatformat:1 }} &middot; {{ d.grade }}{% else %}<span style="font-size:11px;font-weight:600;color:var(--amber)">Awaiting end of term</span>{% endif %}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -166,7 +166,7 @@
             <div style="font-weight:600;font-size:14px">{{ gl.guardian.full_name }}</div>
             <div style="font-size:12px;color:var(--text-muted)">{{ gl.get_relationship_display }} · {{ gl.guardian.phone }}</div>
           </div>
-          {% if gl.is_primary %}<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#EFF6FF;color:#1E40AF">Primary</span>{% endif %}
+          {% if gl.is_primary %}<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;background:var(--hodari-blue-light);color:var(--hodari-blue)">Primary</span>{% endif %}
         </div>
         {% endfor %}
       </div>
@@ -186,7 +186,7 @@
       {% if overall_average is not None %}
       <div style="font-size:36px;font-weight:800;color:var(--hodari-blue)">{{ overall_average|floatformat:1 }}%</div>
       {% else %}
-      <div style="font-size:16px;font-weight:700;color:#8A6400">Awaiting end of term</div>
+      <div style="font-size:16px;font-weight:700;color:var(--amber)">Awaiting end of term</div>
       {% if exam_summary %}<div style="font-size:12px;color:var(--text-muted)">{{ exam_summary.assessed }} of {{ exam_summary.total_subjects }} subjects fully assessed</div>{% endif %}
       {% endif %}
       {% if active_term %}<div style="font-size:12px;color:var(--text-muted);margin-top:4px">{{ active_term.name }}</div>{% endif %}
@@ -203,7 +203,7 @@
         <div><span style="color:var(--text-muted)">Religion</span><br><strong>{{ student.religion|default:"—" }}</strong></div>
         <div><span style="color:var(--text-muted)">Blood Type</span><br><strong>{{ student.blood_type|default:"—" }}</strong></div>
         {% if student.allergies_medical %}
-        <div style="padding:10px;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px">
+        <div style="padding:10px;background:#FEF2F2;border:1px solid var(--red-bd);border-radius:8px">
           <span style="color:#9B1C1C;font-weight:700;font-size:11px;text-transform:uppercase">Medical / Allergies</span><br>
           <strong style="color:#9B1C1C">{{ student.allergies_medical }}</strong>
         </div>

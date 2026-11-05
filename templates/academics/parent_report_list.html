@@ -56,7 +56,7 @@
           <div class="trow-sub">Class: {{ report.student.class_name }} &middot; Published: {{ report.published_at|date:"d M Y" }}</div>
         </div>
         <div class="trow-right">
-          <a href="{% url 'academics:report_preview' report.id %}" target="_blank" style="padding:5px 12px;background:#EBF5FF;border-radius:6px;font-size:11.5px;font-weight:600;color:#1E40AF;text-decoration:none;transition:background 0.1s">View / Print</a>
+          <a href="{% url 'academics:report_preview' report.id %}" target="_blank" style="padding:5px 12px;background:var(--hodari-blue-light);border-radius:6px;font-size:11.5px;font-weight:600;color:var(--hodari-blue);text-decoration:none;transition:background 0.1s">View / Print</a>
         </div>
       </div>
     {% empty %}

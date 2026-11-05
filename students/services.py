@@ -114,17 +114,15 @@ def describe_delivery(delivered):
     return " and ".join(delivered)
 
 
-def grant_portal_access(guardian, actor):
-    """Give a parent portal access, or reissue it. Creates a PARENT login when
-    the parent has none; otherwise sets a new temporary password. Either way
-    the parent must change the password on first login. Returns
-    (created, username, delivered) where delivered lists where the details went."""
+def ensure_parent_user(guardian):
+    """Return (user, created): the PARENT login linked to this guardian,
+    creating it when missing and re-enabling it when it was switched off.
+    A created login has no usable password (parents sign in with a one-time
+    code; staff can still issue a password with grant_portal_access)."""
     from django.contrib.auth.models import Group
-    from django.utils.crypto import get_random_string
 
     from users.models import User, UserRole
 
-    raw_password = get_random_string(length=10)
     user = guardian.user
     created = user is None
     if created:
@@ -141,15 +139,31 @@ def grant_portal_access(guardian, actor):
             role=UserRole.PARENT,
             first_name=name_parts[0] if name_parts else "",
             last_name=name_parts[1] if len(name_parts) > 1 else "",
+            is_active=True,
         )
-    user.must_change_password = True
-    user.is_active = True
-    user.set_password(raw_password)
-    user.save()
-    if created:
+        user.set_unusable_password()
+        user.save()
         Group.objects.get_or_create(name="role_parent")[0].user_set.add(user)
         guardian.user = user
         guardian.save(update_fields=["user", "updated_at"])
+    elif not user.is_active:
+        user.is_active = True
+        user.save(update_fields=["is_active"])
+    return user, created
+
+
+def grant_portal_access(guardian, actor):
+    """Give a parent portal access, or reissue it. Creates a PARENT login when
+    the parent has none; otherwise sets a new temporary password. Either way
+    the parent must change the password on first login. Returns
+    (created, username, delivered) where delivered lists where the details went."""
+    from django.utils.crypto import get_random_string
+
+    raw_password = get_random_string(length=10)
+    user, created = ensure_parent_user(guardian)
+    user.must_change_password = True
+    user.set_password(raw_password)
+    user.save(update_fields=["must_change_password", "password"])
 
     delivered = send_portal_credentials(guardian, user.username, raw_password, actor, reset=not created)
     return created, user.username, delivered

@@ -427,28 +427,16 @@
         </div>
       </div>
 
-      {# ── PARENT LOGIN FORM ── #}
+      {# ── PARENT LOGIN: phone/email + one-time code (Parent Portal v1) ── #}
       <div class="login-tab-panel" id="panel-parent">
-        <form class="login-form" id="parentForm" onsubmit="return parentLogin(event)">
-          {% csrf_token %}
-          <div class="field-group">
-            <label for="parent-email">Email Address</label>
-            <input id="parent-email" name="email" type="email" class="field-input" placeholder="parent@email.com" autocomplete="email" required>
-          </div>
-          <div class="field-group">
-            <label for="parent-password">Password</label>
-            <input id="parent-password" name="password" type="password" class="field-input" placeholder="Enter your password" autocomplete="current-password" required>
-          </div>
-          <div id="parent-alert" style="display:none"></div>
-          <button type="submit" class="btn-login" id="parentSubmit">
-            <span class="btn-text">Sign in as Parent</span>
-            <div class="spinner" id="parentSpinner"></div>
-            <svg class="btn-arrow" viewBox="0 0 18 18" fill="none"><path d="M3.75 9h10.5M9.75 4.5L14.25 9l-4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-        </form>
-        <div class="forgot-link">
-          <a href="{% url 'users:password_reset_request' %}">Forgot password?</a>
-        </div>
+        <p style="font-size:14px;color:var(--text-secondary);margin:0 0 16px;line-height:1.5">
+          Parents sign in with the mobile number or email the school has on record. We send you a 4-digit code &mdash; no password needed.
+        </p>
+        <a class="btn-login" id="parentSubmit" style="text-decoration:none"
+           href="{% url 'parent_portal:login' %}{% if next %}?next={{ next|urlencode }}{% endif %}">
+          <span class="btn-text">Continue to Parent sign in</span>
+          <svg class="btn-arrow" viewBox="0 0 18 18" fill="none"><path d="M3.75 9h10.5M9.75 4.5L14.25 9l-4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
       </div>
 
       <div class="login-footer">
@@ -469,64 +457,11 @@ function switchTab(tab) {
   if (firstInput) firstInput.focus();
 }
 
-function parentLogin(e) {
-  e.preventDefault();
-  var email = document.getElementById('parent-email').value.trim();
-  var password = document.getElementById('parent-password').value;
-  var alertEl = document.getElementById('parent-alert');
-  var btn = document.getElementById('parentSubmit');
-  var spinner = document.getElementById('parentSpinner');
-
-  if (!email || !password) {
-    alertEl.className = 'alert alert-error';
-    alertEl.style.display = 'flex';
-    alertEl.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0;margin-top:1px"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.3"/><path d="M8 5v3.5M8 10.5v.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><div>Email and password are required.</div>';
-    return false;
-  }
-
-  btn.querySelector('.btn-text').style.display = 'none';
-  btn.querySelector('.btn-arrow').style.display = 'none';
-  spinner.style.display = 'block';
-  btn.disabled = true;
-
-  var params = new URLSearchParams(window.location.search);
-  var nextParam = params.get('next') || '';
-  fetch("{% url 'users:login_api' %}", {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': document.querySelector('#parentForm input[name="csrfmiddlewaretoken"]').value
-    },
-    body: JSON.stringify({ email: email, password: password, type: 'parent', next: nextParam })
-  })
-  .then(function(r) { return r.json(); })
-  .then(function(data) {
-    if (data.ok) {
-      alertEl.className = 'alert alert-success';
-      alertEl.style.display = 'flex';
-      alertEl.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0;margin-top:1px"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.3"/><path d="M5 8l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><div>Signing you in...</div>';
-      setTimeout(function() { window.location.href = data.redirect; }, 600);
-    } else {
-      alertEl.className = 'alert alert-error';
-      alertEl.style.display = 'flex';
-      alertEl.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0;margin-top:1px"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.3"/><path d="M8 5v3.5M8 10.5v.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><div>' + (data.error || 'Login failed.') + '</div>';
-      btn.querySelector('.btn-text').style.display = '';
-      btn.querySelector('.btn-arrow').style.display = '';
-      spinner.style.display = 'none';
-      btn.disabled = false;
-    }
-  })
-  .catch(function() {
-    alertEl.className = 'alert alert-error';
-    alertEl.style.display = 'flex';
-    alertEl.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0;margin-top:1px"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.3"/><path d="M8 5v3.5M8 10.5v.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><div>Network error. Please try again.</div>';
-    btn.querySelector('.btn-text').style.display = '';
-    btn.querySelector('.btn-arrow').style.display = '';
-    spinner.style.display = 'none';
-    btn.disabled = false;
-  });
-  return false;
-}
+// Parents arriving from a /parent/ page land on the Parent tab.
+(function () {
+  var nxt = new URLSearchParams(window.location.search).get('next') || '';
+  if (nxt.indexOf('/parent/') === 0) switchTab('parent');
+})();
 
 // Staff form loading state
 document.getElementById('staffForm').addEventListener('submit', function() {
