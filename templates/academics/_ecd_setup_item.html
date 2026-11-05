@@ -1,0 +1,25 @@
+{# One line of an ECD report section, with its term flags (T1/T2/T3) and edit tools. #}
+<div class="es-row{% if off %} off{% endif %}">
+  <div class="es-row-label">{{ item.label }}{% if item.allows_text %}<span class="es-row-note">+ note</span>{% endif %}{% if not item.terms %}<span class="chip chip-amber" style="margin-left:6px;font-size:11px">No term</span>{% endif %}</div>
+  <div class="es-flags" role="group" aria-label="Terms for {{ item.label }}">
+    {% for flag in item.flags %}
+    <button type="button" class="es-flag{% if flag.on %} on{% endif %}{% if flag.n == term_number %} current{% endif %}"
+      aria-pressed="{% if flag.on %}true{% else %}false{% endif %}" title="{% if flag.on %}Shown{% else %}Not shown{% endif %} in Term {{ flag.n }}{% if can_edit %} — click to change{% endif %}"
+      {% if can_edit %}hx-post="{{ request.path }}" hx-vals='{"action": "toggle_item_term", "item": "{{ item.pk }}", "n": "{{ flag.n }}"}'{% else %}disabled{% endif %}>T{{ flag.n }}</button>
+    {% endfor %}
+  </div>
+  {% if can_edit %}
+  <div class="es-row-tools">
+    <button type="button" class="es-ico" title="Move up" aria-label="Move up"
+      hx-post="{{ request.path }}" hx-vals='{"action": "move_item", "item": "{{ item.pk }}", "dir": "up"}'><svg aria-hidden="true"><use href="#es-up"/></svg></button>
+    <button type="button" class="es-ico" title="Move down" aria-label="Move down"
+      hx-post="{{ request.path }}" hx-vals='{"action": "move_item", "item": "{{ item.pk }}", "dir": "down"}'><svg aria-hidden="true"><use href="#es-down"/></svg></button>
+    <button type="button" class="es-ico" title="Edit" aria-label="Edit {{ item.label }}" onclick="esOpenItem(this)"
+      data-item="{{ item.pk }}" data-label="{{ item.label }}" data-terms="{{ item.terms|join:',' }}" data-text="{% if item.allows_text %}1{% endif %}"><svg aria-hidden="true"><use href="#es-edit"/></svg></button>
+    <button type="button" class="es-ico danger" title="Delete" aria-label="Delete {{ item.label }}"
+      hx-post="{{ request.path }}" hx-vals='{"action": "delete_item", "item": "{{ item.pk }}"}'
+      data-confirm-title="Delete line?" data-confirm-body="Delete <strong>{{ item.label }}</strong> from {{ section.title }}?"
+      data-confirm-detail="It disappears from every term. To drop it from one term only, switch that term off instead." data-confirm-text="Delete"><svg aria-hidden="true"><use href="#es-del"/></svg></button>
+  </div>
+  {% endif %}
+</div>

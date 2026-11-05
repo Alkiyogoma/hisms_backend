@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 from attendance.models import PRESENT_STATUSES
 from .models import GuardianRelationship, ParentGuardian, Student, StudentGuardian, StudentStatus, PDPAConsentLog
 from .forms import StudentCreateForm, StudentEditForm, StudentPhotoUploadForm
-from .services import describe_delivery, generate_admission_number, grant_portal_access
+from .services import generate_admission_number
 
 # HOD academic scope derived from role (more reliable than staff_profile.department,
 # which may reflect an administrative department). staff_profile.department is a fallback.
@@ -1263,7 +1263,6 @@ class GuardianCreateView(RoleRequiredMixin, TemplateView):
         # PDPA consent is optional; it can be recorded later from Edit Parent.
         pdpa_consent_given = _clean_consent_post(request.POST, values, errors)
         values.update(
-            portal_access=request.POST.get("portal_access") == "on",
             relationship=request.POST.get("relationship", GuardianRelationship.GUARDIAN),
             is_primary=request.POST.get("is_primary") == "on",
         )
@@ -1302,11 +1301,6 @@ class GuardianCreateView(RoleRequiredMixin, TemplateView):
                         request.POST.get("relationship", GuardianRelationship.GUARDIAN),
                         request.POST.get("is_primary") == "on",
                     )
-                # Portal access: create linked User account if requested
-                portal_access = request.POST.get("portal_access") == "on"
-                if portal_access:
-                    _created, username, delivered = grant_portal_access(guardian, request.user)
-
                 # Tracker 12.1: audit guardian creation
                 from audit.models import log_event
                 log_event(
@@ -1326,13 +1320,7 @@ class GuardianCreateView(RoleRequiredMixin, TemplateView):
                 request, values, {},
                 general=f"The system could not save it ({e}). Nothing was saved; please try again.",
             )
-        if portal_access:
-            (messages.success if delivered else messages.warning)(
-                request,
-                f"Parent {guardian.full_name} created with portal login {username}; details {describe_delivery(delivered)}."
-            )
-        else:
-            messages.success(request, f"Parent {guardian.full_name} created.")
+        messages.success(request, f"Parent {guardian.full_name} created.")
         return redirect("students:guardian_detail", pk=guardian.pk)
 
 
@@ -1535,8 +1523,7 @@ class StudentGuardianLinkView(RoleRequiredMixin, TemplateView):
         values, errors = _clean_guardian_post(request.POST)
         # PDPA consent is optional; it can be recorded later from Edit Parent.
         pdpa_consent_given = _clean_consent_post(request.POST, values, errors)
-        portal_access = request.POST.get("portal_access") == "on"
-        values.update(portal_access=portal_access, relationship=relationship, is_primary=is_primary)
+        values.update(relationship=relationship, is_primary=is_primary)
         if errors:
             return self._invalid(request, pk, values, errors, mode)
 
@@ -1555,9 +1542,6 @@ class StudentGuardianLinkView(RoleRequiredMixin, TemplateView):
                     _record_consent(guardian, values, request.user, "Consent recorded during parent link flow.")
                     guardian.save()
                 _set_guardian_link(student, guardian, relationship, is_primary)
-                # Portal access: create linked User account if requested
-                if portal_access:
-                    _created, username, delivered = grant_portal_access(guardian, request.user)
         except Exception as e:
             logger.exception("Parent create-and-link failed")
             return self._invalid(
@@ -1565,13 +1549,7 @@ class StudentGuardianLinkView(RoleRequiredMixin, TemplateView):
                 general=f"The system could not save it ({e}). Nothing was saved; please try again.",
             )
 
-        if portal_access:
-            (messages.success if delivered else messages.warning)(
-                request,
-                f"Created and linked new parent {guardian.full_name} with portal login {username}; details {describe_delivery(delivered)}."
-            )
-        else:
-            messages.success(request, f"Created and linked new parent: {guardian.full_name}")
+        messages.success(request, f"Created and linked new parent: {guardian.full_name}")
 
         # FR-STU-005: Notify Finance Officer if sibling relationship confirmed
         if request.POST.get("confirm_sibling") == "1":
@@ -1620,47 +1598,6 @@ class GuardianConsentWithdrawView(RoleRequiredMixin, View):
         guardian.save(update_fields=["pdpa_consent_given", "pdpa_consent_method", "pdpa_consent_version", "pdpa_consented_at", "updated_at"])
 
         messages.success(request, f"PDPA consent withdrawn for {guardian.full_name}.")
-        return redirect("students:guardian_detail", pk=pk)
-
-
-class GuardianPortalAccessView(RoleRequiredMixin, View):
-    """Give an existing parent portal access, or send them a new temporary
-    password when they already have a login."""
-    required_permission = "students.change_parentguardian"
-
-    def post(self, request, pk):
-        guardian = get_object_or_404(ParentGuardian, pk=pk)
-        if guardian.is_archived:
-            messages.error(request, f"{guardian.full_name} is archived. Restore the parent before giving portal access.")
-            return redirect("students:guardian_detail", pk=pk)
-        if not (guardian.email or guardian.phone):
-            messages.error(request, f"{guardian.full_name} has no email or phone to send login details to.")
-            return redirect("students:guardian_detail", pk=pk)
-        try:
-            with transaction.atomic():
-                created, username, delivered = grant_portal_access(guardian, request.user)
-        except Exception as e:
-            logger.exception("Parent portal access failed for guardian %s", pk)
-            messages.error(request, f"Portal access was not set up ({e}). Nothing was changed; please try again.")
-            return redirect("students:guardian_detail", pk=pk)
-
-        from audit.models import log_event
-        log_event(
-            actor=request.user,
-            action_type="PARENT_PORTAL_ACCOUNT",
-            model_name="ParentGuardian",
-            object_id=guardian.pk,
-            description=(
-                f"Portal {'account created' if created else 'password reset'} for parent "
-                f"{guardian.full_name} (login {username}) by {request.user.username}"
-            ),
-            request=request,
-        )
-        notify = messages.success if delivered else messages.warning
-        if created:
-            notify(request, f"Portal access created for {guardian.full_name}. Login {username}; details {describe_delivery(delivered)}.")
-        else:
-            notify(request, f"New login details for {guardian.full_name} (login {username}) {describe_delivery(delivered)}.")
         return redirect("students:guardian_detail", pk=pk)
 
 

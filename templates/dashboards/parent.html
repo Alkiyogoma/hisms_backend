@@ -21,16 +21,16 @@
 
 <div class="metrics">
   {% for child in children %}
-    <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
+    <div class="metric-compact" style="background:var(--hodari-blue-pale)">
       <div class="mc-lbl-row"><span class="mc-lbl">{{ child.first_name }} {{ child.last_name }}</span></div>
       <div class="mc-val" style="color:#023AA5;font-size:24px">{{ child.class_name }}</div>
       <div class="mc-sub" style="color:#5A697D">{{ child.admission_no }}</div>
     </div>
   {% endfor %}
-  <div class="metric-compact" style="background:linear-gradient(135deg,{% if outstanding_balance > 0 %}#FFF8ED{% else %}#EEF9F0{% endif %},#fff)">
+  <div class="metric-compact" style="background:{% if outstanding_balance > 0 %}var(--amber-bg){% else %}var(--green-bg){% endif %}">
     <div class="mc-lbl-row"><span class="mc-lbl">Outstanding balance</span></div>
-    <div class="mc-val" style="color:{% if outstanding_balance > 0 %}#B45309{% else %}#059669{% endif %}">{{ outstanding_balance|floatformat:0 }}<span class="mc-currency" style="margin-left:4px;vertical-align:middle">TZS</span></div>
-    <div class="mc-sub" style="color:{% if outstanding_balance > 0 %}#B45309{% else %}#059669{% endif %}">
+    <div class="mc-val" style="color:{% if outstanding_balance > 0 %}var(--amber){% else %}var(--green){% endif %}">{{ outstanding_balance|floatformat:0 }}<span class="mc-currency" style="margin-left:4px;vertical-align:middle">TZS</span></div>
+    <div class="mc-sub" style="color:{% if outstanding_balance > 0 %}var(--amber){% else %}var(--green){% endif %}">
       {% if outstanding_balance > 0 %}Payment due{% else %}All paid up{% endif %}
     </div>
   </div>

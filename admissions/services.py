@@ -1019,104 +1019,39 @@ def complete_enrolment(*, applicant: Applicant, actor, override_duplicate: bool 
             defaults={"relationship": extra_rel, "is_primary": False}
         )
 
-    # FR-PARENT-001: Auto-create parent User account for portal access
+    # FR-PARENT-001: every parent on record can use the portal. The PARENT
+    # login is created here (no password: parents sign in with a one-time code
+    # sent to their phone or email), and the parent is told how to sign in.
     if guardian and not guardian.user:
-        from users.models import User
-        from django.utils.crypto import get_random_string
-
-        phone_digits = "".join(filter(str.isdigit, guardian.phone or ""))
-        base_username = f"parent_{phone_digits[:12]}" if phone_digits else f"parent_{guardian.pk}"
-        username = base_username
-        counter = 1
-        while User.objects.filter(username=username).exists():
-            username = f"{base_username}_{counter}"
-            counter += 1
-
-        raw_password = get_random_string(length=10)
-        name_parts = (guardian.full_name or "").strip().split(maxsplit=1)
-        parent_first = name_parts[0] if name_parts else ""
-        parent_last = name_parts[1] if len(name_parts) > 1 else ""
-
-        # DEF-10: Never collide on users_user.email UNIQUE  generate a unique
-        # fallback for parents without an email instead of saving an empty string.
-        email = (guardian.email or "").strip().lower()
-        if not email:
-            email = f"parent{guardian.pk}@hodari.local"
-        else:
-            base, at, domain = email.partition("@")
-            suffix = 2
-            while User.objects.filter(email=email).exists():
-                email = f"{base}{suffix}@{domain}"
-                suffix += 1
-
-        parent_user = User.objects.create(
-            username=username,
-            email=email,
-            role=UserRole.PARENT,
-            first_name=parent_first,
-            last_name=parent_last,
-            must_change_password=True,
-        )
-        parent_user.set_password(raw_password)
-        parent_user.save()
-
-        guardian.user = parent_user
-        guardian.save(update_fields=["user", "updated_at"])
-
-        # Send credentials to parent via available channels
-        from communications.email_service import send_parent_notification
-        from django.template.loader import render_to_string
         from django.conf import settings as django_settings
+        from urllib.parse import urlencode
+
+        from communications.email_service import send_parent_notification
         from core.models import SchoolSettings
+        from students.services import ensure_parent_user
+
+        ensure_parent_user(guardian)
 
         school_name = SchoolSettings.get_settings().school_name or "Hodari School"
-        _site = getattr(django_settings, 'SITE_URL', 'http://127.0.0.1:8000')
-        _portal_url = _site.rstrip('/') + '/parent/'
-        _admission_form_url = _site.rstrip('/') + '/parent/admission-form/'
+        _site = getattr(django_settings, 'SITE_URL', 'http://127.0.0.1:8000').rstrip('/')
+        _signin_url = _site + '/parent/login/'
+        _admission_form_url = _signin_url + '?' + urlencode({'next': '/parent/admission-form/'})
 
-        creds_message = (
-            f"Dear {guardian.full_name},\n\n"
-            f"Your parent portal account has been created. You can now access your child's "
-            f"attendance records, report cards, invoices, and school communications.\n\n"
-            f"Username: {username}\n"
-            f"Password: {raw_password}\n\n"
-            f"IMPORTANT: You will be required to change your password on first login.\n\n"
-            f"Parent Portal: {_portal_url}\n\n"
-            f"Complete Admission Form: {_admission_form_url}\n\n"
-            f"Thank you for choosing {school_name}."
-        )
-
-        tpl_context = {
-            "guardian_name": guardian.full_name,
-            "username": username,
-            "temp_password": raw_password,
-            "login_url": _admission_form_url,
-            "school_name": school_name,
-            "site_url": _site,
-            "static_url": getattr(django_settings, 'STATIC_URL', '/static/'),
-            "portal_link": _admission_form_url,
-        }
-
-        # Try dynamic DB template first
-        from core.email_templates import send_dynamic_email
-        db_sent = send_dynamic_email(
-            template_type="parent_portal",
-            to_email=guardian.email,
-            context=tpl_context,
+        send_parent_notification(
+            guardian=guardian,
+            title="Your Parent Portal is ready",
+            message=(
+                f"Dear {guardian.full_name},\n\n"
+                f"You can now use the {school_name} Parent Portal to see your child's attendance, "
+                f"report cards and school news.\n\n"
+                f"To sign in, open {_signin_url} and enter this phone number or email. "
+                f"We will send you a 4-digit code. No password is needed.\n\n"
+                f"Please complete the admission form: {_admission_form_url}\n\n"
+                f"Thank you for choosing {school_name}."
+            ),
             actor=actor,
+            action_type="PARENT_PORTAL_ACCOUNT",
         )
-
-        if not db_sent:
-            html_body = render_to_string("registration/parent_portal_email.html", tpl_context)
-
-            send_parent_notification(
-                guardian=guardian,
-                title="Your Parent Portal Account Has Been Created",
-                message=creds_message,
-                html_body=html_body,
-                actor=actor,
-                action_type="PARENT_PORTAL_ACCOUNT",
-            )
 
     applicant.enrolled_student = student
     applicant.save(update_fields=["enrolled_student_id", "updated_at"])
@@ -1208,7 +1143,7 @@ def complete_enrolment(*, applicant: Applicant, actor, override_duplicate: bool 
                 "term_start_date": "See school calendar",
                 "reference_number": applicant.reference_number,
                 "school_name": _ss.school_name or "Hodari Christian School",
-                "portal_link": "/parent/admission-form/",
+                "portal_link": "/parent/login/?next=/parent/admission-form/",
                 "admissions_phone": _contact.get("phone", ""),
                 "uniform_notes": "Ensure correct uniform is worn from day one.",
                 "meals": "School meals available: see fee schedule.",

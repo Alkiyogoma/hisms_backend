@@ -12,7 +12,7 @@ from django.utils import timezone
 
 import academics.tests  # noqa: F401  (applies the SQLite teardown shim)
 from academics.models import (
-    AcademicYear, Department, ECDEvaluation, GradeClass, ReportCard, ReportCardStatus, Term,
+    AcademicYear, Department, ECDEvaluation, ECDItem, GradeClass, ReportCard, ReportCardStatus, Term,
 )
 from academics.tests import assign_role_group
 from students.models import EnrollmentHistory, Student, StudentStatus
@@ -48,7 +48,8 @@ class ECDEarlierTermTests(TestCase):
             student=cls.moved_up, term=cls.old_term, is_ecd_report=True, ecd_template_type="kindergarten",
             status=ReportCardStatus.PUBLISHED, teacher_comments="A joyful learner.", generated_by=cls.hos,
         )
-        ECDEvaluation.objects.create(report_card=cls.old_report, domain="kn1", rating="E")
+        cls.item = ECDItem.objects.filter(section__class_type="kindergarten").for_term(3).first()
+        ECDEvaluation.objects.create(report_card=cls.old_report, item=cls.item, domain=cls.item.label, rating="4")
         # In KG now.
         cls.current = Student.objects.create(
             admission_no="E-002", first_name="Baraka", last_name="Kimaro",
@@ -72,7 +73,7 @@ class ECDEarlierTermTests(TestCase):
     def test_earlier_report_is_shown_as_recorded(self):
         d = self._get("api_ecd_evaluation", self.moved_up.id, class_name="KG", term=self.old_term.id).json()
         self.assertEqual(d["report_card_id"], self.old_report.id)
-        self.assertEqual(d["evaluations"], {"kn1": "E"})
+        self.assertEqual(d["values"], {str(self.item.pk): {"rating": "4", "score": None, "note": ""}})
         self.assertEqual(d["teacher_comments"], "A joyful learner.")
         self.assertEqual(d["ecd_template_type"], "kindergarten")
         self.assertTrue(d["read_only"] and d["is_locked"])
@@ -86,11 +87,11 @@ class ECDEarlierTermTests(TestCase):
     def test_earlier_terms_cannot_be_changed(self):
         url = reverse("academics:api_ecd_evaluation", args=[self.moved_up.id])
         resp = self.client.post(f"{url}?class_name=KG&term={self.old_term.id}",
-                                json.dumps({"evaluations": {"kn1": "N"}}), content_type="application/json")
+                                json.dumps({"values": {str(self.item.pk): {"rating": "1"}}}), content_type="application/json")
         self.assertEqual(resp.status_code, 403)
         submit = reverse("academics:api_ecd_submit", args=[self.moved_up.id])
         self.assertEqual(self.client.post(f"{submit}?class_name=KG&term={self.old_term.id}").status_code, 403)
-        self.assertEqual(ECDEvaluation.objects.get(report_card=self.old_report).rating, "E")
+        self.assertEqual(ECDEvaluation.objects.get(report_card=self.old_report).rating, "4")
 
     def test_page_opens_the_earlier_term_read_only(self):
         page = self._get("ecd_assessment", year=self.old_year.id, term=self.old_term.id, class_name="KG")

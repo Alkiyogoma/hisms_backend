@@ -99,6 +99,19 @@
     .set-cell-chips:empty { display: none; }
     .set-kv div { font-size: 12px; color: var(--text-secondary); line-height: 1.7; }
     .set-kv span { display: inline-block; min-width: 64px; color: var(--text-muted); font-size: 11px; }
+    .set-termno { background: rgba(2,58,165,.04); border: 1px solid rgba(2,58,165,.18); border-radius: 10px; padding: 12px 14px; }
+    .set-termno-opts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 6px; }
+    .set-termno-opt { position: relative; }
+    .set-termno-opt input { position: absolute; opacity: 0; pointer-events: none; }
+    .set-termno-opt span { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 8px 6px; border: 1.5px solid var(--border);
+        border-radius: 8px; background: #fff; cursor: pointer; font-size: 18px; font-weight: 700; color: var(--text-primary); transition: all .12s; }
+    .set-termno-opt span small { font-size: 11px; font-weight: 500; color: var(--text-muted); }
+    .set-termno-opt input:checked + span { border-color: var(--hodari-blue, #023AA5); background: var(--hodari-blue, #023AA5); color: #fff; }
+    .set-termno-opt input:checked + span small { color: rgba(255,255,255,.8); }
+    .set-termno-opt input:focus-visible + span { outline: 2px solid var(--hodari-blue, #023AA5); outline-offset: 2px; }
+    .set-termno-opt input:disabled + span { opacity: .4; cursor: not-allowed; }
+    .set-termno .set-hint { margin: 8px 0 0; }
+    .chip-termno { font-variant-numeric: tabular-nums; }
     .set-empty-row { text-align: center; padding: 24px !important; color: var(--text-muted); font-size: 13px; }
     @media (max-width: 1100px) {
         .set-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -458,6 +471,7 @@
                     <td>
                         <div class="set-cell-main">{{ term.name }}</div>
                         <div class="set-cell-chips">
+                            {% if term.term_number %}<span class="chip chip-blue chip-termno" title="Term number">T{{ term.term_number }}</span>{% else %}<span class="chip chip-amber" title="Edit the term to set its number">No term no.</span>{% endif %}
                             {% if term.is_current_term %}<span class="chip chip-blue">Current</span>{% endif %}
                             {% if term.is_locked %}<span class="chip chip-grey">Locked</span>{% endif %}
                             {% if term.is_ended %}<span class="chip chip-grey">Ended</span>{% endif %}
@@ -484,7 +498,7 @@
                     <td style="text-align:right;white-space:nowrap">
                         {% if not term.is_ended %}
                         <c-button variant="secondary" size="sm"
-                            onclick="openTermDrawer({pk:'{{ term.pk }}',year:'{{ ay.pk }}',name:'{{ term.name|escapejs }}',start:'{{ term.start_date|date:'Y-m-d' }}',end:'{{ term.end_date|date:'Y-m-d' }}',deadline:'{{ term.grading_deadline|date:'Y-m-d' }}',quiz_start:'{{ term.quiz_start_date|date:'Y-m-d' }}',quiz_end:'{{ term.quiz_end_date|date:'Y-m-d' }}',mt_start:'{{ term.midterm_exam_start_date|date:'Y-m-d' }}',mt_end:'{{ term.midterm_exam_end_date|date:'Y-m-d' }}',et_start:'{{ term.endterm_exam_start_date|date:'Y-m-d' }}',et_end:'{{ term.endterm_exam_end_date|date:'Y-m-d' }}',q_days:{{ term.quiz_grade_marking_days|default:5 }},mt_days:{{ term.midterm_grade_marking_days|default:10 }},et_days:{{ term.endterm_grade_marking_days|default:10 }}})">Edit</c-button>
+                            onclick="openTermDrawer({pk:'{{ term.pk }}',year:'{{ ay.pk }}',number:'{{ term.term_number|default:'' }}',name:'{{ term.name|escapejs }}',start:'{{ term.start_date|date:'Y-m-d' }}',end:'{{ term.end_date|date:'Y-m-d' }}',deadline:'{{ term.grading_deadline|date:'Y-m-d' }}',quiz_start:'{{ term.quiz_start_date|date:'Y-m-d' }}',quiz_end:'{{ term.quiz_end_date|date:'Y-m-d' }}',mt_start:'{{ term.midterm_exam_start_date|date:'Y-m-d' }}',mt_end:'{{ term.midterm_exam_end_date|date:'Y-m-d' }}',et_start:'{{ term.endterm_exam_start_date|date:'Y-m-d' }}',et_end:'{{ term.endterm_exam_end_date|date:'Y-m-d' }}',q_days:{{ term.quiz_grade_marking_days|default:5 }},mt_days:{{ term.midterm_grade_marking_days|default:10 }},et_days:{{ term.endterm_grade_marking_days|default:10 }}})">Edit</c-button>
                         <c-button variant="danger" size="sm"
                             onclick="confirmDeleteModal({title:'Delete term?',body:'Delete <strong>{{ term.name|escapejs }}</strong> ({{ ay.name|escapejs }})?',detail:'This cannot be undone.',confirmText:'Delete term',url:'?tab=academic_year',type:'danger',extraData:[{name:'action',value:'delete_term'},{name:'pk',value:'{{ term.pk }}'}]})">Delete</c-button>
                         {% else %}<span class="set-muted">Read-only</span>{% endif %}
@@ -562,10 +576,22 @@
                 </select>
             </div>
             <div class="set-field">
-                <label class="form-label" for="term_name">Term name <span class="req">*</span></label>
-                <input type="text" name="term_name" id="term_name" required class="hf-input" placeholder="e.g. Term 1">
+                <label class="form-label" for="term_name">Term name</label>
+                <input type="text" name="term_name" id="term_name" class="hf-input" placeholder="e.g. Term 1">
             </div>
         </div>
+        <fieldset class="set-termno">
+            <legend class="form-label">Term number <span class="req">*</span></legend>
+            <div class="set-termno-opts">
+                {% for n in "123" %}
+                <label class="set-termno-opt">
+                    <input type="radio" name="term_number" value="{{ n }}" required>
+                    <span>{{ n }}<small>Term {{ n }}</small></span>
+                </label>
+                {% endfor %}
+            </div>
+            <p class="set-hint">Picks the term's report layout and term rules (e.g. ECD progress reports). Each number is used once per year.</p>
+        </fieldset>
         <div class="set-grid-3">
             <div class="set-field">
                 <label class="form-label" for="term_start">Start date <span class="req">*</span></label>
@@ -665,10 +691,37 @@
         set('term_q_days', t.q_days || 5); set('term_mt_days', t.mt_days || 10); set('term_et_days', t.et_days || 10);
         // The year can't be changed on an existing term (the server ignores it).
         document.getElementById('term_year').disabled = !!t.pk;
+        f.dataset.termPk = t.pk || '';
+        f.querySelectorAll('input[name=term_number]').forEach(function (r) { r.checked = r.value === String(t.number || ''); });
+        syncTermNumbers();
         d.querySelector('.drawer-title').firstChild.textContent = t.pk ? 'Edit ' + t.name : 'Add term';
         document.getElementById('termSubmit').textContent = t.pk ? 'Save changes' : 'Add term';
         HodariUI.open('termDrawer');
     }
+
+    // Term numbers already taken in each year: {yearPk: {number: termPk}}.
+    var TERM_NUMBERS_USED = {
+        {% for ay in academic_years %}'{{ ay.pk }}': { {% for t in ay.term_list %}{% if t.term_number %}'{{ t.term_number }}': '{{ t.pk }}',{% endif %}{% endfor %} },
+        {% endfor %}
+    };
+    function syncTermNumbers() {
+        var f = document.getElementById('termForm');
+        var used = TERM_NUMBERS_USED[document.getElementById('term_year').value] || {};
+        f.querySelectorAll('input[name=term_number]').forEach(function (r) {
+            var owner = used[r.value];
+            r.disabled = !!owner && owner !== f.dataset.termPk;
+            if (r.disabled) r.checked = false;
+            r.parentElement.title = r.disabled ? 'Already used in this year' : '';
+        });
+    }
+    document.getElementById('term_year').addEventListener('change', syncTermNumbers);
+    document.querySelectorAll('#termForm input[name=term_number]').forEach(function (r) {
+        r.addEventListener('change', function () {
+            // Keep the name in step with the number unless it was customised.
+            var name = document.getElementById('term_name');
+            if (!name.value.trim() || /^Term [1-3]$/.test(name.value.trim())) name.value = 'Term ' + r.value;
+        });
+    });
 </script>
 
 {# ══════════════════════════════════════════════════════════════ #}

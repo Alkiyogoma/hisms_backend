@@ -10,17 +10,17 @@
 </div>
 
 {% if error %}
-<div class="card" style="padding:24px;color:#DC2626">{{ error }}</div>
+<div class="card" style="padding:24px;color:var(--red)">{{ error }}</div>
 {% else %}
 
 <div class="card" style="padding:24px;max-width:640px">
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-    <div style="width:40px;height:40px;border-radius:10px;background:#EEF4FF;display:flex;align-items:center;justify-content:center">
+    <div style="width:40px;height:40px;border-radius:10px;background:var(--hodari-blue-light);display:flex;align-items:center;justify-content:center">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#023AA5" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
     </div>
     <div>
       <h3 style="margin:0;font-size:15px;font-weight:700">Request a New Parent</h3>
-      <p style="margin:0;font-size:13px;color:#64748B">Send a request to the school office to create and link a new parent record.</p>
+      <p style="margin:0;font-size:13px;color:var(--text-muted)">Send a request to the school office to create and link a new parent record.</p>
     </div>
   </div>
 

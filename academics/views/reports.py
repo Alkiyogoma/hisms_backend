@@ -13,7 +13,6 @@ from django.views.generic import CreateView, UpdateView, TemplateView, View
 import json
 
 from academics.ecd_utils import build_ecd_report_context, ecd_template_type_from_class_name, grade_class_names_for_department
-from academics.views.ecd import ECDEvaluationEntryView
 from academics.forms import LessonPlanForm, LessonPlanReviewForm, ExamScoreFilterForm, SubjectForm, TermForm
 from academics.utils import get_current_term
 from academics.models import (
@@ -396,12 +395,32 @@ def _trait_groups(traits):
     return groups
 
 
-def _build_report_card_context(report):
+def _shared(shared, key, compute):
+    """``compute()`` once per key when a class is printed together (``shared``
+    is a dict then); every time for a single report (``shared`` is None)."""
+    if shared is None:
+        return compute()
+    if key not in shared:
+        shared[key] = compute()
+    return shared[key]
+
+
+def _class_attendance_rows(reports, term):
+    """Attendance rows for every learner of a class print, from one pass."""
+    from attendance import analytics
+    start, end = analytics.term_range(term)
+    period = analytics.build_period(start, end)
+    rows = analytics.build_learners(period, None, student_ids=[r.student_id for r in reports])
+    return {row["student"].pk: row for row in rows}
+
+
+def _build_report_card_context(report, shared=None):
     """
     Build the shared context dict for report card rendering (both preview and PDF).
 
     Returns a dict with keys: report, student, attendance, subjects,
     checkpoint_scores (if applicable), and ecd (if ECD report).
+    ``shared`` (a dict) lets a class print look up class-wide data once.
     """
     ctx = {"report": report, "student": report.student}
 
@@ -410,8 +429,11 @@ def _build_report_card_context(report):
     # as absent. Present includes late; absent includes excused.
     from attendance import analytics
     term = report.term
-    start, end = analytics.term_range(term)
-    row = analytics.learner_attendance(report.student, start, end)["row"] or {}
+    if shared is not None and "attendance_rows" in shared:
+        row = shared["attendance_rows"].get(report.student_id) or {}
+    else:
+        start, end = analytics.term_range(term)
+        row = analytics.learner_attendance(report.student, start, end)["row"] or {}
     ctx["attendance"] = {
         "present": row.get("in_school", 0),
         "late": row.get("late", 0),
@@ -422,11 +444,14 @@ def _build_report_card_context(report):
     }
     ctx["photo_src"] = _photo_data_uri(report.student)
     ctx["photo_checked"] = True
-    ctx["reopens_on"] = _reopens_on(term)
-    ctx["class_teacher"] = _class_teacher_name(report)
+    ctx["reopens_on"] = _shared(shared, ("reopens", term.pk), lambda: _reopens_on(term))
+    ctx["class_teacher"] = _shared(
+        shared, ("class_teacher", report.student.class_name, term.pk, report.generated_by_id),
+        lambda: _class_teacher_name(report),
+    )
 
     if report.is_ecd_report:
-        ctx["ecd"] = build_ecd_report_context(report)
+        ctx["ecd"] = build_ecd_report_context(report, shared=shared)
         return ctx
 
     # Official report card = the Student Progress Report for the term, plus
@@ -567,14 +592,17 @@ class ClassReportPrintView(HOSReportPreviewView):
         from django.template.loader import render_to_string
         report = ctx["report"]
         partial = "academics/_ecd_report_body.html" if report.is_ecd_report else "academics/_progress_report_body.html"
-        reports = (
+        reports = list(
             self.class_report_queryset(report)
-            .select_related("student", "term__academic_year", "signed_off_by")
+            .select_related("student", "term__academic_year", "signed_off_by", "generated_by")
             .order_by("student__last_name", "student__first_name")
         )
+        # Class-wide lookups (attendance pass, class teacher, reopening date,
+        # ECD report lines) are made once for the whole class.
+        shared = {"attendance_rows": _class_attendance_rows(reports, report.term)}
         ctx["class_view"] = True
         ctx["class_reports"] = [
-            render_to_string(partial, _build_report_card_context(r), request=self.request) for r in reports
+            render_to_string(partial, _build_report_card_context(r, shared), request=self.request) for r in reports
         ]
         return ctx
 
@@ -739,26 +767,22 @@ class ReportReviewQueueView(AllowedRolesEnforcedMixin, RoleRequiredMixin, Templa
                     remark_subjects, remarks_by_student.get(rc.student_id),
                 )
 
-        # Batch load ECDEvaluation ratings for ECD students
+        # ECD reports are complete when every line of the term's report is rated
         ecd_complete = set()
         if ecd_student_ids:
-            from academics.ecd_utils import ecd_template_type_from_class_name
+            from academics import ecd_report
+            structures = {}
             for rc in reports:
-                if rc.is_ecd_report:
-                    student_id = rc.student_id
-                    tpl = rc.ecd_template_type or ecd_template_type_from_class_name(rc.student.class_name)
-                    if not tpl:
-                        continue
-                    required = set(ECDEvaluationEntryView.get_flat_domains(tpl))
-                    existing = set(
-                        ECDEvaluation.objects.filter(
-                            report_card__student_id=student_id,
-                            report_card__term=term,
-                            rating__in=["E", "G", "S", "N"],
-                        ).values_list("domain", flat=True)
-                    )
-                    if required and required.issubset(existing):
-                        ecd_complete.add(student_id)
+                if not rc.is_ecd_report:
+                    continue
+                class_type = rc.ecd_template_type or ecd_report.class_type_of(rc.student.class_name)
+                if not class_type:
+                    continue
+                if class_type not in structures:
+                    structures[class_type] = ecd_report.ReportStructure(class_type, ecd_report.term_number_of(term))
+                structure = structures[class_type]
+                if structure.items and not ecd_report.missing_lines(structure, ecd_report.values_for(rc)):
+                    ecd_complete.add(rc.student_id)
 
         rows = []
         for rc in reports:
@@ -1178,10 +1202,12 @@ def render_report_pdf_response(request, report):
         request=request
     )
 
+    # Imported before the try: its except clause names FuturesTimeout, which must
+    # exist even when the WeasyPrint import fails.
+    import time
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
     try:
         from weasyprint import HTML
-        import time
-        from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
         start = time.monotonic()
         with ThreadPoolExecutor(max_workers=1) as executor:
             future = executor.submit(

@@ -1,3 +1,4 @@
+from django.views.generic import RedirectView
 from django.urls import path
 
 from academics.views import (
@@ -65,7 +66,8 @@ from academics.views import (
     SubjectDeleteView,
     SubjectsPerGradeView,
     SubjectClassesAPIView,
-    ECDDomainConfigListView,
+    ECDReportSetupView,
+    ECDReportSetupPreviewView,
     ReportPDFDownloadView,
     StudentAcademicRecordView,
     ProgressionConfigListView,
@@ -155,7 +157,9 @@ urlpatterns = [
     path("api/subjects-by-class/", SubjectClassesAPIView.as_view(), name="api_subjects_by_class"),
 
     # ECD Domain Configuration
-    path("ecd-domains/", ECDDomainConfigListView.as_view(), name="ecd_domain_config"),
+    path("ecd-domains/", RedirectView.as_view(pattern_name="academics:ecd_report_setup"), name="ecd_domain_config"),
+    path("ecd-setup/", ECDReportSetupView.as_view(), name="ecd_report_setup"),
+    path("ecd-setup/preview/", ECDReportSetupPreviewView.as_view(), name="ecd_report_setup_preview"),
 
     # Cambridge Checkpoint (FR-ACAD-005)
     path("exam-score-approval-queue/", ExamScoreApprovalQueueView.as_view(), name="exam_score_approval_queue"),

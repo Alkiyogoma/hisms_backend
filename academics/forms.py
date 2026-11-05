@@ -220,7 +220,7 @@ class TermForm(forms.ModelForm):
     class Meta:
         model = Term
         fields = [
-            "academic_year", "name", "start_date", "end_date",
+            "academic_year", "term_number", "name", "start_date", "end_date",
             "midterm_exam_start_date", "midterm_exam_end_date",
             "endterm_exam_start_date", "endterm_exam_end_date",
             "quiz_start_date", "quiz_end_date",

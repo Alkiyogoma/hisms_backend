@@ -113,8 +113,8 @@
       <div style="display:flex;align-items:center;gap:12px">
         <span style="font-size:12px;color:var(--text-muted)">{{ subjects|length }} subject{{ subjects|length|pluralize }}</span>
         <a href="{% url 'academics:subjects_per_grade' %}" class="hf-btn hf-btn-secondary hf-btn-sm" style="font-size:11px;padding:6px 14px;text-decoration:none">Subjects per Grade</a>
-        {% if perms.academics.change_ecddomainconfig %}
-        <a href="{% url 'academics:ecd_domain_config' %}" class="hf-btn hf-btn-secondary hf-btn-sm" style="font-size:11px;padding:6px 14px;text-decoration:none">ECD Domains</a>
+        {% if perms.academics.view_ecdsection %}
+        <a href="{% url 'academics:ecd_report_setup' %}" class="hf-btn hf-btn-secondary hf-btn-sm" style="font-size:11px;padding:6px 14px;text-decoration:none">ECD Report Setup</a>
         {% endif %}
         <button onclick="window.print()" class="hf-btn hf-btn-secondary hf-btn-sm print-hide" style="font-size:11px;padding:6px 14px">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:4px"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z"/></svg>

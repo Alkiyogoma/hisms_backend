@@ -1,11 +1,12 @@
 """Parent portal URL patterns."""
 from django.urls import path
 from . import views
+from .auth_views import ParentLoginView
 
 app_name = "parent_portal"
 
 urlpatterns = [
-    # v1: Home, learner progress (with published report cards) and the school calendar.
+    path("login/", ParentLoginView.as_view(), name="login"),
     path("", views.ParentDashboardView.as_view(), name="dashboard"),
     path("learner/<int:student_id>/", views.ParentLearnerProgressView.as_view(), name="progress"),
     path("learner/<int:student_id>/photo/", views.ParentLearnerPhotoView.as_view(), name="learner_photo"),

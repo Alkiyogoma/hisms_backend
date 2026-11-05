@@ -1,0 +1,227 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parent sign in · {{ brand.school_name|default:"Hodari Christian School" }}</title>
+<link rel="icon" type="image/x-icon" href="{% static 'branding/favicon.ico' %}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* Parent Portal v1 sign-in. Brand: blue #023AA5, yellow #FBBC05, grey #474747;
+     Roboto for text, Times for headlines (Hodari brand guideline). */
+  :root{
+    --blue:#023AA5; --blue2:#1A56C4; --navy:#012880;
+    --gold:#FBBC05; --goldsoft:#FEF3C7;
+    --ink:#1A1A2E; --muted:#5A697D; --line:#DDE3EE; --bg:#F2F5FA;
+    --ok:#1B7B34; --bad:#9B1C1C; --grey:#8B93A6;
+    --shadow:0 1px 2px rgba(1,40,128,.05),0 8px 24px rgba(1,40,128,.06);
+    --serif:'Times New Roman',Times,'Liberation Serif',serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Roboto',system-ui,sans-serif;color:var(--ink);font-size:16px;line-height:1.45;min-height:100vh;
+    background:radial-gradient(1200px 500px at 90% -10%,#E8EEF9 0%,transparent 60%),
+               radial-gradient(900px 400px at -10% 10%,#FEF3C7 0%,transparent 55%),var(--bg)}
+  button{font:inherit}
+  .wrap{max-width:960px;margin:0 auto;padding:0 16px}
+
+  header.top{background:linear-gradient(120deg,var(--navy) 0%,var(--blue) 60%,var(--blue2) 100%);color:#fff;position:sticky;top:0;z-index:20;box-shadow:0 4px 18px rgba(1,40,128,.25)}
+  header.top::after{content:"";position:absolute;left:0;right:0;bottom:-3px;height:3px;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+  header.top .wrap{display:flex;align-items:center;gap:12px;min-height:64px}
+  header.top img{height:34px;width:auto;display:block}
+  .brand-sub{font-size:12px;letter-spacing:.06em;text-transform:uppercase;opacity:.85;border-left:1px solid rgba(255,255,255,.35);padding-left:12px}
+
+  .login-wrap{min-height:calc(100vh - 64px);display:flex;align-items:center;justify-content:center;padding:32px 16px}
+  .login-card{width:100%;max-width:420px;background:#fff;border-radius:24px;box-shadow:0 24px 60px rgba(1,40,128,.18);overflow:hidden;border:1px solid var(--line);animation:fadeUp .45s ease both}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .login-hero{background:linear-gradient(135deg,var(--navy),var(--blue) 55%,var(--blue2));color:#fff;padding:28px 26px 30px;position:relative;overflow:hidden}
+  .login-hero::before{content:"";position:absolute;right:-50px;top:-50px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(251,188,5,.4),transparent 70%)}
+  .login-hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;background:linear-gradient(90deg,var(--gold),#FCD34D,transparent)}
+  .login-hero .mark{width:44px;height:44px;display:block;margin-bottom:14px;position:relative;z-index:1}
+  .login-hero h1{font-family:var(--serif);font-weight:600;letter-spacing:-.01em;font-size:28px;margin:0 0 6px;position:relative;z-index:1}
+  .login-hero p{margin:0;opacity:.88;font-size:14px;position:relative;z-index:1}
+  .login-body{padding:24px 26px 26px}
+
+  .lbl{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0 0 8px}
+  .field{width:100%;border:1px solid var(--line);border-radius:14px;padding:15px 16px;font:inherit;font-size:17px;outline:none;background:#fff;color:var(--ink);margin-bottom:8px;transition:border-color .15s,box-shadow .15s}
+  .field:focus{border-color:var(--gold);box-shadow:0 0 0 4px rgba(251,188,5,.25)}
+  .field.bad{border-color:var(--bad);box-shadow:0 0 0 4px rgba(155,28,28,.12)}
+  .err{color:var(--bad);font-size:14px;min-height:20px;margin:4px 0 12px}
+  .err.ok{color:var(--ok)}
+  .fine{font-size:12px;color:var(--muted);margin-top:14px;text-align:center}
+
+  .cta{display:flex;justify-content:center;align-items:center;gap:10px;background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;border:0;border-radius:14px;padding:14px 18px;cursor:pointer;font-size:16px;font-weight:700;box-shadow:0 8px 20px rgba(2,58,165,.25);transition:transform .15s ease,box-shadow .15s ease;width:100%}
+  .cta:hover{transform:translateY(-1px);box-shadow:0 12px 26px rgba(2,58,165,.32)}
+  .cta[disabled]{opacity:.7;cursor:wait;transform:none}
+  .cta .arrow{width:34px;height:34px;border-radius:50%;background:var(--gold);color:var(--navy);display:grid;place-items:center;flex:none}
+  .cta .arrow svg{width:16px;height:16px}
+
+  .inline-back{background:none;border:0;color:var(--blue);font-weight:700;cursor:pointer;padding:0;font-size:14px;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+  .step-h{font-family:var(--serif);font-weight:600;font-size:22px;margin:12px 0 8px}
+  .instr{background:#F7F9FF;border:1px solid #DFE6F7;border-radius:14px;padding:12px 14px;font-size:14px;margin:0 0 6px}
+  .instr b{color:var(--navy)}
+  .otp{display:flex;gap:12px;justify-content:center;margin:18px 0}
+  .otp input{width:60px;height:68px;border:1px solid var(--line);border-radius:16px;text-align:center;font-family:var(--serif);font-size:30px;font-weight:700;color:var(--navy);outline:none;background:#fff;box-shadow:var(--shadow);transition:border-color .15s,box-shadow .15s}
+  .otp input:focus{border-color:var(--gold);box-shadow:0 0 0 4px rgba(251,188,5,.25)}
+  .resend{text-align:center;font-size:14px;color:var(--muted);margin-top:16px}
+  .resend button{background:none;border:0;color:var(--blue);font-weight:700;cursor:pointer;padding:0 0 0 6px}
+  .resend button[disabled]{color:var(--grey);cursor:default}
+
+  .sim{margin:18px 0 0;border-radius:16px;background:linear-gradient(180deg,#F3F6FD,#fff);border:1px dashed #C8D3EE;padding:14px}
+  .sim .tag{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--blue);margin-bottom:10px}
+  .bubble{background:#fff;border:1px solid var(--line);border-radius:14px 14px 14px 4px;padding:12px 14px;box-shadow:var(--shadow);font-size:14px}
+  .bubble .from{font-weight:700;font-size:12px;color:var(--navy);margin-bottom:4px}
+  .bubble .code{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--blue);letter-spacing:.2em}
+
+  .staff-link{text-align:center;font-size:13px;color:var(--muted);margin:0 26px 24px}
+  .staff-link a{color:var(--blue);font-weight:500}
+  footer{color:var(--muted);font-size:13px;text-align:center;padding:0 16px 32px}
+  @media (max-width:380px){.otp input{width:54px;height:62px}.login-body{padding:22px 20px}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <img src="{% static 'branding/hodari-logos.png' %}" alt="{{ brand.school_name|default:'Hodari Christian School' }}">
+    <span class="brand-sub">Parent Portal</span>
+  </div>
+</header>
+
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="login-hero">
+      <svg class="mark" viewBox="0 0 48 48" aria-hidden="true">
+        <path d="M4 4H21V21A17 17 0 0 1 4 4Z" fill="#fff"/>
+        <circle cx="35.5" cy="12.5" r="8.5" fill="#FBBC05"/>
+        <path d="M4 27H21V44A17 17 0 0 1 4 27Z" fill="#fff"/>
+        <path d="M27 27H44V44A17 17 0 0 1 27 27Z" fill="#fff"/>
+      </svg>
+      <h1>Parent sign in</h1>
+      <p>Enter the mobile number or email the school has on record.</p>
+    </div>
+
+    <div class="login-body">
+      {% if step == "in" %}
+      <form method="post" id="stepIn" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="lookup">
+        <input type="hidden" name="next" value="{{ next }}">
+        <label class="lbl" for="who">Phone number or email</label>
+        <input class="field{% if error %} bad{% endif %}" id="who" name="who" value="{{ who }}"
+               placeholder="e.g. 0712 345 678 or name@email.com" autocomplete="username"
+               autocapitalize="none" spellcheck="false" autofocus required>
+        <div class="err" role="alert">{{ error|default:"" }}</div>
+        <button class="cta" type="submit">Log in
+          <span class="arrow"><svg viewBox="0 0 18 18" fill="none"><path d="M3.75 9h10.5M9.75 4.5L14.25 9l-4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </button>
+        <div class="fine">We will send a 4-digit code to the number or email on record.</div>
+      </form>
+
+      {% else %}
+      <div id="stepCode">
+        <a class="inline-back" href="{% url 'parent_portal:login' %}?change=1{% if next %}&next={{ next|urlencode }}{% endif %}">&larr; Change phone or email</a>
+        <h2 class="step-h">Enter your code</h2>
+        <div class="instr">
+          {% if channel == "sms" %}
+            We've sent a 4-digit code by <b>SMS</b> to <b>{{ masked }}</b>. It usually arrives within a minute. Check your messages and enter the code below.
+          {% else %}
+            We've sent a 4-digit code to <b>{{ masked }}</b>. Check your inbox, and your spam folder if you can't see it. Enter the code below.
+          {% endif %}
+        </div>
+
+        <form method="post" id="codeForm" autocomplete="off">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="verify">
+          <input type="hidden" name="next" value="{{ next }}">
+          <input type="hidden" name="code" id="codeValue">
+          <div class="otp" id="otpBox">
+            {% for i in code_length %}
+            <input inputmode="numeric" pattern="[0-9]*" aria-label="Digit {{ forloop.counter }}"{% if forloop.first %} autocomplete="one-time-code" autofocus{% endif %}>
+            {% endfor %}
+          </div>
+          <button class="cta" type="submit" id="verify">Verify and sign in
+            <span class="arrow"><svg viewBox="0 0 18 18" fill="none"><path d="M3.75 9h10.5M9.75 4.5L14.25 9l-4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          </button>
+        </form>
+        <div class="err{% if notice %} ok{% endif %}" role="alert" id="err">{{ error|default:notice|default:"" }}</div>
+
+        <form method="post" class="resend">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="resend">
+          <input type="hidden" name="next" value="{{ next }}">
+          <span id="timer" data-wait="{{ resend_wait }}"></span><button id="resend" type="submit"{% if resend_wait %} disabled{% endif %}>Resend code</button>
+        </form>
+
+        {% if debug_code %}
+        <div class="sim">
+          <div class="tag">Development only · what the parent receives</div>
+          <div class="bubble">
+            <div class="from">{{ brand.school_name|default:"Hodari Christian School" }}</div>
+            Your Hodari code is <span class="code">{{ debug_code }}</span>. Do not share this message. Expires in 10 minutes.
+          </div>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="staff-link">School staff? <a href="{% url 'users:login' %}">Staff sign in</a></div>
+  </div>
+</div>
+
+<footer>{{ brand.school_name|default:"Hodari Christian School" }} · Parent Portal · Need help? Call {{ school_phone }}</footer>
+
+<script>
+(function(){
+  var stepIn = document.getElementById('stepIn');
+  if (stepIn) {
+    stepIn.addEventListener('submit', function(){ stepIn.querySelector('.cta').disabled = true; });
+    var who = document.getElementById('who');
+    who.addEventListener('input', function(){ who.classList.remove('bad'); stepIn.querySelector('.err').textContent=''; });
+    return;
+  }
+  var form = document.getElementById('codeForm');
+  if (!form) return;
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('#otpBox input'));
+  var hidden = document.getElementById('codeValue');
+  var submitted = false;
+  function code(){ return boxes.map(function(b){ return b.value; }).join(''); }
+  function submitIfFull(){
+    if (!submitted && boxes.every(function(b){ return b.value; })) {
+      submitted = true; hidden.value = code();
+      document.getElementById('verify').disabled = true;
+      form.submit();
+    }
+  }
+  boxes.forEach(function(inp, i){
+    inp.addEventListener('input', function(){
+      var digits = inp.value.replace(/\D/g, '');
+      if (digits.length > 1) {               // pasted or autofilled the whole code
+        digits.split('').slice(0, boxes.length - i).forEach(function(d, k){ boxes[i + k].value = d; });
+        boxes[Math.min(i + digits.length, boxes.length) - 1].focus();
+      } else {
+        inp.value = digits;
+        if (digits && i < boxes.length - 1) boxes[i + 1].focus();
+      }
+      submitIfFull();
+    });
+    inp.addEventListener('keydown', function(e){
+      if (e.key === 'Backspace' && !inp.value && i > 0) boxes[i - 1].focus();
+    });
+  });
+  form.addEventListener('submit', function(){ hidden.value = code(); });
+
+  var timer = document.getElementById('timer'), resend = document.getElementById('resend');
+  var s = parseInt(timer.getAttribute('data-wait'), 10) || 0;
+  function tick(){
+    timer.textContent = s > 0 ? 'Resend in ' + s + 's ·' : '';
+    resend.disabled = s > 0;
+    if (s-- <= 0) clearInterval(id);
+  }
+  var id = setInterval(tick, 1000); tick();
+})();
+</script>
+</body>
+</html>

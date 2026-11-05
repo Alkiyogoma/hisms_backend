@@ -27,17 +27,32 @@ def _hash_code(phone: str, code: str) -> str:
     return hashlib.sha256(f"{pepper}:{phone}:{code}".encode()).hexdigest()
 
 
-def generate_otp(phone: str) -> str:
-    """Create and store a one-time code for the given phone number."""
+def issue_code(key: str, length: int = OTP_LENGTH, ttl_seconds: int = OTP_TTL_SECONDS) -> str:
+    """Store a fresh one-time code under ``key`` (a phone number or any short
+    id, max 32 chars), cancelling earlier unused ones, and return it. The
+    caller is responsible for delivering it."""
     from communications.models import PhoneOTP
 
-    code = "".join(secrets.choice("0123456789") for _ in range(OTP_LENGTH))
-    PhoneOTP.objects.filter(phone=phone, consumed_at__isnull=True).update(consumed_at=timezone.now())
+    code = "".join(secrets.choice("0123456789") for _ in range(length))
+    PhoneOTP.objects.filter(phone=key, consumed_at__isnull=True).update(consumed_at=timezone.now())
     PhoneOTP.objects.create(
-        phone=phone,
-        code_hash=_hash_code(phone, code),
-        expires_at=timezone.now() + timedelta(seconds=OTP_TTL_SECONDS),
+        phone=key,
+        code_hash=_hash_code(key, code),
+        expires_at=timezone.now() + timedelta(seconds=ttl_seconds),
     )
+    return code
+
+
+def cancel_codes(key: str) -> None:
+    """Void every unused code stored under ``key``."""
+    from communications.models import PhoneOTP
+
+    PhoneOTP.objects.filter(phone=key, consumed_at__isnull=True).update(consumed_at=timezone.now())
+
+
+def generate_otp(phone: str) -> str:
+    """Create and store a one-time code for the given phone number."""
+    code = issue_code(phone)
     _dispatch_sms(phone, f"Hodari School: your verification code is {code}. Valid for {OTP_TTL_SECONDS // 60} min.")
     return code if os.getenv("OTP_DEBUG", "0") == "1" else ""
 

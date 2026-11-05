@@ -6,13 +6,13 @@
 <title>{{ doc_title }}{% if kind == 'student' %} | {{ student.first_name }} {{ student.last_name }}{% elif class_name %} | {{ class_name }}{% endif %}{% if period %} | {{ period.label }}{% elif date %} | {{ date|date:"j M Y" }}{% endif %}</title>
 {% if not is_pdf %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@500;700&family=Merriweather:wght@700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
 {% endif %}
 {% include "attendance/_register_css.html" %}
 <style>
   :root { --blue:#023AA5; --ink:#1A1A2E; --muted:#6B778C; --border:#DDE3EE;
     --green:#1E8A4C; --green-bg:#EAF6EE; --red:#C0392B; --red-bg:#FDECEA; --amber:#C27803; --amber-bg:#FFF6E5; --purple:#5B4FCF; --purple-bg:#EFEDFB; --grey-bg:#F0F2F6;
-    --font-ui:'Roboto', Arial, sans-serif; --font-display:'Merriweather', Georgia, serif; }
+    --font-ui:'Roboto', Arial, sans-serif; --font-display:'Times New Roman', Times, serif; }
   @page { size:A4 {% if kind == 'register' %}landscape{% else %}portrait{% endif %}; margin:12mm 11mm 15mm;
     @bottom-left { content:"Hodari Christian School \00B7  {{ doc_title }} \00B7  Confidential"; font:8pt Roboto, Arial, sans-serif; color:#8492A6; }
     @bottom-right { content:"Page " counter(page) " of " counter(pages); font:8pt Roboto, Arial, sans-serif; color:#8492A6; }

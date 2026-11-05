@@ -1,0 +1,20 @@
+{# One section of a printed ECD report: a rated table, a subject points / marks row, or the Bible memory row. #}
+{% if section.style == "strip" or section.style == "marks" %}
+<table class="ecd-strip">
+  <tr><th>{{ section.title }}</th>{% for line in section.lines %}<th>{{ line.label }}</th>{% endfor %}</tr>
+  <tr><td>{% if section.style == "marks" %}Marks{% else %}Points{% endif %}</td>{% for line in section.lines %}<td class="ecd-val">{% if section.style == "marks" %}{{ line.score|floatformat:"-1"|default:"" }}{% else %}{{ line.rating }}{% endif %}</td>{% endfor %}</tr>
+</table>
+{% elif section.style == "verse" %}
+<table class="ecd-table ecd-verse">
+  {% for line in section.lines %}
+  <tr><th>{{ line.label }}</th>{% if section.column == "full" %}<th class="ecd-verse-text">{{ line.note }}</th>{% endif %}<td class="ecd-val">{{ line.rating }}</td></tr>
+  {% endfor %}
+</table>
+{% else %}
+<table class="ecd-table">
+  <tr><th>{{ section.title }}</th><th class="ecd-val-h">{{ ecd.layout.column_label }}</th></tr>
+  {% for line in section.lines %}
+  <tr><td>{{ line.label }}{% if line.note %} &mdash; {{ line.note }}{% endif %}</td><td class="ecd-val">{{ line.rating }}</td></tr>
+  {% endfor %}
+</table>
+{% endif %}

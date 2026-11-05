@@ -131,6 +131,13 @@ self.addEventListener('fetch', (event) => {
   // Skip non-GET requests (but handle POST via sync)
   if (event.request.method !== 'GET') return;
 
+  // Today's scans change all day and are keyed by date on the client; a cached
+  // copy (possibly from yesterday) would mark learners as already scanned.
+  if (url.pathname.includes('/attendance/api/scans/today')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   // API calls: network first, fall back to cache
   if (url.pathname.includes('/attendance/api/')) {
     event.respondWith(
@@ -216,55 +223,49 @@ function replayOfflineSubmissions() {
       if (grouped[entry.type]) grouped[entry.type].push(entry);
     });
 
-    const promises = [];
-
-    if (grouped.checkin.length) {
-      const csrfToken = grouped.checkin[0].csrfToken || '';
-      const body = {
-        students: grouped.checkin.map(e => ({ id: e.studentId, timestamp: e.timestamp })),
-      };
-      promises.push(
-        fetch('/attendance/api/checkin/', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-          body: JSON.stringify(body),
-        }).then(r => r.json()).then(d => {
-          const ok = d.summary && d.summary.successful || 0;
-          return clearSyncQueue().then(() => ok);
-        }).catch(() => 0)
-      );
-    }
-
-    if (grouped.checkout.length) {
-      const csrfToken = grouped.checkout[0].csrfToken || '';
-      const body = {
-        students: grouped.checkout.map(e => ({
-          id: e.studentId, timestamp: e.timestamp, parent_name: '', reason: '',
-        })),
-      };
-      promises.push(
-        fetch('/attendance/api/checkout/', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-          body: JSON.stringify(body),
-        }).then(r => r.json()).then(d => {
-          const ok = d.summary && d.summary.successful || 0;
-          return clearSyncQueue().then(() => ok);
-        }).catch(() => 0)
-      );
-    }
-
-    return Promise.all(promises).then(results => {
-      const totalOk = results.reduce((a, b) => a + b, 0);
-      if (totalOk > 0) {
-        self.clients.matchAll().then(clients => {
-          clients.forEach(client => {
-            client.postMessage({ type: 'SYNC_COMPLETE', synced: totalOk });
-          });
+    // Post one batch; resolve to the number recorded. Entries the server
+    // answered for (success, already checked in/out, or any other per-student
+    // rejection) are removed from the queue one by one. Entries are kept for
+    // the next retry only when the request itself failed (offline, 5xx,
+    // session expired) so nothing lingers once the server has seen it.
+    function replay(url, batch, toStudent) {
+      if (!batch.length) return Promise.resolve(0);
+      const csrfToken = batch[0].csrfToken || '';
+      return fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify({ students: batch.map(toStudent) }),
+      }).then(r => {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      }).then(d => {
+        const items = Array.isArray(d.data) ? d.data : [];
+        let ok = 0;
+        const done = [];
+        batch.forEach((entry, i) => {
+          const item = items[i];
+          if (!item) return; // no answer for this one: keep for retry
+          if (item.status === 'success') ok++;
+          done.push(removeFromSyncQueue(entry.id));
         });
-      }
+        return Promise.all(done).then(() => ok);
+      }).catch(() => 0);
+    }
+
+    return Promise.all([
+      replay('/attendance/api/checkin/', grouped.checkin,
+        e => ({ id: e.studentId, timestamp: e.timestamp })),
+      replay('/attendance/api/checkout/', grouped.checkout,
+        e => ({ id: e.studentId, timestamp: e.timestamp, parent_name: '', reason: '' })),
+    ]).then(results => {
+      const totalOk = results.reduce((a, b) => a + b, 0);
+      // Always notify so the app refreshes today's records and prunes its list.
+      return self.clients.matchAll().then(clients => {
+        clients.forEach(client => {
+          client.postMessage({ type: 'SYNC_COMPLETE', synced: totalOk });
+        });
+      });
     });
   });
 }

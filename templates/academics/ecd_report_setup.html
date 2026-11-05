@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+{% block title %}ECD Report Setup | {{ brand.school_name }}{% endblock %}
+{% block extra_head %}{{ block.super }}
+<style>
+  .tabs-nav.es-classes { margin: 18px 0 16px; padding: 0; background: transparent; overflow-x: auto; scrollbar-width: none; }
+  .es-classes .tab-item { white-space: nowrap; }
+  .es-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  .es-terms { display: inline-flex; background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 3px; gap: 2px; }
+  .es-term { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    color: var(--text-secondary); text-decoration: none; white-space: nowrap; }
+  .es-term:hover { background: var(--hodari-blue-pale); color: var(--text-primary); }
+  .es-term.active { background: var(--hodari-blue); color: #fff; }
+  .es-term-count { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 99px; background: var(--bg-metric); color: var(--text-muted); }
+  .es-term.active .es-term-count { background: rgba(255,255,255,.2); color: #fff; }
+  .es-toolbar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  .es-summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 20px; align-items: start; }
+  .es-summary-title { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 700; letter-spacing: .02em; color: var(--text-primary); }
+  .es-swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(0,0,0,.12); flex-shrink: 0; }
+  .es-swatch-yellow { background: #FFE699; }
+  .es-swatch-blue { background: #9BDCF3; }
+  .es-keys { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; font-size: 12px; color: var(--text-muted); }
+  .es-keys strong { color: var(--text-secondary); font-weight: 600; margin-right: 4px; }
+  .es-key { display: inline-flex; gap: 4px; margin-right: 8px; }
+  .es-key b { color: var(--text-primary); }
+
+  .es-part { margin-top: 16px; }
+  .es-part-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+  .es-part-title { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+  .es-part-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .es-cols-wrap { container-type: inline-size; }
+  .es-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+  /* Two columns like the printed report once there is room; stacked otherwise. */
+  @container (max-width: 820px) { .es-cols { grid-template-columns: 1fr; } }
+  .es-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .es-full { display: flex; flex-direction: column; gap: 16px; margin-bottom: 16px; }
+  .es-full.after { margin: 16px 0 0; }
+  .es-col-label { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
+
+  .es-sec { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: #fff; }
+  .es-sec-head { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 14px; background: #1F3864; color: #fff; }
+  .es-sec-title { flex: 1; min-width: 0; font-size: 13px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; overflow-wrap: anywhere; }
+  .es-sec-style { font-size: 10.5px; font-weight: 600; text-transform: none; letter-spacing: 0; padding: 2px 8px; border-radius: 99px; background: rgba(255,255,255,.16); margin-left: 6px; white-space: nowrap; }
+  .es-sec-tools { display: flex; gap: 2px; }
+  .es-ico { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent; color: inherit; cursor: pointer; opacity: .75; }
+  .es-ico:hover, .es-ico:focus-visible { opacity: 1; background: rgba(255,255,255,.14); }
+  .es-ico svg { width: 15px; height: 15px; }
+  .es-row .es-ico { color: var(--text-muted); }
+  .es-row .es-ico:hover, .es-row .es-ico:focus-visible { background: var(--hodari-blue-pale); color: var(--hodari-blue); }
+  .es-ico.danger:hover { color: var(--red) !important; background: var(--red-bg) !important; }
+
+  .es-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 7px 8px 7px 14px; border-top: 1px solid #EEF2F7; }
+  .es-row:first-child { border-top: 0; }
+  .es-row-label { font-size: 13px; color: var(--text-primary); overflow-wrap: anywhere; }
+  .es-row-note { font-size: 11px; color: var(--text-muted); margin-left: 6px; white-space: nowrap; }
+  .es-row.off .es-row-label { color: var(--text-muted); }
+  .es-flags { display: inline-flex; gap: 3px; }
+  .es-flag { min-width: 30px; height: 24px; padding: 0 6px; border-radius: 6px; border: 1px solid var(--border); background: #fff; font-size: 11px; font-weight: 700;
+    color: var(--text-muted); cursor: pointer; }
+  .es-flag:hover { border-color: var(--hodari-blue); color: var(--hodari-blue); }
+  .es-flag.on { background: var(--hodari-blue-light); border-color: #BFCFE9; color: var(--hodari-blue); }
+  .es-flag.on.current { background: var(--hodari-blue); border-color: var(--hodari-blue); color: #fff; }
+  .es-flag:disabled { cursor: default; }
+  .es-row-tools { display: inline-flex; gap: 0; }
+
+  .es-other { border-top: 1px dashed var(--border); }
+  .es-other summary { list-style: none; cursor: pointer; padding: 8px 14px; font-size: 12px; color: var(--text-muted); }
+  .es-other summary::-webkit-details-marker { display: none; }
+  .es-other summary:hover { color: var(--hodari-blue); }
+  .es-other[open] summary { border-bottom: 1px solid #EEF2F7; }
+  .es-empty-sec { padding: 12px 14px; font-size: 12.5px; color: var(--text-muted); }
+
+  .es-add { display: flex; gap: 6px; padding: 8px; background: var(--bg-metric); border-top: 1px solid #EEF2F7; }
+  .es-add .hf-input { flex: 1; min-width: 0; height: 32px; font-size: 13px; }
+
+  .es-part-empty { padding: 24px; text-align: center; font-size: 13px; color: var(--text-muted); border: 1px dashed var(--border); border-radius: 10px; }
+
+  .es-check-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .es-check { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .es-check:has(input:checked) { border-color: var(--hodari-blue); background: var(--hodari-blue-pale); color: var(--hodari-blue); }
+  .es-key-grid { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 8px 10px; align-items: center; }
+  .es-key-grid .es-key-val { font-weight: 700; text-align: center; font-size: 14px; color: var(--text-primary); }
+  .es-key-grid .hf-input { height: 36px; }
+  .es-form { display: flex; flex-direction: column; gap: 16px; }
+  .es-field { display: flex; flex-direction: column; gap: 6px; }
+  .es-hint { font-size: 12px; color: var(--text-muted); margin: 0; }
+  .es-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+
+  #ecd-board.htmx-request { opacity: .6; transition: opacity .15s; }
+
+  /* Row tools only on hover / keyboard focus where there is a mouse; always shown on touch screens. */
+  @media (hover: hover) and (pointer: fine) {
+    .es-row-tools { opacity: 0; transition: opacity .12s; }
+    .es-row:hover .es-row-tools, .es-row:focus-within .es-row-tools { opacity: 1; }
+  }
+  /* Finger-sized term flags and tools on touch screens. */
+  @media (pointer: coarse) {
+    .es-flag { min-width: 40px; height: 36px; font-size: 12px; }
+    .es-ico { width: 36px; height: 36px; }
+  }
+
+  @media (max-width: 900px) {
+    .es-summary { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 560px) {
+    .es-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .es-row-tools { grid-column: 1 / -1; justify-content: flex-end; margin-top: -4px; }
+    .es-grid-2 { grid-template-columns: 1fr; }
+    .es-term { padding: 6px 10px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include "academics/_top_tabs.html" %}
+
+<c-page-header title="ECD Report Setup" subtitle="What each ECD progress report contains — the Academic Progress and General Traits lines, for each class and term." />
+
+{# Icons used by every row of the board, defined once (the board is re-sent after each edit). #}
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="es-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></symbol>
+  <symbol id="es-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="es-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></symbol>
+  <symbol id="es-del" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></symbol>
+</svg>
+
+<nav class="tabs-nav es-classes" aria-label="ECD class">
+  {% for c in classes %}
+  <a href="{{ c.url }}" class="tab-item{% if c.active %} active{% endif %}"{% if c.active %} aria-current="page"{% endif %}>{{ c.label }}</a>
+  {% endfor %}
+</nav>
+
+{% include "academics/_ecd_setup_board.html" %}
+
+{% if can_edit %}
+{# ── Section drawer (add / edit) ── #}
+<c-drawer id="esSectionDrawer" title="Add section">
+  <form id="esSectionForm" class="es-form" hx-post="{{ request.path }}" hx-target="#ecd-board" hx-swap="outerHTML">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="add_section">
+    <input type="hidden" name="section">
+    <input type="hidden" name="part">
+    <input type="hidden" name="class">
+    <input type="hidden" name="term">
+    <input type="hidden" name="close" value="1">
+    <div class="es-field">
+      <label class="form-label" for="es_sec_title">Title <span class="req">*</span></label>
+      <input type="text" id="es_sec_title" name="title" class="hf-input" required maxlength="80" placeholder="e.g. NUMERACY">
+    </div>
+    <div class="es-field">
+      <span class="form-label">Position on the report</span>
+      <div class="es-check-row">
+        {% for v, label in column_choices %}
+        <label class="es-check"><input type="radio" name="column" value="{{ v }}"{% if forloop.first %} checked{% endif %}> {{ label }}</label>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="es-field">
+      <label class="form-label" for="es_sec_style">Shown as</label>
+      <select id="es_sec_style" name="style" class="hf-select">
+        {% for v, label in style_choices %}<option value="{{ v }}">{{ label }}</option>{% endfor %}
+      </select>
+      <p class="es-hint">Rated list is the usual table. A subject points row lists subjects across the page; marks are scores out of 100; the Bible memory row lets the teacher type the verse.</p>
+    </div>
+    <label class="es-check" id="es_sec_avg_wrap"><input type="checkbox" name="counts_in_average"> Count these points in the Average Point</label>
+  </form>
+  <c-slot name="footer">
+    <c-button variant="secondary" data-hui-close>Cancel</c-button>
+    <c-button type="submit" form="esSectionForm" id="esSectionSubmit">Add section</c-button>
+  </c-slot>
+</c-drawer>
+
+{# ── Item drawer (edit) ── #}
+<c-drawer id="esItemDrawer" title="Edit item">
+  <form id="esItemForm" class="es-form" hx-post="{{ request.path }}" hx-target="#ecd-board" hx-swap="outerHTML">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="edit_item">
+    <input type="hidden" name="item">
+    <input type="hidden" name="class">
+    <input type="hidden" name="term">
+    <input type="hidden" name="close" value="1">
+    <div class="es-field">
+      <label class="form-label" for="es_item_label">Wording <span class="req">*</span></label>
+      <textarea id="es_item_label" name="label" class="hf-input" rows="2" required maxlength="200" style="height:auto"></textarea>
+    </div>
+    <div class="es-field">
+      <span class="form-label">Appears in</span>
+      <div class="es-check-row">
+        {% for t in terms %}<label class="es-check"><input type="checkbox" name="terms" value="{{ t.n }}"> Term {{ t.n }}</label>{% endfor %}
+      </div>
+      <p class="es-hint">Use separate items when the wording changes between terms, e.g. "Number counting 0-10" in Term 1 and "0-15" in Term 2.</p>
+    </div>
+    <label class="es-check"><input type="checkbox" name="allows_text"> Teacher also types a note (e.g. the Bible verse)</label>
+  </form>
+  <c-slot name="footer">
+    <c-button variant="secondary" data-hui-close>Cancel</c-button>
+    <c-button type="submit" form="esItemForm">Save item</c-button>
+  </c-slot>
+</c-drawer>
+
+{# ── Report settings drawer (title, keys, look) ── #}
+<c-drawer id="esLayoutDrawer" title="Report settings" subtitle="This term">
+  <form id="esLayoutForm" class="es-form" hx-post="{{ request.path }}" hx-target="#ecd-board" hx-swap="outerHTML">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="save_layout">
+    <input type="hidden" name="class">
+    <input type="hidden" name="term">
+    <input type="hidden" name="close" value="1">
+    <div class="es-field">
+      <label class="form-label" for="es_lay_title">Report title <span class="req">*</span></label>
+      <input type="text" id="es_lay_title" name="title" class="hf-input" required maxlength="80">
+    </div>
+    <div class="es-grid-2">
+      <div class="es-field">
+        <label class="form-label" for="es_lay_col">Rating column heading</label>
+        <input type="text" id="es_lay_col" name="column_label" class="hf-input" maxlength="20" placeholder="Points">
+      </div>
+      <div class="es-field">
+        <label class="form-label" for="es_lay_accent">Colour</label>
+        <select id="es_lay_accent" name="accent" class="hf-select">
+          {% for v, label in accent_choices %}<option value="{{ v }}">{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="es-field">
+      <span class="form-label">Academic Progress key</span>
+      <div class="es-key-grid">
+        {% for v in "4321" %}
+        <span class="es-key-val">{{ v }}</span>
+        <input type="text" name="academic_{{ v }}" class="hf-input" maxlength="40" aria-label="Meaning of {{ v }}">
+        {% endfor %}
+      </div>
+    </div>
+    <div class="es-field">
+      <span class="form-label">General Traits key</span>
+      <div class="es-key-grid">
+        {% for i in "0123" %}
+        <input type="text" name="traits_code_{{ i }}" class="hf-input" maxlength="2" style="text-align:center;font-weight:700;text-transform:uppercase" aria-label="Rating letter">
+        <input type="text" name="traits_label_{{ i }}" class="hf-input" maxlength="40" aria-label="Rating meaning">
+        {% endfor %}
+      </div>
+      <p class="es-hint">Best to worst. Each rating needs its own letter.</p>
+    </div>
+  </form>
+  <c-slot name="footer">
+    <c-button variant="secondary" data-hui-close>Cancel</c-button>
+    <c-button type="submit" form="esLayoutForm">Save settings</c-button>
+  </c-slot>
+</c-drawer>
+{% endif %}
+
+<script>
+(function () {
+  function board() { return document.getElementById('ecd-board'); }
+  function stamp(form) {
+    form.elements['class'].value = board().dataset.class;
+    form.elements['term'].value = board().dataset.term;
+  }
+
+  window.esOpenSection = function (btn) {
+    var d = btn.dataset, f = document.getElementById('esSectionForm');
+    f.reset(); stamp(f);
+    f.elements['action'].value = d.section ? 'edit_section' : 'add_section';
+    f.elements['section'].value = d.section || '';
+    f.elements['part'].value = d.part;
+    f.elements['title'].value = d.title || '';
+    f.elements['style'].value = d.style || 'table';
+    f.querySelectorAll('input[name=column]').forEach(function (r) { r.checked = r.value === (d.column || 'left'); });
+    f.elements['counts_in_average'].checked = d.section ? d.avg === '1' : d.part === 'academic';
+    document.getElementById('es_sec_avg_wrap').style.display = d.part === 'academic' ? '' : 'none';
+    var title = d.section ? 'Edit ' + d.title : 'Add section to ' + (d.part === 'academic' ? 'Academic Progress' : 'General Traits');
+    document.querySelector('#esSectionDrawer .drawer-title').firstChild.textContent = title;
+    document.getElementById('esSectionSubmit').textContent = d.section ? 'Save section' : 'Add section';
+    HodariUI.open('esSectionDrawer');
+  };
+
+  window.esOpenItem = function (btn) {
+    var d = btn.dataset, f = document.getElementById('esItemForm');
+    f.reset(); stamp(f);
+    f.querySelector('[name=item]').value = d.item;  // form.elements.item is a method, not the field
+    f.elements['label'].value = d.label;
+    f.elements['allows_text'].checked = d.text === '1';
+    var on = (d.terms || '').split(',');
+    f.querySelectorAll('input[name=terms]').forEach(function (c) { c.checked = on.indexOf(c.value) !== -1; });
+    HodariUI.open('esItemDrawer');
+  };
+
+  window.esOpenLayout = function () {
+    var data = JSON.parse(document.getElementById('es-layout-data').textContent);
+    var f = document.getElementById('esLayoutForm');
+    f.reset(); stamp(f);
+    f.elements['title'].value = data.title;
+    f.elements['column_label'].value = data.column_label;
+    f.elements['accent'].value = data.accent;
+    data.academic_key.forEach(function (k) { var el = f.elements['academic_' + k[0]]; if (el) el.value = k[1]; });
+    data.traits_key.forEach(function (k, i) {
+      if (f.elements['traits_code_' + i]) { f.elements['traits_code_' + i].value = k[0]; f.elements['traits_label_' + i].value = k[1]; }
+    });
+    document.querySelector('#esLayoutDrawer .drawer-title-sub').textContent = data.class_label + ' · Term ' + board().dataset.term;
+    HodariUI.open('esLayoutDrawer');
+  };
+
+  // Deletes and copies ask through the shared confirm dialog instead of the browser's.
+  document.body.addEventListener('htmx:confirm', function (e) {
+    var el = e.detail.elt;
+    if (!el.dataset.confirmTitle) return;
+    e.preventDefault();
+    confirmDeleteModal({
+      title: el.dataset.confirmTitle, body: el.dataset.confirmBody, detail: el.dataset.confirmDetail,
+      confirmText: el.dataset.confirmText || 'Delete', type: el.dataset.confirmType || 'danger',
+      onConfirm: function () { e.detail.issueRequest(true); }
+    });
+  });
+
+  // Keep typing: after adding an item, focus that section's add box again.
+  var refocus = null;
+  document.body.addEventListener('htmx:beforeRequest', function (e) {
+    var form = e.detail.elt.closest && e.detail.elt.closest('.es-add');
+    refocus = form ? form.querySelector('input[name=label]').id : null;
+  });
+  document.body.addEventListener('htmx:afterSwap', function (e) {
+    if (e.detail.target.id !== 'ecd-board' && e.target.id !== 'ecd-board') return;
+    if (refocus) { var el = document.getElementById(refocus); if (el) el.focus(); refocus = null; }
+  });
+})();
+</script>
+{% endblock %}
