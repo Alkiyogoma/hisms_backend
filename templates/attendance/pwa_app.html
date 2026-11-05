@@ -674,6 +674,7 @@ body{
   // Scans already recorded on the server today, keyed "MODE|studentId".
   var recordedToday={}, recordedDay=new Date().toDateString();
   function scanKey(mode,id){return mode+'|'+String(id)}
+  function localDate(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0')}
   function isToday(d){var n=new Date();d=new Date(d);return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate()}
 
   // Pending scans never carry over to another day: submitting them later would
@@ -820,11 +821,12 @@ body{
     var stale=dropStaleScans();
     if(stale){renderPending();showToast(stale+' scan'+(stale>1?'s':'')+' from a previous day cleared',true)}
     apiGet('/attendance/api/scans/today/').then(function(d){
-      var arr=Array.isArray(d)?d:(d.results||d.scans||d.data||[]);
-      var ci=arr.filter(function(s){return s.scan_type==='IN'}).length;
-      var co=arr.filter(function(s){return s.scan_type==='OUT'}).length;
-      document.getElementById('checkinToday').textContent=ci;
-      document.getElementById('checkoutToday').textContent=co;
+      // Ignore an answer for another day (e.g. one cached before midnight).
+      if(!d||(d.date&&d.date!==localDate()))return;
+      var sm=d.summary||{};
+      document.getElementById('checkinToday').textContent=sm.present||0;
+      document.getElementById('checkoutToday').textContent=sm.checked_out||0;
+      var arr=Array.isArray(d.data)?d.data:[];
       // Add-only within the day (reset in dropStaleScans on date change), so
       // keys learned from a submit response survive a lagging refresh.
       arr.forEach(function(s){if(s.student_id&&(s.scan_type==='IN'||s.scan_type==='OUT'))recordedToday[scanKey(s.scan_type,s.student_id)]=true});

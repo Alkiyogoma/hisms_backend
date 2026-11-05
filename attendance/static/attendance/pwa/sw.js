@@ -131,6 +131,13 @@ self.addEventListener('fetch', (event) => {
   // Skip non-GET requests (but handle POST via sync)
   if (event.request.method !== 'GET') return;
 
+  // Today's scans change all day and are keyed by date on the client; a cached
+  // copy (possibly from yesterday) would mark learners as already scanned.
+  if (url.pathname.includes('/attendance/api/scans/today')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   // API calls: network first, fall back to cache
   if (url.pathname.includes('/attendance/api/')) {
     event.respondWith(

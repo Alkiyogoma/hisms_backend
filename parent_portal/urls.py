@@ -6,11 +6,7 @@ from .auth_views import ParentLoginView
 app_name = "parent_portal"
 
 urlpatterns = [
-<<<<<<< HEAD
     path("login/", ParentLoginView.as_view(), name="login"),
-=======
-    # v1: Home, learner progress (with published report cards) and the school calendar.
->>>>>>> main
     path("", views.ParentDashboardView.as_view(), name="dashboard"),
     path("learner/<int:student_id>/", views.ParentLearnerProgressView.as_view(), name="progress"),
     path("learner/<int:student_id>/photo/", views.ParentLearnerPhotoView.as_view(), name="learner_photo"),

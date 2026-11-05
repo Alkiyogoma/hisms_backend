@@ -1202,10 +1202,12 @@ def render_report_pdf_response(request, report):
         request=request
     )
 
+    # Imported before the try: its except clause names FuturesTimeout, which must
+    # exist even when the WeasyPrint import fails.
+    import time
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
     try:
         from weasyprint import HTML
-        import time
-        from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
         start = time.monotonic()
         with ThreadPoolExecutor(max_workers=1) as executor:
             future = executor.submit(

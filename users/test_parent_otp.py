@@ -340,10 +340,9 @@ class ParentsHaveNoPasswordTests(TestCase):
         self.assertEqual(self.client.get("/parent/").status_code, 200)
 
     def test_portal_access_gives_no_usable_password(self):
-        from students.services import grant_portal_access
+        from students.services import ensure_parent_user
         guardian = ParentGuardian.objects.create(full_name="New Parent", phone="0755 000 111")
-        with patch("students.services.send_portal_credentials", return_value=[]):
-            created, _username, _ = grant_portal_access(guardian, actor=self.teacher)
+        _user, created = ensure_parent_user(guardian)
         guardian.refresh_from_db()
         self.assertTrue(created)
         self.assertFalse(guardian.user.has_usable_password())

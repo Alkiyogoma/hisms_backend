@@ -446,22 +446,9 @@
         </div>
       </div>
 
-<<<<<<< HEAD
-      {# ── PARENT LOGIN: phone/email + one-time code (Parent Portal v1) ── #}
-      <div class="login-tab-panel" id="panel-parent">
-        <p style="font-size:14px;color:var(--text-secondary);margin:0 0 16px;line-height:1.5">
-          Parents sign in with the mobile number or email the school has on record. We send you a 4-digit code &mdash; no password needed.
-        </p>
-        <a class="btn-login" id="parentSubmit" style="text-decoration:none"
-           href="{% url 'parent_portal:login' %}{% if next %}?next={{ next|urlencode }}{% endif %}">
-          <span class="btn-text">Continue to Parent sign in</span>
-          <svg class="btn-arrow" viewBox="0 0 18 18" fill="none"><path d="M3.75 9h10.5M9.75 4.5L14.25 9l-4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </a>
-=======
       {# ── PARENT LOGIN: phone number or email + one-time code, no password ── #}
       <div class="login-tab-panel" id="panel-parent">
         {% include "registration/_parent_signin.html" %}
->>>>>>> main
       </div>
 
       <div class="login-footer">
@@ -482,17 +469,10 @@ function switchTab(tab) {
   if (firstInput) firstInput.focus();
 }
 
-<<<<<<< HEAD
-// Parents arriving from a /parent/ page land on the Parent tab.
-(function () {
-  var nxt = new URLSearchParams(window.location.search).get('next') || '';
-  if (nxt.indexOf('/parent/') === 0) switchTab('parent');
-=======
 // Open the Parent tab for parent links (?parent=1 or a /parent/ next URL).
 (function () {
   var q = new URLSearchParams(window.location.search);
   if (q.get('parent') === '1' || (q.get('next') || '').indexOf('/parent/') === 0) switchTab('parent');
->>>>>>> main
 })();
 
 // Staff form loading state
