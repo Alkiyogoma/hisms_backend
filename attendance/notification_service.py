@@ -1,7 +1,8 @@
 """
 Notification Service for Attendance Events
 
-Handles SMS and email notifications for check-in/check-out events with:
+Handles parent notifications for attendance events. Parents get an SMS only
+when their child is checked out (picked up), never on check-in. Features:
 - Reliable delivery with retry logic
 - Support for multiple parent contacts
 - Integration with real-time event system
@@ -19,7 +20,7 @@ import requests
 import json
 
 from .models import Message, NotificationLog, OtpCode, AttendanceEntry
-from students.models import Student, ParentGuardian
+from students.models import Student, ParentGuardian, StudentGuardian
 
 logger = logging.getLogger(__name__)
 
@@ -314,7 +315,6 @@ class NotificationService:
     SMS_PROVIDER = getattr(settings, 'SMS_PROVIDER', 'cloudservice')
     
     # Notification Templates
-    CHECKIN_SMS_TEMPLATE = "Your child {student_name} has been checked in at {timestamp} to Hodari Christian School."
     CHECKOUT_SMS_TEMPLATE = "Your child {student_name} has been picked up{pickup_info} on {timestamp} from Hodari Christian School."
     OTP_SMS_TEMPLATE = "Your OTP code for Hodari Christian School is: {code}. Valid for 10 minutes."
     
@@ -412,7 +412,8 @@ Hodari Christian School
     @staticmethod
     def send_checkin_notification(student: Student, timestamp: timezone.datetime) -> Dict[str, int]:
         """
-        Send check-in notifications to all student's parents via SMS and email.
+        Send check-in emails to the student's parents. No SMS: parents are
+        texted only on check-out.
         
         Args:
             student: Student instance
@@ -442,21 +443,8 @@ Hodari Christian School
             sms_count = 0
             email_count = 0
             
-            # Send notifications to each parent
+            # Email only: check-in never sends an SMS.
             for parent in parents:
-                # Send SMS
-                if parent.get('phone'):
-                    sms_count += NotificationService._queue_sms(
-                        phone=parent['phone'],
-                        message=NotificationService.CHECKIN_SMS_TEMPLATE.format(
-                            student_name=student.get_full_name(),
-                            timestamp=timestamp.strftime('%Y-%m-%d %H:%M:%S')
-                        ),
-                        attendance_entry=attendance_entry,
-                        notification_type='checkin'
-                    )
-                
-                # Send Email
                 if parent.get('email'):
                     # Try dynamic DB template first
                     from core.email_templates import send_dynamic_email
@@ -591,48 +579,53 @@ Hodari Christian School
     @staticmethod
     def _get_parent_contacts(student: Student) -> List[Dict[str, str]]:
         """
-        Get all parent contacts for a student from both Django and Laravel systems.
-        
-        Args:
-            student: Student instance
-            
+        The student's current parent contacts, for attendance notifications.
+
+        Archived guardians are left out. A Laravel-imported parent tied to a
+        guardian record counts only while that guardian is still a current
+        (unarchived) guardian of this student, so removing or archiving a
+        guardian also stops the old Laravel link from being texted. Phone
+        numbers are compared in normalised form, so "0712..." and
+        "+255 712..." reach the parent once.
+
         Returns:
-            List of parent contact dictionaries with phone, email, and name
+            List of dicts with phone, email and name. Every entry has a
+            phone or an email.
         """
-        parents = []
-        
-        # Get from Django guardian system
-        for guardian_rel in student.guardians.all():
-            if guardian_rel.phone or guardian_rel.email:
-                parents.append({
-                    'phone': guardian_rel.phone or '',
-                    'email': guardian_rel.email or '',
-                    'name': guardian_rel.full_name
-                })
-        
-        # Get from Laravel parent system if available
-        if hasattr(student, 'laravel_parents'):
-            for parent_rel in student.laravel_parents.all():
-                if parent_rel.parent.phone or parent_rel.parent.email:
-                    parents.append({
-                        'phone': parent_rel.parent.phone or '',
-                        'email': parent_rel.parent.email or '',
-                        'name': parent_rel.parent.full_name
-                    })
-        
-        # Remove duplicates based on phone number
-        seen_phones = set()
-        unique_parents = []
-        for parent in parents:
-            phone = parent['phone'].strip()
-            if phone and phone not in seen_phones:
-                seen_phones.add(phone)
-                unique_parents.append(parent)
-            elif not phone and parent['email']:
-                # Include email-only contacts
-                unique_parents.append(parent)
-        
-        return unique_parents
+        current = [
+            sg.guardian for sg in StudentGuardian.objects
+            .filter(student=student, guardian__is_archived=False)
+            .select_related('guardian').order_by('-is_primary', 'pk')
+        ]
+        current_ids = {g.pk for g in current}
+        contacts = [
+            {'phone': (g.phone or '').strip(), 'email': (g.email or '').strip(), 'name': g.full_name}
+            for g in current
+        ]
+        for link in student.laravel_parents.select_related('parent__guardian'):
+            parent = link.parent
+            if parent.guardian_id and parent.guardian_id not in current_ids:
+                continue  # linked guardian was removed or archived: stale contact
+            contacts.append({
+                'phone': (parent.phone or '').strip(),
+                'email': (parent.email or '').strip(),
+                'name': parent.full_name,
+            })
+
+        unique, seen_phones, seen_emails = [], set(), set()
+        for contact in contacts:
+            phone_key = normalize_tz_phone(contact['phone']) or contact['phone']
+            email_key = contact['email'].lower()
+            if phone_key:
+                if phone_key in seen_phones:
+                    continue
+                seen_phones.add(phone_key)
+            elif not email_key or email_key in seen_emails:
+                continue  # no phone, and no new email either
+            if email_key:
+                seen_emails.add(email_key)
+            unique.append(contact)
+        return unique
     
     @staticmethod
     def _queue_sms(
