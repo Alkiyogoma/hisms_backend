@@ -399,14 +399,14 @@ function drawChart() {
     ctx.stroke();
     var lbl = Math.round(yMax - (g / 4) * (yMax - yMin));
     ctx.fillStyle = '#94A3B8';
-    ctx.font = '10px system-ui, sans-serif';
+    ctx.font = '10px Roboto, Arial, sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText(lbl + '%', pad.left - 6, gy + 4);
   }
 
   // X labels
   ctx.fillStyle = '#94A3B8';
-  ctx.font = '10px system-ui, sans-serif';
+  ctx.font = '10px Roboto, Arial, sans-serif';
   ctx.textAlign = 'center';
   chartData.forEach(function(pt, i) {
     ctx.fillText(pt.label, xPos(i), h - pad.bottom + 16);
@@ -451,7 +451,7 @@ function drawChart() {
   });
 
   // Value labels on dots
-  ctx.font = '9px system-ui, sans-serif';
+  ctx.font = '9px Roboto, Arial, sans-serif';
   ctx.textAlign = 'center';
   chartData.forEach(function(pt, i) {
     var x = xPos(i);

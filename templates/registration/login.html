@@ -8,7 +8,7 @@
   <link rel="icon" type="image/x-icon" href="{% static 'branding/favicon.ico' %}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -30,7 +30,7 @@
       --radius: 12px;
     }
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: 'Roboto', Arial, sans-serif;
       background: #F0F4FA;
       color: var(--text);
       min-height: 100vh;
@@ -76,7 +76,7 @@
       filter: brightness(0) invert(1);
     }
     .login-left h1 {
-      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-family: 'Times New Roman', Times, serif;
       font-size: 28px;
       font-weight: 800;
       color: #fff;
@@ -138,7 +138,7 @@
       margin-bottom: 28px;
     }
     .login-card h2 {
-      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-family: 'Times New Roman', Times, serif;
       font-size: 22px;
       font-weight: 700;
       color: var(--text);
@@ -390,12 +390,14 @@
       <p class="subtitle">{{ brand.login_right_subtitle }}</p>
 
       {# ── TABS ── #}
+      {# Parent Login is the default tab; Staff opens after a failed staff sign-in or with ?staff=1. #}
+      {% if form.errors or request.GET.staff == "1" %}{% firstof "staff" as open_tab %}{% else %}{% firstof "parent" as open_tab %}{% endif %}
       <div class="login-tabs">
-        <button type="button" class="login-tab active" onclick="switchTab('staff')" id="tab-staff">
-          Staff Login
-        </button>
-        <button type="button" class="login-tab" onclick="switchTab('parent')" id="tab-parent">
+        <button type="button" class="login-tab{% if open_tab == 'parent' %} active{% endif %}" onclick="switchTab('parent')" id="tab-parent">
           Parent Login
+        </button>
+        <button type="button" class="login-tab{% if open_tab == 'staff' %} active{% endif %}" onclick="switchTab('staff')" id="tab-staff">
+          Staff Login
         </button>
       </div>
 
@@ -417,12 +419,12 @@
       {% endif %}
 
       {# ── STAFF LOGIN FORM ── #}
-      <div class="login-tab-panel active" id="panel-staff">
+      <div class="login-tab-panel{% if open_tab == 'staff' %} active{% endif %}" id="panel-staff">
         <form method="post" action="{% url 'users:login' %}" class="login-form" id="staffForm">
           {% csrf_token %}
           <div class="field-group">
             <label for="staff-email">Username or school email</label>
-            <input id="staff-email" name="username" type="text" class="field-input" value="{{ form.username.value|default:'' }}" placeholder="e.g. username or your school email" autocomplete="username" autocapitalize="none" spellcheck="false" autofocus required>
+            <input id="staff-email" name="username" type="text" class="field-input" value="{{ form.username.value|default:'' }}" placeholder="e.g. username or your school email" autocomplete="username" autocapitalize="none" spellcheck="false"{% if open_tab == 'staff' %} autofocus{% endif %} required>
             {% for error in form.username.errors %}
               <div class="field-error">{{ error }}</div>
             {% endfor %}
@@ -447,7 +449,7 @@
       </div>
 
       {# ── PARENT LOGIN: phone/email + one-time code on its own page (parent_portal:login) ── #}
-      <div class="login-tab-panel" id="panel-parent">
+      <div class="login-tab-panel{% if open_tab == 'parent' %} active{% endif %}" id="panel-parent">
         <p style="font-size:14px;color:var(--text-secondary);margin:0 0 16px;line-height:1.5">
           Parents sign in with the mobile number or email the school has on record. We send you a 4-digit code &mdash; no password needed.
         </p>
@@ -475,12 +477,6 @@ function switchTab(tab) {
   var firstInput = document.querySelector('#panel-' + tab + ' .field-input');
   if (firstInput) firstInput.focus();
 }
-
-// Open the Parent tab for parent links (?parent=1 or a /parent/ next URL).
-(function () {
-  var q = new URLSearchParams(window.location.search);
-  if (q.get('parent') === '1' || (q.get('next') || '').indexOf('/parent/') === 0) switchTab('parent');
-})();
 
 // Staff form loading state
 document.getElementById('staffForm').addEventListener('submit', function() {

@@ -9,7 +9,23 @@
 <style>
   .rq-table-wrap { overflow-x: auto; }
   .metrics-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  @media (max-width: 760px) { .metrics-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .metric-compact:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  .rq-check { width: 16px; height: 16px; cursor: pointer; accent-color: var(--hodari-blue); vertical-align: middle; }
+  .rq-sel-col { width: 36px; padding-left: 20px !important; padding-right: 0 !important; }
+  .h-table tr.rq-row-selected td { background: #F2F6FE; }
+  .rq-gates { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
+  .rq-gate-sub { font-size: 10.5px; color: var(--text-muted); }
+  .rq-btn { font-size: 11px; padding: 5px 12px; }
+  .rq-btn-hod { background: #7C3AED; border-color: #7C3AED; }
+  .rq-bulkbar { position: sticky; bottom: 12px; z-index: 30; margin-top: 8px; display: none; align-items: center; gap: 10px;
+    flex-wrap: wrap; padding: 12px 16px; background: #fff; border: 1px solid var(--border-strong); border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(2, 25, 80, .14); }
+  .rq-bulkbar.on { display: flex; }
+  .rq-bulkbar-count { font-weight: 700; font-size: 13px; color: var(--text-primary); margin-right: auto; }
+  .rq-bulkbar-note { width: 100%; font-size: 11.5px; color: var(--text-muted); }
+  .rq-help { font-size: 12.5px; color: var(--text-secondary); line-height: 1.55; margin: 0 0 16px; }
+  .rq-help b { color: var(--text-primary); }
 </style>
 {% endblock %}
 
@@ -24,45 +40,21 @@
 </div>
 {% else %}
 
-{% if status_filter == 'published' %}
-<div class="metrics metrics-4">
-  <div class="metric-compact" style="background:linear-gradient(135deg,#F0FDF4,#fff)">
-    <div class="mc-lbl-row"><span class="mc-lbl">Published</span></div>
-    <div class="mc-val" style="color:#059669">{{ total_published }}</div>
-    <div class="mc-sub" style="color:#059669">Visible to parents</div>
-  </div>
-  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
-    <div class="mc-lbl-row"><span class="mc-lbl">Pending Review</span></div>
-    <div class="mc-val" style="color:#023AA5">{{ total_pending }}</div>
-    <div class="mc-sub" style="color:#5A697D">Awaiting HOD/HOS action</div>
-  </div>
-  <div class="metric-compact" style="background:linear-gradient(135deg,#EEF9F0,#fff)">
-    <div class="mc-lbl-row"><span class="mc-lbl">Ready to Publish</span></div>
-    <div class="mc-val" style="color:#059669">{{ total_ready }}</div>
-    <div class="mc-sub" style="color:#059669">All scores approved, comments complete</div>
-  </div>
-  <div class="metric-compact" style="background:linear-gradient(135deg,#FFF8ED,#fff)">
-    <div class="mc-lbl-row"><span class="mc-lbl">Total Reports</span></div>
-    <div class="mc-val" style="color:#B45309">{{ total_published|add:total_pending }}</div>
-    <div class="mc-sub" style="color:#B45309">All reports this term</div>
-  </div>
-</div>
-{% else %}
 <div class="metrics metrics-4">
   <div class="metric-compact" style="background:linear-gradient(135deg,#EEF4FF,#fff)">
     <div class="mc-lbl-row"><span class="mc-lbl">Pending Review</span></div>
     <div class="mc-val" style="color:#023AA5">{{ total_pending }}</div>
-    <div class="mc-sub" style="color:#5A697D">Reports with comments submitted</div>
+    <div class="mc-sub" style="color:#5A697D">Submitted by class teachers</div>
+  </div>
+  <div class="metric-compact" style="background:linear-gradient(135deg,#F5F0FF,#fff)">
+    <div class="mc-lbl-row"><span class="mc-lbl">Awaiting ECD HOD</span></div>
+    <div class="mc-val" style="color:#7C3AED">{{ total_awaiting_hod }}</div>
+    <div class="mc-sub" style="color:#7C3AED">ECD reports to approve</div>
   </div>
   <div class="metric-compact" style="background:linear-gradient(135deg,#EEF9F0,#fff)">
     <div class="mc-lbl-row"><span class="mc-lbl">Ready to Publish</span></div>
     <div class="mc-val" style="color:#059669">{{ total_ready }}</div>
-    <div class="mc-sub" style="color:#059669">All scores approved, comments complete</div>
-  </div>
-  <div class="metric-compact" style="background:linear-gradient(135deg,#FFF8ED,#fff)">
-    <div class="mc-lbl-row"><span class="mc-lbl">Blocked</span></div>
-    <div class="mc-val" style="color:#B45309">{{ total_pending|add:"-total_ready" }}</div>
-    <div class="mc-sub" style="color:#B45309">Pending scores or incomplete comments</div>
+    <div class="mc-sub" style="color:#059669">Waiting for Head of School sign-off</div>
   </div>
   <div class="metric-compact" style="background:linear-gradient(135deg,#F0FDF4,#fff);cursor:pointer" onclick="window.location.href='?status=published'" title="Show published reports">
     <div class="mc-lbl-row"><span class="mc-lbl">Published</span></div>
@@ -70,7 +62,11 @@
     <div class="mc-sub" style="color:#059669">Visible to parents</div>
   </div>
 </div>
-{% endif %}
+
+<p class="rq-help">
+  <b>ECD reports:</b> the class teacher submits &rarr; the <b>ECD HOD approves</b> &rarr; the <b>Head of School publishes</b> to parents.
+  Tick reports (or a whole class) to approve, publish or return several at once. Publishing sends each learner's parents an in-app, email and SMS notice with a link to the report in the parent portal.
+</p>
 
 {% include "academics/_pending_signoffs.html" %}
 
@@ -84,15 +80,24 @@
   </div>
 </div>
 
+{# Row checkboxes belong to this form through their form="rqBulk" attribute. #}
+<form method="post" id="rqBulk">
+  {% csrf_token %}
+  <input type="hidden" name="action" id="rqBulkAction" value="">
+</form>
+
 {% regroup reports by class_name as class_groups %}
 {% for group in class_groups %}
-<div class="card" style="margin-bottom:20px;padding:0;overflow:hidden">
+<div class="card rq-class" style="margin-bottom:20px;padding:0;overflow:hidden">
   <div class="card-title-row" style="padding:14px 20px;border-bottom:1px solid var(--border);margin-bottom:0">
-    <span style="font-weight:700;font-size:15px;color:var(--text-primary)">{{ group.grouper }}</span>
+    <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+      {% if status_filter != 'published' %}<input type="checkbox" class="rq-check rq-all" aria-label="Select every report in {{ group.grouper }}">{% endif %}
+      <span style="font-weight:700;font-size:15px;color:var(--text-primary)">{{ group.grouper }}</span>
+    </label>
     <div style="display:flex;align-items:center;gap:10px">
       <span style="font-size:12px;color:var(--text-muted)">{{ group.list|length }} {{ group.list|length|pluralize:"student,students" }}</span>
       {% if not status_filter or status_filter == 'pending' %}
-      <a href="?generate={{ group.grouper }}" class="hf-btn hf-btn-secondary" style="font-size:11px;padding:4px 10px" onclick="return confirm('Generate missing report cards for {{ group.grouper }}?')">
+      <a href="?generate={{ group.grouper|urlencode }}" class="hf-btn hf-btn-secondary" style="font-size:11px;padding:4px 10px" onclick="return confirm('Generate missing report cards for {{ group.grouper|escapejs }}?')">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:2px"><path d="M12 5v14M5 12h14"/></svg>
         Generate Reports
       </a>
@@ -103,18 +108,29 @@
   <table class="h-table">
     <thead>
       <tr>
-        <th style="padding-left:20px">Student</th>
+        {% if status_filter != 'published' %}<th class="rq-sel-col"></th>{% endif %}
+        <th {% if status_filter == 'published' %}style="padding-left:20px"{% endif %}>Student</th>
         <th>Average</th>
         <th>Scores</th>
         <th>Comment</th>
+        <th>Approval</th>
         <th>Teacher</th>
         <th style="padding-right:20px;text-align:right">Actions</th>
       </tr>
     </thead>
     <tbody>
       {% for item in group.list %}
-      <tr>
-        <td style="padding-left:20px">
+      <tr class="rq-row">
+        {% if status_filter != 'published' %}
+        <td class="rq-sel-col">
+          {% if item.report.status != 'published' %}
+          <input type="checkbox" class="rq-check rq-one" name="report_ids" value="{{ item.report.pk }}" form="rqBulk"
+            data-awaiting-hod="{{ item.awaiting_hod|yesno:'1,' }}" data-ready="{{ item.ready_to_publish|yesno:'1,' }}"
+            aria-label="Select {{ item.student.get_full_name }}">
+          {% endif %}
+        </td>
+        {% endif %}
+        <td {% if status_filter == 'published' %}style="padding-left:20px"{% endif %}>
           <div style="font-weight:600;font-size:13px;color:var(--text-primary)">{{ item.student.get_full_name }}</div>
           <div style="font-size:11px;color:var(--text-muted)">{{ item.student.admission_no }}</div>
         </td>
@@ -126,7 +142,14 @@
           {% endif %}
         </td>
         <td>
-          {% if item.all_scores_approved %}
+          {% if item.is_ecd %}
+            {% url 'academics:ecd_assessment' as ecd_url %}
+            {% if item.all_scores_approved %}
+              <a href="{{ ecd_url }}?class_name={{ item.class_name|urlencode }}&term={{ term.id }}" target="_blank" class="chip chip-green" style="text-decoration:none" title="Every report line is rated">Lines rated</a>
+            {% else %}
+              <a href="{{ ecd_url }}?class_name={{ item.class_name|urlencode }}&term={{ term.id }}" target="_blank" class="chip chip-red" style="text-decoration:none" title="Some report lines are not rated yet">Lines missing</a>
+            {% endif %}
+          {% elif item.all_scores_approved %}
             <a href="{% url 'academics:primary_assessment' %}?class_name={{ item.class_name|urlencode }}&term_id={{ term.id }}" target="_blank" class="chip chip-green" style="cursor:pointer;text-decoration:none" title="View scores for {{ item.class_name }}">Approved</a>
           {% elif item.approved_subjects %}
             <a href="{% url 'academics:primary_assessment' %}?class_name={{ item.class_name|urlencode }}&term_id={{ term.id }}" target="_blank" class="chip chip-amber" style="cursor:pointer;text-decoration:none" title="Report is incomplete until every subject is approved">{{ item.approved_subjects }}/{{ item.total_subjects }} approved</a>
@@ -137,43 +160,60 @@
           {% endif %}
         </td>
         <td>
-          {% if item.comment_ok %}
+          {% if item.is_ecd %}
+            <a href="{% url 'academics:ecd_assessment' %}?class_name={{ item.class_name|urlencode }}&term={{ term.id }}" target="_blank" class="chip {% if item.comment_ok %}chip-green{% else %}chip-red{% endif %}" style="text-decoration:none" title="Class teacher's comment">{% if item.comment_ok %}Ready{% else %}Min 50 chars{% endif %}</a>
+          {% elif item.comment_ok %}
             <a href="{% url 'academics:primary_comments_entry' %}?class_name={{ item.class_name|urlencode }}&term_id={{ term.id }}" target="_blank" class="chip chip-green" style="cursor:pointer;text-decoration:none" title="View comments for {{ item.class_name }}">Ready</a>
           {% else %}
             <a href="{% url 'academics:primary_comments_entry' %}?class_name={{ item.class_name|urlencode }}&term_id={{ term.id }}" target="_blank" class="chip chip-red" style="cursor:pointer;text-decoration:none" title="Comment needs at least 50 characters">Min 50 chars</a>
           {% endif %}
         </td>
+        <td>
+          <div class="rq-gates">
+            {% if item.report.status == 'published' %}
+              <span class="chip chip-green" style="font-size:10px">Published</span>
+              {% if item.report.published_at %}<span class="rq-gate-sub">{{ item.report.published_at|date:"d M Y" }}</span>{% endif %}
+            {% elif item.is_ecd and item.hod_approved %}
+              <span class="chip chip-blue" style="font-size:10px">HOD approved</span>
+              <span class="rq-gate-sub">{{ item.report.ecd_hod_approved_by.get_full_name|default:"" }}</span>
+            {% elif item.awaiting_hod %}
+              <span class="chip chip-amber" style="font-size:10px">Awaiting ECD HOD</span>
+            {% elif item.ready_to_publish %}
+              <span class="chip chip-blue" style="font-size:10px">Awaiting HOS</span>
+            {% elif item.report.status == 'draft' %}
+              <span class="chip chip-grey" style="font-size:10px">Not submitted</span>
+            {% else %}
+              <span class="chip chip-red" style="font-size:10px">Incomplete</span>
+            {% endif %}
+          </div>
+        </td>
         <td style="font-size:12px;color:var(--text-muted)">{{ item.teacher.get_full_name|default:item.teacher.username }}</td>
         <td style="padding-right:20px;text-align:right">
           <div style="display:flex;gap:6px;justify-content:flex-end">
-            <a href="{% url 'academics:report_preview' item.report.pk %}" class="hf-btn hf-btn-secondary" style="font-size:11px;padding:5px 12px" target="_blank">
+            <a href="{% url 'academics:report_preview' item.report.pk %}" class="hf-btn hf-btn-secondary rq-btn" target="_blank">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
               Preview
             </a>
-            {% if item.report.status == 'published' %}
-              <span class="chip chip-green" style="font-size:10px">Published</span>
-            {% else %}
-              {% if item.is_ecd and item.all_scores_approved and item.comment_ok and not item.report.ecd_hod_approved_by %}
+            {% if item.report.status != 'published' %}
+              {% if item.awaiting_hod and can_ecd_approve %}
               <form method="post" style="display:inline">
                 {% csrf_token %}
                 <input type="hidden" name="report_id" value="{{ item.report.pk }}">
                 <input type="hidden" name="action" value="ecd_hod_approve">
-                <button type="submit" class="hf-btn hf-btn-primary" style="font-size:11px;padding:5px 12px;background:#7C3AED;border-color:#7C3AED">
+                <button type="submit" class="hf-btn hf-btn-primary rq-btn rq-btn-hod">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:3px"><path d="M20 6L9 17l-5-5"/></svg>
                   HOD Approve
                 </button>
               </form>
               {% endif %}
-              {% if can_publish and item.all_scores_approved and item.comment_ok %}
-              <button type="button" class="hf-btn hf-btn-primary" style="font-size:11px;padding:5px 12px"
-                onclick="confirmDeleteModal({title:'Publish Report?',body:'Approve and publish the report for <strong>{{ item.student.get_full_name }}</strong>?',detail:'This report will become visible to parents immediately.',confirmText:'Publish Report',url:'{% url 'academics:signoff_action' %}',type:'info',extraData:[{name:'report_id',value:'{{ item.report.pk }}'},{name:'action',value:'approve'}]})">
+              {% if can_publish and item.ready_to_publish %}
+              <button type="button" class="hf-btn hf-btn-primary rq-btn"
+                onclick="confirmDeleteModal({title:'Publish Report?',body:'Approve and publish the report for <strong>{{ item.student.get_full_name|escapejs }}</strong>?',detail:'The report becomes visible in the parent portal now and the parents are notified.',confirmText:'Publish Report',url:'{% url 'academics:report_review_queue' %}',type:'info',extraData:[{name:'report_id',value:'{{ item.report.pk }}'},{name:'action',value:'approve'}]})">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:3px"><path d="M20 6L9 17l-5-5"/></svg>
                 Approve and Publish
               </button>
-              {% elif not can_publish and item.all_scores_approved and item.comment_ok %}
-              <span class="chip chip-amber" style="font-size:10px">Awaiting HOS Sign-Off</span>
               {% endif %}
-              <button class="hf-btn hf-btn-secondary" style="font-size:11px;padding:5px 12px;color:var(--red);border-color:var(--red-bd)" data-subjects="{{ item.subject_names|join:'|' }}" onclick="showReject({{ item.report.pk }}, this.dataset.subjects)">
+              <button type="button" class="hf-btn hf-btn-secondary rq-btn" style="color:var(--red);border-color:var(--red-bd)" data-subjects="{{ item.subject_names|join:'|' }}" onclick="showReject([{{ item.report.pk }}], this.dataset.subjects)">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M18 6L6 18M6 6l12 12"/></svg>
                 Return
               </button>
@@ -195,18 +235,33 @@
   {% endif %}
 </div>
 {% endfor %}
+
+{% if status_filter != 'published' and reports %}
+<div class="rq-bulkbar" id="rqBulkBar" role="region" aria-label="Selected reports">
+  <span class="rq-bulkbar-count" id="rqBulkCount">0 selected</span>
+  {% if can_ecd_approve %}
+  <button type="button" class="hf-btn hf-btn-primary rq-btn rq-btn-hod" id="rqBulkHod" onclick="bulkAct('ecd_hod_approve')">HOD approve <span data-n="hod"></span></button>
+  {% endif %}
+  {% if can_publish %}
+  <button type="button" class="hf-btn hf-btn-primary rq-btn" id="rqBulkPublish" onclick="bulkAct('approve')">Approve and publish <span data-n="ready"></span></button>
+  {% endif %}
+  <button type="button" class="hf-btn hf-btn-secondary rq-btn" style="color:var(--red);border-color:var(--red-bd)" onclick="bulkAct('reject')">Return <span data-n="all"></span></button>
+  <button type="button" class="hf-btn hf-btn-secondary rq-btn" onclick="clearSelection()">Clear</button>
+  <span class="rq-bulkbar-note" id="rqBulkNote"></span>
+</div>
+{% endif %}
 {% endif %}
 
 <!-- Reject Modal -->
 <div id="rejectModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.2);width:100%;max-width:480px;margin:16px">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border)">
-      <h3 style="margin:0;font-size:16px;font-weight:700;color:var(--text-primary)">Return Report for Correction</h3>
-      <button onclick="closeReject()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted);padding:0 4px">&times;</button>
+      <h3 id="rejectTitle" style="margin:0;font-size:16px;font-weight:700;color:var(--text-primary)">Return Report for Correction</h3>
+      <button type="button" onclick="closeReject()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted);padding:0 4px">&times;</button>
     </div>
     <form method="post" id="rejectForm">
       {% csrf_token %}
-      <input type="hidden" name="report_id" id="rejectReportId">
+      <div id="rejectIds"></div>
       <input type="hidden" name="action" value="reject">
       <div style="padding:20px 22px">
         <div id="rejectSubjectsWrap" style="display:none;margin-bottom:14px">
@@ -226,13 +281,21 @@
 </div>
 
 <script>
-function showReject(reportId, subjects) {
-  document.getElementById('rejectReportId').value = reportId;
+function showReject(reportIds, subjects) {
+  var ids = document.getElementById('rejectIds');
+  ids.innerHTML = '';
+  reportIds.forEach(function (id) {
+    var input = document.createElement('input');
+    input.type = 'hidden'; input.name = 'report_ids'; input.value = id;
+    ids.appendChild(input);
+  });
+  document.getElementById('rejectTitle').textContent = reportIds.length > 1
+    ? 'Return ' + reportIds.length + ' Reports for Correction' : 'Return Report for Correction';
   var wrap = document.getElementById('rejectSubjectsWrap');
   var list = document.getElementById('rejectSubjects');
   list.innerHTML = '';
-  var names = (subjects || '').split('|').filter(Boolean);
-  names.forEach(function(name) {
+  var names = reportIds.length === 1 ? (subjects || '').split('|').filter(Boolean) : [];
+  names.forEach(function (name) {
     var label = document.createElement('label');
     label.style.cssText = 'display:flex;align-items:center;gap:8px;cursor:pointer';
     var cb = document.createElement('input');
@@ -242,17 +305,86 @@ function showReject(reportId, subjects) {
     list.appendChild(label);
   });
   wrap.style.display = names.length ? 'block' : 'none';
-  var modal = document.getElementById('rejectModal');
-  modal.style.display = 'flex';
+  document.getElementById('rejectModal').style.display = 'flex';
 }
 function closeReject() {
-  var modal = document.getElementById('rejectModal');
-  modal.style.display = 'none';
-  document.getElementById('rejectReportId').value = '';
+  document.getElementById('rejectModal').style.display = 'none';
+  document.getElementById('rejectIds').innerHTML = '';
   document.getElementById('rejectReason').value = '';
 }
-document.getElementById('rejectModal').addEventListener('click', function(e) {
+document.getElementById('rejectModal').addEventListener('click', function (e) {
   if (e.target === this) closeReject();
 });
+
+// ── Selection and bulk actions ──
+(function () {
+  var bar = document.getElementById('rqBulkBar');
+  if (!bar) return;
+  function boxes() { return Array.prototype.slice.call(document.querySelectorAll('.rq-one')); }
+  function picked() { return boxes().filter(function (b) { return b.checked; }); }
+
+  function refresh() {
+    var sel = picked();
+    var hod = sel.filter(function (b) { return b.dataset.awaitingHod; }).length;
+    var ready = sel.filter(function (b) { return b.dataset.ready; }).length;
+    bar.classList.toggle('on', sel.length > 0);
+    document.getElementById('rqBulkCount').textContent = sel.length + ' selected';
+    bar.querySelectorAll('[data-n]').forEach(function (el) {
+      var n = { hod: hod, ready: ready, all: sel.length }[el.dataset.n];
+      el.textContent = '(' + n + ')';
+      el.parentNode.disabled = n === 0;
+    });
+    var skipped = [];
+    if (document.getElementById('rqBulkHod') && hod < sel.length) skipped.push((sel.length - hod) + ' not waiting for HOD approval');
+    if (document.getElementById('rqBulkPublish') && ready < sel.length) skipped.push((sel.length - ready) + ' not ready to publish');
+    document.getElementById('rqBulkNote').textContent = skipped.length
+      ? 'Of the selection: ' + skipped.join(', ') + '. Each action only applies to the reports it fits.' : '';
+    document.querySelectorAll('.rq-one').forEach(function (b) {
+      b.closest('tr').classList.toggle('rq-row-selected', b.checked);
+    });
+    document.querySelectorAll('.rq-class').forEach(function (card) {
+      var mine = card.querySelectorAll('.rq-one');
+      var on = card.querySelectorAll('.rq-one:checked').length;
+      var all = card.querySelector('.rq-all');
+      if (!all) return;
+      all.checked = mine.length > 0 && on === mine.length;
+      all.indeterminate = on > 0 && on < mine.length;
+      all.disabled = mine.length === 0;
+    });
+  }
+
+  document.addEventListener('change', function (e) {
+    if (e.target.classList.contains('rq-all')) {
+      e.target.closest('.rq-class').querySelectorAll('.rq-one').forEach(function (b) { b.checked = e.target.checked; });
+    }
+    if (e.target.classList.contains('rq-check')) refresh();
+  });
+
+  window.clearSelection = function () { boxes().forEach(function (b) { b.checked = false; }); refresh(); };
+
+  window.bulkAct = function (action) {
+    var sel = picked();
+    if (action === 'reject') { showReject(sel.map(function (b) { return b.value; }), ''); return; }
+    var key = action === 'ecd_hod_approve' ? 'awaitingHod' : 'ready';
+    var targets = sel.filter(function (b) { return b.dataset[key]; });
+    if (!targets.length) return;
+    // Only the reports this action applies to are sent.
+    sel.forEach(function (b) { if (!b.dataset[key]) b.checked = false; });
+    var n = targets.length, s = n === 1 ? '' : 's';
+    var opts = action === 'ecd_hod_approve'
+      ? { title: 'Approve ' + n + ' ECD report' + s + '?', body: 'Approve <strong>' + n + ' ECD report' + s + '</strong> as ECD HOD?',
+          detail: 'They move to the Head of School for publishing. The Head of School is notified.', confirmText: 'Approve ' + n }
+      : { title: 'Publish ' + n + ' report' + s + '?', body: 'Approve and publish <strong>' + n + ' report' + s + '</strong>?',
+          detail: 'The reports become visible in the parent portal now and each learner\'s parents are notified.', confirmText: 'Publish ' + n };
+    opts.type = 'info';
+    opts.onConfirm = function () {
+      document.getElementById('rqBulkAction').value = action;
+      document.getElementById('rqBulk').submit();
+    };
+    confirmDeleteModal(opts);
+    refresh();
+  };
+  refresh();
+})();
 </script>
 {% endblock %}

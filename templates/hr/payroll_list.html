@@ -26,7 +26,7 @@
   .metric-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
   .metric-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; }
   .metric-card .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
-  .metric-card .value { font-family: 'Roboto Mono', monospace; font-size: 26px; font-weight: 500; margin-top: 4px; }
+  .metric-card .value { font-family: 'Roboto', Arial, sans-serif; font-size: 26px; font-weight: 500; margin-top: 4px; }
   .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 24px; }
   table { width: 100%; border-collapse: collapse; }
   thead th { background: var(--bg-page); font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
@@ -104,7 +104,7 @@
             {% endif %}
           </td>
           <td>{{ run.employee_count }}</td>
-          <td style="font-family:'Roboto Mono',monospace;">TZS {{ run.total_net_pay|floatformat:0|intcomma }}</td>
+          <td style="font-family:'Roboto', Arial, sans-serif;">TZS {{ run.total_net_pay|floatformat:0|intcomma }}</td>
           <td>{{ run.payment_date|date:"d M Y"|default:"N/A" }}</td>
           <td><a href="{% url 'hr:payroll_detail' run.pk %}" class="btn-secondary btn-sm">View</a></td>
         </tr>

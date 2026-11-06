@@ -202,7 +202,7 @@ class ThreadedCallerIPTest(TestCase):
             class_name="Grade 1",
         )
         guardian = ParentGuardian.objects.create(
-            full_name="Parent", phone="+255700000000",
+            full_name="Parent", phone="+255767016940",
         )
         StudentGuardian.objects.create(
             student=sibling, guardian=guardian, relationship="parent",

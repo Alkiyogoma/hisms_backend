@@ -45,7 +45,7 @@
 .lpv-msg { margin-left: auto; margin-right: auto; }
 .lpv-page canvas { display: block; }
 .lpv-pages img { max-width: none; background: #fff; box-shadow: 0 1px 4px rgba(15,23,42,.18); }
-.lpv-pages pre { background: #fff; padding: 16px; margin: 0; width: 100%; max-width: 960px; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; line-height: 1.55; font-family: 'SF Mono', 'Fira Code', monospace; }
+.lpv-pages pre { background: #fff; padding: 16px; margin: 0; width: 100%; max-width: 960px; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; line-height: 1.55; font-family: 'Roboto', Arial, sans-serif; }
 .lpv-pages table { background: #fff; border-collapse: collapse; font-size: 12px; }
 .lpv-pages th, .lpv-pages td { border: 1px solid #CBD5E1; padding: 5px 9px; text-align: left; }
 .lpv-pages th { background: #F1F5F9; }

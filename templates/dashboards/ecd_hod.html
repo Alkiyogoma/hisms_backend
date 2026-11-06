@@ -12,7 +12,7 @@
   .ev-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 0.5px solid #DDE3EE; }
   .ev-item:last-child { border-bottom: none; padding-bottom: 0; }
   .ev-date { flex-shrink: 0; width: 44px; text-align: center; background: #fff; border: 1px solid #DDE3EE; border-radius: 7px; padding: 5px 3px; }
-  .ev-day { font-size: 17px; font-weight: 700; color: #023AA5; font-family: monospace; line-height: 1; }
+  .ev-day { font-size: 17px; font-weight: 700; color: #023AA5; font-family: 'Roboto', Arial, sans-serif; line-height: 1; }
   .ev-mon { font-size: 9px; color: #8492A6; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; margin-top: 1px; }
   .ev-body { flex: 1; min-width: 0; }
   .ev-name { font-size: 12.5px; font-weight: 600; color: #1A1A2E; line-height: 1.3; }
@@ -197,15 +197,15 @@
     
     <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:10px 0 14px">
       <a href="{% url 'academics:progression_hod_review' %}" style="background:#E8F5EC;border:1px solid #B7DFBF;border-radius:8px;padding:12px;text-align:center;text-decoration:none;display:block">
-        <div style="font-size:22px;font-weight:700;color:#1B7B34;font-family:monospace">{{ progression.meets }}</div>
+        <div style="font-size:22px;font-weight:700;color:#1B7B34;font-family:'Roboto', Arial, sans-serif">{{ progression.meets }}</div>
         <div style="font-size:10.5px;color:#1B7B34;font-weight:600;margin-top:2px">Meets expectation</div>
       </a>
       <a href="{% url 'academics:progression_hod_review' %}" style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:12px;text-align:center;text-decoration:none;display:block">
-        <div style="font-size:22px;font-weight:700;color:#92550A;font-family:monospace">{{ progression.towards }}</div>
+        <div style="font-size:22px;font-weight:700;color:#92550A;font-family:'Roboto', Arial, sans-serif">{{ progression.towards }}</div>
         <div style="font-size:10.5px;color:#92550A;font-weight:600;margin-top:2px">Working towards</div>
       </a>
       <a href="{% url 'academics:progression_hod_review' %}" style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:12px;text-align:center;text-decoration:none;display:block">
-        <div style="font-size:22px;font-weight:700;color:#9B1C1C;font-family:monospace">{{ progression.not_meet }}</div>
+        <div style="font-size:22px;font-weight:700;color:#9B1C1C;font-family:'Roboto', Arial, sans-serif">{{ progression.not_meet }}</div>
         <div style="font-size:10.5px;color:#9B1C1C;font-weight:600;margin-top:2px">Does not meet</div>
       </a>
     </div>

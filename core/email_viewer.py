@@ -24,7 +24,7 @@ def email_viewer(request):
     page = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Sent Emails ({len(data)})</title>
 <style>
-body {{ font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; background: #1a1a2e; color: #e0e0e0; margin: 20px; }}
+body {{ font-family: Roboto, Arial, sans-serif; background: #1a1a2e; color: #e0e0e0; margin: 20px; }}
 h1 {{ color: #00d4ff; }}
 .toolbar {{ margin-bottom: 18px; font-size: 14px; }}
 .toolbar a {{ color: #00d4ff; margin-right: 14px; }}
@@ -38,8 +38,8 @@ h1 {{ color: #00d4ff; }}
 .actions a {{ color: #00d4ff; text-decoration: none; font-size: 12px; margin-right: 15px; }}
 .frame-wrap {{ margin: 0 15px 15px; border: 1px solid #444; border-radius: 6px; background: #fff; }}
 .frame-wrap iframe {{ width: 100%; border: 0; display: block; min-height: 420px; background: #fff; }}
-.raw {{ background: #0f3460; padding: 10px; border-radius: 4px; white-space: pre-wrap; margin: 0 15px 15px; max-height: 420px; overflow-y: auto; font-family: monospace; font-size: 12px; }}
-.plain {{ background: #0f3460; padding: 10px; border-radius: 4px; white-space: pre-wrap; margin: 0 15px 15px; max-height: 160px; overflow-y: auto; font-family: monospace; font-size: 12px; }}
+.raw {{ background: #0f3460; padding: 10px; border-radius: 4px; white-space: pre-wrap; margin: 0 15px 15px; max-height: 420px; overflow-y: auto; font-family: Roboto, Arial, sans-serif; font-size: 12px; }}
+.plain {{ background: #0f3460; padding: 10px; border-radius: 4px; white-space: pre-wrap; margin: 0 15px 15px; max-height: 160px; overflow-y: auto; font-family: Roboto, Arial, sans-serif; font-size: 12px; }}
 .toggle {{ cursor: pointer; color: #00d4ff; text-decoration: underline; font-size: 12px; margin: 0 0 12px 15px; }}
 </style></head><body>
 <h1>Sent Emails</h1>

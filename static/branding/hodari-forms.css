@@ -394,7 +394,7 @@ textarea.form-input,textarea.hf-input{height:auto;min-height:96px;padding:10px 1
 .mc-val {
   font-size: 26px;
   font-weight: 800;
-  font-family: var(--font-mono, 'SF Mono', monospace);
+  font-family: var(--font-mono);
   line-height: 1.15;
   letter-spacing: -.03em;
   overflow: hidden;

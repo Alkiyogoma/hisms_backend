@@ -14,7 +14,7 @@
 <link rel="manifest" href="{% url 'attendance:pwa_manifest' %}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
 <title>Attendance | {{ brand.school_name }}</title>
 <style>
 :root {
@@ -28,7 +28,7 @@
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{
-  font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  font-family:'Roboto', Arial, sans-serif;
   background:var(--bg);color:var(--text);
   -webkit-font-smoothing:antialiased;overflow-x:hidden;
 }
@@ -194,7 +194,7 @@ body{
 }
 .action-btn{
   padding:14px;border-radius:14px;border:none;
-  font-family:'Inter';font-size:14px;font-weight:600;
+  font-family:'Roboto', Arial, sans-serif;font-size:14px;font-weight:600;
   cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;
   transition:transform .15s;
 }
@@ -227,7 +227,7 @@ body{
 .confirm-question{font-size:15px;font-weight:600;color:var(--text-secondary);margin:16px 0}
 .confirm-actions{display:flex;gap:10px}
 .confirm-actions button{
-  flex:1;padding:14px;border-radius:14px;font-family:'Inter';
+  flex:1;padding:14px;border-radius:14px;font-family:'Roboto', Arial, sans-serif;
   font-weight:700;font-size:14px;cursor:pointer;border:none;
   display:flex;align-items:center;justify-content:center;gap:8px;
   transition:transform .15s;
@@ -235,7 +235,7 @@ body{
 .confirm-actions button:active{transform:scale(.95)}
 .btn-checkin{background:var(--green);color:#fff}
 .btn-checkout{background:var(--orange);color:#fff}
-.btn-cancel-scan{width:100%;padding:12px;border:none;background:transparent;color:var(--text-muted);font-family:'Inter';font-size:13px;font-weight:600;margin-top:8px;cursor:pointer}
+.btn-cancel-scan{width:100%;padding:12px;border:none;background:transparent;color:var(--text-muted);font-family:'Roboto', Arial, sans-serif;font-size:13px;font-weight:600;margin-top:8px;cursor:pointer}
 
 /* ─── QR Scanner ─── */
 .scanner-overlay{
@@ -311,12 +311,12 @@ body{
 .manual-field label{font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px}
 .manual-field input{
   width:100%;padding:14px;border:1.5px solid var(--border);border-radius:12px;
-  font-size:16px;font-family:'Inter';
+  font-size:16px;font-family:'Roboto', Arial, sans-serif;
 }
 .manual-field input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
 .manual-actions{display:flex;gap:10px;margin-top:16px}
 .manual-actions button{
-  flex:1;padding:14px;border-radius:12px;font-family:'Inter';
+  flex:1;padding:14px;border-radius:12px;font-family:'Roboto', Arial, sans-serif;
   font-weight:700;font-size:14px;cursor:pointer;border:none;
 }
 .manual-actions .m-cancel{background:var(--bg);color:var(--text-secondary)}
@@ -352,7 +352,7 @@ body{
 .search-box:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
 .search-box input{
   flex:1;padding:14px 0;border:none;background:transparent;
-  font-size:14px;font-family:'Inter';color:var(--text);
+  font-size:14px;font-family:'Roboto', Arial, sans-serif;color:var(--text);
 }
 .search-box input::placeholder{color:var(--text-muted)}
 .search-box input:focus{outline:none}
@@ -384,7 +384,7 @@ body{
 .toast{
   position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-10px);
   background:#1e293b;color:#fff;padding:12px 22px;
-  border-radius:12px;font-size:13px;font-weight:500;font-family:'Inter';
+  border-radius:12px;font-size:13px;font-weight:500;font-family:'Roboto', Arial, sans-serif;
   z-index:300;opacity:0;transition:all .3s ease;pointer-events:none;
   display:flex;align-items:center;gap:8px;white-space:nowrap;
   box-shadow:0 4px 20px rgba(0,0,0,.15);max-width:90vw;
@@ -426,7 +426,7 @@ body{
 .install-banner .ib-actions{display:flex;gap:8px;flex-shrink:0}
 .install-banner .ib-btn{
   padding:8px 16px;border-radius:10px;border:none;font-size:13px;
-  font-weight:600;cursor:pointer;font-family:'Inter';
+  font-weight:600;cursor:pointer;font-family:'Roboto', Arial, sans-serif;
 }
 .install-banner .ib-install{background:var(--blue);color:#fff}
 .install-banner .ib-install:active{opacity:.85}
@@ -792,7 +792,7 @@ body{
   function apiFetch(url,opts){
     return fetch(url,opts).then(function(r){
       if(r.ok)return r.json();
-      if(r.status===403||r.status===401){showToast('Session expired: redirecting...',true);setTimeout(function(){window.location.href=API+'/accounts/login/'},1500);throw new Error('auth_redirect')}
+      if(r.status===403||r.status===401){showToast('Session expired: redirecting...',true);setTimeout(function(){window.location.href=API+'/accounts/login/?staff=1'},1500);throw new Error('auth_redirect')}
       return r.json().then(function(d){
         console.error('API error',r.status,url,d);
         throw new Error(d.detail||d.message||JSON.stringify(d)||r.statusText);
@@ -1401,7 +1401,7 @@ body{
   // ── Logout ──
   window.confirmLogout=function(){document.getElementById('logoutOverlay').classList.add('show')};
   window.closeLogout=function(){document.getElementById('logoutOverlay').classList.remove('show')};
-  window.doLogout=function(){closeLogout();fetch(API+'/accounts/logout/',{method:'POST',headers:{'X-CSRFToken':getCSRF()}}).finally(function(){window.location.href=API+'/accounts/login/'})};
+  window.doLogout=function(){closeLogout();fetch(API+'/accounts/logout/',{method:'POST',headers:{'X-CSRFToken':getCSRF()}}).finally(function(){window.location.href=API+'/accounts/login/?staff=1'})};
 
   // ── Generic Confirm Modal ──
   var _confirmCb=null;

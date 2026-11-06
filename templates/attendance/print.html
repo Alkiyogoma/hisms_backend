@@ -6,7 +6,7 @@
 <title>{{ doc_title }}{% if kind == 'student' %} | {{ student.first_name }} {{ student.last_name }}{% elif class_name %} | {{ class_name }}{% endif %}{% if period %} | {{ period.label }}{% elif date %} | {{ date|date:"j M Y" }}{% endif %}</title>
 {% if not is_pdf %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 {% endif %}
 {% include "attendance/_register_css.html" %}
 <style>
@@ -46,7 +46,7 @@
   .kpis { display:grid; grid-template-columns:repeat(6,1fr); gap:7px; margin-bottom:12px; }
   .kpi { border:1px solid var(--border); border-radius:6px; padding:7px 9px; }
   .kpi span { display:block; font-size:6.8pt; letter-spacing:.7px; text-transform:uppercase; color:var(--muted); font-weight:700; }
-  .kpi b { display:block; font-size:15pt; line-height:1.15; margin-top:3px; font-family:'Roboto Mono', Consolas, monospace; }
+  .kpi b { display:block; font-size:15pt; line-height:1.15; margin-top:3px; font-family:'Roboto', Arial, sans-serif; }
   .kpi small { font-size:7.5pt; color:var(--muted); }
   .k-green { background:var(--green-bg); border-color:#CDE9D7; } .k-green b { color:var(--green); }
   .k-red { background:var(--red-bg); border-color:#F6CFC9; } .k-red b { color:var(--red); }
@@ -62,7 +62,7 @@
   table.t tbody tr:nth-child(even) td { background:#F7F9FC; }
   table.t thead { display:table-header-group; }
   table.t tr { break-inside:avoid; page-break-inside:avoid; }
-  .r { text-align:right; } .ctr { text-align:center; } .mono { font-family:'Roboto Mono', Consolas, monospace; white-space:nowrap; }
+  .r { text-align:right; } .ctr { text-align:center; } .mono { font-family:'Roboto', Arial, sans-serif; white-space:nowrap; }
   .n { color:#8492A6; width:24px; }
   .st { display:inline-block; padding:1px 7px; border-radius:10px; font-size:7.6pt; font-weight:700; white-space:nowrap; }
   .st-green { background:var(--green-bg); color:var(--green); } .st-red { background:var(--red-bg); color:var(--red); }

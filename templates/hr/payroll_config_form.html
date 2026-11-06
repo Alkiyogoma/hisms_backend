@@ -96,22 +96,22 @@
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
       <div style="padding:16px;background:var(--green-bg);border-radius:8px;border:1px solid var(--green-bd);">
         <div style="font-size:11px;color:var(--green);text-transform:uppercase;letter-spacing:.05em;font-weight:500;">NSSF Employee</div>
-        <div style="font-family:'Roboto Mono',monospace;font-size:24px;font-weight:500;color:var(--green);margin-top:4px;">{{ form.nssf_employee_rate.value|default:"10.00" }}%</div>
+        <div style="font-family:'Roboto', Arial, sans-serif;font-size:24px;font-weight:500;color:var(--green);margin-top:4px;">{{ form.nssf_employee_rate.value|default:"10.00" }}%</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">of gross salary</div>
       </div>
       <div style="padding:16px;background:var(--hodari-blue-light);border-radius:8px;border:1px solid var(--blue-st-bd);">
         <div style="font-size:11px;color:var(--hodari-blue);text-transform:uppercase;letter-spacing:.05em;font-weight:500;">NSSF Employer</div>
-        <div style="font-family:'Roboto Mono',monospace;font-size:24px;font-weight:500;color:var(--hodari-blue);margin-top:4px;">{{ form.nssf_employer_rate.value|default:"10.00" }}%</div>
+        <div style="font-family:'Roboto', Arial, sans-serif;font-size:24px;font-weight:500;color:var(--hodari-blue);margin-top:4px;">{{ form.nssf_employer_rate.value|default:"10.00" }}%</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">school liability</div>
       </div>
       <div style="padding:16px;background:var(--amber-bg);border-radius:8px;border:1px solid var(--amber-bd);">
         <div style="font-size:11px;color:var(--amber);text-transform:uppercase;letter-spacing:.05em;font-weight:500;">Working Days</div>
-        <div style="font-family:'Roboto Mono',monospace;font-size:24px;font-weight:500;color:var(--amber);margin-top:4px;">{{ form.working_days_per_month.value|default:"26" }}</div>
+        <div style="font-family:'Roboto', Arial, sans-serif;font-size:24px;font-weight:500;color:var(--amber);margin-top:4px;">{{ form.working_days_per_month.value|default:"26" }}</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">per month for daily rate</div>
       </div>
       <div style="padding:16px;background:var(--blue-st-bg);border-radius:8px;border:1px solid var(--blue-st-bd);">
         <div style="font-size:11px;color:var(--hodari-blue);text-transform:uppercase;letter-spacing:.05em;font-weight:500;">Total NSSF Liability</div>
-        <div style="font-family:'Roboto Mono',monospace;font-size:24px;font-weight:500;color:var(--hodari-blue);margin-top:4px;">
+        <div style="font-family:'Roboto', Arial, sans-serif;font-size:24px;font-weight:500;color:var(--hodari-blue);margin-top:4px;">
           {% with ee=form.nssf_employee_rate.value|default:10.00|floatformat:2 er=form.nssf_employer_rate.value|default:10.00|floatformat:2 %}
             {{ ee|add:er }}%
           {% endwith %}
