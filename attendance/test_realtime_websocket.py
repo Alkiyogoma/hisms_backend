@@ -287,21 +287,11 @@ class TestNotificationTriggering(TestCase):
 class TestNotificationMessageFormat(TestCase):
     """Property 17: Notification Message Format Accuracy Tests"""
     
-    def test_checkin_message_format(self):
-        """Property 17: Check-in messages have correct format"""
+    def test_no_checkin_sms_template(self):
+        """Property 17: parents are not texted on check-in, so there is no check-in SMS"""
         from attendance.notification_service import NotificationService
         
-        student_name = "John Smith"
-        timestamp = timezone.now().strftime('%Y-%m-%d %H:%M:%S')
-        
-        message = NotificationService.CHECKIN_SMS_TEMPLATE.format(
-            student_name=student_name,
-            timestamp=timestamp
-        )
-        
-        assert "John Smith" in message
-        assert timestamp in message
-        assert "checked in" in message.lower()
+        assert not hasattr(NotificationService, 'CHECKIN_SMS_TEMPLATE')
     
     def test_checkout_message_format(self):
         """Property 17: Check-out messages have correct format"""
@@ -343,8 +333,8 @@ class TestMultiChannelNotification(TestCase):
         ]):
             result = NotificationService.send_checkin_notification(student, timezone.now())
             
-            # Should send both SMS and email
-            assert result['sms'] >= 1
+            # Check-in: email only, never an SMS
+            assert result['sms'] == 0
             assert result['email'] >= 1
 
 

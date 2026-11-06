@@ -264,19 +264,9 @@ class NotificationMessageFormatAccuracy(TestCase):
             current_class=self.class_obj
         )
 
-    def test_checkin_sms_format_accuracy(self):
-        """Check-in SMS contains required fields"""
-        timestamp = timezone.now()
-        message = NotificationService.CHECKIN_SMS_TEMPLATE.format(
-            student_name=self.student.get_full_name(),
-            timestamp=timestamp.strftime('%Y-%m-%d %H:%M:%S')
-        )
-        
-        # Validate message contains required fields
-        assert 'John Doe' in message, "SMS must contain student name"
-        assert str(timestamp.year) in message, "SMS must contain timestamp"
-        assert 'checked in' in message.lower(), "SMS must mention check-in"
-        assert 'Hodari Christian School' in message, "SMS must contain school name"
+    def test_no_checkin_sms_template(self):
+        """Parents are not texted on check-in, so there is no check-in SMS"""
+        assert not hasattr(NotificationService, 'CHECKIN_SMS_TEMPLATE')
 
     def test_checkout_sms_format_accuracy(self):
         """Check-out SMS contains required fields"""
@@ -684,20 +674,13 @@ class NotificationSystemIntegration(TransactionTestCase):
 
         assert result['success'], "Check-in should succeed"
 
-        # Verify SMS queued
-        messages = Message.objects.filter(
-            phone=self.parent.phone,
-            status=0
-        )
-        assert messages.exists(), "SMS should be queued for parent"
-
-        # Verify notification logged
-        logs = NotificationLog.objects.filter(
+        # Check-in never texts parents
+        assert not Message.objects.filter(phone=self.parent.phone).exists(), \
+            "No SMS should be queued on check-in"
+        assert not NotificationLog.objects.filter(
             recipient_phone=self.parent.phone,
             notification_type='checkin',
-            delivery_status='pending'
-        )
-        assert logs.exists(), "Notification should be logged"
+        ).exists(), "No check-in notification should be logged"
 
     def test_end_to_end_otp_notification_flow(self):
         """Complete OTP generation to SMS delivery workflow"""

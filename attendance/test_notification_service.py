@@ -235,17 +235,15 @@ class TestNotificationService(TestCase):
     
     @patch.object(NotificationService, 'send_sms')
     def test_send_checkin_notification(self, mock_send_sms):
-        """Test sending check-in notification"""
+        """Check-in never texts parents: only check-out sends an SMS."""
         mock_send_sms.return_value = {'success': True, 'message_id': 'msg_123'}
         
         timestamp = timezone.now()
         self.service.send_checkin_notification(self.student, timestamp)
         
-        # Check notification was queued
-        assert NotificationLog.objects.count() == 1
-        notification = NotificationLog.objects.first()
-        assert notification.notification_type == 'checkin'
-        assert notification.recipient_phone == '+255123456789'
+        assert not NotificationLog.objects.filter(recipient_phone='+255123456789').exists()
+        assert Message.objects.count() == 0
+        mock_send_sms.assert_not_called()
     
     @patch.object(NotificationService, 'send_sms')
     def test_send_checkout_notification(self, mock_send_sms):
@@ -459,11 +457,6 @@ class TestNotificationIntegration(TestCase):
         # Send notification
         service.send_checkin_notification(self.student, timestamp)
         
-        # Verify notification was queued
-        assert NotificationLog.objects.count() == 1
-        assert Message.objects.count() == 1
-        
-        notification = NotificationLog.objects.first()
-        assert notification.notification_type == 'checkin'
-        assert notification.recipient_phone == '+255123456789'
-        assert 'John Doe' in notification.message
+        # Check-in never texts parents
+        assert Message.objects.count() == 0
+        assert not NotificationLog.objects.filter(recipient_phone='+255123456789').exists()

@@ -11,6 +11,7 @@ Background tasks for:
 from celery import shared_task
 from django.core.mail import send_mail
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 import logging
 from datetime import datetime, timedelta
@@ -415,58 +416,19 @@ def audit_log_task(actor_id, action_type, model_name, object_id="", description=
 # ---------------------------------------------------------------------------
 
 def _collect_parent_contacts(student):
-    """Collect deduplicated parent phone contacts for a student."""
-    from students.models import Student
-    parents = []
-    seen_phones = set()
-    for guardian_rel in student.guardians.all():
-        phone = (guardian_rel.phone or '').strip()
-        if phone and phone not in seen_phones:
-            seen_phones.add(phone)
-            parents.append({'phone': phone, 'name': guardian_rel.full_name})
-    if hasattr(student, 'laravel_parents'):
-        for parent_rel in student.laravel_parents.all():
-            phone = (parent_rel.parent.phone or '').strip()
-            if phone and phone not in seen_phones:
-                seen_phones.add(phone)
-                parents.append({'phone': phone, 'name': parent_rel.parent.full_name})
-    return parents
+    """Current parent contacts with a phone number (see NotificationService._get_parent_contacts)."""
+    return [c for c in NotificationService._get_parent_contacts(student) if c['phone']]
 
 
-@shared_task(bind=True, max_retries=3)
-def send_checkin_notification_task(self, student_id, entry_id, timestamp_iso):
+@shared_task
+def send_checkin_notification_task(student_id, entry_id=None, timestamp_iso=None, *args, **kwargs):
     """
-    Async check-in notification  runs outside the scan hot path.
-    Queues SMS messages and logs notifications for all parent contacts.
+    Retired: parents are not texted on check-in, only on check-out.
+
+    Kept so check-in tasks still sitting in the Celery queue from before this
+    change are consumed without sending anything.
     """
-    try:
-        from attendance.models import Message, NotificationLog
-        from students.models import Student
-
-        student = Student.objects.get(id=student_id)
-        timestamp = datetime.fromisoformat(timestamp_iso)
-
-        message_text = (
-            f"Your child {student.get_full_name()} has been checked in at "
-            f"{timestamp.strftime('%Y-%m-%d %H:%M:%S')} to Hodari Christian School."
-        )
-
-        parents = _collect_parent_contacts(student)
-        for parent in parents:
-            Message.queue(parent['phone'], message_text)
-            NotificationLog.objects.create(
-                attendance_entry_id=entry_id,
-                recipient_phone=parent['phone'],
-                notification_type='checkin',
-                message=message_text,
-                delivery_status='pending',
-            )
-
-        logger.info("Checkin notifications queued for student %s: %d parents", student_id, len(parents))
-
-    except Exception as exc:
-        logger.error("send_checkin_notification_task failed for student %s: %s", student_id, exc)
-        raise self.retry(exc=exc, countdown=60 * (2 ** self.request.retries))
+    logger.info("Check-in SMS is disabled; nothing sent for student %s", student_id)
 
 
 @shared_task(bind=True, max_retries=3)
@@ -488,16 +450,26 @@ def send_checkout_notification_task(self, student_id, entry_id, timestamp_iso, p
             f"{timestamp.strftime('%Y-%m-%d %H:%M:%S')} from Hodari Christian School."
         )
 
-        parents = _collect_parent_contacts(student)
-        for parent in parents:
-            Message.queue(parent['phone'], message_text)
-            NotificationLog.objects.create(
-                attendance_entry_id=entry_id,
-                recipient_phone=parent['phone'],
-                notification_type='checkout',
-                message=message_text,
-                delivery_status='pending',
-            )
+        # A retry (or a redelivered task) must not text the same parent twice.
+        already = set()
+        if entry_id:
+            already = set(NotificationLog.objects.filter(
+                attendance_entry_id=entry_id, notification_type='checkout',
+            ).values_list('recipient_phone', flat=True))
+
+        parents = [p for p in _collect_parent_contacts(student) if p['phone'] not in already]
+        # All or nothing: if one fails, nothing is queued and the retry starts clean
+        # (Message.queue only dispatches once the transaction commits).
+        with transaction.atomic():
+            for parent in parents:
+                Message.queue(parent['phone'], message_text)
+                NotificationLog.objects.create(
+                    attendance_entry_id=entry_id,
+                    recipient_phone=parent['phone'],
+                    notification_type='checkout',
+                    message=message_text,
+                    delivery_status='pending',
+                )
 
         logger.info("Checkout notifications queued for student %s: %d parents", student_id, len(parents))
 

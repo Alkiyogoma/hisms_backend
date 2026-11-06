@@ -254,9 +254,8 @@ class AttendanceService:
                     entry.marked_at = timestamp
                     entry.save(update_fields=['status', 'check_in_time', 'marked_by', 'marked_at'])
             
-            # Send parent notifications asynchronously (deferred to Celery)
-            AttendanceService._send_checkin_notifications(student, timestamp, entry_id=entry.id)
-            
+            # No parent SMS on check-in: parents are texted only on check-out.
+
             # Broadcast real-time event (deferred to Celery  avoids blocking response)
             try:
                 from attendance.tasks import broadcast_checkin_event_task, broadcast_statistics_update_task, audit_log_task
@@ -694,18 +693,6 @@ class AttendanceService:
             'results': results
         }
 
-    @staticmethod
-    def _send_checkin_notifications(student, timestamp, entry_id=None):
-        """Defer check-in notifications to Celery to avoid blocking the scan path."""
-        from attendance.tasks import send_checkin_notification_task
-        try:
-            send_checkin_notification_task.delay(student.id, entry_id, timestamp.isoformat())
-        except Exception:
-            import logging
-            logging.getLogger(__name__).warning(
-                "Failed to enqueue checkin notification for student %s", student.id, exc_info=True,
-            )
-    
     @staticmethod
     def _send_checkout_notifications(student, timestamp, parent_name="", entry_id=None):
         """Defer check-out notifications to Celery to avoid blocking the scan path."""
