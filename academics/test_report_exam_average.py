@@ -217,7 +217,7 @@ class ReportLayoutTests(TestCase):
         from django.core.files.base import ContentFile
         from admissions.models import Applicant, ApplicantDocumentReceipt, ApplicantDocumentType
         applicant = Applicant.objects.create(
-            child_full_name="Joan Namunga", parent_full_name="Parent", parent_phone="0700000000",
+            child_full_name="Joan Namunga", parent_full_name="Parent", parent_phone="0767016940",
             grade_applying_for="Grade 5", enrolled_student=self.student,
         )
         doc = ApplicantDocumentReceipt(applicant=applicant, document_type=ApplicantDocumentType.STUDENT_PHOTO)
@@ -242,7 +242,7 @@ class ReportLayoutTests(TestCase):
         self.assertIn("No Photo", page)
         self.assertNotIn("gone.jpg", page)
         applicant = Applicant.objects.create(
-            child_full_name="Joan Namunga", parent_full_name="Parent", parent_phone="0700000000",
+            child_full_name="Joan Namunga", parent_full_name="Parent", parent_phone="0767016940",
             grade_applying_for="Grade 5", enrolled_student=self.student,
         )
         doc = ApplicantDocumentReceipt(applicant=applicant, document_type=ApplicantDocumentType.STUDENT_PHOTO)

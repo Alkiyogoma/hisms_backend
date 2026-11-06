@@ -37,8 +37,8 @@ LINE = "#E5E7EB"
 CANVAS = "#EEF1F6"
 SOFT = "#F7F8FB"
 
-SANS = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
-SERIF = "Georgia,'Times New Roman',Times,serif"
+SANS = "Roboto,Arial,sans-serif"
+SERIF = "'Times New Roman',Times,serif"
 
 # Section label shown above the title, by the first segment of the link.
 _SECTION_BY_PATH = {

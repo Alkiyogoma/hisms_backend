@@ -42,9 +42,9 @@
   --blue-st-bd: #93C5FD;
   --border: #DDE3EE;
   --border-strong: #B8C4D8;
-  --font-ui: 'Roboto', sans-serif;
-  --font-display: 'Times New Roman', Times, 'Liberation Serif', serif;
-  --font-mono: 'Roboto Mono', monospace;
+  --font-ui: 'Roboto', Arial, sans-serif;
+  --font-display: 'Times New Roman', Times, serif;
+  --font-mono: 'Roboto', Arial, sans-serif; /* numbers/codes: Roboto figures are tabular */
 }
 
 body {
@@ -56,6 +56,12 @@ body {
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased
+}
+
+/* House fonts: Roboto (Arial fallback) for text, Times New Roman for headers. */
+h1, h2, h3, h4, h5, h6,
+.topbar-greeting, .section-title, .card-title, .page-title {
+  font-family: var(--font-display);
 }
 
 /* ── SIDEBAR ── */
@@ -1327,7 +1333,7 @@ body {
   font-size: 17px;
   font-weight: 700;
   color: var(--hodari-blue);
-  font-family: monospace;
+  font-family: 'Roboto', Arial, sans-serif;
   line-height: 1
 }
 
@@ -1397,7 +1403,7 @@ body {
 .staff-tile-val {
   font-size: 24px;
   font-weight: 700;
-  font-family: monospace
+  font-family: 'Roboto', Arial, sans-serif
 }
 
 .staff-tile-lbl {
@@ -2016,7 +2022,7 @@ body {
   font-size: 20px;
   font-weight: 700;
   color: #1A1A2E;
-  font-family: monospace;
+  font-family: 'Roboto', Arial, sans-serif;
   line-height: 1.2
 }
 
@@ -2062,7 +2068,7 @@ body {
   font-size: 22px;
   font-weight: 700;
   color: #1A1A2E;
-  font-family: monospace;
+  font-family: 'Roboto', Arial, sans-serif;
   line-height: 1.2
 }
 

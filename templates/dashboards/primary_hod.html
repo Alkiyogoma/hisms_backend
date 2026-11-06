@@ -16,7 +16,7 @@
   .ev-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 0.5px solid #DDE3EE; }
   .ev-item:last-child { border-bottom: none; padding-bottom: 0; }
   .ev-date { flex-shrink: 0; width: 44px; text-align: center; background: #fff; border: 1px solid #DDE3EE; border-radius: 7px; padding: 5px 3px; }
-  .ev-day { font-size: 17px; font-weight: 700; color: #023AA5; font-family: monospace; line-height: 1; }
+  .ev-day { font-size: 17px; font-weight: 700; color: #023AA5; font-family: 'Roboto', Arial, sans-serif; line-height: 1; }
   .ev-mon { font-size: 9px; color: #8492A6; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; margin-top: 1px; }
   .ev-body { flex: 1; min-width: 0; }
   .ev-name { font-size: 12.5px; font-weight: 600; color: #1A1A2E; line-height: 1.3; }
@@ -125,7 +125,7 @@
         <div>
           <div style="font-size:10.5px;font-weight:700;color:#8492A6;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Performance pulse &middot; {{ term_label }} &middot; Primary</div>
           <div style="display:flex;align-items:baseline;gap:10px">
-            <span style="font-size:28px;font-weight:700;color:#1A1A2E;font-family:monospace;line-height:1">{{ dept_performance.avg }}%</span>
+            <span style="font-size:28px;font-weight:700;color:#1A1A2E;font-family:'Roboto', Arial, sans-serif;line-height:1">{{ dept_performance.avg }}%</span>
             <span class="chip chip-blue" style="font-size:11px;font-weight:700">Grade {{ dept_performance.grade }}</span>
             <span style="font-size:12px;color:#1B7B34;font-weight:600">{{ dept_performance.trend }}</span>
           </div>
@@ -138,9 +138,9 @@
         <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:12px;margin-bottom:10px">
           <div style="font-size:11px;font-weight:700;color:#9B1C1C;margin-bottom:6px">{{ flagged_class.name }} requires immediate attention</div>
           <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
-            <div style="text-align:center"><div style="font-size:18px;font-weight:700;color:#9B1C1C;font-family:monospace">{{ flagged_class.avg }}%</div><div style="font-size:10.5px;color:#9B1C1C;font-weight:600">Class avg</div></div>
-            <div style="text-align:center"><div style="font-size:18px;font-weight:700;color:#9B1C1C;font-family:monospace">{{ flagged_class.trend }}</div><div style="font-size:10.5px;color:#9B1C1C;font-weight:600">vs Term 1</div></div>
-            <div style="text-align:center"><div style="font-size:18px;font-weight:700;color:#9B1C1C;font-family:monospace">{{ flagged_class.critical_count }}</div><div style="font-size:10.5px;color:#9B1C1C;font-weight:600">Students at E</div></div>
+            <div style="text-align:center"><div style="font-size:18px;font-weight:700;color:#9B1C1C;font-family:'Roboto', Arial, sans-serif">{{ flagged_class.avg }}%</div><div style="font-size:10.5px;color:#9B1C1C;font-weight:600">Class avg</div></div>
+            <div style="text-align:center"><div style="font-size:18px;font-weight:700;color:#9B1C1C;font-family:'Roboto', Arial, sans-serif">{{ flagged_class.trend }}</div><div style="font-size:10.5px;color:#9B1C1C;font-weight:600">vs Term 1</div></div>
+            <div style="text-align:center"><div style="font-size:18px;font-weight:700;color:#9B1C1C;font-family:'Roboto', Arial, sans-serif">{{ flagged_class.critical_count }}</div><div style="font-size:10.5px;color:#9B1C1C;font-weight:600">Students at E</div></div>
           </div>
         </div>
       {% endif %}

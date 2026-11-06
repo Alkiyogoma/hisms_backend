@@ -18,11 +18,11 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='schoolsettings',
             name='admissions_phone',
-            field=models.CharField(blank=True, default='+255 700 000 000', help_text='Phone number shown in admissions emails and SMS.', max_length=32),
+            field=models.CharField(blank=True, default='+255 767016940', help_text='Phone number shown in admissions emails and SMS.', max_length=32),
         ),
         migrations.AddField(
             model_name='schoolsettings',
             name='admissions_whatsapp',
-            field=models.CharField(blank=True, default='+255 700 000 000', help_text='WhatsApp number for proof-of-payment submissions.', max_length=32),
+            field=models.CharField(blank=True, default='+255 767016940', help_text='WhatsApp number for proof-of-payment submissions.', max_length=32),
         ),
     ]

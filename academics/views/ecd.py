@@ -377,7 +377,7 @@ class ECDSubmissionAPIView(RoleRequiredMixin, View):
                         f"{student.first_name} {student.last_name} ({student.class_name}). "
                         f"Please review and approve."
                     ),
-                    link="/academics/ecd-assessment/?class_name=" + student.class_name,
+                    link=reverse("academics:report_review_queue") + "?dept=ecd",
                     actor=request.user,
                 )
         except Exception:

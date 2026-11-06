@@ -31,7 +31,7 @@
     <div style="flex:1;padding:24px 28px;display:flex;flex-direction:column;justify-content:center">
       <h1 style="margin:0;font-size:22px;font-weight:800;color:#1E293B">{{ student.first_name }} {{ student.last_name }}</h1>
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:14px;color:var(--text-muted);flex-wrap:wrap">
-        <span style="font-family:monospace;font-weight:700;color:var(--hodari-blue);background:var(--hodari-blue-light);padding:2px 8px;border-radius:6px;font-size:12px">{{ student.admission_no }}</span>
+        <span style="font-family:'Roboto', Arial, sans-serif;font-weight:700;color:var(--hodari-blue);background:var(--hodari-blue-light);padding:2px 8px;border-radius:6px;font-size:12px">{{ student.admission_no }}</span>
         <span>{{ student.class_name|default:"—" }}</span>
         {% if student.stream_name %}<span>· {{ student.stream_name }}</span>{% endif %}
       </div>

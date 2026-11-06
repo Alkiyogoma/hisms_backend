@@ -177,7 +177,7 @@ class SchoolSettings(TimeStampedModel):
 
     # Admissions contact details (used in spec-compliant email/SMS templates)
     admissions_phone = models.CharField(
-        max_length=32, blank=True, default="+255 700 000 000",
+        max_length=32, blank=True, default="+255 767016940",
         help_text="Phone number shown in admissions emails and SMS.",
     )
     admissions_email = models.EmailField(
@@ -190,7 +190,7 @@ class SchoolSettings(TimeStampedModel):
                   "Falls back to the admissions phone when empty.",
     )
     admissions_whatsapp = models.CharField(
-        max_length=32, blank=True, default="+255 700 000 000",
+        max_length=32, blank=True, default="+255 767016940",
         help_text="WhatsApp number for proof-of-payment submissions.",
     )
 
@@ -301,9 +301,9 @@ class SchoolSettings(TimeStampedModel):
         """Return admissions contact details from DB settings, with env fallback."""
         import os
         return {
-            "phone": self.admissions_phone or os.getenv("ADMISSIONS_PHONE", "+255 700 000 000"),
+            "phone": self.admissions_phone or os.getenv("ADMISSIONS_PHONE", "+255 767016940"),
             "email": self.admissions_email or os.getenv("ADMISSIONS_EMAIL", "admissions@hodari.ac.tz"),
-            "whatsapp": self.admissions_whatsapp or os.getenv("ADMISSIONS_WHATSAPP", "+255 700 000 000"),
+            "whatsapp": self.admissions_whatsapp or os.getenv("ADMISSIONS_WHATSAPP", "+255 767016940"),
             "reply_to": self.admissions_email or os.getenv("ADMISSIONS_REPLY_TO", "admissions@hodari.ac.tz"),
         }
 

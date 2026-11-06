@@ -155,20 +155,31 @@ class HOSSignOffListView(AllowedRolesEnforcedMixin, RoleRequiredMixin, TemplateV
                 if total > 0:
                     published = sum(1 for r in class_reports if r.status == ReportCardStatus.PUBLISHED)
                     pending = total - published
+                    unpublished = [r for r in class_reports if r.status != ReportCardStatus.PUBLISHED]
+                    # ECD reports publish only after ECD HOD approval.
+                    def _awaiting_hod(r):
+                        return (r.is_ecd_report and not r.ecd_hod_approved_by_id
+                                and r.status == ReportCardStatus.PENDING_SIGN_OFF)
+                    awaiting_hod = sum(1 for r in unpublished if _awaiting_hod(r))
+                    # Not publishable yet: ECD drafts the teacher has not
+                    # submitted, and reports missing the teacher's comment.
                     blocked = sum(
-                        1 for r in class_reports
-                        if r.status != ReportCardStatus.PUBLISHED
-                        and r.is_ecd_report
-                        and r.ecd_template_type in ["kindergarten", "pre_school", "abc"]
-                        and len((r.teacher_comments or "").strip()) < 50
+                        1 for r in unpublished
+                        if not _awaiting_hod(r) and (
+                            (r.is_ecd_report and not r.ecd_hod_approved_by_id)
+                            or len((r.teacher_comments or "").strip()) < 50
+                        )
                     )
+                    ready = pending - awaiting_hod - blocked
                     class_stats.append({
                         "class_name": c,
                         "total": total,
                         "published": published,
                         "pending": pending,
                         "blocked": blocked,
-                        "can_sign_off_all": pending > 0 and blocked == 0,
+                        "awaiting_hod": awaiting_hod,
+                        "ready": ready,
+                        "can_sign_off_all": ready > 0,
                     })
             ctx["class_stats"] = class_stats
             ctx["pending_signoffs"] = pending_signoffs_by_class(term, classes)
@@ -624,7 +635,11 @@ class HOSSignOffActionView(AllowedRolesEnforcedMixin, RoleRequiredMixin, View):
         
         if report_id:
             try:
-                report = ReportCard.objects.get(pk=report_id)
+                report = ReportCard.objects.select_related("student").get(pk=report_id)
+                from core.scoping import hod_class_names
+                section_classes = hod_class_names(request.user)
+                if section_classes is not None and report.student.class_name not in section_classes:
+                    raise PermissionDenied(f"{report.student.class_name} is outside your section.")
                 if action == "reject":
                     reject_report_for_edit(
                         report, request.user, reason=reason, subjects=request.POST.getlist("subjects"),
@@ -639,8 +654,19 @@ class HOSSignOffActionView(AllowedRolesEnforcedMixin, RoleRequiredMixin, View):
                 messages.error(request, f"Nothing was changed: {_action_error(e)}")
         elif class_name and term_id:
             reports = ReportCard.objects.filter(student__class_name=class_name, term_id=term_id).exclude(status=ReportCardStatus.PUBLISHED)
+            from core.scoping import hod_class_names
+            section_classes = hod_class_names(request.user)
+            if section_classes is not None and class_name not in section_classes:
+                messages.error(request, f"Nothing was changed: {class_name} is outside your section.")
+                return _back_to(request, "academics:hos_signoff_list")
             processed_count = 0
             blocked = []
+            skipped_ecd = 0
+            if action != "reject":
+                # Publishing a class: ECD reports still waiting for the ECD HOD
+                # are left as they are rather than listed as failures.
+                skipped_ecd = reports.filter(is_ecd_report=True, ecd_hod_approved_by__isnull=True).count()
+                reports = reports.exclude(is_ecd_report=True, ecd_hod_approved_by__isnull=True)
             for r in reports.select_related("student"):
                 try:
                     if action == "reject":
@@ -656,8 +682,14 @@ class HOSSignOffActionView(AllowedRolesEnforcedMixin, RoleRequiredMixin, View):
                     blocked.append(f"{r.student.first_name} {r.student.last_name} ({_action_error(exc)})")
 
             verb = "returned" if action == "reject" else "signed off"
+            if skipped_ecd:
+                messages.info(
+                    request,
+                    f"{skipped_ecd} ECD report(s) in {class_name} are not yet approved by the ECD HOD and were not published.",
+                )
             if not processed_count and not blocked:
-                messages.info(request, f"There were no unpublished reports in {class_name} to process.")
+                if not skipped_ecd:
+                    messages.info(request, f"There were no unpublished reports in {class_name} to process.")
             elif not blocked:
                 messages.success(request, f"{processed_count} report(s) in {class_name} {verb}.")
             else:
@@ -800,9 +832,19 @@ class ReportReviewQueueView(AllowedRolesEnforcedMixin, RoleRequiredMixin, Templa
                     if v["status"] in {ScoreStatus.SUBMITTED, ScoreStatus.RETURNED}
                 )
 
+            hod_approved = bool(rc.ecd_hod_approved_by_id)
+            submitted = rc.status == ReportCardStatus.PENDING_SIGN_OFF
             rows.append({
                 "report": rc,
                 "student": rc.student,
+                "hod_approved": hod_approved,
+                # ECD gate 1: submitted, complete and waiting for the ECD HOD.
+                "awaiting_hod": rc.is_ecd_report and submitted and all_approved and comment_ok and not hod_approved,
+                # Gate 2: what the Head of School may publish now.
+                "ready_to_publish": (
+                    all_approved and comment_ok and rc.status != ReportCardStatus.PUBLISHED
+                    and (not rc.is_ecd_report or hod_approved)
+                ),
                 "all_scores_approved": all_approved,
                 "pending_score_count": pending_count,
                 "comment_ok": comment_ok,
@@ -847,10 +889,22 @@ class ReportReviewQueueView(AllowedRolesEnforcedMixin, RoleRequiredMixin, Templa
                 p = progress_by_student.get(rc.student_id)
                 all_a = bool(p and p["is_complete"])
             comment_ok = len((rc.teacher_comments or "").strip()) >= 50
-            pending_rows.append({"all_scores_approved": all_a, "comment_ok": comment_ok})
+            complete = all_a and comment_ok
+            pending_rows.append({
+                "ready": complete and (not rc.is_ecd_report or bool(rc.ecd_hod_approved_by_id)),
+                "awaiting_hod": complete and rc.is_ecd_report and not rc.ecd_hod_approved_by_id
+                and rc.status == ReportCardStatus.PENDING_SIGN_OFF,
+            })
 
         ctx["total_pending"] = len(pending_rows)
-        ctx["total_ready"] = len([r for r in pending_rows if r["all_scores_approved"] and r["comment_ok"]])
+        ctx["total_ready"] = sum(1 for r in pending_rows if r["ready"])
+        ctx["total_awaiting_hod"] = sum(1 for r in pending_rows if r["awaiting_hod"])
+        ctx["total_blocked"] = ctx["total_pending"] - ctx["total_ready"] - ctx["total_awaiting_hod"]
+        from academics.approval_policy import can_approve_grades
+        ctx["can_ecd_approve"] = can_approve_grades(user) and (
+            user.is_school_wide or Department.ECD in (user.section_departments or [])
+            or user.has_role(UserRole.ECD_HOD)
+        )
 
         # Count published reports for this term+department
         published_count = ReportCard.objects.filter(
@@ -864,70 +918,105 @@ class ReportReviewQueueView(AllowedRolesEnforcedMixin, RoleRequiredMixin, Templa
         ctx["academics_tab"] = "review_queue"
         return ctx
 
+    # Past-tense wording for the result message, per action.
+    ACTION_VERBS = {
+        "ecd_hod_approve": "approved by the ECD HOD",
+        "reject": "returned for correction",
+        "revoke": "had the sign-off revoked",
+        "approve": "signed off and published",
+    }
+
     def post(self, request, *args, **kwargs):
+        """One report (``report_id``) or a selection (``report_ids``)."""
         action = request.POST.get("action", "approve")
-        report_id = request.POST.get("report_id")
-        reason = request.POST.get("reason", "")
+        if action not in self.ACTION_VERBS:
+            action = "approve"
+        reason = request.POST.get("reason", "").strip()
+        ids = [i for i in request.POST.getlist("report_ids") + [request.POST.get("report_id", "")] if i.isdigit()]
 
-        from academics.services import sign_off_report, reject_report_for_edit, revoke_report_signoff
+        from academics.approval_policy import approver_class_names
+        from academics.services import (
+            ecd_hod_approve_report, reject_report_for_edit, revoke_report_signoff, sign_off_report,
+        )
 
-        if not report_id:
-            messages.error(request, "No report specified.")
+        if not ids:
+            messages.error(request, "Nothing was changed: no report was selected.")
+            return _back_to(request, "academics:report_review_queue")
+        if action in {"reject", "revoke"} and not reason:
+            messages.error(request, "Nothing was changed: a reason is required.")
             return _back_to(request, "academics:report_review_queue")
 
+        user = request.user
         try:
-            report = ReportCard.objects.get(pk=report_id)
-        except ReportCard.DoesNotExist:
-            messages.error(request, "Report not found.")
-            return _back_to(request, "academics:report_review_queue")
-
-        try:
-            if action == "ecd_hod_approve":
-                # ECD HOD approves ECD report before HOS sign-off
-                if not request.user.has_role(UserRole.ECD_HOD, UserRole.SUPER_ADMIN):
-                    raise PermissionDenied("Only ECD HOD or Super Admin can approve ECD reports.")
-                if not report.is_ecd_report:
-                    messages.error(request, "This action is only for ECD reports.")
-                    return _back_to(request, "academics:report_review_queue")
-                report.ecd_hod_approved_by = request.user
-                report.ecd_hod_approved_at = timezone.now()
-                report.save(update_fields=["ecd_hod_approved_by", "ecd_hod_approved_at", "updated_at"])
-                from audit.models import log_event
-                log_event(
-                    actor=request.user,
-                    action_type="ECD_REPORT_APPROVED",
-                    model_name="ReportCard",
-                    object_id=report.pk,
-                    description=f"ECD report approved by HOD: {report.student.admission_no}",
-                )
-                messages.success(request, f"ECD report for {report.student.first_name} approved by HOD.")
-            elif action == "reject":
-                # GRD-009: Only HOS, Super Admin, or HOD can reject reports.
-                if not request.user.has_role(UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD):
-                    raise PermissionDenied("Only HOS, Super Admin, or HOD can reject reports.")
-                reject_report_for_edit(
-                    report, request.user, reason=reason, subjects=request.POST.getlist("subjects"),
-                )
-                messages.success(request, f"Report for {report.student.first_name} returned for correction.")
-            elif action == "revoke":
-                # GRD-016: Only HOS or Super Admin can revoke.
-                if request.user.role not in {UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN}:
-                    raise PermissionDenied("Only HOS or Super Admin can revoke a signed-off report.")
-                if not reason:
-                    messages.error(request, "A reason is required to revoke a report sign-off.")
-                    return _back_to(request, "academics:report_review_queue")
-                revoke_report_signoff(report, request.user, reason=reason)
-                messages.success(request, f"Report sign-off revoked for {report.student.first_name}.")
-            else:
-                # GRD-009: Only HOS or Super Admin can sign off.
-                if request.user.role not in {UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN}:
-                    raise PermissionDenied("Only the Head of School or Super Admin can sign off reports.")
-                sign_off_report(report, request.user)
-                messages.success(request, f"Report for {report.student.first_name} signed off and published.")
-        except Exception as e:
+            # GRD-009 / GRD-016: who may do what.
+            if action == "approve" and user.role not in {UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN}:
+                raise PermissionDenied("Only the Head of School or Super Admin can sign off reports.")
+            if action == "revoke" and user.role not in {UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN}:
+                raise PermissionDenied("Only HOS or Super Admin can revoke a signed-off report.")
+        except PermissionDenied as e:
             messages.error(request, f"Nothing was changed: {_action_error(e)}")
+            return _back_to(request, "academics:report_review_queue")
 
+        scope = approver_class_names(user)
+        reports = ReportCard.objects.filter(pk__in=ids).select_related("student", "generated_by")
+        done, failed = [], []
+        for report in reports:
+            name = f"{report.student.first_name} {report.student.last_name}"
+            try:
+                if scope is not None and report.student.class_name not in scope:
+                    raise PermissionDenied(f"{report.student.class_name} is outside your section.")
+                if action == "ecd_hod_approve":
+                    ecd_hod_approve_report(report, user)
+                elif action == "reject":
+                    reject_report_for_edit(report, user, reason=reason, subjects=request.POST.getlist("subjects"))
+                elif action == "revoke":
+                    revoke_report_signoff(report, user, reason=reason)
+                else:
+                    sign_off_report(report, user)
+                done.append(report)
+            except Exception as e:
+                failed.append(f"{name}: {_action_error(e)}")
+        missing = len(ids) - len(done) - len(failed)
+
+        if action == "ecd_hod_approve" and done:
+            _notify_ecd_approved(user, done)
+
+        verb = self.ACTION_VERBS[action]
+        if len(done) == 1 and not failed:
+            messages.success(request, f"{done[0].student.first_name}'s report {verb}.")
+        elif done and not failed:
+            messages.success(request, f"{len(done)} reports {verb}.")
+        elif done:
+            messages.warning(request, f"{len(done)} report(s) {verb}; {len(failed)} not changed. " + " ".join(failed))
+        elif failed:
+            messages.error(request, "Nothing was changed. " + " ".join(failed))
+        if missing > 0:
+            messages.error(request, f"{missing} selected report(s) no longer exist. Refresh the page.")
         return _back_to(request, "academics:report_review_queue")
+
+
+def _notify_ecd_approved(approver, reports):
+    """One message per Head of School for a batch of ECD HOD approvals."""
+    try:
+        from communications.email_service import dispatch_notification
+        from users.models import User
+        classes = sorted({r.student.class_name for r in reports})
+        count = len(reports)
+        link = reverse("academics:report_review_queue") + "?dept=ecd"
+        for hos in User.objects.filter(role=UserRole.HEAD_OF_SCHOOL, is_active=True):
+            dispatch_notification(
+                user=hos,
+                title="ECD reports ready to publish",
+                message=(
+                    f"{approver.get_full_name()} approved {count} ECD report{'s' if count != 1 else ''} "
+                    f"({', '.join(classes)}). They are ready for your sign-off."
+                ),
+                link=link,
+                actor=approver,
+            )
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("ECD approval notification failed")
 
 
 class AcademicAnalyticsView(RoleRequiredMixin, View):

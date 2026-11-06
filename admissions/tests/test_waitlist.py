@@ -51,7 +51,7 @@ def _create_applicant(grade="Grade 1", status=ApplicantStatus.INQUIRY_RECEIVED, 
     """Create an Applicant with sensible defaults."""
     defaults = dict(
         parent_full_name="Test Parent",
-        parent_phone="+255700000000",
+        parent_phone="+255767016940",
         parent_email="parent@test.com",
         child_full_name="Test Child",
         child_date_of_birth="2018-01-15",

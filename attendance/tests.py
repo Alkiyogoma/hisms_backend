@@ -86,7 +86,7 @@ class MarkAutoAbsentAuditNotificationTest(_AttendanceTestBase):
         guardian = ParentGuardian.objects.create(
             user=guardian_user,
             full_name=f"Parent of {student.first_name}",
-            phone="0700000000",
+            phone="0767016940",
         )
         StudentGuardian.objects.create(
             student=student,

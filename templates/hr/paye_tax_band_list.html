@@ -120,10 +120,10 @@
         {% for band in bands %}
         <tr>
           <td><strong>{{ band.version }}</strong></td>
-          <td style="font-family:'Roboto Mono',monospace;">TZS {{ band.band_from|floatformat:0|intcomma }}</td>
-          <td style="font-family:'Roboto Mono',monospace;">{% if band.band_to %}TZS {{ band.band_to|floatformat:0|intcomma }}{% else %}∞{% endif %}</td>
-          <td style="font-family:'Roboto Mono',monospace;">TZS {{ band.base_tax|floatformat:0|intcomma }}</td>
-          <td style="font-family:'Roboto Mono',monospace;font-weight:500;">{{ band.rate_percentage|floatformat:1 }}%</td>
+          <td style="font-family:'Roboto', Arial, sans-serif;">TZS {{ band.band_from|floatformat:0|intcomma }}</td>
+          <td style="font-family:'Roboto', Arial, sans-serif;">{% if band.band_to %}TZS {{ band.band_to|floatformat:0|intcomma }}{% else %}∞{% endif %}</td>
+          <td style="font-family:'Roboto', Arial, sans-serif;">TZS {{ band.base_tax|floatformat:0|intcomma }}</td>
+          <td style="font-family:'Roboto', Arial, sans-serif;font-weight:500;">{{ band.rate_percentage|floatformat:1 }}%</td>
           <td>
             {% if band.is_active %}
             <span class="badge-pill green">Active</span>

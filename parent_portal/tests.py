@@ -493,7 +493,7 @@ class LearnerPhotoTests(PortalTestBase):
     def test_admission_photo_is_used_when_profile_has_none(self):
         from admissions.models import Applicant
         applicant = Applicant.objects.create(child_full_name="Sherissa Kimaro", parent_full_name="Parent",
-                                             parent_phone="0700000000", grade_applying_for="Grade 5",
+                                             parent_phone="0767016940", grade_applying_for="Grade 5",
                                              enrolled_student=self.child)
         applicant.photo.save("passport.png", ContentFile(b"\x89PNG\r\n\x1a\nfake"), save=True)
         self.client.force_login(self.parent)

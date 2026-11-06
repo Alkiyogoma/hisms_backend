@@ -94,6 +94,67 @@ def recalculate_report_card_average(report_card):
     report_card.save(update_fields=["overall_average", "updated_at"])
 
 
+def ecd_report_gaps(report_card):
+    """What still stops an ECD report going forward ([] when complete):
+    unrated report lines and a class teacher's comment under 50 characters."""
+    from academics import ecd_report
+
+    gaps = []
+    class_type = report_card.ecd_template_type or ecd_report.class_type_of(report_card.student.class_name)
+    if class_type:
+        structure = ecd_report.ReportStructure(class_type, ecd_report.term_number_of(report_card.term))
+        missing = ecd_report.missing_lines(structure, ecd_report.values_for(report_card))
+        if missing:
+            gaps.append(f"{len(missing)} report line(s) not rated")
+    if len((report_card.teacher_comments or "").strip()) < 50:
+        gaps.append("class teacher's comment is under 50 characters")
+    return gaps
+
+
+def ecd_hod_approve_report(report_card, user):
+    """ECD HOD approval: the first gate for an ECD report, before the Head of
+    School publishes it. The report must be submitted by the class teacher,
+    fully rated and commented, and in the approver's section."""
+    from academics.approval_policy import approver_class_names, can_approve_grades
+    from audit.models import log_event
+
+    name = f"{report_card.student.first_name} {report_card.student.last_name}"
+    if not can_approve_grades(user):
+        raise ValidationError("Only the ECD HOD or the Head of School can approve ECD reports.")
+    if not report_card.is_ecd_report:
+        raise ValidationError(f"{name}'s report is not an ECD report.")
+    scope = approver_class_names(user)
+    if scope is not None and report_card.student.class_name not in scope:
+        raise ValidationError(f"{name} ({report_card.student.class_name}) is outside your section.")
+    if report_card.status == ReportCardStatus.PUBLISHED:
+        raise ValidationError(f"{name}'s report is already published.")
+    if report_card.status != ReportCardStatus.PENDING_SIGN_OFF:
+        raise ValidationError(f"{name}'s report has not been submitted by the class teacher yet.")
+    if report_card.ecd_hod_approved_by_id:
+        raise ValidationError(f"{name}'s report is already approved.")
+    gaps = ecd_report_gaps(report_card)
+    if gaps:
+        raise ValidationError(f"{name}'s report is incomplete: " + "; ".join(gaps) + ".")
+
+    report_card.ecd_hod_approved_by = user
+    report_card.ecd_hod_approved_at = timezone.now()
+    report_card.save(update_fields=["ecd_hod_approved_by", "ecd_hod_approved_at", "updated_at"])
+    log_event(
+        actor=user, action_type="ECD_REPORT_APPROVED", model_name="ReportCard",
+        object_id=report_card.pk, description=f"ECD report approved by HOD: {report_card.student.admission_no}",
+    )
+
+
+def report_guardians(student):
+    """Who is told when a report is published: the primary parents, or every
+    linked parent when none is marked primary (otherwise nobody hears)."""
+    from students.models import ParentGuardian
+
+    linked = ParentGuardian.objects.filter(studentguardian__student=student)
+    primary = linked.filter(studentguardian__is_primary=True)
+    return (primary if primary.exists() else linked).distinct()
+
+
 @transaction.atomic
 def sign_off_report(report_card, user):
     # GRD-015: Only HOS or Super Admin may sign off reports.
@@ -163,10 +224,15 @@ def sign_off_report(report_card, user):
                 + "; ".join(gaps) + "."
             )
 
-    # Validation gate: ECD mandatory comments
-    if report_card.is_ecd_report and report_card.ecd_template_type in ["kindergarten", "pre_school", "abc"]:
-        if len((report_card.teacher_comments or "").strip()) < 50:
-            raise ValidationError("Mandatory teacher comment (min 50 chars) is missing.")
+    # ECD two-gate: the class teacher submits, the ECD HOD approves, then the
+    # Head of School publishes. Every line must be rated and commented.
+    if report_card.is_ecd_report:
+        name = f"{report_card.student.first_name} {report_card.student.last_name}"
+        if not report_card.ecd_hod_approved_by_id:
+            raise ValidationError(f"{name}'s ECD report is waiting for ECD HOD approval.")
+        gaps = ecd_report_gaps(report_card)
+        if gaps:
+            raise ValidationError(f"{name}'s report is incomplete: " + "; ".join(gaps) + ".")
 
     # Validation gate: Primary/Secondary mandatory comments
     if not report_card.is_ecd_report:
@@ -196,16 +262,18 @@ def sign_off_report(report_card, user):
     )
     
     # NOTIF-07: Fire parent notification (in-app, email, and SMS fallback)
+    # Parents now sign in to the parent portal, so link straight to the report there.
     from communications.email_service import send_parent_notification, dispatch_notification
-    from students.models import ParentGuardian
-    guardians = ParentGuardian.objects.filter(studentguardian__student=report_card.student, studentguardian__is_primary=True)
-    parent_reports_url = reverse("academics:parent_reports")
-    for guardian in guardians:
+    report_url = reverse(
+        "parent_portal:report_card",
+        kwargs={"student_id": report_card.student_id, "report_id": report_card.pk},
+    )
+    for guardian in report_guardians(report_card.student):
         send_parent_notification(
             guardian=guardian,
             title="Term Report Published",
             message=f"The term report for {report_card.student.first_name} is now available.",
-            link=parent_reports_url,
+            link=report_url,
             actor=user
         )
 
@@ -243,6 +311,9 @@ def reject_report_for_edit(report_card, user, reason="", subjects=None):
     report_card.status = ReportCardStatus.DRAFT
     report_card.signed_off_by = None
     report_card.signed_off_at = None
+    # A corrected ECD report goes back through ECD HOD approval.
+    report_card.ecd_hod_approved_by = None
+    report_card.ecd_hod_approved_at = None
     # Preserve existing comments but unlock them so the teacher can edit.
     report_card.comments_submitted = False
     report_card.save()

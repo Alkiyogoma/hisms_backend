@@ -58,7 +58,7 @@
     {% for ftype, flabel in filing_types %}
     <div class="card" style="padding:12px 16px;">
       <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">{{ flabel }}</div>
-      <div style="font-family:'Roboto Mono',monospace;font-size:18px;font-weight:500;margin-top:4px;">
+      <div style="font-family:'Roboto', Arial, sans-serif;font-size:18px;font-weight:500;margin-top:4px;">
         {% with count_var=ftype|add:"_count" %}
         {% with pending_var=ftype|add:"_pending" %}
         {{ count }} filings
@@ -101,9 +101,9 @@
         <tr>
           <td><strong>{{ filing.get_filing_type_display }}</strong></td>
           <td>{{ filing.period_name }}</td>
-          <td style="font-family:'Roboto Mono',monospace;">TZS {{ filing.employee_contribution|floatformat:0|intcomma }}</td>
-          <td style="font-family:'Roboto Mono',monospace;">TZS {{ filing.employer_contribution|floatformat:0|intcomma }}</td>
-          <td style="font-family:'Roboto Mono',monospace;font-weight:500;">TZS {{ filing.total_amount|floatformat:0|intcomma }}</td>
+          <td style="font-family:'Roboto', Arial, sans-serif;">TZS {{ filing.employee_contribution|floatformat:0|intcomma }}</td>
+          <td style="font-family:'Roboto', Arial, sans-serif;">TZS {{ filing.employer_contribution|floatformat:0|intcomma }}</td>
+          <td style="font-family:'Roboto', Arial, sans-serif;font-weight:500;">TZS {{ filing.total_amount|floatformat:0|intcomma }}</td>
           <td>
             {% if filing.status == 'submitted' %}
             <span class="badge-pill green">{{ filing.get_status_display }}</span>

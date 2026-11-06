@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Performance Report &mdash; {{ scope.label }} &mdash; {{ terms_label }} {{ selected_year.name }}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   /* Letterhead + signature styles (from includes/hodari_print_styles.html,
      without its global margin/padding reset). */
@@ -64,7 +64,7 @@
   table.t tbody tr:nth-child(even) td { background:#F7F9FC; }
   table.t thead { display:table-header-group; }
   table.t tr { break-inside:avoid; }
-  .r { text-align:right; } .c { text-align:center; } .mono { font-family:'Roboto Mono', Consolas, monospace; white-space:nowrap; }
+  .r { text-align:right; } .c { text-align:center; } .mono { font-family:'Roboto', Arial, sans-serif; white-space:nowrap; }
   .n { color:#8492A6; width:24px; }
   .b-critical { color:var(--crit); font-weight:700; } .b-support { color:var(--supp); font-weight:700; }
   .b-pass { color:var(--pass); font-weight:700; } .b-strong { color:var(--strong); font-weight:700; }
@@ -78,7 +78,7 @@
   table.heat th, table.heat td { border:1px solid #fff; padding:4px 3px; text-align:center; }
   table.heat thead th { background:#F0F3F8; color:#3C4559; font-size:7.2pt; font-weight:700; vertical-align:bottom; line-height:1.15; word-break:break-word; }
   table.heat th.rowh { text-align:left; background:#F0F3F8; font-weight:700; white-space:nowrap; padding-left:6px; }
-  table.heat td { font-family:'Roboto Mono', Consolas, monospace; font-weight:700; }
+  table.heat td { font-family:'Roboto', Arial, sans-serif; font-weight:700; }
   .h-critical { background:var(--crit-bg); color:var(--crit); } .h-support { background:var(--supp-bg); color:var(--supp); }
   .h-pass { background:var(--pass-bg); color:var(--pass); } .h-strong { background:var(--strong-bg); color:var(--strong); }
   .h-none { background:#FAFBFC; color:#B4BBC9; font-weight:400; }

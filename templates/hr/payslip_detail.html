@@ -32,7 +32,7 @@
   .total-row td { font-weight: 600; background: var(--green-bg); }
   .net-pay { text-align: center; padding: 20px; margin-top: 16px; background: var(--blue-st-bg); border-radius: 8px; }
   .net-pay .label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
-  .net-pay .amount { font-family: 'Roboto Mono', monospace; font-size: 32px; font-weight: 700; color: var(--hodari-blue); }
+  .net-pay .amount { font-family: 'Roboto', Arial, sans-serif; font-size: 32px; font-weight: 700; color: var(--hodari-blue); }
   .btn-primary { background: var(--hodari-blue); color: #fff; border: none; padding: 8px 18px; border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
   .btn-primary:hover { background: var(--hodari-blue-dark); }
   .btn-secondary { background: #fff; color: var(--hodari-blue); border: 1px solid var(--border-strong); padding: 8px 18px; border-radius: 6px; font-family: 'Roboto', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: none; }
@@ -72,14 +72,14 @@
         <tr><th style="width:60%;">Earnings</th><th style="width:40%;text-align:right;">Amount (TZS)</th></tr>
       </thead>
       <tbody>
-        <tr><td>Basic Pay</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.basic_pay|floatformat:2|intcomma }}</td></tr>
-        {% if entry.housing_allowance %}<tr><td>Housing Allowance</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.housing_allowance|floatformat:2|intcomma }}</td></tr>{% endif %}
-        {% if entry.transport_allowance %}<tr><td>Transport Allowance</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.transport_allowance|floatformat:2|intcomma }}</td></tr>{% endif %}
-        {% if entry.medical_allowance %}<tr><td>Medical Allowance</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.medical_allowance|floatformat:2|intcomma }}</td></tr>{% endif %}
-        {% if entry.other_allowances %}<tr><td>Other Allowances</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.other_allowances|floatformat:2|intcomma }}</td></tr>{% endif %}
-        {% if entry.overtime_pay %}<tr><td>Overtime Pay</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.overtime_pay|floatformat:2|intcomma }}</td></tr>{% endif %}
-        {% if entry.bonus_pay %}<tr><td>Bonus Pay</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.bonus_pay|floatformat:2|intcomma }}</td></tr>{% endif %}
-        <tr class="total-row"><td><strong>Gross Pay</strong></td><td style="text-align:right;font-family:'Roboto Mono',monospace;"><strong>{{ entry.gross_pay|floatformat:2|intcomma }}</strong></td></tr>
+        <tr><td>Basic Pay</td><td style="text-align:right;font-family:'Roboto', Arial, sans-serif;">{{ entry.basic_pay|floatformat:2|intcomma }}</td></tr>
+        {% if entry.housing_allowance %}<tr><td>Housing Allowance</td><td style="text-align:right;font-family:'Roboto', Arial, sans-serif;">{{ entry.housing_allowance|floatformat:2|intcomma }}</td></tr>{% endif %}
+        {% if entry.transport_allowance %}<tr><td>Transport Allowance</td><td style="text-align:right;font-family:'Roboto', Arial, sans-serif;">{{ entry.transport_allowance|floatformat:2|intcomma }}</td></tr>{% endif %}
+        {% if entry.medical_allowance %}<tr><td>Medical Allowance</td><td style="text-align:right;font-family:'Roboto', Arial, sans-serif;">{{ entry.medical_allowance|floatformat:2|intcomma }}</td></tr>{% endif %}
+        {% if entry.other_allowances %}<tr><td>Other Allowances</td><td style="text-align:right;font-family:'Roboto', Arial, sans-serif;">{{ entry.other_allowances|floatformat:2|intcomma }}</td></tr>{% endif %}
+        {% if entry.overtime_pay %}<tr><td>Overtime Pay</td><td style="text-align:right;font-family:'Roboto', Arial, sans-serif;">{{ entry.overtime_pay|floatformat:2|intcomma }}</td></tr>{% endif %}
+        {% if entry.bonus_pay %}<tr><td>Bonus Pay</td><td style="text-align:right;font-family:'Roboto', Arial, sans-serif;">{{ entry.bonus_pay|floatformat:2|intcomma }}</td></tr>{% endif %}
+        <tr class="total-row"><td><strong>Gross Pay</strong></td><td style="text-align:right;font-family:'Roboto', Arial, sans-serif;"><strong>{{ entry.gross_pay|floatformat:2|intcomma }}</strong></td></tr>
       </tbody>
     </table>
 
@@ -88,13 +88,13 @@
         <tr><th style="width:60%;">Deductions</th><th style="width:40%;text-align:right;">Amount (TZS)</th></tr>
       </thead>
       <tbody>
-        {% if entry.paye_tax %}<tr><td>PAYE Tax</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.paye_tax|floatformat:2|intcomma }}</td></tr>{% endif %}
-        {% if entry.nssf_employee %}<tr><td>NSSF (Employee 5%)</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.nssf_employee|floatformat:2|intcomma }}</td></tr>{% endif %}
-        {% if entry.nhif_deduction %}<tr><td>NHIF Deduction</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.nhif_deduction|floatformat:2|intcomma }}</td></tr>{% endif %}
-        {% if entry.hesb_deduction %}<tr><td>HESLB Loan Repayment</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.hesb_deduction|floatformat:2|intcomma }}</td></tr>{% endif %}
-        {% if entry.other_deductions %}<tr><td>Other Deductions</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.other_deductions|floatformat:2|intcomma }}</td></tr>{% endif %}
-        {% if entry.leave_deduction %}<tr><td>Unpaid Leave Deduction ({{ entry.unpaid_leave_days }} days)</td><td style="text-align:right;font-family:'Roboto Mono',monospace;">{{ entry.leave_deduction|floatformat:2|intcomma }}</td></tr>{% endif %}
-        <tr class="total-row"><td><strong>Total Deductions</strong></td><td style="text-align:right;font-family:'Roboto Mono',monospace;"><strong>{{ entry.total_deductions|floatformat:2|intcomma }}</strong></td></tr>
+        {% if entry.paye_tax %}<tr><td>PAYE Tax</td><td style="text-align:right;font-family:'Roboto', Arial, sans-serif;">{{ entry.paye_tax|floatformat:2|intcomma }}</td></tr>{% endif %}
+        {% if entry.nssf_employee %}<tr><td>NSSF (Employee 5%)</td><td style="text-align:right;font-family:'Roboto', Arial, sans-serif;">{{ entry.nssf_employee|floatformat:2|intcomma }}</td></tr>{% endif %}
+        {% if entry.nhif_deduction %}<tr><td>NHIF Deduction</td><td style="text-align:right;font-family:'Roboto', Arial, sans-serif;">{{ entry.nhif_deduction|floatformat:2|intcomma }}</td></tr>{% endif %}
+        {% if entry.hesb_deduction %}<tr><td>HESLB Loan Repayment</td><td style="text-align:right;font-family:'Roboto', Arial, sans-serif;">{{ entry.hesb_deduction|floatformat:2|intcomma }}</td></tr>{% endif %}
+        {% if entry.other_deductions %}<tr><td>Other Deductions</td><td style="text-align:right;font-family:'Roboto', Arial, sans-serif;">{{ entry.other_deductions|floatformat:2|intcomma }}</td></tr>{% endif %}
+        {% if entry.leave_deduction %}<tr><td>Unpaid Leave Deduction ({{ entry.unpaid_leave_days }} days)</td><td style="text-align:right;font-family:'Roboto', Arial, sans-serif;">{{ entry.leave_deduction|floatformat:2|intcomma }}</td></tr>{% endif %}
+        <tr class="total-row"><td><strong>Total Deductions</strong></td><td style="text-align:right;font-family:'Roboto', Arial, sans-serif;"><strong>{{ entry.total_deductions|floatformat:2|intcomma }}</strong></td></tr>
       </tbody>
     </table>
 
