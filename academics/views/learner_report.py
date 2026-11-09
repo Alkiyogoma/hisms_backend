@@ -121,7 +121,7 @@ def build_learner_report(student, term, shared=None, terms=None):
         "attendance": attendance,
         "class_name": class_name,
         "class_teacher": _shared(shared, ("class_teachers",), analytics.class_teachers).get(class_name, ""),
-        "pass_mark": int(performance.PASS_MARK),
+        **performance.pass_mark_context(),
         "generated_at": timezone.localtime(),
         "scale": [("A*", "90–100", "Outstanding"), ("A", "80–89", "High"), ("B", "70–79", "Good"),
                   ("C", "60–69", "Aspiring"), ("D", "50–59", "Basic"), ("E", "0–49", "Needs Improvement")],

@@ -115,6 +115,33 @@ def _recent_audit():
     return AuditLog.objects.all().select_related("actor")[:6]
 
 
+def _class_attendance_today(today, class_names=None):
+    """Per-class student attendance for one day: {class_name: (present, enrolled, pct)}.
+
+    enrolled = active students currently in the class. present = those same
+    students with a present status (Late counts as present, once). Each student
+    is counted once however many entries, sessions or corrections they have, so
+    pct is always 0-100.
+    """
+    students = Student.objects.filter(status=StudentStatus.ACTIVE)
+    if class_names is not None:
+        students = students.filter(class_name__in=class_names)
+    enrolled = dict(
+        students.values('class_name').annotate(cnt=Count('id')).values_list('class_name', 'cnt')
+    )
+    present = dict(
+        students.filter(attendance_entries__date=today, attendance_entries__status__in=PRESENT_STATUSES)
+        .values('class_name')
+        .annotate(cnt=Count('id', distinct=True))
+        .values_list('class_name', 'cnt')
+    )
+    result = {}
+    for cname, total in enrolled.items():
+        p = min(present.get(cname, 0), total)
+        result[cname] = (p, total, round(p / total * 100) if total else 0)
+    return result
+
+
 from core.utils import is_school_day  # noqa: F401  re-exported for callers within this module
 
 
@@ -367,31 +394,12 @@ class HOSDashboardView(RoleRequiredMixin, TemplateView):
         if unconfirmed_staff < 0:
             unconfirmed_staff = 0
         
-        # 4. Attendance by class  single query with annotation (eliminates N+1)
-        class_active_counts = dict(
-            Student.objects.filter(status=StudentStatus.ACTIVE)
-            .values('class_name')
-            .annotate(cnt=Count('id'))
-            .values_list('class_name', 'cnt')
-        )
-        class_present_counts = dict(
-            AttendanceEntry.objects.filter(date=today, status__in=PRESENT_STATUSES)
-            .values('student__class_name')
-            .annotate(cnt=Count('id'))
-            .values_list('student__class_name', 'cnt')
-        )
-        class_late_counts = dict(
-            AttendanceEntry.objects.filter(date=today, status=AttendanceStatus.LATE)
-            .values('student__class_name')
-            .annotate(cnt=Count('id'))
-            .values_list('student__class_name', 'cnt')
-        )
-        class_attendance = []
-        for cname, c_total in class_active_counts.items():
-            if c_total > 0:
-                c_checked_in = class_present_counts.get(cname, 0) + class_late_counts.get(cname, 0)
-                c_pct = round((c_checked_in / c_total) * 100)
-                class_attendance.append({"name": cname, "pct": c_pct})
+        # 4. Attendance by class
+        class_attendance = [
+            {"name": cname, "pct": c_pct}
+            for cname, (_, c_total, c_pct) in _class_attendance_today(today).items()
+            if c_total > 0
+        ]
 
         # 5. Lesson plan compliance by department  single annotated query
         dept_plan_stats = (
@@ -584,6 +592,8 @@ class HOSDashboardView(RoleRequiredMixin, TemplateView):
         from academics.models import ScoreStatus, ExamTypeConfiguration
         from academics.utils import get_current_term
         perf_term = get_current_term()
+        from academics.grading_utils import get_pass_mark
+        pass_mark = get_pass_mark()
 
         school_avg = 0
         school_grade = "-"
@@ -628,7 +638,7 @@ class HOSDashboardView(RoleRequiredMixin, TemplateView):
             if total_with_scores:
                 d_count = sum(1 for a in student_overall_avgs.values() if 50 <= a < 60)
                 e_count = sum(1 for a in student_overall_avgs.values() if a < 50)
-                passed_count = sum(1 for a in student_overall_avgs.values() if a >= 60)
+                passed_count = sum(1 for a in student_overall_avgs.values() if a >= pass_mark)
                 pass_rate = round(passed_count / total_with_scores * 100)
                 school_avg = round(sum(student_overall_avgs.values()) / total_with_scores, 1)
                 school_grade = "B" if school_avg >= 70 else "C" if school_avg >= 60 else "D" if school_avg >= 50 else "E"
@@ -645,7 +655,7 @@ class HOSDashboardView(RoleRequiredMixin, TemplateView):
                     "name": row['student__class_name'],
                     "avg": avg,
                     "grade": "B" if avg >= 70 else "C" if avg >= 60 else "D" if avg >= 50 else "E",
-                    "flagged": avg < 60,
+                    "flagged": avg < pass_mark,
                 })
             class_perf_list.sort(key=lambda x: x['avg'])
             flagged_class_count = sum(1 for c in class_perf_list if c['flagged'])
@@ -743,6 +753,7 @@ class HOSDashboardView(RoleRequiredMixin, TemplateView):
             "school_avg": school_avg,
             "school_grade": school_grade,
             "pass_rate": pass_rate,
+            "pass_mark": int(pass_mark),
             "d_count": d_count,
             "e_count": e_count,
             "total_with_scores": total_with_scores,
@@ -983,31 +994,10 @@ class PrimaryHODDashboardView(RoleRequiredMixin, TemplateView):
 
         # 8. Class Attendance Today  real data from AttendanceEntry
         class_att = []
-        class_active_counts = dict(
-            Student.objects.filter(class_name__in=dept_classes, status=StudentStatus.ACTIVE)
-            .values('class_name')
-            .annotate(cnt=Count('id'))
-            .values_list('class_name', 'cnt')
-        )
-        class_present_counts = dict(
-            AttendanceEntry.objects.filter(date=today, student__class_name__in=dept_classes, status__in=PRESENT_STATUSES)
-            .values('student__class_name')
-            .annotate(cnt=Count('id'))
-            .values_list('student__class_name', 'cnt')
-        )
-        class_late_counts = dict(
-            AttendanceEntry.objects.filter(date=today, student__class_name__in=dept_classes, status=AttendanceStatus.LATE)
-            .values('student__class_name')
-            .annotate(cnt=Count('id'))
-            .values_list('student__class_name', 'cnt')
-        )
+        class_att_today = _class_attendance_today(today, dept_classes)
         for c in dept_classes:
-            total = class_active_counts.get(c, 0)
+            _, total, pct = class_att_today.get(c, (0, 0, 0))
             if total > 0:
-                present = class_present_counts.get(c, 0)
-                late = class_late_counts.get(c, 0)
-                checked_in = present + late
-                pct = round((checked_in / total) * 100)
                 status = "green" if pct >= 90 else ("amber" if pct >= 80 else "red")
                 class_att.append({"name": c, "pct": pct, "status": status})
         ctx["class_attendance"] = class_att[:5]
@@ -1197,31 +1187,10 @@ class ECDHODDashboardView(RoleRequiredMixin, TemplateView):
         
         # 4. Attendance  real data from AttendanceEntry
         class_att = []
-        class_active_counts = dict(
-            Student.objects.filter(class_name__in=ecd_classes, status=StudentStatus.ACTIVE)
-            .values('class_name')
-            .annotate(cnt=Count('id'))
-            .values_list('class_name', 'cnt')
-        )
-        class_present_counts = dict(
-            AttendanceEntry.objects.filter(date=today, student__class_name__in=ecd_classes, status__in=PRESENT_STATUSES)
-            .values('student__class_name')
-            .annotate(cnt=Count('id'))
-            .values_list('student__class_name', 'cnt')
-        )
-        class_late_counts = dict(
-            AttendanceEntry.objects.filter(date=today, student__class_name__in=ecd_classes, status=AttendanceStatus.LATE)
-            .values('student__class_name')
-            .annotate(cnt=Count('id'))
-            .values_list('student__class_name', 'cnt')
-        )
+        class_att_today = _class_attendance_today(today, ecd_classes)
         for c in ecd_classes:
-            total = class_active_counts.get(c, 0)
+            _, total, pct = class_att_today.get(c, (0, 0, 0))
             if total > 0:
-                present = class_present_counts.get(c, 0)
-                late = class_late_counts.get(c, 0)
-                checked_in = present + late
-                pct = round((checked_in / total) * 100)
                 status = "green" if pct >= 90 else ("amber" if pct >= 80 else "red")
                 class_att.append({"name": c, "pct": pct, "status": status})
         ctx["class_attendance"] = class_att[:5]
@@ -1515,18 +1484,12 @@ class TeacherDashboardView(RoleRequiredMixin, TemplateView):
                 .annotate(cnt=Count('id'))
                 .values_list('student__class_name', 'cnt')
             )
-            cls_present_counts = dict(
-                AttendanceEntry.objects.filter(date=today, student__class_name__in=att_classes, status__in=PRESENT_STATUSES)
-                .values('student__class_name')
-                .annotate(cnt=Count('id'))
-                .values_list('student__class_name', 'cnt')
-            )
+            cls_att_today = _class_attendance_today(today, att_classes)
             for cls_name in att_classes:
                 cls_total = cls_totals.get(cls_name, 0)
                 cls_marked = cls_marked_counts.get(cls_name, 0)
-                cls_present = cls_present_counts.get(cls_name, 0)
+                cls_present, _, cls_pct = cls_att_today.get(cls_name, (0, 0, 0))
                 is_marked = cls_marked > 0
-                cls_pct = round((cls_present / cls_total * 100)) if cls_total > 0 else 0
                 class_attendance_status.append({
                     "class_name": cls_name,
                     "total": cls_total,

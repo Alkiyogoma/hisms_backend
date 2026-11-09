@@ -12,6 +12,8 @@ from django.utils import timezone
 
 import academics.tests  # noqa: F401  (applies the SQLite teardown shim)
 from academics import performance
+from academics.grading_utils import clear_pass_mark_cache
+from core.models import SchoolSettings
 from academics.models import (
     AcademicYear, Department, ExamScore, ExamTypeConfiguration, GradeClass,
     ScoreStatus, Subject, Term,
@@ -25,8 +27,19 @@ URL = reverse("academics:performance_report")
 
 
 class PerformanceReportTests(TestCase):
+    # These fixtures exercise all four bands (critical / requires support /
+    # pass / strong), which only exist while the pass mark sits above grade E,
+    # so they pin it to 60. The school default (50) is covered in
+    # academics/test_pass_mark.py.
+    PASS_MARK = 60
+
+    def setUp(self):
+        clear_pass_mark_cache()
+        self.addCleanup(clear_pass_mark_cache)
+
     @classmethod
     def setUpTestData(cls):
+        SchoolSettings.objects.update_or_create(pk=1, defaults={"pass_mark": cls.PASS_MARK})
         today = timezone.localdate()
         cls.old_year = AcademicYear.objects.create(name="2025/2026")
         cls.year = AcademicYear.objects.create(name="2026/2027", is_current=True)

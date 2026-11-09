@@ -84,11 +84,11 @@
       </div>
       <div style="text-align:center">
         <div style="font-size:20px;font-weight:700;font-family:var(--font-mono);color:#1B7B34">{{ pass_rate }}%</div>
-        <div style="font-size:9.5px;font-weight:600;color:#8492A6;margin-top:1px">Pass rate (C+) &middot; {{ total_with_scores }} students</div>
+        <div style="font-size:9.5px;font-weight:600;color:#8492A6;margin-top:1px">Pass rate ({{ pass_mark }}%+) &middot; {{ total_with_scores }} students</div>
       </div>
       <div style="text-align:center">
         <div style="font-size:20px;font-weight:700;font-family:var(--font-mono);color:#D97706">{{ d_count }}</div>
-        <div style="font-size:9.5px;font-weight:600;color:#8492A6;margin-top:1px">At grade D &middot; flagged</div>
+        <div style="font-size:9.5px;font-weight:600;color:#8492A6;margin-top:1px">At grade D</div>
       </div>
       <div style="text-align:center">
         <div style="font-size:20px;font-weight:700;font-family:var(--font-mono);color:#DC2626">{{ e_count }}</div>
@@ -96,7 +96,7 @@
       </div>
       <div style="text-align:center">
         <div style="font-size:20px;font-weight:700;font-family:var(--font-mono);color:#9B1C1C">{{ flagged_class_count }}</div>
-        <div style="font-size:9.5px;font-weight:600;color:#8492A6;margin-top:1px">Classes below C &middot; attention</div>
+        <div style="font-size:9.5px;font-weight:600;color:#8492A6;margin-top:1px">Classes below pass &middot; attention</div>
       </div>
     </div>
   </div>
@@ -257,9 +257,9 @@
         <div class="trow-name">{{ cls.name }}</div>
       </div>
       <span class="trow-right">
-        <span class="status-dot {% if cls.avg >= 70 %}dot-green{% elif cls.avg >= 60 %}dot-amber{% else %}dot-red{% endif %}"></span>
-        <span class="trow-val {% if cls.avg >= 70 %}t-green{% elif cls.avg >= 60 %}t-gold{% else %}t-red{% endif %}">{{ cls.avg }}%</span>
-        <span class="chip {% if cls.avg >= 70 %}chip-green{% elif cls.avg >= 60 %}chip-amber{% else %}chip-red{% endif %}" style="font-size:10px;margin-left:6px">{{ cls.grade }}</span>
+        <span class="status-dot {% if cls.avg >= 70 %}dot-green{% elif not cls.flagged %}dot-amber{% else %}dot-red{% endif %}"></span>
+        <span class="trow-val {% if cls.avg >= 70 %}t-green{% elif not cls.flagged %}t-gold{% else %}t-red{% endif %}">{{ cls.avg }}%</span>
+        <span class="chip {% if cls.avg >= 70 %}chip-green{% elif not cls.flagged %}chip-amber{% else %}chip-red{% endif %}" style="font-size:10px;margin-left:6px">{{ cls.grade }}</span>
       </span>
     </div>
     {% empty %}

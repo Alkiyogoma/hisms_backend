@@ -34,20 +34,73 @@ def get_full_grade_display(score: float | Decimal) -> str:
         return "N/A"
     return f"{label} ({grade})"
 
+# ---------------------------------------------------------------------------
+# Pass mark: the one place every pass/fail decision reads from.
+# ---------------------------------------------------------------------------
+
+DEFAULT_PASS_MARK = 50     # used when School Settings has no row yet
+CRITICAL_MARK = 50         # grade E: below this is critical
+PASS_MARK_CACHE_KEY = "academics:pass_mark"
+_LOCAL_TTL = 10            # seconds; band checks call this once per result
+_local = {"value": None, "expires": 0.0}
+
+
+def get_pass_mark() -> float:
+    """The school pass mark (%), set on the School Settings page
+    (``SchoolSettings.pass_mark``). Cached in-process for a few seconds and in
+    the shared cache for five minutes; saving the settings clears both here
+    (other workers pick the change up within seconds)."""
+    import time
+    now = time.monotonic()
+    if _local["value"] is not None and now < _local["expires"]:
+        return _local["value"]
+    from django.core.cache import cache
+    value = cache.get(PASS_MARK_CACHE_KEY)
+    if value is None:
+        from django.db import DatabaseError
+        try:
+            from core.models import SchoolSettings
+            value = SchoolSettings.objects.filter(pk=1).values_list("pass_mark", flat=True).first()
+        except DatabaseError:
+            value = None
+        if value is None:
+            value = DEFAULT_PASS_MARK
+        cache.set(PASS_MARK_CACHE_KEY, value, 300)
+    _local.update(value=float(value), expires=now + _LOCAL_TTL)
+    return float(value)
+
+
+def clear_pass_mark_cache() -> None:
+    from django.core.cache import cache
+    _local.update(value=None, expires=0.0)
+    cache.delete(PASS_MARK_CACHE_KEY)
+
+
 def is_pass(score: float | Decimal) -> bool:
     if score is None:
         return False
-    return float(score) >= 60
+    return float(score) >= get_pass_mark()
 
 def is_at_risk(score: float | Decimal) -> bool:
+    """Below the pass mark."""
     if score is None:
         return False
-    return float(score) < 60
+    return float(score) < get_pass_mark()
 
 def is_critical(score: float | Decimal) -> bool:
     if score is None:
         return False
-    return float(score) < 50
+    return float(score) < CRITICAL_MARK
+
+
+GRADE_LOWER_BOUNDS = (("A+", 90), ("A", 80), ("B", 70), ("C", 60), ("D", 50), ("E", 0))
+
+
+def pass_grade() -> str:
+    """The lowest grade that passes at the current pass mark (e.g. "D" at 50%)."""
+    pm = get_pass_mark()
+    passing = [g for g, low in GRADE_LOWER_BOUNDS if low >= pm]
+    return passing[-1] if passing else "A+"
 
 
 # ---------------------------------------------------------------------------

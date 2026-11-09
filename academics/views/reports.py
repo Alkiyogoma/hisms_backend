@@ -65,7 +65,7 @@ from academics.approval_policy import AllowedRolesEnforcedMixin
 from core.teacher_context import get_teacher_assigned_classes, get_teacher_assigned_classes_from_tca, is_ecd_teacher
 from academics.grading_utils import (
     compute_grade_with_gaps, get_grade_from_score, get_grade_label, get_full_grade_display,
-    is_pass, is_at_risk, is_critical
+    is_pass, is_at_risk, is_critical, get_pass_mark
 )
 
 
@@ -1070,6 +1070,7 @@ class AtRiskStudentsListView(RoleRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        ctx["pass_mark"] = int(get_pass_mark())
         from django.db.models import Q
         from academics.models import Department, GradeClass
 
@@ -1106,7 +1107,7 @@ class AtRiskStudentsListView(RoleRequiredMixin, TemplateView):
                         continue
                     avg_rating = total_val / count
                     avg_pct = avg_rating / 4.0 * 100.0
-                    if avg_pct < 60:  # At-risk threshold
+                    if is_at_risk(avg_pct):  # below the pass mark
                         student = rc.student  # Already fetched via select_related
                         student.avg = round(avg_pct, 1)
                         student.grade = get_grade_from_score(student.avg)

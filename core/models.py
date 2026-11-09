@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 
@@ -166,7 +167,12 @@ class SchoolSettings(TimeStampedModel):
     sms_sender_id = models.CharField(max_length=20, default="HODARI")
     
     # Academic
-    pass_mark = models.PositiveIntegerField(default=50)
+    pass_mark = models.PositiveIntegerField(
+        default=50,
+        validators=[MinValueValidator(1), MaxValueValidator(100)],
+        help_text="Average % at or above which a student passes. Used by report cards, "
+                  "progress reports, the PTC module, dashboards and performance reports.",
+    )
     enable_auto_report_generation = models.BooleanField(default=False)
 
     # Email (SMTP) is configured in the server's .env (see config/settings.py), not here.
@@ -285,6 +291,11 @@ class SchoolSettings(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"Settings for {self.school_name}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        from academics.grading_utils import clear_pass_mark_cache
+        clear_pass_mark_cache()
 
     @classmethod
     def get_settings(cls):

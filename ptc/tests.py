@@ -729,3 +729,49 @@ class ModelConstraintTests(TestCase):
         window = PTCWindow(academic_year=ay, term_slot="term_2", ptc_date=date(2025, 11, 15))
         with self.assertRaises(Exception):
             window.clean()
+
+
+class PTCAverageIgnoresUnmarkedSubjectsTests(TestCase):
+    """A student with 55% in every marked subject averages 55% and meets
+    expectations: remark-only and not-yet-marked subjects are left out."""
+
+    def test_remark_and_unmarked_subjects_do_not_count_as_zero(self):
+        from datetime import timedelta
+        from decimal import Decimal
+        from django.utils import timezone
+        from academics.grading_utils import clear_pass_mark_cache
+        from academics.models import (
+            AcademicYear, AssessmentMode, Department, ExamScore, ExamTypeConfiguration,
+            GradeClass, ScoreStatus, Subject, Term,
+        )
+        from students.models import Student, StudentStatus
+        from users.models import User, UserRole
+        from ptc.services import get_academic_performance_grid
+
+        clear_pass_mark_cache()
+        self.addCleanup(clear_pass_mark_cache)
+        today = timezone.localdate()
+        year = AcademicYear.objects.create(name="2030/2031", is_current=True)
+        term = Term.objects.create(academic_year=year, name="Term 1",
+                                   start_date=today - timedelta(days=10), end_date=today + timedelta(days=60))
+        for code, w in (("quiz", 20), ("mid_term", 30), ("end_of_term", 50)):
+            ExamTypeConfiguration.objects.update_or_create(
+                code=code, defaults={"name": code, "weight_percentage": Decimal(w),
+                                     "max_score": Decimal(100), "is_active": True})
+        gc = GradeClass.objects.create(name="Grade 3", department=Department.PRIMARY, sort_order=99)
+        for i, (name, mode) in enumerate((("MathsX", AssessmentMode.MARKS), ("EnglishX", AssessmentMode.MARKS),
+                                          ("ArtX", AssessmentMode.REMARK), ("ScienceX", AssessmentMode.MARKS))):
+            Subject.objects.create(name=name, code=f"PX{i}", department=Department.PRIMARY,
+                                   assessment_mode=mode).classes.add(gc)
+        student = Student.objects.create(admission_no="PX1", first_name="Pat", last_name="X", class_name="Grade 3",
+                                         academic_year=year, status=StudentStatus.ACTIVE)
+        user = User.objects.create_user(username="px", email="px@example.test", password="x", role=UserRole.HEAD_OF_SCHOOL)
+        for subj in ("MathsX", "EnglishX"):  # ScienceX has no marks yet
+            for et in ("quiz", "mid_term", "end_of_term"):
+                ExamScore.objects.create(student=student, term=term, subject_name=subj, exam_type=et,
+                                         score=Decimal(55), entered_by=user, status=ScoreStatus.APPROVED)
+        grid = get_academic_performance_grid(student, year)
+        self.assertNotIn("ArtX", grid["subjects"])
+        t = grid["terms"][0]
+        self.assertIsNone(t["subjects"]["ScienceX"]["weighted_avg"])
+        self.assertEqual((t["overall_average"], t["meets_expectations"]), (55.0, "Yes"))

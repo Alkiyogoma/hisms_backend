@@ -46,6 +46,7 @@
   .meta b { font-size:9.5pt; font-weight:600; }
 
   .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:14px; }
+  .kpis.three { grid-template-columns:repeat(3,1fr); }
   .kpi { border:1px solid var(--border); border-radius:6px; padding:8px 10px; }
   .kpi span { display:block; font-size:7pt; letter-spacing:.8px; text-transform:uppercase; color:var(--text-muted); font-weight:700; }
   .kpi b { display:block; font-size:17pt; line-height:1.15; margin-top:3px; }
@@ -107,7 +108,7 @@
     table.t, table.heat { font-size:8.4pt; }
   }
   @media screen and (max-width:700px) {
-    .sheet { padding:16px; } .meta, .kpis { grid-template-columns:repeat(2,1fr); }
+    .sheet { padding:16px; } .meta, .kpis, .kpis.three { grid-template-columns:repeat(2,1fr); }
     .meta div:nth-child(4n) { border-right:1px solid var(--border); } .meta div:nth-child(2n) { border-right:none; }
     .two { grid-template-columns:1fr; }
   }
@@ -141,10 +142,10 @@
     <div><span>Generated</span><b>{{ generated_at|date:"j M Y, H:i" }}</b></div>
   </div>
 
-  <div class="kpis">
+  <div class="kpis{% if not has_support_band %} three{% endif %}">
     <div class="kpi avg"><span>Average result</span><b>{% if summary.average is not None %}{{ summary.average }}%{% else %}—{% endif %}</b><small>mean of {{ summary.count }} result{{ summary.count|pluralize }} from {{ summary.learners }} student{{ summary.learners|pluralize }}{% if summary.average_grade %} &middot; grade {{ summary.average_grade }}{% endif %}</small></div>
     <div class="kpi pass"><span>Pass rate &middot; results</span><b>{% if summary.pass_rate is not None %}{{ summary.pass_rate }}%{% else %}—{% endif %}</b><small>{{ summary.passed }} of {{ summary.count }} results at {{ pass_mark }}%+</small></div>
-    <div class="kpi supp"><span>Results at D</span><b>{{ summary.flagged }}</b><small>{{ critical_mark }}&ndash;{{ pass_mark|add:-1 }}%, from {{ summary.flagged_learners }} student{{ summary.flagged_learners|pluralize }}</small></div>
+    {% if has_support_band %}<div class="kpi supp"><span>Requires support</span><b>{{ summary.flagged }}</b><small>{{ critical_mark }}&ndash;{{ pass_mark|add:-1 }}%, from {{ summary.flagged_learners }} student{{ summary.flagged_learners|pluralize }}</small></div>{% endif %}
     <div class="kpi crit"><span>Results at E</span><b>{{ summary.critical }}</b><small>below {{ critical_mark }}%, from {{ summary.critical_learners }} student{{ summary.critical_learners|pluralize }}</small></div>
   </div>
   <p class="lead">A result is one student&rsquo;s mark in one subject.</p>
@@ -217,8 +218,8 @@
     </table>
     <div class="legend">
       <span><i class="f-critical"></i>Below {{ critical_mark }}% (E)</span>
-      <span><i class="f-support"></i>{{ critical_mark }}&ndash;{{ pass_mark|add:-1 }}% (D)</span>
-      <span><i class="f-pass"></i>{{ pass_mark }}&ndash;{{ strong_mark|add:-1 }}% (C)</span>
+      {% if has_support_band %}<span><i class="f-support"></i>{{ critical_mark }}&ndash;{{ pass_mark|add:-1 }}% (requires support)</span>{% endif %}
+      <span><i class="f-pass"></i>{{ pass_mark }}&ndash;{{ strong_mark|add:-1 }}% ({{ pass_band_grades }})</span>
       <span><i class="f-strong"></i>{{ strong_mark }}%+ (B and above)</span>
     </div>
     {% endif %}
@@ -261,7 +262,7 @@
       <li>Only marks that have been entered <b>and approved</b> are included. Assessments not yet marked are left out, never counted as zero.</li>
       {% if not selected_type %}<li>Weighted averages use the configured assessment weights, rescaled over the assessments marked so far.</li>{% endif %}
       {% if not selected_term %}<li>With all terms selected, each mark is the average of the student's term results.</li>{% endif %}
-      <li>Pass mark {{ pass_mark }}% (grade C). Requires support: {{ critical_mark }}&ndash;{{ pass_mark|add:-1 }}% (D). Critical: below {{ critical_mark }}% (E). The marker on each bar is the pass mark.</li>
+      <li>Pass mark {{ pass_mark }}% (grade {{ pass_grade }}).{% if has_support_band %} Requires support: {{ critical_mark }}&ndash;{{ pass_mark|add:-1 }}%.{% endif %} Critical: below {{ critical_mark }}% (E). The marker on each bar is the pass mark.</li>
       <li>Scope: {{ scope.label }} &mdash; limited to what the preparer's role allows.</li>
     </ul>
   </div>
