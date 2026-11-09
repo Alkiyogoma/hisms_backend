@@ -22,7 +22,7 @@ class LearnerReportView(StudentDetailView):
         term_param = self.request.GET.get("term", "")
         term = next((t for t in terms if str(t.pk) == term_param), None) \
             or performance.default_learner_term(student, terms)
-        ctx.update(build_learner_report(student, term))
+        ctx.update(build_learner_report(student, term, terms=terms))
         # The term's report card adds its general traits and class teacher
         # remark, for staff who may see report cards.
         if term and self.request.user.has_perm("academics.view_reportcard"):
@@ -58,21 +58,29 @@ class LearnerReportView(StudentDetailView):
 _COLUMN_LABELS = {"quiz": "Quiz", "mid_term": "Mid-Term", "end_of_term": "End of Term"}
 
 
-def build_learner_report(student, term):
+def build_learner_report(student, term, shared=None, terms=None):
     """Everything the official progress report / report card shows for one
     learner and term: approved results, class comparison, attendance and
-    progress across terms. Shared by the progress report and the report card."""
+    progress across terms. Shared by the progress report and the report card.
+    ``shared`` (a dict) keeps class-wide figures when a class prints together."""
     from academics import performance
     from academics.grading_utils import get_grade_label
     from academics.score_progress import exam_summary
-    from academics.views.reports import _photo_data_uri, _remark_rows
+    from academics.remarks import remark_subject_names
+    from academics.score_progress import expected_subjects_for_class
+    from academics.views.reports import _photo_data_uri, _remark_rows, _shared
     from attendance import analytics
 
-    record = performance.learner_record(student, term)
+    record = performance.learner_record(student, term, shared=shared, terms=terms)
     # Same rule as the printed report card: a subject's mark and grade only
     # once all its assessments are approved; the overall average, grade,
     # position and trend only once every mark-bearing subject is.
-    exam = exam_summary(student, term) if term else None
+    # Class-wide lookups, once per class when a class prints together.
+    expected = _shared(shared, ("expected_subjects", student.class_name),
+                       lambda: expected_subjects_for_class(student.class_name))
+    remark_names = _shared(shared, ("remark_subject_names",), remark_subject_names)
+    exam = exam_summary(student, term, expected_subjects=expected,
+                        types=performance.active_exam_types(shared), remark_names=remark_names) if term else None
     done = {r["subject"] for r in exam["rows"] if r["complete"]} if exam else set()
     for r in record["subjects"]:
         r["awaiting"] = r["subject"] not in done
@@ -89,12 +97,18 @@ def build_learner_report(student, term):
         columns = [f"{_COLUMN_LABELS.get(t.code, t.name)} ({t.weight_percentage:.0f})" for t in exam["types"]]
         academic_rows = [{**r, "class_average": class_avgs.get(r["subject"])} for r in exam["rows"]]
 
-    start, end = analytics.term_range(term)
-    attendance = analytics.learner_attendance(student, start, end)
+    if shared is not None and "attendance_period" in shared:
+        attendance = analytics.attendance_summary(shared["attendance_period"],
+                                                  shared["attendance_rows"].get(student.pk))
+    else:
+        start, end = analytics.term_range(term)
+        attendance = analytics.learner_attendance(student, start, end)
     class_name = record.get("class_name") or student.class_name
+    from academics.class_position import learner_positions
     return {
+        "positions": learner_positions(student, term, class_name, shared=shared),
         "student": student,
-        "remark_rows": _remark_rows(student, term) if term else [],
+        "remark_rows": _remark_rows(student, term, expected, remark_names) if term else [],
         "photo_src": _photo_data_uri(student),
         "photo_checked": True,
         "exam": exam,
@@ -106,7 +120,7 @@ def build_learner_report(student, term):
         "grade_label": get_grade_label(record["grade"]) if record["grade"] else "",
         "attendance": attendance,
         "class_name": class_name,
-        "class_teacher": analytics.class_teachers().get(class_name, ""),
+        "class_teacher": _shared(shared, ("class_teachers",), analytics.class_teachers).get(class_name, ""),
         "pass_mark": int(performance.PASS_MARK),
         "generated_at": timezone.localtime(),
         "scale": [("A*", "90–100", "Outstanding"), ("A", "80–89", "High"), ("B", "70–79", "Good"),

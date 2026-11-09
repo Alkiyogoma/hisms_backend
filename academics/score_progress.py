@@ -182,7 +182,7 @@ def report_grade(mark):
     return ("A*" if grade == "A+" else grade), get_grade_label(grade)
 
 
-def exam_summary(student, term, expected_subjects=None):
+def exam_summary(student, term, expected_subjects=None, types=None, remark_names=None):
     """
     The marks table of a learner's progress report, from approved scores of
     mark-bearing subjects only. Remark-only subjects never count.
@@ -196,9 +196,12 @@ def exam_summary(student, term, expected_subjects=None):
     from academics.models import ExamTypeConfiguration
     from academics.remarks import remark_subject_names
 
-    types = list(ExamTypeConfiguration.objects.filter(is_active=True).order_by("display_order", "name"))
+    if types is None:
+        types = list(ExamTypeConfiguration.objects.filter(is_active=True).order_by("display_order", "name"))
     if expected_subjects is None:
         expected_subjects = expected_subjects_for_class(student.class_name)
+    if remark_names is None:
+        remark_names = remark_subject_names()
 
     points = {}
     for subject, code, score, max_score in ExamScore.objects.filter(
@@ -232,7 +235,7 @@ def exam_summary(student, term, expected_subjects=None):
                      "running": running,
                      "running_grade": report_grade(running)[0] if running is not None else None})
 
-    mark_subjects = (set(expected_subjects) | set(points)) - remark_subject_names()
+    mark_subjects = (set(expected_subjects) | set(points)) - remark_names
     assessed = sum(1 for r in rows if r["complete"])
     summary = {
         "types": types,

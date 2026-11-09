@@ -167,9 +167,13 @@ class PTCStudentPickerView(RoleRequiredMixin, TemplateView):
             comment_counts = dict(comment_rows)
 
         # Get total core subjects count per student (to verify all comments entered)
+        # Core subjects depend only on the class: look them up once per class.
+        core_by_class = {}
         core_subject_counts = {}
         for s in students:
-            core_subject_counts[s.id] = len(get_core_subjects_for_student(s))
+            if s.class_name not in core_by_class:
+                core_by_class[s.class_name] = len(get_core_subjects_for_student(s))
+            core_subject_counts[s.id] = core_by_class[s.class_name]
 
         # Determine completion per student
         student_completion = {}
@@ -355,15 +359,17 @@ class PTCScreenView(RoleRequiredMixin, TemplateView):
         ctx["core_subjects"] = get_core_subjects_for_student(student)
 
         # 5. Enrichment Grades
-        enrichment_subjects = EnrichmentSubject.objects.filter(is_active=True)
-        enrichment_grades = {}
+        enrichment_subjects = list(EnrichmentSubject.objects.filter(is_active=True).select_related("subject"))
         terms = list(academic_year.terms.all()) if academic_year else []
-        for es in enrichment_subjects:
-            enrichment_grades[es.subject.name] = {}
-            for term in terms:
-                enrichment_grades[es.subject.name][term.name] = EnrichmentGrade.objects.filter(
-                    student=student, enrichment_subject=es, term=term
-                ).first()
+        # Every grade of this learner in one query, not one per subject and term.
+        grades = {}
+        for g in EnrichmentGrade.objects.filter(
+                student=student, enrichment_subject__in=enrichment_subjects, term__in=terms).order_by("-pk"):
+            grades[(g.enrichment_subject_id, g.term_id)] = g  # first() kept the lowest pk
+        enrichment_grades = {
+            es.subject.name: {term.name: grades.get((es.pk, term.pk)) for term in terms}
+            for es in enrichment_subjects
+        }
         ctx["enrichment_subjects"] = enrichment_subjects
         ctx["enrichment_grades"] = enrichment_grades
         ctx["enrichment_terms"] = terms
