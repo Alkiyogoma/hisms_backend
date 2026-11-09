@@ -958,6 +958,14 @@ class ReportCard(TimeStampedModel):
     )
     ecd_hod_approved_at = models.DateTimeField(null=True, blank=True)
 
+    # Last time a reviewer returned the report for correction, so the teacher
+    # sees what to fix. Cleared when the teacher submits it again.
+    return_reason = models.TextField(blank=True)
+    returned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="reports_returned"
+    )
+    returned_at = models.DateTimeField(null=True, blank=True)
+
     # Overall computed fields (populated on generation)
     overall_average = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     teacher_comments = models.TextField(blank=True)
@@ -1143,7 +1151,7 @@ class ECDSection(TimeStampedModel):
         TABLE = "table", "Rated list"
         STRIP = "strip", "Subject points row"
         MARKS = "marks", "Marks out of 100"
-        VERSE = "verse", "Bible memory row"
+        VERSE = "verse", "Bible memory verses"
 
     class_type = models.CharField(max_length=20, choices=ECDClassType.choices)
     part = models.CharField(max_length=10, choices=Part.choices)

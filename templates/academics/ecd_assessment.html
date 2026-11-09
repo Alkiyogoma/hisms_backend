@@ -53,6 +53,10 @@
 
   .ee-banner { margin-top: 12px; padding: 10px 14px; border-radius: 8px; font-size: 12.5px; }
   .ee-banner.lock { background: var(--red-bg); border: 1px solid var(--red-bd); color: var(--red); }
+  .ee-banner.approved { background: var(--green-bg); border: 1px solid var(--green-bd); color: var(--green); font-weight: 600; }
+  .ee-banner.returned { background: var(--amber-bg); border: 1px solid var(--amber-bd); color: #7C4A03; }
+  .ee-banner.returned b { display: block; margin-bottom: 4px; }
+  .ee-banner.returned p { white-space: pre-line; color: var(--text-primary); }
   .ee-banner.welfare { background: var(--amber-bg); border: 1px solid var(--amber-bd); color: var(--amber); }
 
   .ee-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 10px; margin: 16px 0; }
@@ -187,6 +191,8 @@
           </div>
         </div>
         <div class="ee-banner lock" id="eeLock" hidden>This report has been submitted and is locked. Ask the HOD if it needs a correction.</div>
+        <div class="ee-banner approved" id="eeApproved" role="status" hidden></div>
+        <div class="ee-banner returned" id="eeReturned" role="status" hidden><b id="eeReturnedHead"></b><p id="eeReturnedText"></p></div>
         <div class="ee-banner welfare" id="eeWelfare" hidden></div>
 
         <div class="ee-summary">
@@ -257,6 +263,7 @@
   var CLASS_LABEL = '{{ ecd_class_name|escapejs }} · {{ current_term.name|escapejs }}';
   var WELFARE = JSON.parse(document.getElementById('ee-welfare').textContent);
   var STATUS = { draft: ['Draft', 'chip-amber'], pending_sign_off: ['Submitted', 'chip-green'], published: ['Published', 'chip-blue'] };
+  var APPROVED = ['Approved', 'chip-green'], RETURNED = ['Returned', 'chip-red'];
 
   var $ = function (id) { return document.getElementById(id); };
   var form = $('eeForm'), students = [], current = null, locked = false, pending = {}, timer = null, saving = null;
@@ -271,7 +278,9 @@
 
   // ── learners ──
   function chip(s) {
+    if (s.status === 'pending_sign_off' && s.approved) return APPROVED;
     if (s.status && STATUS[s.status] && s.status !== 'draft') return STATUS[s.status];
+    if (s.returned) return RETURNED;
     if (!s.total) return ['—', 'chip-grey'];
     return s.rated >= s.total ? ['Rated', 'chip-blue'] : [s.rated + '/' + s.total, s.rated ? 'chip-amber' : 'chip-grey'];
   }
@@ -339,8 +348,23 @@
       if (d.report_card_id) $('eePreview').href = '/academics/reports/' + d.report_card_id + '/preview/';
     }
     var s = STATUS[d.status] || ['No report', 'chip-grey'];
+    if (d.status === 'pending_sign_off' && d.approval) s = APPROVED;
+    else if (d.status === 'draft' && d.returned) s = RETURNED;
     $('eeStatus').textContent = s[0]; $('eeStatus').className = 'chip ' + s[1];
-    if (current) { current.rated = d.rated; current.total = d.total; current.status = d.status; renderList(); }
+    var a = d.approval;
+    $('eeApproved').hidden = !a;
+    if (a) $('eeApproved').textContent = (a.stage === 'published' ? '\u2713 Signed off and published by ' : '\u2713 Approved by the HOD: ')
+      + a.by + (a.at ? ' on ' + a.at : '') + (a.stage === 'hod' ? '. Waiting for the Head of School to publish it.' : '.');
+    var r = d.returned;
+    $('eeReturned').hidden = !r;
+    if (r) {
+      $('eeReturnedHead').textContent = 'Returned for correction by ' + (r.by || 'the HOD') + ' on ' + r.at;
+      $('eeReturnedText').textContent = r.reason ? 'HOD comment: ' + r.reason : 'No comment was given.';
+    }
+    if (current) {
+      current.rated = d.rated; current.total = d.total; current.status = d.status;
+      current.approved = !!(a && a.stage === 'hod'); current.returned = !!r; renderList();
+    }
   }
   function setLocked(on) {
     locked = on || READ_ONLY;

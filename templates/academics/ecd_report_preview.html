@@ -24,7 +24,6 @@
     .ecd-sheet { max-width: 210mm; margin: 0 auto; background: #fff; padding: 12mm 14mm; box-shadow: 0 6px 30px rgba(15,35,95,.12); border-radius: 6px;
       font-family: var(--font-doc); font-size: 11.5pt; }
     .report-container + .report-container { margin-top: 24px; break-before: page; page-break-before: always; }
-    .accent-blue { --accent: #9BDCF3; }
 
     .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
     .header-left { display: flex; gap: 14px; align-items: center; }
@@ -48,32 +47,39 @@
     .ecd-h3 { font-size: 11.5pt; font-weight: 700; text-transform: uppercase; margin: 12px 0 4px; }
     .ecd-legacy-note { font-size: 9.5pt; color: var(--muted); margin-bottom: 6px; text-align: center; }
 
-    .ecd-key { border-collapse: collapse; width: 100%; margin-bottom: 10px; font-size: 10.5pt; }
+    .ecd-key { border-collapse: collapse; width: 100%; margin-bottom: 10px; font-size: 10.5pt; table-layout: fixed; }
     .ecd-key th, .ecd-key td { border: 1px solid var(--line); padding: 3px 6px; background: var(--accent); }
-    .ecd-key th { background: #fff; font-weight: 700; width: 1%; white-space: nowrap; }
+    .ecd-key th { background: #fff; font-weight: 700; width: 46px; white-space: nowrap; }
 
-    table.ecd-table, table.ecd-strip, table.ecd-overall { border-collapse: collapse; width: 100%; font-size: 10.5pt; margin-bottom: 8px; }
+    table.ecd-table, table.ecd-strip, table.ecd-overall { border-collapse: collapse; width: 100%; font-size: 10.5pt; margin-bottom: 8px; table-layout: fixed; }
     .ecd-table th, .ecd-table td, .ecd-strip th, .ecd-strip td, .ecd-overall th, .ecd-overall td { border: 1px solid var(--line); padding: 3px 6px; text-align: left; vertical-align: top; }
     .ecd-table th { background: var(--navy); color: #fff; font-weight: 700; text-transform: uppercase; }
-    .ecd-table th.ecd-val-h { width: 62px; text-transform: none; font-weight: 500; text-align: center; }
-    .ecd-val { width: 62px; text-align: center; font-weight: 700; background: var(--accent); }
+    .ecd-table th.ecd-val-h { width: 72px; text-transform: none; font-weight: 500; text-align: center; padding: 3px 2px; }
+    .ecd-val { width: 72px; text-align: center; font-weight: 700; background: var(--accent); }
+    .ecd-table td, .ecd-table th { overflow-wrap: anywhere; }
     .ecd-strip, .ecd-overall { table-layout: fixed; }
-    .ecd-strip th { background: #fff; font-weight: 700; }
-    .ecd-strip td.ecd-val { min-width: 48px; }
-    .ecd-verse th { text-transform: none; }
+    .ecd-strip th { background: #fff; font-weight: 700; overflow-wrap: anywhere; }
+    .ecd-strip td.ecd-val { width: auto; }
     .ecd-verse-text { font-weight: 700; }
     /* The two columns sit flush, sharing one border, as in the school's template. */
-    .ecd-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0; align-items: start; }
+    /* Both columns are the same width and end on the same line: the last
+       table in the shorter column stretches down to meet the other. */
+    .ecd-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0; align-items: stretch; margin-bottom: 8px; }
+    .ecd-cols > div { display: flex; flex-direction: column; min-width: 0; }
+    .ecd-cols > div > table:last-child { flex: 1 1 auto; margin-bottom: 0; }
     .ecd-cols > div + div { margin-left: -1px; }
     .ecd-overall th { font-weight: 700; background: #fff; }
     .ecd-overall td { height: 24px; font-weight: 700; }
 
     .ecd-footer { margin-top: 10px; break-inside: avoid; page-break-inside: avoid; }
-    .ecd-comment { min-height: 60px; border-bottom: 1px solid #999; padding: 2px 0 8px; font-style: italic; white-space: pre-line; }
+    .ecd-comment { min-height: 60px; border-bottom: 1px solid #999; padding: 2px 0 8px; font-style: normal; white-space: pre-line; }
     .ecd-foot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; margin-top: 12px; }
     .ecd-sig { display: flex; align-items: flex-end; gap: 6px; }
     .ecd-sig span { flex: 1; border-bottom: 1px solid #000; min-height: 20px; }
     .ecd-sig-wide { grid-column: 1 / -1; max-width: 70%; }
+    .ecd-approval { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 10px; }
+    .ecd-approved { display: inline-block; font-family: var(--font-ui); font-size: 9pt; font-weight: 700; color: #1B7B34;
+      border: 1.5px solid #1B7B34; border-radius: 4px; padding: 2px 8px; }
     .ecd-stamp { font-family: var(--font-ui); font-size: 9pt; color: var(--hodari-blue); font-weight: 700; font-style: normal; }
 
     .ecd-part, .ecd-table, .ecd-strip, .ecd-overall { break-inside: avoid; page-break-inside: avoid; }
@@ -84,7 +90,8 @@
       .ecd-sheet { padding: 16px 12px; }
       .ecd-cols, .ecd-foot-grid { grid-template-columns: 1fr; }
       .ecd-sig-wide { max-width: none; }
-      .ecd-cols > div + div { margin-left: 0; }
+      .ecd-cols > div + div { margin-left: 0; margin-top: -1px; }
+      .ecd-cols > div > table:last-child { flex: none; }
       .ecd-strip, .ecd-overall, .ecd-meta { table-layout: auto; }
       .ecd-meta td:first-child { width: auto; }
     }

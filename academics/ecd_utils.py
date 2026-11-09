@@ -69,7 +69,8 @@ def build_ecd_report_context(report, shared=None):
         "layout": structure.layout,
         "teacher_comments": (report.teacher_comments or "").strip(),
     }
-    evaluations = list(ECDEvaluation.objects.filter(report_card=report).order_by("pk"))
+    # An unsaved report is a blank sheet for a learner not yet started (class print).
+    evaluations = list(ECDEvaluation.objects.filter(report_card=report).order_by("pk")) if report.pk else []
     # Rated before the per-term templates: only old-style rows, none linked to a line.
     ctx["legacy"] = bool(evaluations) and all(ev.item_id is None for ev in evaluations)
     if ctx["legacy"]:

@@ -129,7 +129,15 @@ class ECDTemplateSeedTests(TestCase):
         self.assertIn(["S", "Satisfactory"], kg1.traits_key)
         self.assertIn(["M", "Making Progress"], kg2.traits_key)
         abc = ECDReportLayout.objects.get(class_type="abc", term_number=1)
-        self.assertIn(["1", "Area of Concern"], abc.academic_key)
+        self.assertIn(["1", "Not Yet"], abc.academic_key)
+        self.assertEqual(abc.accent, "yellow")
+
+    def test_bible_memory_is_a_full_width_header_for_the_verses(self):
+        for class_type in ("abc", "pre_school"):
+            verse = ECDSection.objects.get(class_type=class_type, style="verse")
+            self.assertEqual(verse.column, "full")
+            # No "Bible Memory" line to rate: the verses are added in Report Setup.
+            self.assertFalse(verse.items.filter(is_active=True).exists())
 
     def test_abc_term_3_has_pace_and_marks_only_in_term_3(self):
         pace = ECDItem.objects.filter(section__class_type="abc", section__title="PACE")

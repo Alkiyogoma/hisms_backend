@@ -579,10 +579,18 @@ class HOSReportPreviewView(RoleRequiredMixin, TemplateView):
         if user.role != UserRole.PARENT:
             class_reports = self.class_report_queryset(report)
             ctx["class_name"] = report.student.class_name
-            ctx["class_total"] = class_reports.count()
+            ctx["class_total"] = (
+                self.ecd_class_learners(report).count() if report.is_ecd_report else class_reports.count()
+            )
             ctx["class_unpublished"] = class_reports.exclude(status=ReportCardStatus.PUBLISHED).count()
 
         return ctx
+
+    @staticmethod
+    def ecd_class_learners(report):
+        """The children in the learner's ECD class that term, as the teacher's list shows them."""
+        from academics.views.ecd import ecd_class_roster
+        return ecd_class_roster(report.student.class_name, report.term)
 
     @staticmethod
     def class_report_queryset(report):
@@ -603,11 +611,33 @@ class ClassReportPrintView(HOSReportPreviewView):
         from django.template.loader import render_to_string
         report = ctx["report"]
         partial = "academics/_ecd_report_body.html" if report.is_ecd_report else "academics/_progress_report_body.html"
-        reports = list(
-            self.class_report_queryset(report)
-            .select_related("student", "term__academic_year", "signed_off_by", "generated_by")
-            .order_by("student__last_name", "student__first_name")
-        )
+        related = ("student", "term__academic_year", "signed_off_by", "generated_by", "ecd_hod_approved_by")
+        if report.is_ecd_report:
+            # One sheet per child in the class: a child whose report has not
+            # been started still gets a blank sheet, and learners who left the
+            # class are not printed.
+            learners = list(self.ecd_class_learners(report).order_by("last_name", "first_name"))
+            by_student = {
+                r.student_id: r for r in ReportCard.objects.filter(
+                    term=report.term, student__in=learners, is_ecd_report=True,
+                ).select_related(*related)
+            }
+            reports = [
+                by_student.get(s.pk) or ReportCard(
+                    student=s, term=report.term, is_ecd_report=True,
+                    ecd_template_type=report.ecd_template_type, status=ReportCardStatus.DRAFT,
+                    generated_by=report.generated_by,
+                )
+                for s in learners
+            ]
+            ctx["class_not_started"] = sum(1 for r in reports if r.pk is None)
+        else:
+            reports = list(
+                self.class_report_queryset(report)
+                .select_related(*related)
+                .order_by("student__last_name", "student__first_name")
+            )
+        ctx["class_total"] = len(reports)
         # Class-wide lookups (attendance pass, class teacher, reopening date,
         # ECD report lines) are made once for the whole class.
         shared = {"attendance_rows": _class_attendance_rows(reports, report.term)}

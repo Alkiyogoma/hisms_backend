@@ -316,6 +316,10 @@ def reject_report_for_edit(report_card, user, reason="", subjects=None):
     report_card.ecd_hod_approved_at = None
     # Preserve existing comments but unlock them so the teacher can edit.
     report_card.comments_submitted = False
+    # Kept on the report so the teacher sees what to correct.
+    report_card.return_reason = (reason or "").strip()
+    report_card.returned_by = user
+    report_card.returned_at = timezone.now()
     report_card.save()
 
     # Reopen only the subjects the reviewer picked.
@@ -360,7 +364,7 @@ def reject_report_for_edit(report_card, user, reason="", subjects=None):
             user=teacher,
             title="Report Returned for Edit",
             message=f"The term report for {report_card.student.first_name} has been returned for correction by {user.get_full_name()}.{subject_note}\n\nReason: {reason}",
-            link="/academics/primary-assessment/", # or dynamic based on type
+            link="/academics/ecd-assessment/" if report_card.is_ecd_report else "/academics/primary-assessment/",
             actor=user
         )
 
