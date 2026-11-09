@@ -111,7 +111,7 @@
         <td class="class-col">{{ p.class_name }}</td>
         <td style="font-size:12px; color:#475569">{{ p.teacher.get_full_name|default:p.teacher.username }}</td>
         <td>
-          <span class="status-tag {% if p.status == 'approved' %}st-approved{% elif p.status == 'rejected' %}st-rejected{% elif p.status == 'submitted' %}st-submitted{% elif p.status == 'revision_requested' %}st-revision-requested{% elif p.status == 'missing' %}st-missing{% else %}st-draft{% endif %}">
+          <span class="status-tag {% if p.status == 'approved' or p.status == 'awaiting_reflection' or p.status == 'complete' %}st-approved{% elif p.status == 'rejected' %}st-rejected{% elif p.status == 'submitted' %}st-submitted{% elif p.status == 'revision_requested' %}st-revision-requested{% elif p.status == 'missing' %}st-missing{% else %}st-draft{% endif %}">
             {{ p.get_status_display }}
           </span>
         </td>

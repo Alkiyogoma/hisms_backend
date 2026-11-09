@@ -15,6 +15,16 @@
   .avatar-circle img { width:100%; height:100%; object-fit:cover; }
   .count-badge { background:var(--hodari-blue); color:#fff; padding:2px 8px; border-radius:99px;
     font-size:12px; font-weight:700; margin-left:8px; }
+  .student-export { display:inline-flex; gap:8px; flex-wrap:wrap; }
+
+  /* Phones: keep the three totals on one compact row instead of a full screen of cards */
+  @media (max-width:540px) {
+    .metrics.student-totals { grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; }
+    .student-totals .metric-icon { padding:12px 10px; }
+    .student-totals .mi-icon { display:none; }
+    .student-totals .mi-val { font-size:22px; }
+    .student-totals .mi-sub { font-size:10px; }
+  }
 
   @media print {
     .toolbar, .hf-filterbar, .hf-bulkbar, .col-check, .pagination { display:none !important; }
@@ -34,12 +44,25 @@
   <div style="display:flex;justify-content:space-between;align-items:center">
     <div>
       <div style="font-family:var(--font-display);font-size:18pt;font-weight:bold;color:var(--hodari-blue);text-transform:uppercase">Student Register</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">{{ students|length }} student{{ students|length|pluralize }}</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">{{ summary.total }} student{{ summary.total|pluralize }}</div>
     </div>
     <div style="text-align:right;font-size:12px;color:var(--text-muted)">
       <div style="font-weight:700;color:var(--hodari-blue)">Generated {% now "d M Y" %}</div>
     </div>
   </div>
+</div>
+
+{# Totals for the current filter (same queryset as the table, all pages) #}
+<div class="metrics metrics-3 student-totals" id="student-totals">
+  <c-stat variant="blue" label="Total students" value="{{ summary.total }}" sub="{% if archive_status == 'archived' %}Archived records{% elif archive_status == 'all' %}All records{% else %}Enrolled{% endif %}">
+    <c-slot name="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></c-slot>
+  </c-stat>
+  <c-stat variant="green" label="Boys" value="{{ summary.boys }}" sub="{% if summary.total %}{% widthratio summary.boys summary.total 100 %}% of total{% else %}&nbsp;{% endif %}">
+    <c-slot name="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10" cy="14" r="6"/><path d="M14.5 9.5 21 3m0 0h-5m5 0v5"/></svg></c-slot>
+  </c-stat>
+  <c-stat variant="amber" label="Girls" value="{{ summary.girls }}" sub="{% if summary.total %}{% widthratio summary.girls summary.total 100 %}% of total{% else %}&nbsp;{% endif %}">
+    <c-slot name="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="9" r="6"/><path d="M12 15v7m-3-3h6"/></svg></c-slot>
+  </c-stat>
 </div>
 
 <div id="student-page-container" class="card">
@@ -86,6 +109,10 @@
       <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>Showing {% if archive_status == 'archived' %}archived{% elif archive_status == 'all' %}all{% else %}active{% endif %} students &mdash; filters apply as you choose them.</span>
       <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <noscript><button type="submit" class="hf-btn hf-btn-primary">Apply</button></noscript>
+        <span class="student-export" title="Downloads every student matching these filters, not just this page">
+          <a class="hf-btn hf-btn-secondary" href="{% url 'students:list_export' %}?{% if export_query %}{{ export_query }}&amp;{% endif %}format=xlsx">Export Excel</a>
+          <a class="hf-btn hf-btn-secondary" href="{% url 'students:list_export' %}?{% if export_query %}{{ export_query }}&amp;{% endif %}format=pdf" target="_blank" rel="noopener">Export PDF</a>
+        </span>
         {% if request.GET.class_name and can_add_student %}
         <a class="hf-reset" href="{% url 'students:print_class_id_bulk' request.GET.class_name %}" target="_blank">Print IDs</a>
         <a class="hf-reset" href="#" onclick="confirmDeleteModal({title:'Bulk Generate IDs?',body:'Generate IDs for all students in <strong>{{ request.GET.class_name|escapejs }}</strong> who do not have a valid ADM-YYYY-XXX format?',detail:'Existing valid IDs will NOT be changed.',confirmText:'Generate IDs',url:'{% url 'students:bulk_generate_ids' %}',type:'info',extraData:[{name:'class_name',value:'{{ request.GET.class_name|escapejs }}'}]});return false">Bulk generate IDs</a>

@@ -14,6 +14,8 @@ cbor2==5.6.5; sys_platform == "darwin"
 cbor2>=5.2.0; sys_platform != "darwin"
 # PDF rendering: install WeasyPrint on Linux/Ubuntu deployments (Windows dev often skips it).
 weasyprint>=62.0
+# Excel exports (student list, attendance, DSAR)
+openpyxl>=3.1
 Pillow
 # QR code generation
 qrcode[pil]>=8.0

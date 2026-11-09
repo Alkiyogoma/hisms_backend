@@ -152,7 +152,7 @@ def generate_lesson_plan_review_tasks(lesson_plan):
 
 def generate_lesson_plan_submission_task(teacher):
     """Remind a teacher to submit lesson plans if none exist this week."""
-    from academics.models import LessonPlan, LessonPlanStatus
+    from academics.models import LessonPlan, LessonPlanStatus, LESSON_PLAN_APPROVED_STATUSES
 
     now = timezone.now()
     today = now.date()
@@ -162,7 +162,7 @@ def generate_lesson_plan_submission_task(teacher):
     existing = LessonPlan.objects.filter(
         teacher=teacher,
         week_start_date=monday,
-        status__in=[LessonPlanStatus.SUBMITTED, LessonPlanStatus.APPROVED, LessonPlanStatus.DRAFT],
+        status__in=[LessonPlanStatus.SUBMITTED, *LESSON_PLAN_APPROVED_STATUSES, LessonPlanStatus.DRAFT],
     ).exists()
 
     if existing:

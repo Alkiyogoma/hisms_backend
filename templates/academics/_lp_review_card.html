@@ -3,7 +3,7 @@
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
     <div>
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-        <span class="status-tag {% if p.status == 'approved' %}st-approved{% elif p.status == 'rejected' %}st-rejected{% elif p.status == 'submitted' %}st-submitted{% elif p.status == 'revision_requested' %}st-revision-requested{% else %}st-draft{% endif %}">
+        <span class="status-tag {% if p.status == 'approved' or p.status == 'awaiting_reflection' or p.status == 'complete' %}st-approved{% elif p.status == 'rejected' %}st-rejected{% elif p.status == 'submitted' %}st-submitted{% elif p.status == 'revision_requested' %}st-revision-requested{% else %}st-draft{% endif %}">
           {{ p.get_status_display }}
         </span>
         <span style="font-size:10px;color:#94A3B8;font-weight:600">#{{ p.id }}</span>
@@ -68,7 +68,7 @@
         </button>
       </div>
     </form>
-    {% elif p.status == 'approved' %}
+    {% elif p.status == 'approved' or p.status == 'awaiting_reflection' or p.status == 'complete' %}
     <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:#E8F5EC;border-radius:8px">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
       <span style="font-size:12px;font-weight:700;color:#16A34A">Approved{% if p.reviewed_by %} by {{ p.reviewed_by.get_full_name|default:p.reviewed_by.username }}{% endif %}</span>
