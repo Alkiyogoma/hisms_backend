@@ -11,7 +11,7 @@
   <ul>
     <li>Each assessment column shows weighted points: {% for c in exam_columns %}{{ c }}{% if not forloop.last %}, {% endif %}{% endfor %}. They add up to the subject TOTAL out of 100.</li>
     <li>Only marks that have been entered <b>and approved</b> are included, never counted as zero when missing. A subject's total and grade are given once all its assessments are approved; the overall average and grade once every mark-bearing subject is.</li>
-    <li>Remark-only subjects take a remark once per term and no marks, so they are not part of the average. Pass mark {{ pass_mark }}% (grade C).</li>
+    <li>Remark-only subjects take a remark once per term and no marks, so they are not part of the average. Pass mark {{ pass_mark }}% (grade {{ pass_grade }}).</li>
     <li>Attendance = days in school ÷ days marked. Late counts as in school; excused counts as absent but authorised; unmarked days are left out.</li>
   </ul>
 </div>

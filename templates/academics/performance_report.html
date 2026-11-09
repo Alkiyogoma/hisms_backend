@@ -45,6 +45,7 @@
 
   /* summary tiles */
   .pr-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-bottom:18px; }
+  .pr-stats.three { grid-template-columns:repeat(3,minmax(0,1fr)); }
   .pr-stat { display:block; border:1px solid var(--pr-line); border-radius:14px; padding:16px 18px; background:#fff; text-decoration:none; position:relative; transition:border-color .15s, box-shadow .15s, transform .15s; }
   a.pr-stat:hover { box-shadow:0 6px 18px -8px rgba(15,35,95,.25); transform:translateY(-1px); }
   a.pr-stat.on { box-shadow:0 0 0 2px currentColor inset; }
@@ -167,7 +168,7 @@
     .pr-grid2 { grid-template-columns:1fr; }
     .pr-grid2 .pr-card { margin-bottom:18px; }
   }
-  @media (max-width:900px) { .pr-stats { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  @media (max-width:900px) { .pr-stats, .pr-stats.three { grid-template-columns:repeat(2,minmax(0,1fr)); } }
   @media (max-width:640px) {
     .pr-filters { grid-template-columns:1fr 1fr; }
     .pr-stats { gap:10px; }
@@ -276,7 +277,7 @@
 {% else %}
 
 <!-- summary -->
-<div class="pr-stats">
+<div class="pr-stats{% if not has_support_band %} three{% endif %}">
   <div class="pr-stat s-avg">
     <div class="lab">Average result</div>
     <div class="row">
@@ -289,13 +290,13 @@
     <div class="lab">Pass rate &middot; results</div>
     <div class="row"><div class="num">{% if summary.pass_rate is not None %}{{ summary.pass_rate }}<em>%</em>{% else %}&mdash;{% endif %}</div></div>
     <div class="pr-meter"><span style="width:{{ summary.pass_rate|default:0|floatformat:0 }}%"></span></div>
-    <div class="sub">{{ summary.passed }} of {{ summary.count }} result{{ summary.count|pluralize }} at {{ pass_mark }}% (grade C) or above</div>
+    <div class="sub">{{ summary.passed }} of {{ summary.count }} result{{ summary.count|pluralize }} at {{ pass_mark }}% (grade {{ pass_grade }}) or above</div>
   </div>
-  <a class="pr-stat s-flag{% if view == 'help' and show == 'support' %} on{% endif %}" href="{% querystring view='help' show='support' page=None %}">
-    <div class="lab">Results at D &middot; requires support</div>
+  {% if has_support_band %}<a class="pr-stat s-flag{% if view == 'help' and show == 'support' %} on{% endif %}" href="{% querystring view='help' show='support' page=None %}">
+    <div class="lab">Results requiring support</div>
     <div class="row"><div class="num">{{ summary.flagged }}</div></div>
     <div class="sub">{{ critical_mark }}&ndash;{{ pass_mark|add:-1 }}%, from {{ summary.flagged_learners }} student{{ summary.flagged_learners|pluralize }} &middot; <span class="go">View &rarr;</span></div>
-  </a>
+  </a>{% endif %}
   <a class="pr-stat s-crit{% if view == 'help' and show == 'critical' %} on{% endif %}" href="{% querystring view='help' show='critical' page=None %}">
     <div class="lab">Results at E &middot; critical</div>
     <div class="row"><div class="num">{{ summary.critical }}</div></div>
@@ -489,8 +490,8 @@
   </div>
   <div class="pr-legend">
     <span><i class="f-critical"></i>Below {{ critical_mark }}% (E)</span>
-    <span><i class="f-support"></i>{{ critical_mark }}&ndash;{{ pass_mark|add:-1 }}% (D)</span>
-    <span><i class="f-pass"></i>{{ pass_mark }}&ndash;{{ strong_mark|add:-1 }}% (C)</span>
+    {% if has_support_band %}<span><i class="f-support"></i>{{ critical_mark }}&ndash;{{ pass_mark|add:-1 }}% (requires support)</span>{% endif %}
+    <span><i class="f-pass"></i>{{ pass_mark }}&ndash;{{ strong_mark|add:-1 }}% ({{ pass_band_grades }})</span>
     <span><i class="f-strong"></i>{{ strong_mark }}% and above (B+)</span>
     <span><i style="background:#5B6578;opacity:.55;width:2px"></i>Pass mark on bars</span>
   </div>

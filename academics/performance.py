@@ -23,7 +23,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-from academics.grading_utils import get_grade_from_score
+from academics.grading_utils import CRITICAL_MARK, GRADE_LOWER_BOUNDS, get_grade_from_score, get_pass_mark
 from academics.models import (
     Department,
     ExamScore,
@@ -34,8 +34,8 @@ from academics.models import (
 )
 from users.models import UserRole
 
-PASS_MARK = 60.0       # grade C and above (see grading_utils.is_pass)
-CRITICAL_MARK = 50.0   # grade E (see grading_utils.is_critical)
+# The pass mark comes from School Settings via grading_utils.get_pass_mark();
+# CRITICAL_MARK (grade E) is imported from grading_utils.
 
 
 @dataclass
@@ -165,16 +165,34 @@ BAND_LABELS = {
 
 
 def _mark_band(mark):
-    """critical (E) / support (D) need help; pass (C) and strong (B and
-    above) are on track  split so comparisons above the pass mark still
-    show a difference."""
-    if mark < CRITICAL_MARK:
-        return "critical"
-    if mark < PASS_MARK:
-        return "support"
+    """Below the pass mark needs help: critical (E) or requires support (below
+    the pass mark but not E, only when the pass mark is above 50). At or above
+    it is on track: pass, or strong at B and above  split so comparisons
+    above the pass mark still show a difference."""
+    pass_mark = get_pass_mark()
+    if mark < pass_mark:
+        # Below the pass mark: critical at grade E, otherwise requires support
+        # (an empty band when the pass mark is at or below the E boundary).
+        return "critical" if mark < CRITICAL_MARK else "support"
     if mark < STRONG_MARK:
         return "pass"
     return "strong"
+
+
+def pass_mark_context():
+    """Template context describing the pass mark and the bands around it."""
+    from academics.grading_utils import pass_grade
+    pm = get_pass_mark()
+    grade = pass_grade()
+    return {
+        "pass_mark": int(pm),
+        "pass_grade": grade,
+        # Grades in the "pass" band, e.g. "D–C" at 50% or "C" at 60%.
+        "pass_band_grades": grade if grade == "C" else f"{grade}\u2013C",
+        "critical_mark": int(CRITICAL_MARK),
+        "strong_mark": int(STRONG_MARK),
+        "has_support_band": pm > CRITICAL_MARK,
+    }
 
 
 def needs_help(band):
@@ -263,13 +281,14 @@ def compute_results(scope, terms, year, exam_type=None, student_ids=None, split_
 def summarise(results):
     n = len(results)
     marks = [r["mark"] for r in results]
+    pass_mark = get_pass_mark()
     return {
         "count": n,
         "learners": len({r["student_id"] for r in results}),
         "average": round(sum(marks) / n, 1) if n else None,
         "average_grade": get_grade_from_score(sum(marks) / n) if n else None,
-        "passed": sum(1 for m in marks if m >= PASS_MARK),
-        "pass_rate": round(sum(1 for m in marks if m >= PASS_MARK) / n * 100, 1) if n else None,
+        "passed": sum(1 for m in marks if m >= pass_mark),
+        "pass_rate": round(sum(1 for m in marks if m >= pass_mark) / n * 100, 1) if n else None,
         "flagged": sum(1 for r in results if r["band"] == "support"),
         "critical": sum(1 for r in results if r["band"] == "critical"),
         "below_pass": sum(1 for r in results if needs_help(r["band"])),
@@ -280,7 +299,11 @@ def summarise(results):
 
 
 GRADES = ("A+", "A", "B", "C", "D", "E")
-GRADE_BANDS = {"A+": "strong", "A": "strong", "B": "strong", "C": "pass", "D": "support", "E": "critical"}
+
+
+def grade_bands():
+    """Band of each grade at the current pass mark (by its lowest mark)."""
+    return {g: _mark_band(low) for g, low in GRADE_LOWER_BOUNDS}
 
 
 def grade_distribution(rows):
@@ -292,6 +315,7 @@ def grade_distribution(rows):
     for r in rows:
         counts[get_grade_from_score(r["mark"])] += 1
     top = max(counts.values()) if total else 0
+    bands = grade_bands()
     return {
         "total": total,
         "grades": [{
@@ -299,7 +323,7 @@ def grade_distribution(rows):
             "count": counts[g],
             "pct": round(counts[g] / total * 100, 1) if total else 0,
             "width": round(counts[g] / top * 100) if top else 0,
-            "band": GRADE_BANDS[g],
+            "band": bands[g],
         } for g in GRADES],
     }
 
@@ -317,7 +341,7 @@ def _group(results, key):
             "band": _mark_band(avg),
             "results": len(rows),
             "learners": len({r["student_id"] for r in rows}),
-            "below_pass": sum(1 for r in rows if r["mark"] < PASS_MARK),
+            "below_pass": sum(1 for r in rows if needs_help(r["band"])),
         })
     return out
 

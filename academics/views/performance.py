@@ -107,7 +107,10 @@ class PerformanceReportView(RoleRequiredMixin, TemplateView):
             return ctx
 
         view = params.get("view") if params.get("view") in VIEWS else "help"
-        show = params.get("show") if params.get("show") in SHOW else "help"
+        # "Requires support" only exists while the pass mark sits above grade E.
+        has_support = performance.pass_mark_context()["has_support_band"]
+        shows = {k: v for k, v in SHOW.items() if k != "support" or has_support}
+        show = params.get("show") if params.get("show") in shows else "help"
         group = params.get("group") if params.get("group") in GROUPS else "result"
         sort = params.get("sort") if group == "learner" and params.get("sort") in SORTS else "average"
         query = params.get("q", "").strip()
@@ -120,7 +123,7 @@ class PerformanceReportView(RoleRequiredMixin, TemplateView):
         if query:
             q = query.lower()
             rows = [r for r in rows if q in r["name"].lower() or q in (r["admission_no"] or "").lower()]
-        show_counts = {key: sum(1 for r in rows if test(r["band"])) for key, (_, test) in SHOW.items()}
+        show_counts = {key: sum(1 for r in rows if test(r["band"])) for key, (_, test) in shows.items()}
         rows = sorted((r for r in rows if SHOW[show][1](r["band"])), key=SORTS[sort])
         try:
             page_size = int(params.get("page_size", PAGE_SIZES[0]))
@@ -169,7 +172,7 @@ class PerformanceReportView(RoleRequiredMixin, TemplateView):
             "view": view,
             "show": show,
             "show_label": SHOW[show][0],
-            "show_options": [(key, label, show_counts[key]) for key, (label, _) in SHOW.items()],
+            "show_options": [(key, label, show_counts[key]) for key, (label, _) in shows.items()],
             "group": group,
             "sort": sort,
             "query": query,
@@ -186,9 +189,7 @@ class PerformanceReportView(RoleRequiredMixin, TemplateView):
             "ranking": ranking,
             "matrix": performance.class_subject_matrix(
                 [r for r in all_results if (not subject or r["subject"] == subject)], scope),
-            "pass_mark": int(performance.PASS_MARK),
-            "critical_mark": int(performance.CRITICAL_MARK),
-            "strong_mark": int(performance.STRONG_MARK),
+            **performance.pass_mark_context(),
             "generated_at": timezone.localtime(),
         })
         return ctx

@@ -20,7 +20,7 @@ from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 
-from academics.grading_utils import compute_grade_with_gaps
+from academics.grading_utils import compute_grade_with_gaps, get_pass_mark
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,6 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-PASS_THRESHOLD = 50  # FR-PTC-029: ≥ 50% = Yes for "Meets Academic Expectations"
 IMPROVING_THRESHOLD = 3  # percentage points
 NEEDS_ATTENTION_THRESHOLD = -3
 
@@ -64,20 +63,22 @@ def get_core_subjects_for_student(student) -> list[str]:
     Read the core subjects dynamically from the grade's subject configuration.
     This avoids hardcoding the five subjects and allows future curriculum changes.
     """
-    from academics.models import GradeClass, Subject
+    from academics.models import AssessmentMode, GradeClass, Subject
     from ptc.models import EnrichmentSubject
 
     grade_class = GradeClass.objects.filter(name=student.class_name).first()
     if not grade_class:
         return []
 
-    # Core subjects are those assigned to this grade class that are NOT enrichment
+    # Core subjects are those assigned to this grade class that are NOT
+    # enrichment and carry marks (remark-only subjects have no marks to average).
     enrichment_subject_ids = EnrichmentSubject.objects.filter(
         is_active=True
     ).values_list("subject_id", flat=True)
     subject_names = list(
         grade_class.subjects.filter(is_active=True)
         .exclude(id__in=enrichment_subject_ids)
+        .exclude(assessment_mode=AssessmentMode.REMARK)
         .values_list("name", flat=True)
         .order_by("name")
     )
@@ -161,13 +162,15 @@ def get_academic_performance_grid(student, academic_year) -> dict:
                 scores=exams,
                 weights=exam_weights,
             )
-            exam_data["weighted_avg"] = grade_result["average"]
+            exam_data["weighted_avg"] = grade_result["average"] if exams else None
             exam_data["gap_case"] = grade_result["gap"]["case"]
             exam_data["gap_label"] = grade_result["gap"]["label"]
             exam_data["redistributed_weights"] = grade_result["redistributed_weights"]
             exam_data["makeup_required"] = grade_result["makeup_required"]
 
-            if grade_result["average"] is not None:
+            # A subject with no approved marks yet is left out of the
+            # average, never counted as zero.
+            if exams and grade_result["average"] is not None:
                 subject_avgs.append(grade_result["average"])
 
             term_subjects[subj] = exam_data
@@ -225,12 +228,13 @@ def calculate_weighted_average(
 
 def calculate_meets_expectations(overall_average: Optional[float]) -> str:
     """
-    Returns "Yes" if overall_average >= 50%, "No" otherwise.
+    Returns "Yes" if overall_average is at or above the school pass mark
+    (School Settings, 50% by default), "No" otherwise.
     If average is None (no data), returns "N/A".
     """
     if overall_average is None:
         return "N/A"
-    return "Yes" if overall_average >= PASS_THRESHOLD else "No"
+    return "Yes" if overall_average >= get_pass_mark() else "No"
 
 
 # ---------------------------------------------------------------------------

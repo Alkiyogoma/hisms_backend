@@ -267,6 +267,8 @@ class PTCScreenView(RoleRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        from academics.grading_utils import get_pass_mark
+        ctx["pass_mark"] = int(get_pass_mark())
         ctx["ptc_tab"] = "student_picker"
         from students.models import Student
         from academics.models import GradeClass
