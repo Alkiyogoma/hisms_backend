@@ -964,9 +964,9 @@ class WelfareEditView(RoleRequiredMixin, View):
     """Edit a draft, or correct a submitted note.
 
     - Drafts: the author edits freely, then submits or deletes the draft.
-    - Submitted notes: the author may correct within the correction window
-      (before HOD review); a Super Admin may correct any time. A reason is
-      required and every change is kept as a WelfareObservationRevision.
+    - Submitted notes: who may correct is set by
+      WelfareObservation.edit_block_reason. A reason is required and every
+      change is kept as a WelfareObservationRevision.
     - Safeguarding notes are never editable once submitted.
     """
     allowed_roles = [UserRole.TEACHER, UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD]

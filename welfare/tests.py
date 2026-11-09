@@ -264,6 +264,40 @@ class CorrectionTests(WelfareTestBase):
         obs.refresh_from_db()
         self.assertEqual(obs.observation_text, "observation text")
 
+    def test_class_teacher_corrects_open_note_on_their_class(self):
+        obs = self.note(self.pupil8, self.subject_teacher8, "observation")
+        self.client.force_login(self.class_teacher8)
+        self.correct(obs, observation_text="Class teacher fixed it")
+        obs.refresh_from_db()
+        self.assertEqual(obs.observation_text, "Class teacher fixed it")
+        self.assertEqual(obs.revisions.get().edited_by, self.class_teacher8)
+
+    def test_author_blocked_once_escalated_or_reviewed_but_hod_and_hos_can_correct(self):
+        escalated = self.note(self.pupil3, self.class_teacher3, "concern", severity=WelfareSeverity.HIGH)
+        reviewed = self.note(self.pupil3, self.class_teacher3, "observation", hod_status="resolved")
+        for obs in (escalated, reviewed):
+            self.assertTrue(obs.edit_block_reason(self.class_teacher3))
+        self.client.force_login(self.primary_hod)
+        self.correct(reviewed, observation_text="HOD correction")
+        reviewed.refresh_from_db()
+        self.assertEqual(reviewed.observation_text, "HOD correction")
+        self.assertFalse(escalated.edit_block_reason(self.hos))
+
+    def test_hod_cannot_correct_another_sections_note(self):
+        obs = self.note(self.pupil8, self.class_teacher8, "observation")
+        self.assertTrue(obs.edit_block_reason(self.primary_hod))
+
+    def test_printed_note_has_no_correction_notes(self):
+        obs = self.note(self.pupil8, self.class_teacher8, "observation", observation_text="Original")
+        self.client.force_login(self.class_teacher8)
+        self.correct(obs, observation_text="Final wording", edit_reason="Spelling of the name")
+        html = self.client.get(reverse("welfare:detail", args=[obs.pk])).content.decode()
+        sheet = html[html.index('<div class="wn-sheet">'):html.index("Screen-only panels")]
+        self.assertIn("Final wording", sheet)
+        for internal in ("Spelling of the name", "Original", "Corrected", "Correction history"):
+            self.assertNotIn(internal, sheet)
+        self.assertIn("Spelling of the name", html)
+
     def test_safeguarding_locked_follow_up_added_instead(self):
         obs = self.note(self.pupil8, self.class_teacher8, "safeguarding", severity="critical", is_locked=True)
         for user in (self.class_teacher8, self.admin):

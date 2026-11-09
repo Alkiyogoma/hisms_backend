@@ -39,9 +39,6 @@
   .ds-sgrid, .ds-staff { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; margin-top: 26px; }
   .ds-staff { margin-top: 30px; page-break-inside: avoid; }
   .ds-sline { border-top: 1px solid var(--ds-ink); padding-top: 5px; font-size: 11.5px; color: #5A6170; }
-  .ds-amend { border: 1px solid #F0DFB4; background: #FFF9EC; padding: 10px 13px; font-size: 12.5px; line-height: 1.6; }
-  .ds-amend + .ds-amend { border-top: none; }
-  .ds-amend-why { color: #5A6170; }
   .ds-change { margin-top: 10px; font-size: 13px; }
   .ds-change-k { font-weight: 700; }
   .ds-change pre { white-space: pre-wrap; font-family: inherit; margin: 4px 0 0; padding: 8px 10px; background: #F8FAFC; border: 1px solid var(--border); border-radius: 8px; }
@@ -189,7 +186,7 @@
 
     <div class="ds-title">
       <h3>Discipline Incident Record</h3>
-      <div class="ds-ref">Reference {{ incident.reference }} · Issued {{ issued_on|date:"j F Y" }}{% if last_amended %} · Amended {{ last_amended|date:"j F Y" }}; replaces any earlier copy{% endif %}</div>
+      <div class="ds-ref">Reference {{ incident.reference }} · Issued {{ issued_on|date:"j F Y" }}</div>
     </div>
 
     <div class="ds-grid">
@@ -276,19 +273,7 @@
       {% endif %}
     </div>
 
-    {% if amendments %}
-    <div class="ds-sec">
-      <h4>Record of amendment</h4>
-      {% for a in amendments %}
-      <div class="ds-amend">
-        <b>{{ a.changed_at|date:"j F Y, H:i" }} - {{ a.by_name }}, {{ a.by_title }}</b><br>
-        {% for c in a.changes %}{% if c.text %}{{ c.field }} corrected.{% else %}{{ c.field }} changed from {{ c.before }} to {{ c.after }}.{% endif %}<br>{% endfor %}
-        <span class="ds-amend-why">Reason: {{ a.reason }}</span>
-      </div>
-      {% endfor %}
-    </div>
-    {% endif %}
-
+    {# Amendment history is internal: it stays on screen below and is never printed. #}
   </div>
 
   <!-- ═══ Screen only: review notes and controls ═══ -->
