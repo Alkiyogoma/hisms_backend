@@ -9,8 +9,8 @@ the term numbers the line appears in.
 ALL = (1, 2, 3)
 
 KEY_4 = [["4", "Outstanding"], ["3", "Good"], ["2", "Satisfactory"], ["1", "Not yet"]]
+KEY_4_ABC = [["4", "Outstanding"], ["3", "Good"], ["2", "Satisfactory"], ["1", "Not Yet"]]
 KEY_4_PROGRESS = [["4", "Outstanding"], ["3", "Good"], ["2", "Making Progress"], ["1", "Not Yet"]]
-KEY_4_CONCERN = [["4", "Outstanding"], ["3", "Good"], ["2", "Satisfactory"], ["1", "Area of Concern"]]
 TRAITS_NOT_YET = [["E", "Excellence"], ["G", "Good"], ["S", "Satisfactory"], ["N", "Not yet"]]
 TRAITS_NEEDS = [["E", "Excellence"], ["G", "Good"], ["S", "Satisfactory"], ["N", "Needs Improvement"]]
 TRAITS_KG = [["E", "Excellent"], ["G", "Good"], ["S", "Satisfactory"], ["N", "Not Yet"]]
@@ -164,9 +164,8 @@ TEMPLATES = {
                 "Writing first name",
                 "Writing last name",
             ]),
-            ("academic", "Bible Memory", "full", "verse", [
-                ("Bible Memory", ALL, True),
-            ]),
+            # The verses are the lines, added per term in Report Setup.
+            ("academic", "Bible Memory", "full", "verse", []),
             ("traits", "PERSONAL", "left", "table", [
                 "Completes work timely",
                 "Shows initiative and creativity",
@@ -197,7 +196,7 @@ TEMPLATES = {
         ],
     },
     "abc": {
-        "layouts": _layouts("ABC PROGRESS REPORT", "blue", KEY_4_CONCERN, TRAITS_NEEDS, "Evaluation"),
+        "layouts": _layouts("ABC PROGRESS REPORT", "yellow", KEY_4_ABC, TRAITS_NEEDS, "Evaluation"),
         "term_overrides": {3: {"column_label": "Points"}},
         "sections": [
             ("academic", "Subject", "full", "strip", [
@@ -221,9 +220,8 @@ TEMPLATES = {
                 "Shapes",
                 "Problem solving and critical thinking",
             ]),
-            ("academic", "Bible Memory", "left", "verse", [
-                "Bible Memory",
-            ]),
+            # The verses are the lines, added per term in Report Setup.
+            ("academic", "Bible Memory", "full", "verse", []),
             ("academic", "READING", "right", "table", [
                 "Recognize, Compare & Distinguish Sounds",
                 "Recognize letters",

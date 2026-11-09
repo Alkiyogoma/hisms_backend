@@ -100,10 +100,17 @@ def ecd_term_editable(term) -> bool:
 def ecd_class_roster(class_name, term):
     """Learners in an ECD class during ``term``.
 
-    The enrolment history places learners in a class for a term or a year, so
-    a past year's class is found even after they move up or leave. In the
-    current academic year, anyone in the class now is included as well.
+    For the current term that is the class as it is now (learners who left or
+    moved class are not counted), so the list, the progress count and a class
+    print all match the number of children in the class.
+
+    For an earlier term the enrolment history places learners in a class for a
+    term or a year, so a past class is found even after they move up or leave.
+    In the current academic year, anyone in the class now is included as well.
     """
+    current = get_current_term()
+    if current is not None and term == current:
+        return Student.objects.filter(class_name=class_name, is_archived=False)
     ids = set(
         EnrollmentHistory.objects.filter(class_name=class_name)
         .filter(Q(term=term) | Q(term__isnull=True, academic_year=term.academic_year))
@@ -113,7 +120,6 @@ def ecd_class_roster(class_name, term):
         ReportCard.objects.filter(term=term, is_ecd_report=True, student__class_name=class_name)
         .values_list("student_id", flat=True)
     )
-    current = get_current_term()
     if current is None or term.academic_year_id == current.academic_year_id:
         ids |= set(
             Student.objects.filter(class_name=class_name, is_archived=False).values_list("id", flat=True)
@@ -162,10 +168,35 @@ class ECDStudentsAPIView(RoleRequiredMixin, View):
             for s in students:
                 rc = reports.get(s["id"])
                 s["status"] = rc.status if rc else ""
+                s["approved"] = bool(rc and rc.ecd_hod_approved_by_id)
+                s["returned"] = bool(rc and rc.status == ReportCardStatus.DRAFT and rc.returned_at)
                 s["rated"] = rated.get(s["id"], 0)
                 s["total"] = len(structure.items)
 
         return JsonResponse({"students": students, "read_only": not ecd_term_editable(term)})
+
+
+def _person(user):
+    return (user.get_full_name() or user.username) if user else ""
+
+
+def _approval(report):
+    """Who approved the report so far: the ECD HOD, then the Head of School."""
+    if report.status == ReportCardStatus.PUBLISHED and report.signed_off_by_id:
+        return {"stage": "published", "by": _person(report.signed_off_by),
+                "at": report.signed_off_at.strftime("%d %b %Y") if report.signed_off_at else ""}
+    if report.ecd_hod_approved_by_id:
+        return {"stage": "hod", "by": _person(report.ecd_hod_approved_by),
+                "at": report.ecd_hod_approved_at.strftime("%d %b %Y") if report.ecd_hod_approved_at else ""}
+    return None
+
+
+def _returned(report):
+    """The reviewer's note on a report sent back to the teacher, while it is still a draft."""
+    if report.status != ReportCardStatus.DRAFT or not report.returned_at:
+        return None
+    return {"reason": report.return_reason, "by": _person(report.returned_by),
+            "at": report.returned_at.strftime("%d %b %Y, %H:%M")}
 
 
 def _report_payload(report, structure, *, read_only):
@@ -177,6 +208,8 @@ def _report_payload(report, structure, *, read_only):
         "teacher_comments": report.teacher_comments or "",
         "ecd_remarks": report.ecd_remarks or "",
         "status": report.status,
+        "approval": _approval(report),
+        "returned": _returned(report),
         "is_locked": read_only or report.status != ReportCardStatus.DRAFT,
         "read_only": read_only,
         "days_absent": report.attendance_days_absent,
@@ -351,7 +384,13 @@ class ECDSubmissionAPIView(RoleRequiredMixin, View):
 
         report_card.status = ReportCardStatus.PENDING_SIGN_OFF
         report_card.comments_submitted = True
-        report_card.save(update_fields=["status", "comments_submitted", "updated_at"])
+        # The correction asked for is done: the HOD reviews it afresh.
+        report_card.return_reason = ""
+        report_card.returned_by = None
+        report_card.returned_at = None
+        report_card.save(update_fields=[
+            "status", "comments_submitted", "return_reason", "returned_by", "returned_at", "updated_at",
+        ])
 
         log_event(
             actor=request.user,

@@ -122,6 +122,46 @@ class ECDApprovalTests(ECDFixture):
         self.assertEqual(report.status, ReportCardStatus.DRAFT)
         self.assertIsNone(report.ecd_hod_approved_by_id)
 
+    def test_returned_report_shows_the_hod_comment_to_the_teacher(self):
+        report = self.submit(self.learner)
+        self.queue(self.ecd_hod, action="reject", report_ids=[report.pk], reason="Please expand the comment.")
+        report.refresh_from_db()
+        self.assertEqual(report.return_reason, "Please expand the comment.")
+        self.assertEqual(report.returned_by, self.ecd_hod)
+        self.client.force_login(self.hos)
+        data = self.client.get(self.api("api_ecd_evaluation", self.learner)).json()
+        self.assertEqual(data["returned"]["reason"], "Please expand the comment.")
+        roster = self.client.get(reverse("academics:api_ecd_students"), {"class_name": "Pre-School", "term": self.term.pk}).json()["students"]
+        self.assertTrue(next(s for s in roster if s["id"] == self.learner.pk)["returned"])
+        # Submitting the correction clears the note.
+        self.submit(self.learner)
+        report.refresh_from_db()
+        self.assertEqual(report.return_reason, "")
+        self.assertIsNone(self.client.get(self.api("api_ecd_evaluation", self.learner)).json()["returned"])
+
+    def test_approval_shows_to_the_teacher_and_on_the_printed_report(self):
+        report = self.submit(self.learner)
+        self.queue(self.ecd_hod, action="ecd_hod_approve", report_ids=[report.pk])
+        self.client.force_login(self.hos)
+        data = self.client.get(self.api("api_ecd_evaluation", self.learner)).json()
+        self.assertEqual(data["approval"]["stage"], "hod")
+        roster = self.client.get(reverse("academics:api_ecd_students"), {"class_name": "Pre-School", "term": self.term.pk}).json()["students"]
+        self.assertTrue(next(s for s in roster if s["id"] == self.learner.pk)["approved"])
+        page = self.client.get(reverse("academics:report_preview", args=[report.pk]))
+        self.assertContains(page, "Approved by HOD")
+
+    def test_print_all_has_one_sheet_per_child_in_the_class(self):
+        report = self.submit(self.learner)  # the other two learners are not started
+        Student.objects.create(admission_no="E-199", first_name="Gone", last_name="Left", class_name="Pre-School",
+                               academic_year=self.year, status=StudentStatus.ACTIVE, is_archived=True)
+        self.client.force_login(self.hos)
+        page = self.client.get(reverse("academics:report_preview_class", args=[report.pk]))
+        self.assertEqual(len(page.context["class_reports"]), len(self.learners))
+        self.assertEqual(page.context["class_not_started"], len(self.learners) - 1)
+        self.assertNotContains(page, "Gone Left")
+        single = self.client.get(reverse("academics:report_preview", args=[report.pk]))
+        self.assertContains(single, f"Print all ({len(self.learners)})")
+
     def test_queue_shows_selection_and_ecd_links(self):
         self.submit(self.learner)
         self.client.force_login(self.ecd_hod)

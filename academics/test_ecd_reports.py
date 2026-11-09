@@ -85,19 +85,22 @@ class ECDEntryTests(ECDFixture):
         self.assertContains(page, 'data-value="NA"')
 
     def test_save_and_read_back(self):
+        # Bible Memory is a header; the term's verses are its lines, added in setup.
+        ECDSection.objects.get(class_type="pre_school", style=ECDSection.Style.VERSE).items.create(label="Genesis 1:1-5")
         s = self.structure()
         numeracy = next(i for i in s.items if i.label == "Number Value")
         bible = next(i for i in s.items if i.section.style == ECDSection.Style.VERSE)
+        self.assertEqual(bible.label, "Genesis 1:1-5")
         trait = next(i for i in s.items if i.section.part == ECDSection.Part.TRAITS)
         resp = self.save(self.learner, {"values": {
             str(numeracy.pk): {"rating": "4"},
-            str(bible.pk): {"rating": "3", "note": "Genesis 1:1-5"},
+            str(bible.pk): {"rating": "3"},
             str(trait.pk): {"rating": "E"},
         }, "teacher_comments": COMMENT})
         self.assertEqual(resp.status_code, 200, resp.content)
         d = self.client.get(self.api("api_ecd_evaluation", self.learner)).json()
         self.assertEqual(d["values"][str(numeracy.pk)]["rating"], "4")
-        self.assertEqual(d["values"][str(bible.pk)]["note"], "Genesis 1:1-5")
+        self.assertEqual(d["values"][str(bible.pk)]["rating"], "3")
         self.assertEqual(d["average"], 3.5)
         self.assertEqual(d["remarks"], "Outstanding")
         self.assertEqual(d["rated"], 3)

@@ -58,6 +58,12 @@
       <div class="ecd-sig ecd-sig-wide"><b>Head Teacher&rsquo;s Signature:</b>
         <span>{% if report.signed_off_by %}<em class="ecd-stamp">Signed &middot; {{ report.signed_off_by.get_full_name|default:report.signed_off_by.username }}</em>{% endif %}</span>
       </div>
+      {% if report.ecd_hod_approved_by or report.signed_off_by %}
+      <div class="ecd-approval">
+        {% if report.ecd_hod_approved_by %}<span class="ecd-approved">&#10003; Approved by HOD &middot; {{ report.ecd_hod_approved_by.get_full_name|default:report.ecd_hod_approved_by.username }}{% if report.ecd_hod_approved_at %} &middot; {{ report.ecd_hod_approved_at|date:"d M Y" }}{% endif %}</span>{% endif %}
+        {% if report.signed_off_by %}<span class="ecd-approved">&#10003; Signed off by Head of School &middot; {{ report.signed_off_by.get_full_name|default:report.signed_off_by.username }}{% if report.signed_off_at %} &middot; {{ report.signed_off_at|date:"d M Y" }}{% endif %}</span>{% endif %}
+      </div>
+      {% endif %}
     </div>
   </section>
 </div>

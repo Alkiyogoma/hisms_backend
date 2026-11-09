@@ -12,7 +12,7 @@
 <div class="no-print">
     {% is_hod_like user as can_signoff %}
     {% if class_view %}
-        <span class="tb-title">{{ class_name }} &middot; {{ report.term.name }} &middot; {{ class_total }} report{{ class_total|pluralize }}</span>
+        <span class="tb-title">{{ class_name }} &middot; {{ report.term.name }} &middot; {{ class_total }} report{{ class_total|pluralize }}{% if class_not_started %} ({{ class_not_started }} not started, printed blank){% endif %}</span>
     {% endif %}
     {% if can_signoff %}
         {% if not class_view and report.status == 'pending_sign_off' or not class_view and report.status == 'draft' %}
