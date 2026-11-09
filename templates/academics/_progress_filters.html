@@ -69,7 +69,7 @@
     {% endif %}
   </div>
   <div class="pf-foot">
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>{{ pf.footnote }}</span>
+    <span>{% if pf.footnote %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>{{ pf.footnote }}{% endif %}</span>
     <span>
       {% if pf.term and not pf.is_current_term %}<span class="pf-past">Viewing {{ pf.term.name }}, not the current term</span>{% endif %}
       <noscript><button type="submit" class="hf-btn hf-btn-primary">Apply</button></noscript>

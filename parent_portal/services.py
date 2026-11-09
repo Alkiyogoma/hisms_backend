@@ -44,7 +44,7 @@ def child_or_404(user, student_id):
     changing the id in the URL can't tell anyone whether a learner exists)."""
     child = children_for(user).filter(pk=student_id).first()
     if child is None:
-        raise Http404("No such learner.")
+        raise Http404("No such student.")
     return child
 
 

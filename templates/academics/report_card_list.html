@@ -24,21 +24,15 @@
     {% is_hod_like user as can_signoff %}
     {% if has_pending and can_signoff and not signoff_blocked %}
       <button type="button" class="hf-btn hf-btn-primary" style="font-size:12px; padding:6px 14px"
-        onclick="confirmDeleteModal({title:'Sign Off All?',body:'Sign off all pending reports for <strong>{{ class_name }}</strong>?',detail:'Reports will be published and become visible to parents immediately.',confirmText:'Sign Off All',url:'{% url 'academics:signoff_action' %}',type:'info',extraData:[{name:'class_name',value:'{{ class_name }}'},{name:'term_id',value:'{{ term.id }}'}]})">
-        Sign Off All Class
+        onclick="confirmDeleteModal({title:'Publish {{ class_name|escapejs }}?',body:'Publish every ready report for <strong>{{ class_name }}</strong>?',detail:'Parents can see them straight away and are notified. Reports that are not ready stay unpublished.',confirmText:'Publish',url:'{% url 'academics:signoff_action' %}',type:'info',extraData:[{name:'class_name',value:'{{ class_name }}'},{name:'term_id',value:'{{ term.id }}'}]})">
+        Publish ready reports
       </button>
     {% elif has_pending and can_signoff and signoff_blocked %}
       <span class="hf-btn hf-btn-secondary" style="font-size:12px; padding:6px 14px; opacity:0.5; cursor:not-allowed" title="{{ signoff_block_reason }}">
-        Sign Off All Class
+        Publish ready reports
       </span>
     {% endif %}
   </div>
-  {% is_hod_like user as can_signoff_nav %}
-  {% if not can_signoff_nav %}
-    <a href="/" class="hf-btn hf-btn-secondary" style="font-size:12px; padding:6px 12px">Back to Dashboard</a>
-  {% else %}
-    <a href="{% url 'academics:hos_signoff_list' %}" class="hf-btn hf-btn-secondary" style="font-size:12px; padding:6px 12px">Back to Overview</a>
-  {% endif %}
 </div>
 
 {% if class_error %}
@@ -49,7 +43,7 @@
     <thead>
       <tr style="background: #F8FAFC">
         <th style="padding-left:24px; width:140px">Admission No</th>
-        <th>Student Name</th>
+        <th>Student</th>
         <th style="text-align:center">Report Status</th>
         <th style="text-align:right; padding-right:24px">Actions</th>
       </tr>
@@ -63,17 +57,14 @@
             {% if report.status == 'published' %}
               <div style="display:flex; flex-direction:column; align-items:center">
                 <span class="chip chip-green" style="font-weight:700">Published</span>
-                <span style="font-size:10px; color:var(--green); margin-top:2px">Visible to Parents</span>
               </div>
             {% elif report.status == 'pending_sign_off' %}
               <div style="display:flex; flex-direction:column; align-items:center">
-                <span class="chip chip-amber" style="font-weight:700">Pending Sign-off</span>
-                <span style="font-size:10px; color:var(--amber); margin-top:2px">Awaiting HOS Action</span>
+                <span class="chip chip-amber" style="font-weight:700">Awaiting sign-off</span>
               </div>
             {% else %}
               <div style="display:flex; flex-direction:column; align-items:center">
-                <span class="chip chip-grey">Draft</span>
-                <span style="font-size:10px; color:var(--text-muted); margin-top:2px">Not Submitted</span>
+                <span class="chip chip-grey">Not submitted</span>
               </div>
             {% endif %}
           </td>

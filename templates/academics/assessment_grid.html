@@ -124,7 +124,9 @@
   {% endif %}
 </div>
 
-{% if can_edit and not term.is_locked and rows %}
+{% if rows and not editable_subjects %}
+<div class="ag-savebar"><span class="ag-dirty-count">View only &middot; marks in this class are entered by each subject's teacher.</span></div>
+{% elif can_edit and not term.is_locked and rows %}
 <div class="ag-savebar">
   <span class="ag-dirty-count" id="ag-dirty">No unsaved changes</span>
   <div style="display:flex;gap:8px;flex-wrap:wrap">

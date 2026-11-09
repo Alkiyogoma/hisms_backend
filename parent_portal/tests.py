@@ -384,7 +384,7 @@ class CalendarTests(PortalTestBase):
         assign_role_group(lonely)
         self.client.force_login(lonely)
         CalendarEvent.objects.all().delete()  # terms add their own dates to the calendar
-        self.assertIn("No learners linked yet", self.client.get(reverse("parent_portal:dashboard")).content.decode())
+        self.assertIn("No students linked yet", self.client.get(reverse("parent_portal:dashboard")).content.decode())
         self.assertIn("No upcoming events", self.client.get(reverse("parent_portal:calendar")).content.decode())
 
 

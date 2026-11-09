@@ -49,7 +49,7 @@
 
 <!-- Filters -->
 <form method="get" class="dl-filters">
-  <input type="search" name="q" value="{{ current_filters.q|default:'' }}" class="form-input dl-search" placeholder="Search learner, admission no. or DISC-…" aria-label="Search incidents">
+  <input type="search" name="q" value="{{ current_filters.q|default:'' }}" class="form-input dl-search" placeholder="Search student, admission no. or DISC-…" aria-label="Search incidents">
   <select name="status" class="form-select" aria-label="Status">
     <option value="">All statuses</option>
     {% for val, lbl in status_choices %}

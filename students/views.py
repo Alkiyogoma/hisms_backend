@@ -406,7 +406,7 @@ class StudentDetailView(RoleRequiredMixin, DetailView):
         term_param = self.request.GET.get("term", "")
         record_term = next((t for t in record_terms if str(t.pk) == term_param), None) \
             or performance.default_learner_term(student, record_terms)
-        record = None if is_ecd else performance.learner_record(student, record_term)
+        record = None if is_ecd else performance.learner_record(student, record_term, terms=record_terms)
         if record and record["average"] is not None:
             academic_summary.update({
                 "average": record["average"], "grade": record["grade"], "term_name": record_term.name,

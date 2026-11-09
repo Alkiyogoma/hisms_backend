@@ -314,22 +314,17 @@ class SingleSourceOfPerformanceTests(PerformanceReportTests):
         page = self._get(self.hos, term=self.term1.pk).content.decode()
         self.assertNotIn(">Analytics<", page)
 
-    def test_pending_signoffs_shown_on_review_queue_and_hos_signoff(self):
+    def test_no_pending_signoffs_panel_on_review_queue_or_hos_signoff(self):
+        # Removed: it counted every unpublished report, drafts still with the
+        # class teacher included, under a title that read as "awaiting sign-off".
         from academics.models import ReportCard, ReportCardStatus
         ReportCard.objects.create(student=self.amani, term=self.term1, generated_by=self.hos, status=ReportCardStatus.DRAFT)
-        ReportCard.objects.create(student=self.baraka, term=self.term1, generated_by=self.hos, status=ReportCardStatus.PUBLISHED)
-        ReportCard.objects.create(student=self.caren, term=self.term1, generated_by=self.hos, status=ReportCardStatus.PENDING_SIGN_OFF)
         self.client.force_login(self.hos)
         for name in ("academics:report_review_queue", "academics:hos_signoff_list"):
             resp = self.client.get(reverse(name))
             self.assertEqual(resp.status_code, 200, name)
-            self.assertEqual(resp.context["pending_signoffs"],
-                             [{"class_name": "Grade 4", "count": 1}, {"class_name": "Grade 8", "count": 1}], name)
-            self.assertContains(resp, "Pending sign-offs")
-        # A Head of Primary only sees their own section's classes.
-        self.client.force_login(self.hod)
-        resp = self.client.get(reverse("academics:report_review_queue"))
-        self.assertEqual(resp.context["pending_signoffs"], [{"class_name": "Grade 4", "count": 1}])
+            self.assertNotContains(resp, "Pending sign-offs")
+            self.assertNotIn("pending_signoffs", resp.context)
 
 
 class AtRiskConsistencyTests(PerformanceReportTests):

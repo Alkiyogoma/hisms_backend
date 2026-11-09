@@ -484,7 +484,12 @@ def learner_attendance(student, start: date, end: date, today: date | None = Non
     """One learner's attendance over a range, for the profile and reports."""
     period = build_period(start, end, today)
     rows = build_learners(period, None, student_ids=[student.pk])
-    row = rows[0] if rows else None
+    return attendance_summary(period, rows[0] if rows else None)
+
+
+def attendance_summary(period, row) -> dict:
+    """learner_attendance's result from a learner row already built (for
+    example by one build_learners pass over a whole class)."""
     counted = [(d, c) for d, c, _ in (row["cells"] if row else []) if c not in (NOT_ON_ROLL, FUTURE)]
     return {"period": period, "row": row, "pattern": learner_pattern(row) if row else None,
             "recent": counted[-10:][::-1], "strip": counted[-30:]}

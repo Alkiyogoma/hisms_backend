@@ -63,16 +63,11 @@
   </div>
 </div>
 
-<p class="rq-help">
-  <b>ECD reports:</b> the class teacher submits &rarr; the <b>ECD HOD approves</b> &rarr; the <b>Head of School publishes</b> to parents.
-  Tick reports (or a whole class) to approve, publish or return several at once. Publishing sends each learner's parents an in-app, email and SMS notice with a link to the report in the parent portal.
-</p>
-
-{% include "academics/_pending_signoffs.html" %}
+<p class="rq-help">Tick reports or a whole class to act on several at once. Publishing notifies parents. ECD reports need ECD HOD approval first.</p>
 
 <div class="section-hdr">
   <span class="section-title">
-    {% if status_filter == 'published' %}Published Reports{% else %}Reports awaiting HOD and HOS review{% endif %}
+    {% if status_filter == 'published' %}Published{% else %}Submitted by class teachers{% endif %}
   </span>
   <div style="display:flex;gap:6px;margin-left:auto">
     <a href="?" class="hf-btn hf-btn-secondary" style="font-size:11px;padding:4px 12px;{% if not status_filter or status_filter == 'pending' %}background:var(--hodari-blue);color:#fff;border-color:var(--hodari-blue){% endif %}">Pending</a>
@@ -96,12 +91,6 @@
     </label>
     <div style="display:flex;align-items:center;gap:10px">
       <span style="font-size:12px;color:var(--text-muted)">{{ group.list|length }} {{ group.list|length|pluralize:"student,students" }}</span>
-      {% if not status_filter or status_filter == 'pending' %}
-      <a href="?generate={{ group.grouper|urlencode }}" class="hf-btn hf-btn-secondary" style="font-size:11px;padding:4px 10px" onclick="return confirm('Generate missing report cards for {{ group.grouper|escapejs }}?')">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:2px"><path d="M12 5v14M5 12h14"/></svg>
-        Generate Reports
-      </a>
-      {% endif %}
     </div>
   </div>
   <div class="rq-table-wrap">
@@ -113,7 +102,7 @@
         <th>Average</th>
         <th>Scores</th>
         <th>Comment</th>
-        <th>Approval</th>
+        <th>Status</th>
         <th>Teacher</th>
         <th style="padding-right:20px;text-align:right">Actions</th>
       </tr>
@@ -375,7 +364,7 @@ document.getElementById('rejectModal').addEventListener('click', function (e) {
       ? { title: 'Approve ' + n + ' ECD report' + s + '?', body: 'Approve <strong>' + n + ' ECD report' + s + '</strong> as ECD HOD?',
           detail: 'They move to the Head of School for publishing. The Head of School is notified.', confirmText: 'Approve ' + n }
       : { title: 'Publish ' + n + ' report' + s + '?', body: 'Approve and publish <strong>' + n + ' report' + s + '</strong>?',
-          detail: 'The reports become visible in the parent portal now and each learner\'s parents are notified.', confirmText: 'Publish ' + n };
+          detail: 'The reports become visible in the parent portal now and each student\'s parents are notified.', confirmText: 'Publish ' + n };
     opts.type = 'info';
     opts.onConfirm = function () {
       document.getElementById('rqBulkAction').value = action;

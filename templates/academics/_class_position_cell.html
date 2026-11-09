@@ -1,0 +1,1 @@
+{% comment %}One class-position cell: `pos` is {"position", "of"} or None; the overall average waits for the end of term like the report's average.{% endcomment %}{% if p.code == "overall" and not term_complete %}<span class="na">Awaiting end of term</span>{% elif pos %}<b>{{ pos.position }}</b> of {{ pos.of }}{% else %}<span class="na">–</span>{% endif %}

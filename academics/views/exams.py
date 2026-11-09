@@ -568,7 +568,7 @@ class ExamScoreApprovalQueueView(RoleRequiredMixin, TemplateView):
         ctx["selected_class"] = selected_class
         ctx["selected_subject"] = selected_subject
         ctx["pf"] = pf.context(footnote=(
-            "Marks submitted to the HOD for review. Approve or return them per learner or per group."
+            "Marks submitted to the HOD for review. Approve or return them per student or per group."
             if can_approve else "The sign-off status of the marks you entered."
         ))
 

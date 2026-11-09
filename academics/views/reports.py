@@ -182,14 +182,7 @@ class HOSSignOffListView(AllowedRolesEnforcedMixin, RoleRequiredMixin, TemplateV
                         "can_sign_off_all": ready > 0,
                     })
             ctx["class_stats"] = class_stats
-            ctx["pending_signoffs"] = pending_signoffs_by_class(term, classes)
-            ctx["pending_signoff_total"] = sum(p["count"] for p in ctx["pending_signoffs"])
-            
-            # Action: generate missing reports
-            if "generate" in self.request.GET:
-                cls_to_gen = self.request.GET.get("generate")
-                generate_class_reports(term.id, cls_to_gen, self.request.user)
-                
+
         # Sign-off window gating
         from django.utils import timezone as _tz
         today = _tz.localdate()
@@ -253,7 +246,7 @@ class ReportCardListView(RoleRequiredMixin, TemplateView):
         ctx["class_name"] = class_name
         pf.pick_subject([], note="All subjects")
         pf.pick_type(note="Term report")
-        ctx["pf"] = pf.context(footnote="Each student's term report: marks, remarks and comments, signed off before parents see it.")
+        ctx["pf"] = pf.context()
 
         if class_name and term:
             reports = ReportCard.objects.filter(
@@ -286,13 +279,18 @@ class ReportCardListView(RoleRequiredMixin, TemplateView):
         return ctx
 
 
-def _remark_rows(student, term):
+def _remark_rows(student, term, expected=None, remark_names=None):
     """[(subject, remark)] for the remark-only subjects of the learner's class,
-    plus any other remark recorded for them; remark is "" when not entered."""
+    plus any other remark recorded for them; remark is "" when not entered.
+    ``expected`` (the class's subjects) and ``remark_names`` (every
+    remark-only subject) save their lookups when the caller has them."""
     from academics.remarks import remark_subject_names, remarks_for
     from academics.score_progress import expected_subjects_for_class
     remarks = remarks_for(student, term)
-    names = remark_subject_names(expected_subjects_for_class(student.class_name) | set(remarks))
+    if expected is None:
+        expected = expected_subjects_for_class(student.class_name)
+    wanted = set(expected) | set(remarks)
+    names = (remark_names & wanted) if remark_names is not None else remark_subject_names(wanted)
     return [(name, remarks.get(name, "")) for name in sorted(names)]
 
 
@@ -416,13 +414,14 @@ def _shared(shared, key, compute):
     return shared[key]
 
 
-def _class_attendance_rows(reports, term):
-    """Attendance rows for every learner of a class print, from one pass."""
+def _class_attendance(reports, term):
+    """(period, {learner id: attendance row}) for every learner of a class
+    print, from one pass."""
     from attendance import analytics
     start, end = analytics.term_range(term)
     period = analytics.build_period(start, end)
     rows = analytics.build_learners(period, None, student_ids=[r.student_id for r in reports])
-    return {row["student"].pk: row for row in rows}
+    return period, {row["student"].pk: row for row in rows}
 
 
 def _build_report_card_context(report, shared=None):
@@ -440,11 +439,16 @@ def _build_report_card_context(report, shared=None):
     # as absent. Present includes late; absent includes excused.
     from attendance import analytics
     term = report.term
-    if shared is not None and "attendance_rows" in shared:
-        row = shared["attendance_rows"].get(report.student_id) or {}
-    else:
+    if shared is None:
+        # One report: still look attendance up once for this card and the
+        # progress report built into it.
+        shared = {}
+    if "attendance_rows" not in shared:
         start, end = analytics.term_range(term)
-        row = analytics.learner_attendance(report.student, start, end)["row"] or {}
+        att = analytics.learner_attendance(report.student, start, end)
+        shared["attendance_period"] = att["period"]
+        shared["attendance_rows"] = {report.student_id: att["row"]}
+    row = shared["attendance_rows"].get(report.student_id) or {}
     ctx["attendance"] = {
         "present": row.get("in_school", 0),
         "late": row.get("late", 0),
@@ -468,7 +472,7 @@ def _build_report_card_context(report, shared=None):
     # Official report card = the Student Progress Report for the term, plus
     # the report's general traits, class teacher remark and sign-off.
     from academics.views.learner_report import build_learner_report
-    learner = build_learner_report(report.student, term)
+    learner = build_learner_report(report.student, term, shared=shared)
     learner.pop("class_teacher")
     ctx.update(learner)
     ctx["trait_groups"] = _trait_groups(report.general_traits or {})
@@ -482,7 +486,7 @@ def _build_report_card_context(report, shared=None):
         if s.subject_name not in subjects:
             subjects[s.subject_name] = {}
         subjects[s.subject_name][s.exam_type] = float(s.score)
-    exam_weights = get_exam_weights()
+    exam_weights = _shared(shared, ("exam_weights",), get_exam_weights)
     ctx["exam_weights"] = exam_weights
     for subj, exams in subjects.items():
         grade_result = compute_grade_with_gaps(
@@ -611,7 +615,8 @@ class ClassReportPrintView(HOSReportPreviewView):
         from django.template.loader import render_to_string
         report = ctx["report"]
         partial = "academics/_ecd_report_body.html" if report.is_ecd_report else "academics/_progress_report_body.html"
-        related = ("student", "term__academic_year", "signed_off_by", "generated_by", "ecd_hod_approved_by")
+        related = ("student", "student__from_applicant", "term__academic_year", "signed_off_by", "generated_by",
+                   "ecd_hod_approved_by")
         if report.is_ecd_report:
             # One sheet per child in the class: a child whose report has not
             # been started still gets a blank sheet, and learners who left the
@@ -640,10 +645,14 @@ class ClassReportPrintView(HOSReportPreviewView):
         ctx["class_total"] = len(reports)
         # Class-wide lookups (attendance pass, class teacher, reopening date,
         # ECD report lines) are made once for the whole class.
-        shared = {"attendance_rows": _class_attendance_rows(reports, report.term)}
+        period, rows = _class_attendance(reports, report.term)
+        shared = {"attendance_period": period, "attendance_rows": rows}
         ctx["class_view"] = True
+        # The report partials use nothing from the request, so they render
+        # without it: the context processors (notifications, task counts,
+        # branding) would otherwise run again for every learner.
         ctx["class_reports"] = [
-            render_to_string(partial, _build_report_card_context(r, shared), request=self.request) for r in reports
+            render_to_string(partial, _build_report_card_context(r, shared)) for r in reports
         ]
         return ctx
 
@@ -770,14 +779,6 @@ class ReportReviewQueueView(AllowedRolesEnforcedMixin, RoleRequiredMixin, Templa
         dept_class_names = list(
             GradeClass.objects.filter(department__in=allowed_depts).values_list("name", flat=True)
         )
-
-        # Action: generate missing reports for a class
-        if "generate" in self.request.GET:
-            cls_to_gen = self.request.GET.get("generate")
-            if cls_to_gen in dept_class_names:
-                from academics.services import generate_class_reports
-                generate_class_reports(term.id, cls_to_gen, self.request.user)
-                messages.success(self.request, f"Generated missing report cards for {cls_to_gen}.")
 
         # Reports with comments submitted, not yet published -- includes ECD + Primary
         status_filter = self.request.GET.get("status", "")
@@ -943,8 +944,6 @@ class ReportReviewQueueView(AllowedRolesEnforcedMixin, RoleRequiredMixin, Templa
             status=ReportCardStatus.PUBLISHED,
         ).count()
         ctx["total_published"] = published_count
-        ctx["pending_signoffs"] = pending_signoffs_by_class(term, dept_class_names)
-        ctx["pending_signoff_total"] = sum(p["count"] for p in ctx["pending_signoffs"])
         ctx["academics_tab"] = "review_queue"
         return ctx
 
@@ -1062,19 +1061,6 @@ class AcademicAnalyticsView(RoleRequiredMixin, View):
         if term:
             url += "?" + urlencode({"year": term.academic_year_id, "term": term.pk})
         return redirect(url)
-
-
-def pending_signoffs_by_class(term, class_names=None):
-    """Reports not yet published this term, counted per class (reports, not
-    learners). ``class_names`` limits it to a section; None means every class."""
-    from django.db.models import Count
-    qs = ReportCard.objects.filter(term=term).exclude(status=ReportCardStatus.PUBLISHED)
-    if class_names is not None:
-        qs = qs.filter(student__class_name__in=list(class_names))
-    return [
-        {"class_name": r["student__class_name"], "count": r["count"]}
-        for r in qs.values("student__class_name").annotate(count=Count("id")).order_by("student__class_name")
-    ]
 
 
 class AtRiskStudentsListView(RoleRequiredMixin, TemplateView):

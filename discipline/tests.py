@@ -74,7 +74,7 @@ class SubmitTests(IncidentBase):
     def test_form_shows_guidance_and_single_scale(self):
         self.client.force_login(self.hod)
         resp = self.client.get(reverse("discipline:submit"))
-        self.assertContains(resp, "Do not name other learners.")
+        self.assertContains(resp, "Do not name other students.")
         self.assertContains(resp, "Level 2 - Moderate")
         self.assertNotContains(resp, 'name="previous_incidents"')
         self.assertNotContains(resp, 'name="severity"')
@@ -192,7 +192,7 @@ class DetailTests(IncidentBase):
     def test_single_parent_signature_and_no_controls_in_sheet(self):
         sheet = self.sheet(self.page(self.incident()))
         self.assertEqual(sheet.count("Parent / guardian name"), 1)
-        self.assertIn("Relationship to learner", sheet)
+        self.assertIn("Relationship to student", sheet)
         self.assertNotIn("<form", sheet)
         self.assertNotIn("<textarea", sheet)
         self.assertNotIn("Digitally Confirm", self.page(self.incident()).content.decode())

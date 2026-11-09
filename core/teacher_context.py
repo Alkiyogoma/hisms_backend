@@ -37,8 +37,8 @@ def get_teacher_assigned_classes(user) -> set[str]:
 
 
 def get_teacher_assigned_classes_from_tca(user) -> dict[str, dict]:
-    """Return {class_name: {"subjects": {subject_name, ...}, "is_class_teacher": bool}}
-    from TeacherClassAssignment (current term), falling back to all terms and
+    """Return {class_name: {"subjects": {subject_name, ...}, "is_class_teacher": bool,
+    "is_assistant_class_teacher": bool}} from TeacherClassAssignment (current term), falling back to all terms and
     timetable slots so teachers always see their classes.
     """
     if getattr(user, "role", None) != UserRole.TEACHER:
@@ -54,12 +54,15 @@ def get_teacher_assigned_classes_from_tca(user) -> dict[str, dict]:
             if not name:
                 continue
             if name not in result:
-                result[name] = {"subjects": set(), "is_class_teacher": False}
+                result[name] = {"subjects": set(), "is_class_teacher": False,
+                                "is_assistant_class_teacher": False}
             for subj in (a.subjects_taught or []):
                 if subj and isinstance(subj, str):
                     result[name]["subjects"].add(subj.strip())
             if a.is_class_teacher:
                 result[name]["is_class_teacher"] = True
+            if a.is_assistant_class_teacher:
+                result[name]["is_assistant_class_teacher"] = True
         return result
 
     # 1. Try current term
@@ -91,7 +94,8 @@ def get_teacher_assigned_classes_from_tca(user) -> dict[str, dict]:
         if not cn:
             continue
         if cn not in result:
-            result[cn] = {"subjects": set(), "is_class_teacher": False}
+            result[cn] = {"subjects": set(), "is_class_teacher": False,
+                          "is_assistant_class_teacher": False}
         if sn:
             result[cn]["subjects"].add(sn)
     return result
@@ -119,3 +123,10 @@ def is_ecd_teacher(user) -> bool:
         return True
     return any(ecd_template_type_from_class_name(c) is not None for c in classes)
 
+
+
+def sees_whole_class(info) -> bool:
+    """A class teacher or assistant class teacher sees every subject of the
+    class (``info`` is one entry of get_teacher_assigned_classes_from_tca).
+    Seeing is not editing: marks stay with each subject's own teacher."""
+    return bool(info and (info.get("is_class_teacher") or info.get("is_assistant_class_teacher")))

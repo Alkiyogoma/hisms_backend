@@ -17,7 +17,7 @@
 <section aria-labelledby="children-heading">
   <div class="pp-section-head">
     <h2 id="children-heading">My children</h2>
-    {% if learners %}<span class="pp-muted">{{ learners|length }} learner{{ learners|length|pluralize }}</span>{% endif %}
+    {% if learners %}<span class="pp-muted">{{ learners|length }} student{{ learners|length|pluralize }}</span>{% endif %}
   </div>
   {% if learners %}
     <ul class="pp-learners" role="list">
@@ -26,7 +26,7 @@
       {% endfor %}
     </ul>
   {% else %}
-    {% include "parent_portal/v1/includes/empty.html" with title="No learners linked yet" text="We couldn't find any learners linked to your account." %}
+    {% include "parent_portal/v1/includes/empty.html" with title="No students linked yet" text="We couldn't find any students linked to your account." %}
   {% endif %}
 </section>
 

@@ -139,11 +139,11 @@
   {% include "academics/_progress_filters.html" %}
 
   {% if ecd_read_only %}
-  <div class="ee-readonly-note"><span class="chip chip-grey">Read only</span>{{ pf.term.name }} &middot; the learners who were in {{ ecd_class_name }} that term, with the reports as recorded.</div>
+  <div class="ee-readonly-note"><span class="chip chip-grey">Read only</span>{{ pf.term.name }} &middot; the students who were in {{ ecd_class_name }} that term, with the reports as recorded.</div>
   {% endif %}
 
   {% if not structure %}
-    <c-empty-state title="Pick a class and term" desc="Choose an ECD class and term above to start rating learners." icon="search" />
+    <c-empty-state title="Pick a class and term" desc="Choose an ECD class and term above to start rating students." icon="search" />
   {% elif not structure.items %}
     {% if perms.academics.view_ecdsection %}{% url 'academics:ecd_report_setup' as setup_url %}{% endif %}
     <c-empty-state title="This report has no lines yet" desc="Set up what the {{ ecd_class_name }} report contains for Term {{ term_number }} first." icon="doc"
@@ -164,30 +164,30 @@
   </div>
 
   <div class="ee-shell"><div class="ee-layout">
-    <nav class="card ee-list" aria-label="Learners">
-      <div class="ee-list-head" id="eeListHead">Learners</div>
+    <nav class="card ee-list" aria-label="Students">
+      <div class="ee-list-head" id="eeListHead">Students</div>
       <div id="eeList"></div>
     </nav>
 
     <div>
       <div class="ee-picker">
-        <c-button variant="secondary" size="sm" id="eePrevM" aria-label="Previous learner">&lsaquo;</c-button>
-        <select class="hf-select" id="eePicker" aria-label="Learner"></select>
-        <c-button variant="secondary" size="sm" id="eeNextM" aria-label="Next learner">&rsaquo;</c-button>
+        <c-button variant="secondary" size="sm" id="eePrevM" aria-label="Previous student">&lsaquo;</c-button>
+        <select class="hf-select" id="eePicker" aria-label="Student"></select>
+        <c-button variant="secondary" size="sm" id="eeNextM" aria-label="Next student">&rsaquo;</c-button>
       </div>
 
       <section class="card ee-form" id="eeForm" aria-live="polite">
         <div class="ee-form-head">
           <div>
-            <div class="ee-name" id="eeName">Select a learner</div>
+            <div class="ee-name" id="eeName">Select a student</div>
             <div class="ee-meta" id="eeMeta"></div>
           </div>
           <div class="ee-head-tools">
             <span class="ee-mini" id="eeMini"></span>
             <span class="ee-save-state" id="eeSaveState"></span>
             <span class="chip chip-grey" id="eeStatus">—</span>
-            <c-button variant="secondary" size="sm" id="eePrev" aria-label="Previous learner">&lsaquo; Prev</c-button>
-            <c-button variant="secondary" size="sm" id="eeNext" aria-label="Next learner">Next &rsaquo;</c-button>
+            <c-button variant="secondary" size="sm" id="eePrev" aria-label="Previous student">&lsaquo; Prev</c-button>
+            <c-button variant="secondary" size="sm" id="eeNext" aria-label="Next student">Next &rsaquo;</c-button>
           </div>
         </div>
         <div class="ee-banner lock" id="eeLock" hidden>This report has been submitted and is locked. Ask the HOD if it needs a correction.</div>
@@ -231,7 +231,7 @@
 
         <div class="ee-comment">
           <label class="form-label" for="eeComment">Class teacher's comment <span class="req">*</span></label>
-          <textarea id="eeComment" class="hf-input" maxlength="2000" placeholder="At least 50 characters about the learner's progress this term."></textarea>
+          <textarea id="eeComment" class="hf-input" maxlength="2000" placeholder="At least 50 characters about the student's progress this term."></textarea>
           <div class="ee-count" id="eeCount">0 / 50 minimum</div>
         </div>
 
@@ -240,7 +240,7 @@
           <span class="ee-actions-hint">Changes save automatically.</span>
           <div class="ee-actions-btns">
             <c-button variant="secondary" id="eePreview" href="#" target="_blank" rel="noopener" hidden>Preview report</c-button>
-            <c-button variant="secondary" id="eeSaveNext">Save &amp; next learner</c-button>
+            <c-button variant="secondary" id="eeSaveNext">Save &amp; next student</c-button>
             <c-button variant="success" id="eeSubmit">Submit to HOD</c-button>
           </div>
         </div>
@@ -285,7 +285,7 @@
     return s.rated >= s.total ? ['Rated', 'chip-blue'] : [s.rated + '/' + s.total, s.rated ? 'chip-amber' : 'chip-grey'];
   }
   function renderList() {
-    $('eeListHead').textContent = 'Learners (' + students.length + ')';
+    $('eeListHead').textContent = 'Students (' + students.length + ')';
     var list = $('eeList'); list.textContent = '';
     var picker = $('eePicker'); picker.textContent = '';
     students.forEach(function (s) {
@@ -479,11 +479,11 @@
   });
   if ($('eeSubmitAll')) $('eeSubmitAll').addEventListener('click', function () {
     var ready = students.filter(function (s) { return s.status !== 'pending_sign_off' && s.status !== 'published' && s.total && s.rated >= s.total; });
-    if (!ready.length) { toast('No learner is fully rated yet.', 'info'); return; }
+    if (!ready.length) { toast('No student is fully rated yet.', 'info'); return; }
     confirmDeleteModal({
       title: 'Submit ' + ready.length + ' report' + (ready.length > 1 ? 's' : '') + '?',
-      body: 'Send every fully rated learner in <strong>' + CLASS_LABEL + '</strong> to the HOD.',
-      detail: 'Learners whose comment is shorter than 50 characters are skipped.',
+      body: 'Send every fully rated student in <strong>' + CLASS_LABEL + '</strong> to the HOD.',
+      detail: 'Students whose comment is shorter than 50 characters are skipped.',
       confirmText: 'Submit', type: 'info',
       onConfirm: function () {
         flush().then(function () {
@@ -557,7 +557,7 @@
   }
 
   setLocked(READ_ONLY);
-  loadStudents().then(function () { if (students.length) open(students[0].id); else $('eeName').textContent = 'No learners in this class'; });
+  loadStudents().then(function () { if (students.length) open(students[0].id); else $('eeName').textContent = 'No students in this class'; });
 })();
 </script>
 {% endif %}

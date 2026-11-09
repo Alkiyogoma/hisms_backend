@@ -456,7 +456,7 @@ class ECDAssessmentView(RoleRequiredMixin, TemplateView):
         ctx["pf"] = pf.context(footnote=(
             "Earlier term: reports are shown as recorded and cannot be changed."
             if ctx["ecd_read_only"] else
-            "Rate each learner on every line, add the class teacher's comment, then submit to the HOD."
+            "Rate each student on every line, add the class teacher's comment, then submit to the HOD."
         ))
 
         class_type = ecd_report.class_type_of(class_name)

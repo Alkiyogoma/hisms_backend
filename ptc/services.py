@@ -428,6 +428,23 @@ def _is_class_teacher(user, class_name: str = None) -> bool:
     return qs.exists()
 
 
+def _is_assistant_class_teacher(user, class_name: str = None) -> bool:
+    """Assistant class teacher this term (optionally of ``class_name``). They
+    may view the PTC report of learners in that class, never change it."""
+    from hr.models import TeacherClassAssignment
+    from academics.utils import get_current_term
+
+    current_term = get_current_term()
+    if not current_term:
+        return False
+    qs = TeacherClassAssignment.objects.filter(
+        teacher__user=user, term=current_term, is_assistant_class_teacher=True,
+    )
+    if class_name:
+        qs = qs.filter(grade_class__name=class_name)
+    return qs.exists()
+
+
 def _get_class_teacher_for_class(class_name: str):
     """Get the class teacher User for a given class name."""
     from hr.models import TeacherClassAssignment
@@ -476,7 +493,7 @@ def _get_ptc_eligible_students(user, ptc_window=None):
     ).exclude(class_name__in=ecd_class_names | ecd_names)
 
     # For class teachers: filter to own class only (FR-PTC-037)
-    if _is_class_teacher(user):
+    if _is_class_teacher(user) or _is_assistant_class_teacher(user):
         own_classes = _get_teacher_class_names(user)
         students = students.filter(class_name__in=own_classes)
 
@@ -500,6 +517,11 @@ def can_open_ptc(user, student) -> bool:
 
     # Class teacher: must be assigned to the student's class
     if _is_class_teacher(user, student.class_name):
+        return True
+
+    # Assistant class teacher: view only, their own class (the screen is
+    # read-only for anyone but the class teacher and leadership).
+    if _is_assistant_class_teacher(user, student.class_name):
         return True
 
     return False

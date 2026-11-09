@@ -498,12 +498,15 @@ class SubjectAssessmentEntryMixin:
             teacher_tca = get_teacher_assigned_classes_from_tca(user)
             classes = sorted(c for c in teacher_tca if c in department_classes)
             ctx["class_teacher_classes"] = {c for c, info in teacher_tca.items() if info.get("is_class_teacher")}
+            ctx["assistant_classes"] = {c for c, info in teacher_tca.items()
+                                        if info.get("is_assistant_class_teacher") and not info.get("is_class_teacher")}
         else:
             classes = sorted(department_classes)
 
         pf = ProgressFilters(self.request)
         selected_class = pf.pick_class(classes, labels={
-            c: f"{c} ★ Class teacher" for c in ctx.get("class_teacher_classes", ())
+            **{c: f"{c} ☆ Assistant class teacher" for c in ctx.get("assistant_classes", ())},
+            **{c: f"{c} ★ Class teacher" for c in ctx.get("class_teacher_classes", ())},
         })
         term = pf.term
         ctx.update({
@@ -522,9 +525,10 @@ class SubjectAssessmentEntryMixin:
             class_info = teacher_tca.get(selected_class, {})
             assigned_subjects = class_info.get("subjects", set())
             subjects = assigned_subjects
-            # A class teacher sees every subject of the class, read-only
-            # where another teacher teaches it.
-            if class_info.get("is_class_teacher"):
+            # A class teacher or assistant class teacher sees every subject
+            # of the class, read-only where another teacher teaches it.
+            from core.teacher_context import sees_whole_class
+            if sees_whole_class(class_info):
                 gc = GradeClass.objects.filter(name=selected_class).first()
                 if gc:
                     subjects = set(gc.subjects.filter(is_active=True).values_list("name", flat=True))

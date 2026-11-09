@@ -181,9 +181,10 @@ def needs_help(band):
     return band in ("critical", "support")
 
 
-def compute_results(scope, terms, year, exam_type=None, student_ids=None):
+def compute_results(scope, terms, year, exam_type=None, student_ids=None, split_terms=False):
     """One result per (learner, subject): the learner's mark in that subject
-    across ``terms`` from approved scores only.
+    across ``terms`` from approved scores only. With ``split_terms`` there is
+    one result per (learner, subject, term) instead, each with ``term_id``.
 
     With ``exam_type`` the mark is that assessment's percentage; otherwise it
     is the weighted average of the assessments marked so far in each term
@@ -216,7 +217,7 @@ def compute_results(scope, terms, year, exam_type=None, student_ids=None):
         code: float(w) for code, w in ExamTypeConfiguration.objects.values_list("code", "weight_percentage")
     }
 
-    # (student, subject) -> term -> [(pct, weight)]
+    # (student, subject[, term]) -> term -> [(pct, weight)]
     per_term = defaultdict(lambda: defaultdict(list))
     for sid, tid, subject, etype, score, max_score in raw:
         if sid not in students:
@@ -226,10 +227,12 @@ def compute_results(scope, terms, year, exam_type=None, student_ids=None):
             continue
         max_score = float(max_score or 100) or 100.0
         pct = float(score) / max_score * 100.0
-        per_term[(sid, subject)][tid].append((pct, weights.get(etype, 0.0)))
+        key = (sid, subject, tid) if split_terms else (sid, subject)
+        per_term[key][tid].append((pct, weights.get(etype, 0.0)))
 
     results = []
-    for (sid, subject), terms_map in per_term.items():
+    for key, terms_map in per_term.items():
+        sid, subject = key[0], key[1]
         term_marks = []
         for marks in terms_map.values():
             total_w = sum(w for _, w in marks)
@@ -252,6 +255,7 @@ def compute_results(scope, terms, year, exam_type=None, student_ids=None):
             "band": _mark_band(mark),
             "status": BAND_LABELS[_mark_band(mark)],
             "assessments": sum(len(m) for m in terms_map.values()),
+            **({"term_id": key[2]} if split_terms else {}),
         })
     return results
 
@@ -476,19 +480,49 @@ def default_learner_term(student, terms=None):
     return terms[-1] if terms else current
 
 
-def learner_record(student, term):
+def active_exam_types(shared=None):
+    """Active assessment types in report order (kept in ``shared`` when given)."""
+    key = ("active_exam_types",)
+    if shared is not None and key in shared:
+        return shared[key]
+    types = list(ExamTypeConfiguration.objects.filter(is_active=True).order_by("display_order", "name"))
+    if shared is not None:
+        shared[key] = types
+    return types
+
+
+def class_term_results(student, term, shared=None):
+    """Approved results for ``term`` of everyone in the class ``student`` was
+    in that term (not the whole school). ``shared`` (a dict) keeps them for
+    the next learner of the same class when a class is printed together."""
+    from academics.class_position import classmate_ids
+
+    year = term.academic_year
+    class_name = _classes_for_year([student.pk], year, {term.pk}).get(student.pk) or student.class_name
+    key = ("class_term_results", class_name, term.pk)
+    if shared is not None and key in shared:
+        return shared[key]
+    school = Scope(label="Whole school", kind="school")
+    ids = classmate_ids(class_name, year, shared=shared) | {student.pk}
+    results = compute_results(school, [term], year, student_ids=ids)
+    if shared is not None:
+        shared[key] = results
+    return results
+
+
+def learner_record(student, term, shared=None, terms=None):
     """One learner's approved results for ``term``: each subject's mark per
     assessment and weighted, with the class average and the learner's
-    position in class, plus their average in every term so far."""
+    position in class, plus their average in every term so far.
+    ``terms`` are the learner's terms when the caller already has them."""
     school = Scope(label="Whole school", kind="school")
-    types = list(ExamTypeConfiguration.objects.filter(is_active=True).order_by("display_order", "name"))
+    types = active_exam_types(shared)
     record = {"term": term, "types": types, "subjects": [], "average": None, "grade": None, "band": None,
               "below_pass": [], "position": None, "class_size": 0, "class_average": None,
               "history": [], "trend": None, "assessments": 0, "class_diff": None}
     if term is None:
         return record
-    year = term.academic_year
-    everyone = compute_results(school, [term], year)
+    everyone = class_term_results(student, term, shared)
     mine = [r for r in everyone if r["student_id"] == student.pk]
     if mine:
         class_name = mine[0]["class_name"]
@@ -522,9 +556,15 @@ def learner_record(student, term):
         record["class_size"] = len(averages)
         record["class_average"] = round(sum(averages) / len(averages), 1)
         record["class_diff"] = round(avg - record["class_average"], 1)
-    for t in learner_terms(student):
-        # The selected term's rows are already in hand.
-        rows = mine if t == term else compute_results(school, [t], t.academic_year, student_ids=[student.pk])
+    # Every term's results for this learner in one pass (the selected
+    # term's rows are already in hand).
+    terms = learner_terms(student) if terms is None else terms
+    others = [t for t in terms if t != term]
+    by_term = defaultdict(list)
+    for r in compute_results(school, others, None, student_ids=[student.pk], split_terms=True) if others else []:
+        by_term[r["term_id"]].append(r)
+    for t in terms:
+        rows = mine if t == term else by_term.get(t.pk, [])
         if rows:
             a = round(sum(r["mark"] for r in rows) / len(rows), 1)
             record["history"].append({"term": t, "average": a, "grade": get_grade_from_score(a),
