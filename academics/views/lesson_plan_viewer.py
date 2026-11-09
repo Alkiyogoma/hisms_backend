@@ -100,6 +100,7 @@ class LessonPlanThreadView(RoleRequiredMixin, View):
                 "teacher": plan.teacher.get_full_name() or plan.teacher.username,
                 "status": plan.get_status_display(),
                 "feedback": plan.reviewer_feedback,
+                "reflection": plan.reflection,
             },
             "files": files,
             "comments": [_comment_json(c, request.user) for c in comments],

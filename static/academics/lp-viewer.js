@@ -65,6 +65,7 @@
     $('#lpvTabs').innerHTML = '';
     $('#lpvList').innerHTML = '';
     $('#lpvFeedback').hidden = true;
+    $('#lpvReflection').hidden = true;
     message('spin', 'Loading the plan…');
     setSwitch(pane === 'thread' ? 'thread' : 'doc');
     root.classList.add('open');
@@ -82,6 +83,9 @@
         var fb = $('#lpvFeedback');
         fb.hidden = !data.plan.feedback;
         if (data.plan.feedback) { fb.querySelector('span').textContent = data.plan.feedback; }
+        var rf = $('#lpvReflection');
+        rf.hidden = !data.plan.reflection;
+        if (data.plan.reflection) { rf.querySelector('span').textContent = data.plan.reflection; }
         renderTabs(data.files, attachmentId);
         renderComments(data.comments);
         renderForm(data);

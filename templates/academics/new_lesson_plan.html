@@ -270,8 +270,8 @@
                     Withdraw
                   </button>
                 </form>
-              {% elif p.status == 'approved' %}
-                <div style="font-size:10px; color:#1B7B34; font-weight:600">Approved</div>
+              {% elif p.status == 'approved' or p.status == 'awaiting_reflection' or p.status == 'complete' %}
+                <div style="font-size:10px; color:#1B7B34; font-weight:600">{{ p.get_status_display }}</div>
               {% endif %}
             </div>
             {% if att_count > 0 %}
@@ -314,6 +314,8 @@ var currentMondayStr   = '{{ current_monday|date:"Y-m-d" }}';
 var weekDates = [{% for d in week_dates %}'{{ d|date:"j M" }}'{% if not forloop.last %},{% endif %}{% endfor %}];
 var LP_OUTLINE = {
   'approved':           {border: '#16A34A', bg: '#F0FDF4', fg: '#166534', label: 'Approved'},
+  'awaiting_reflection':{border: '#2563EB', bg: '#EFF6FF', fg: '#1D4ED8', label: 'Awaiting reflection'},
+  'complete':           {border: '#15803D', bg: '#DCFCE7', fg: '#14532D', label: 'Complete'},
   'submitted':          {border: '#2563EB', bg: '#EFF6FF', fg: '#1E40AF', label: 'Submitted'},
   'draft':              {border: '#94A3B8', bg: '#F8FAFC', fg: '#475569', label: 'Draft'},
   'missing':            {border: '#DC2626', bg: '#FEF2F2', fg: '#991B1B', label: 'Missing'},

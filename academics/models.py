@@ -573,9 +573,21 @@ class LessonPlanStatus(models.TextChoices):
     SUBMITTED = "submitted", "Submitted"
     REVISION_REQUESTED = "revision_requested", "Revision Requested"
     APPROVED = "approved", "Approved"
+    # After an approved lesson is taught, the teacher who taught it writes a
+    # short reflection; only then is the plan complete.
+    AWAITING_REFLECTION = "awaiting_reflection", "Awaiting Reflection"
+    COMPLETE = "complete", "Complete"
     REJECTED = "rejected", "Rejected"
     MISSING = "missing", "Missing"
 
+
+# Every status a plan can have once the HOD has approved it. Counts of
+# "approved" plans (compliance, reports, dashboards) use these.
+LESSON_PLAN_APPROVED_STATUSES = (
+    LessonPlanStatus.APPROVED,
+    LessonPlanStatus.AWAITING_REFLECTION,
+    LessonPlanStatus.COMPLETE,
+)
 
 LESSON_PLAN_FILE_REQUIRED = (
     "Attach the lesson plan file before submitting. A plan cannot be submitted without one."
@@ -601,6 +613,9 @@ class LessonPlan(TimeStampedModel):
     )
     reviewed_at = models.DateTimeField(null=True, blank=True)
     reviewer_feedback = models.TextField(blank=True)
+    taught_at = models.DateTimeField(null=True, blank=True)
+    reflection = models.TextField(blank=True, default="", help_text="How the lesson went, from the teacher who taught it")
+    reflection_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         permissions = [
@@ -616,10 +631,12 @@ class LessonPlan(TimeStampedModel):
         super().clean()
         if not self.class_name.strip() or not self.subject_name.strip():
             raise ValidationError("Class and subject are required.")
-        if self.status in {LessonPlanStatus.APPROVED, LessonPlanStatus.REJECTED, LessonPlanStatus.REVISION_REQUESTED} and not self.reviewed_by_id:
+        if self.status in {*LESSON_PLAN_APPROVED_STATUSES, LessonPlanStatus.REJECTED, LessonPlanStatus.REVISION_REQUESTED} and not self.reviewed_by_id:
             raise ValidationError("reviewed_by is required for approved/rejected/revision plans.")
         if self.status in {LessonPlanStatus.REJECTED, LessonPlanStatus.REVISION_REQUESTED} and not (self.reviewer_feedback or "").strip():
             raise ValidationError("Feedback is required when rejecting or requesting revision.")
+        if self.status == LessonPlanStatus.COMPLETE and not (self.reflection or "").strip():
+            raise ValidationError("A lesson plan is complete only once the teacher's reflection is entered.")
         # A submitted plan is reviewed from its attached file, so it cannot be
         # submitted without one. Checked when a plan becomes submitted, so one
         # submitted earlier without a file can still be edited to add it.

@@ -182,7 +182,7 @@
               <div class="trow-sub">{{ plan.get_status_display }} &middot; Week starting {{ plan.week_start_date|date:"d M" }}</div>
             </div>
             <span class="trow-right">
-              <span class="chip {% if plan.status == 'approved' %}chip-green{% elif plan.status == 'rejected' %}chip-red{% elif plan.status == 'submitted' %}chip-amber{% else %}chip-grey{% endif %}">
+              <span class="chip {% if plan.status == 'approved' or plan.status == 'complete' %}chip-green{% elif plan.status == 'awaiting_reflection' %}chip-blue{% elif plan.status == 'rejected' %}chip-red{% elif plan.status == 'submitted' %}chip-amber{% else %}chip-grey{% endif %}">
                   {% if plan.status == 'rejected' %}Resubmit{% else %}{{ plan.get_status_display }}{% endif %}
               </span>
             </span>

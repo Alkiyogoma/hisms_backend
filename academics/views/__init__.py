@@ -11,6 +11,8 @@ from academics.views.lesson_plans import (
     LessonPlanUpdateView,
     LessonPlanSubmitView,
     LessonPlanWithdrawView,
+    LessonPlanMarkTaughtView,
+    LessonPlanReflectionView,
     LessonPlanDeleteView,
     LessonPlanAttachmentDeleteView,
     LessonPlanReviewView,

@@ -1,5 +1,5 @@
 {% load static %}{# Lesson plan viewer: the attached plan beside its comment thread. Include once per page; open with LPViewer.open(planId[, attachmentId]). #}
-<link rel="stylesheet" href="{% static 'academics/lp-viewer.css' %}?v=2">
+<link rel="stylesheet" href="{% static 'academics/lp-viewer.css' %}?v=3">
 <div class="lpv" id="lpViewer" role="dialog" aria-modal="true" aria-labelledby="lpvTitle"
      data-thread-url="{% url 'academics:lesson_plan_thread' 0 %}">
   <div class="lpv-panel">
@@ -50,6 +50,7 @@
           <p>Questions and notes between the teacher and reviewers. Commenting does not change the plan&rsquo;s status.</p>
         </div>
         <div class="lpv-feedback" id="lpvFeedback" hidden><strong>Review feedback:</strong> <span></span></div>
+        <div class="lpv-feedback lpv-reflection" id="lpvReflection" hidden><strong>Teacher's reflection:</strong> <span></span></div>
         <div class="lpv-list" id="lpvList" aria-live="polite"></div>
         <form class="lpv-form" id="lpvForm" method="post" hidden>
           {% csrf_token %}
@@ -66,4 +67,4 @@
     </div>
   </div>
 </div>
-<script src="{% static 'academics/lp-viewer.js' %}?v=2" defer></script>
+<script src="{% static 'academics/lp-viewer.js' %}?v=3" defer></script>

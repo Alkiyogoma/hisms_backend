@@ -13,7 +13,7 @@ from core.permissions import RoleRequiredMixin
 from users.models import UserRole
 
 from academics import performance
-from academics.models import LessonPlan, LessonPlanStatus, Term, GradeClass, Department, ReportCard, ReportCardStatus, ExamScore
+from academics.models import LessonPlan, LessonPlanStatus, LESSON_PLAN_APPROVED_STATUSES, Term, GradeClass, Department, ReportCard, ReportCardStatus, ExamScore
 from admissions.models import Applicant, ApplicantStatus
 from attendance.models import PRESENT_STATUSES, AttendanceEntry, AttendanceStatus
 from audit.models import AuditLog
@@ -307,7 +307,7 @@ class HOSDashboardView(RoleRequiredMixin, TemplateView):
         # Lesson plan counts in one query
         plan_stats = LessonPlan.objects.aggregate(
             total=Count('id'),
-            approved=Count('id', filter=Q(status=LessonPlanStatus.APPROVED)),
+            approved=Count('id', filter=Q(status__in=LESSON_PLAN_APPROVED_STATUSES)),
             pending=Count('id', filter=Q(status=LessonPlanStatus.SUBMITTED)),
         )
         total_plans = plan_stats['total']
@@ -400,7 +400,7 @@ class HOSDashboardView(RoleRequiredMixin, TemplateView):
             )
             .values('class_name')
             .annotate(
-                approved=Count('id', filter=Q(status=LessonPlanStatus.APPROVED)),
+                approved=Count('id', filter=Q(status__in=LESSON_PLAN_APPROVED_STATUSES)),
                 total=Count('id'),
             )
         )
@@ -567,7 +567,7 @@ class HOSDashboardView(RoleRequiredMixin, TemplateView):
                     )
                     .values('class_name')
                     .annotate(
-                        approved=Count('id', filter=Q(status=LessonPlanStatus.APPROVED)),
+                        approved=Count('id', filter=Q(status__in=LESSON_PLAN_APPROVED_STATUSES)),
                         total=Count('id'),
                     )
                 )
@@ -915,7 +915,7 @@ class PrimaryHODDashboardView(RoleRequiredMixin, TemplateView):
         teacher_pks = list(dept_staff.values_list('pk', flat=True))
         approved_teachers = set(
             LessonPlan.objects.filter(
-                teacher_id__in=teacher_pks, status=LessonPlanStatus.APPROVED
+                teacher_id__in=teacher_pks, status__in=LESSON_PLAN_APPROVED_STATUSES
             ).values_list('teacher_id', flat=True)
         )
         submitted_teachers = set(

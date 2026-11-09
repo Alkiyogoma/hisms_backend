@@ -162,7 +162,7 @@ class StudentListView(RoleRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        qs = self.get_queryset()
+        qs = self.object_list  # the filtered, unpaginated queryset behind the table
         ctx["archive_status"] = self.request.GET.get(
             "archive_status", "all" if self.request.GET.get("include_archived") == "1" else "active",
         )
@@ -188,10 +188,163 @@ class StudentListView(RoleRequiredMixin, ListView):
         ctx["statuses"] = StudentStatus.choices
         ctx["genders"] = [("male", "Male"), ("female", "Female"), ("other", "Other")]
         ctx["today_date"] = date.today().strftime("%d %B %Y")
-        ctx["total_students"] = qs.count()
+        summary = student_sex_summary(qs)
+        ctx["summary"] = summary
+        ctx["total_students"] = summary["total"]
+        export_params = self.request.GET.copy()
+        export_params.pop("page", None)
+        export_params.pop("format", None)
+        ctx["export_query"] = export_params.urlencode()
         from academics.models import AcademicYear
         ctx["academic_years"] = AcademicYear.objects.all().order_by("-is_current", "-name")
         return ctx
+
+
+def student_sex_summary(qs):
+    """Total, boys and girls in a student queryset (one query)."""
+    return qs.aggregate(
+        total=Count("id"),
+        boys=Count("id", filter=Q(gender="male")),
+        girls=Count("id", filter=Q(gender="female")),
+    )
+
+
+def student_export_status(student) -> str:
+    """Status label for exports: archived records say so alongside their status."""
+    label = student.get_status_display()
+    if student.is_archived:
+        return "Archived" if student.status == StudentStatus.ACTIVE else f"Archived ({label})"
+    return label
+
+
+class StudentListExportView(StudentListView):
+    """Download every student matching the list filters (all pages) as Excel or PDF.
+
+    Subclasses StudentListView so the export uses exactly the list's queryset,
+    including role scoping (teacher classes, HOD departments).
+    """
+
+    COLUMNS = ["Name", "Sex", "Age", "Grade", "Status"]
+
+    def get(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        rows = [
+            [
+                s.get_full_name(),
+                s.get_gender_display() if s.gender else "",
+                s.age if s.age is not None else "",
+                s.class_name,
+                student_export_status(s),
+            ]
+            for s in qs
+        ]
+        summary = student_sex_summary(qs)
+        stamp = timezone.localdate().isoformat()
+        if request.GET.get("format") == "pdf":
+            return self._pdf(rows, summary, stamp)
+        return self._xlsx(rows, summary, stamp)
+
+    def _filter_description(self):
+        from academics.models import AcademicYear, Department
+        g = self.request.GET
+        archive_status = g.get("archive_status", "all" if g.get("include_archived") == "1" else "active")
+        parts = [{"archived": "Archived records", "all": "All records"}.get(archive_status, "Active records")]
+        ay = g.get("academic_year", "").strip()
+        if ay.isdigit():
+            year = AcademicYear.objects.filter(pk=ay).first()
+            if year:
+                parts.append(f"Academic year {year.name}")
+        if g.get("department"):
+            parts.append(dict(Department.choices).get(g["department"], g["department"]))
+        if g.get("class_name"):
+            parts.append(f"Class {g['class_name']}")
+        if g.get("status"):
+            parts.append(dict(StudentStatus.choices).get(g["status"], g["status"]))
+        if g.get("gender"):
+            parts.append(g["gender"].capitalize())
+        if g.get("q", "").strip():
+            parts.append(f"Search \"{g['q'].strip()}\"")
+        return " · ".join(parts)
+
+    def _xlsx(self, rows, summary, stamp):
+        import csv
+        import io
+        from django.http import HttpResponse
+
+        try:
+            from openpyxl import Workbook
+            from openpyxl.styles import Font, PatternFill
+        except ImportError:
+            # No Excel library on this server: CSV opens in Excel just the same.
+            buf = io.StringIO()
+            writer = csv.writer(buf)
+            writer.writerow(self.COLUMNS)
+            writer.writerows(rows)
+            resp = HttpResponse("﻿" + buf.getvalue(), content_type="text/csv; charset=utf-8")
+            resp["Content-Disposition"] = f'attachment; filename="students-{stamp}.csv"'
+            return resp
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Students"
+        ws.append(self.COLUMNS)
+        for cell in ws[1]:
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(start_color="023AA5", end_color="023AA5", fill_type="solid")
+        for row in rows:
+            ws.append(row)
+        ws.freeze_panes = "A2"
+        for col, width in zip("ABCDE", (32, 10, 8, 18, 22)):
+            ws.column_dimensions[col].width = width
+
+        info = wb.create_sheet("Summary")
+        for line in (
+            ["Student list", ""],
+            ["Filter", self._filter_description()],
+            ["Generated", stamp],
+            ["Total students", summary["total"]],
+            ["Boys", summary["boys"]],
+            ["Girls", summary["girls"]],
+        ):
+            info.append(line)
+        info["A1"].font = Font(bold=True, size=13)
+        info.column_dimensions["A"].width = 18
+        info.column_dimensions["B"].width = 60
+
+        out = io.BytesIO()
+        wb.save(out)
+        resp = HttpResponse(
+            out.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        resp["Content-Disposition"] = f'attachment; filename="students-{stamp}.xlsx"'
+        return resp
+
+    def _pdf(self, rows, summary, stamp):
+        from django.http import HttpResponse
+        from django.shortcuts import render
+        from django.template.loader import render_to_string
+
+        ctx = {
+            "columns": self.COLUMNS,
+            "rows": rows,
+            "summary": summary,
+            "filter_description": self._filter_description(),
+            "generated_at": timezone.localtime(),
+            "is_pdf": True,
+        }
+        html = render_to_string("students/list_export_pdf.html", ctx, request=self.request)
+        try:
+            from weasyprint import HTML
+            pdf = HTML(string=html, base_url=self.request.build_absolute_uri("/")).write_pdf()
+        except (ImportError, OSError):
+            # No PDF engine on this server: open the document with the print
+            # dialog, where "Save as PDF" gives the same file.
+            return render(self.request, "students/list_export_pdf.html",
+                          {**ctx, "is_pdf": False, "print_now": True})
+        resp = HttpResponse(pdf, content_type="application/pdf")
+        resp["Content-Disposition"] = f'attachment; filename="students-{stamp}.pdf"'
+        return resp
 
 
 class StudentDetailView(RoleRequiredMixin, DetailView):

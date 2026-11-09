@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student List | {{ generated_at|date:"d M Y" }}</title>
+{% include "includes/hodari_print_styles.html" %}
+<style>
+  @page { size: A4; margin: 14mm 12mm; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #1a2233; margin: 0; background: #fff; }
+  .doc { max-width: 900px; margin: 0 auto; padding: 16px; }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 10px 16px; background: #F4F6FB; border-bottom: 1px solid #DDE3EE; font-size: 13px; }
+  .toolbar .btn { padding: 6px 14px; border-radius: 6px; border: 1px solid #023AA5; background: #023AA5;
+    color: #fff; font-size: 13px; cursor: pointer; }
+  .doc-title { font-size: 18pt; font-weight: bold; color: #023AA5; text-transform: uppercase; margin: 14px 0 2px; }
+  .doc-sub { font-size: 11px; color: #5b6475; }
+  .totals { display: flex; gap: 10px; margin: 12px 0 14px; }
+  .totals div { flex: 1; border: 1px solid #DDE3EE; border-radius: 8px; padding: 8px 12px; }
+  .totals span { display: block; font-size: 9px; text-transform: uppercase; letter-spacing: .05em; color: #5b6475; }
+  .totals b { font-size: 16pt; color: #023AA5; }
+  table.list { width: 100%; border-collapse: collapse; font-size: 10.5px; }
+  table.list th { background: #023AA5; color: #fff; text-align: left; padding: 6px 8px; }
+  table.list td { padding: 5px 8px; border-bottom: 1px solid #E6EAF2; }
+  table.list tr:nth-child(even) td { background: #F8F9FC; }
+  table.list thead { display: table-header-group; }
+  table.list tr { page-break-inside: avoid; }
+  .num { color: #5b6475; width: 28px; }
+  @media print { .toolbar { display: none; } }
+</style>
+</head>
+<body>
+{% if not is_pdf %}
+<div class="toolbar">
+  <span>A4 document. In the print dialog choose <b>Save as PDF</b>.</span>
+  <button class="btn" type="button" onclick="window.print()">Print</button>
+</div>
+{% endif %}
+<div class="doc">
+  {% include "includes/hodari_print_header.html" %}
+  <div class="doc-title">Student List</div>
+  <div class="doc-sub">{{ filter_description }} &middot; Generated {{ generated_at|date:"d M Y, H:i" }}</div>
+  <div class="totals">
+    <div><span>Total students</span><b>{{ summary.total }}</b></div>
+    <div><span>Boys</span><b>{{ summary.boys }}</b></div>
+    <div><span>Girls</span><b>{{ summary.girls }}</b></div>
+  </div>
+  <table class="list">
+    <thead>
+      <tr><th class="num">#</th>{% for c in columns %}<th>{{ c }}</th>{% endfor %}</tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr><td class="num">{{ forloop.counter }}</td>{% for v in row %}<td>{{ v }}</td>{% endfor %}</tr>
+      {% empty %}
+      <tr><td colspan="6">No students match this filter.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if not is_pdf and print_now %}
+<script>window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 350); });</script>
+{% endif %}
+</body>
+</html>

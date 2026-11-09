@@ -24,6 +24,7 @@ from academics.models import (
     ExamScore,
     ExamType,
     LessonPlan,
+    LESSON_PLAN_APPROVED_STATUSES,
     LESSON_PLAN_FILE_REQUIRED,
     LessonPlanAttachment,
     LessonPlanStatus,
@@ -91,7 +92,9 @@ def _is_super_admin(user) -> bool:
 
 
 # Plans that are waiting on the person looking at the list come first.
-TEACHER_ACTION_STATUSES = (LessonPlanStatus.REVISION_REQUESTED, LessonPlanStatus.REJECTED, LessonPlanStatus.DRAFT)
+TEACHER_ACTION_STATUSES = (
+    LessonPlanStatus.REVISION_REQUESTED, LessonPlanStatus.REJECTED, LessonPlanStatus.AWAITING_REFLECTION, LessonPlanStatus.DRAFT,
+)
 REVIEWER_ACTION_STATUSES = (LessonPlanStatus.SUBMITTED,)
 
 
@@ -104,6 +107,14 @@ def _search_lesson_plans(qs, text):
             | Q(teacher__first_name__icontains=word) | Q(teacher__last_name__icontains=word)
         )
     return qs
+
+
+def _filter_status(qs, status):
+    """"Approved" covers every stage after approval (awaiting reflection,
+    complete) so the list matches the Approved count."""
+    if status == LessonPlanStatus.APPROVED:
+        return qs.filter(status__in=LESSON_PLAN_APPROVED_STATUSES)
+    return qs.filter(status=status)
 
 
 def _action_first(qs, statuses):
@@ -228,17 +239,22 @@ class LessonPlanListView(RoleRequiredMixin, TemplateView):
 
         # Stat counts: HODs see all plans (excluding drafts), teachers see only their own
         if _is_hod_like(user):
-            approved_count = LessonPlan.objects.filter(status=LessonPlanStatus.APPROVED).count()
+            approved_count = LessonPlan.objects.filter(status__in=LESSON_PLAN_APPROVED_STATUSES).count()
             draft_count = 0
             submitted_count = LessonPlan.objects.filter(status=LessonPlanStatus.SUBMITTED).count()
             total_plans_count = LessonPlan.objects.exclude(status=LessonPlanStatus.DRAFT).count()
         else:
-            approved_count = LessonPlan.objects.filter(teacher=user, status=LessonPlanStatus.APPROVED).count()
+            approved_count = LessonPlan.objects.filter(teacher=user, status__in=LESSON_PLAN_APPROVED_STATUSES).count()
             draft_count = LessonPlan.objects.filter(teacher=user, status=LessonPlanStatus.DRAFT).count()
             submitted_count = LessonPlan.objects.filter(teacher=user, status=LessonPlanStatus.SUBMITTED).count()
             total_plans_count = LessonPlan.objects.filter(teacher=user).count()
 
         ctx["approved_count"] = approved_count
+        # Lessons taught but still waiting on the teacher's reflection.
+        awaiting = LessonPlan.objects.filter(status=LessonPlanStatus.AWAITING_REFLECTION)
+        if not _is_hod_like(user):
+            awaiting = awaiting.filter(teacher=user)
+        ctx["awaiting_reflection_count"] = awaiting.count()
         ctx["draft_count"] = draft_count
         ctx["submitted_count"] = submitted_count
         ctx["total_plans_count"] = total_plans_count
@@ -246,7 +262,7 @@ class LessonPlanListView(RoleRequiredMixin, TemplateView):
         # Status filter for My Submissions
         status_filter = self.request.GET.get("status", "")
         if status_filter:
-            mine_qs = mine_qs.filter(status=status_filter)
+            mine_qs = _filter_status(mine_qs, status_filter)
         ctx["status_filter"] = status_filter
 
         page = int(self.request.GET.get("page", 1))
@@ -296,7 +312,7 @@ class LessonPlanListView(RoleRequiredMixin, TemplateView):
                 except (ValueError, TypeError):
                     pass
             if status_filter:
-                display_qs = display_qs.filter(status=status_filter)
+                display_qs = _filter_status(display_qs, status_filter)
         else:
             display_qs = mine_qs
         if _is_hod_like(user) and selected_teacher:
@@ -358,7 +374,7 @@ class LessonPlanListView(RoleRequiredMixin, TemplateView):
         # Recent plans for HOD/HOS review queue
         if _is_hod_like(user):
             recent_plans = LessonPlan.objects.filter(
-                status__in=[LessonPlanStatus.SUBMITTED, LessonPlanStatus.APPROVED, LessonPlanStatus.REJECTED, LessonPlanStatus.REVISION_REQUESTED]
+                status__in=[LessonPlanStatus.SUBMITTED, *LESSON_PLAN_APPROVED_STATUSES, LessonPlanStatus.REJECTED, LessonPlanStatus.REVISION_REQUESTED]
             ).select_related("teacher", "term").order_by("-updated_at")[:10]
             ctx["recent_plans"] = recent_plans
 
@@ -966,6 +982,7 @@ def _lesson_plan_snapshot(plan):
         "assessment_strategy": plan.assessment_strategy,
         "resources": plan.resources,
         "status": plan.status,
+        "reflection": plan.reflection,
     }
 
 
@@ -1108,7 +1125,7 @@ class LessonPlanSubmitView(RoleRequiredMixin, LoginRequiredMixin, View):
         plan = get_object_or_404(LessonPlan, pk=pk)
         if plan.teacher_id != request.user.id and request.user.role != UserRole.SUPER_ADMIN:
             raise PermissionDenied()
-        if plan.status in {LessonPlanStatus.APPROVED}:
+        if plan.status in LESSON_PLAN_APPROVED_STATUSES:
             raise ValidationError("Approved lesson plans cannot be resubmitted.")
         # Require at least one attachment
         if not plan.attachments.exists():
@@ -1198,6 +1215,103 @@ class LessonPlanWithdrawView(RoleRequiredMixin, LoginRequiredMixin, View):
             )
             return HttpResponse(js)
         return redirect("academics:lesson_plan_edit", pk=plan.pk)
+
+
+REFLECTION_MAX_LENGTH = 2000
+
+
+def _taught_plan_for(request, pk, allowed_statuses):
+    """The plan, if the signed-in user is the teacher who teaches it and it is
+    at a stage of the taught/reflection step. Nobody else, super admins and
+    HODs included, may mark it taught or write its reflection."""
+    plan = get_object_or_404(LessonPlan.objects.select_related("term"), pk=pk)
+    if plan.teacher_id != request.user.id:
+        raise PermissionDenied("Only the teacher who taught this lesson can do this.")
+    if plan.status not in allowed_statuses:
+        return plan, False
+    return plan, True
+
+
+class LessonPlanMarkTaughtView(RoleRequiredMixin, View):
+    """The teacher marks an approved lesson as taught. The plan then awaits
+    their reflection; if the reflection is sent at the same time it is
+    complete straight away."""
+    required_permission = "academics.view_lessonplan"
+
+    def post(self, request, pk: int):
+        plan, ok = _taught_plan_for(request, pk, {LessonPlanStatus.APPROVED})
+        if not ok:
+            messages.error(request, "Only approved lesson plans can be marked as taught.")
+            return redirect("academics:lesson_plans")
+        reflection = (request.POST.get("reflection") or "").strip()
+        if len(reflection) > REFLECTION_MAX_LENGTH:
+            messages.error(request, f"Keep the reflection under {REFLECTION_MAX_LENGTH} characters.")
+            return redirect("academics:lesson_plans")
+        before = _lesson_plan_snapshot(plan)
+        now = timezone.now()
+        plan.taught_at = now
+        fields = ["status", "taught_at", "updated_at"]
+        if reflection:
+            plan.reflection = reflection
+            plan.reflection_at = now
+            plan.status = LessonPlanStatus.COMPLETE
+            fields += ["reflection", "reflection_at"]
+        else:
+            plan.status = LessonPlanStatus.AWAITING_REFLECTION
+        # No full_clean: the view checks the reflection itself, and an older
+        # approved plan missing its reviewer must not stop the teacher here.
+        plan.save(update_fields=fields)
+        log_event(
+            actor=request.user,
+            action_type="LESSON_PLAN_TAUGHT",
+            model_name="LessonPlan",
+            object_id=plan.pk,
+            description=f"Lesson plan {plan.class_name} - {plan.subject_name} ({plan.week_start_date}) marked as taught",
+            before=before,
+            after=_lesson_plan_snapshot(plan),
+            request=request,
+        )
+        if reflection:
+            messages.success(request, "Lesson marked as taught and your reflection saved. The plan is complete.")
+        else:
+            messages.success(request, "Lesson marked as taught. Add your reflection to complete the plan.")
+        return redirect("academics:lesson_plans")
+
+
+class LessonPlanReflectionView(RoleRequiredMixin, View):
+    """The teacher who taught the lesson writes how it went; the plan is then
+    complete."""
+    required_permission = "academics.view_lessonplan"
+
+    def post(self, request, pk: int):
+        plan, ok = _taught_plan_for(request, pk, {LessonPlanStatus.AWAITING_REFLECTION})
+        if not ok:
+            messages.error(request, "A reflection can only be added once the lesson is marked as taught.")
+            return redirect("academics:lesson_plans")
+        reflection = (request.POST.get("reflection") or "").strip()
+        if not reflection:
+            messages.error(request, "Write a short reflection on how the lesson went.")
+            return redirect("academics:lesson_plans")
+        if len(reflection) > REFLECTION_MAX_LENGTH:
+            messages.error(request, f"Keep the reflection under {REFLECTION_MAX_LENGTH} characters.")
+            return redirect("academics:lesson_plans")
+        before = _lesson_plan_snapshot(plan)
+        plan.reflection = reflection
+        plan.reflection_at = timezone.now()
+        plan.status = LessonPlanStatus.COMPLETE
+        plan.save(update_fields=["status", "reflection", "reflection_at", "updated_at"])
+        log_event(
+            actor=request.user,
+            action_type="LESSON_PLAN_REFLECTION",
+            model_name="LessonPlan",
+            object_id=plan.pk,
+            description=f"Reflection added to lesson plan {plan.class_name} - {plan.subject_name} ({plan.week_start_date}); plan complete",
+            before=before,
+            after=_lesson_plan_snapshot(plan),
+            request=request,
+        )
+        messages.success(request, "Reflection saved. The lesson plan is complete.")
+        return redirect("academics:lesson_plans")
 
 
 class LessonPlanAttachmentDeleteView(RoleRequiredMixin, LoginRequiredMixin, View):
@@ -1330,7 +1444,7 @@ def _get_missing_plan_teachers():
     submitted_teacher_ids = set(
         LessonPlan.objects.filter(
             week_start_date=this_monday,
-            status__in=[LessonPlanStatus.SUBMITTED, LessonPlanStatus.APPROVED],
+            status__in=[LessonPlanStatus.SUBMITTED, *LESSON_PLAN_APPROVED_STATUSES],
         ).values_list("teacher_id", flat=True)
     )
     # Teachers with a MISSING marker are still considered non-compliant
@@ -1679,7 +1793,7 @@ class LessonPlanComplianceView(RoleRequiredMixin, TemplateView):
 
         for p in plans:
             t = teacher_plans[p["teacher_id"]]
-            if p["status"] == LessonPlanStatus.APPROVED:
+            if p["status"] in LESSON_PLAN_APPROVED_STATUSES:
                 t["approved"].add(p["week_start_date"])
             elif p["status"] == LessonPlanStatus.SUBMITTED:
                 t["submitted"].add(p["week_start_date"])
@@ -1752,7 +1866,7 @@ class LessonPlanComplianceView(RoleRequiredMixin, TemplateView):
         # Trend: weekly approved counts
         weekly_data = defaultdict(int)
         for p in plans:
-            if p["status"] == LessonPlanStatus.APPROVED:
+            if p["status"] in LESSON_PLAN_APPROVED_STATUSES:
                 weekly_data[p["week_start_date"]] += 1
 
         ctx["weekly_trend"] = sorted(
@@ -1788,6 +1902,9 @@ class LessonPlanComplianceView(RoleRequiredMixin, TemplateView):
         heatmap_data = []
         teacher_plan_map = defaultdict(lambda: defaultdict(lambda: {"status": None, "subject": "", "cls": ""}))
         for p in selected_week_plans:
+            # Taught / reflected plans are still approved for coverage.
+            if p["status"] in LESSON_PLAN_APPROVED_STATUSES:
+                p["status"] = LessonPlanStatus.APPROVED
             t = teacher_plan_map[p["teacher_id"]]
             # All plans for this week go to Monday since week_start_date is Monday
             # But we show coverage status for the whole week
@@ -1796,7 +1913,7 @@ class LessonPlanComplianceView(RoleRequiredMixin, TemplateView):
                     t[day_dates[i]]["status"] = p["status"]
                     t[day_dates[i]]["subject"] = p["subject_name"]
                     t[day_dates[i]]["cls"] = p["class_name"]
-                elif p["status"] == LessonPlanStatus.APPROVED:
+                elif p["status"] in LESSON_PLAN_APPROVED_STATUSES:
                     t[day_dates[i]]["status"] = p["status"]
 
         for teacher in teachers:
@@ -1862,7 +1979,7 @@ class LessonPlanReviewQueueView(RoleRequiredMixin, TemplateView):
         elif status_filter == "all_pending":
             plans_qs = plans_qs.filter(status__in=[LessonPlanStatus.SUBMITTED, LessonPlanStatus.REVISION_REQUESTED])
         elif status_filter == "reviewed":
-            plans_qs = plans_qs.filter(status__in=[LessonPlanStatus.APPROVED, LessonPlanStatus.REJECTED])
+            plans_qs = plans_qs.filter(status__in=[*LESSON_PLAN_APPROVED_STATUSES, LessonPlanStatus.REJECTED])
         elif status_filter == "all":
             pass
         
@@ -1875,7 +1992,7 @@ class LessonPlanReviewQueueView(RoleRequiredMixin, TemplateView):
         from django.db.models import Count, Q
         stats = all_dept_plans.aggregate(
             submitted=Count("id", filter=Q(status=LessonPlanStatus.SUBMITTED)),
-            approved=Count("id", filter=Q(status=LessonPlanStatus.APPROVED)),
+            approved=Count("id", filter=Q(status__in=LESSON_PLAN_APPROVED_STATUSES)),
             rejected=Count("id", filter=Q(status=LessonPlanStatus.REJECTED)),
             revision=Count("id", filter=Q(status=LessonPlanStatus.REVISION_REQUESTED)),
         )
@@ -1937,7 +2054,7 @@ class LessonPlanProgressView(RoleRequiredMixin, TemplateView):
             
             stats = plans.aggregate(
                 total=Count("id"),
-                approved=Count("id", filter=Q(status=LessonPlanStatus.APPROVED)),
+                approved=Count("id", filter=Q(status__in=LESSON_PLAN_APPROVED_STATUSES)),
                 submitted=Count("id", filter=Q(status=LessonPlanStatus.SUBMITTED)),
                 draft=Count("id", filter=Q(status=LessonPlanStatus.DRAFT)),
                 revision=Count("id", filter=Q(status=LessonPlanStatus.REVISION_REQUESTED)),
@@ -1949,7 +2066,7 @@ class LessonPlanProgressView(RoleRequiredMixin, TemplateView):
             # Weekly breakdown
             from django.db.models.functions import TruncWeek
             weekly = (
-                plans.filter(status=LessonPlanStatus.APPROVED)
+                plans.filter(status__in=LESSON_PLAN_APPROVED_STATUSES)
                 .annotate(week=TruncWeek("week_start_date"))
                 .values("week")
                 .annotate(count=Count("id"))
@@ -2005,7 +2122,7 @@ class LessonPlanReportsView(RoleRequiredMixin, TemplateView):
                 plans.values("teacher__first_name", "teacher__last_name", "teacher__username")
                 .annotate(
                     total=Count("id"),
-                    approved=Count("id", filter=Q(status=LessonPlanStatus.APPROVED)),
+                    approved=Count("id", filter=Q(status__in=LESSON_PLAN_APPROVED_STATUSES)),
                     submitted=Count("id", filter=Q(status=LessonPlanStatus.SUBMITTED)),
                     missing=Count("id", filter=Q(status=LessonPlanStatus.MISSING)),
                 )
@@ -2028,7 +2145,7 @@ class LessonPlanReportsView(RoleRequiredMixin, TemplateView):
                 plans.values("class_name")
                 .annotate(
                     total=Count("id"),
-                    approved=Count("id", filter=Q(status=LessonPlanStatus.APPROVED)),
+                    approved=Count("id", filter=Q(status__in=LESSON_PLAN_APPROVED_STATUSES)),
                 )
                 .order_by("-approved")
             )
@@ -2039,7 +2156,7 @@ class LessonPlanReportsView(RoleRequiredMixin, TemplateView):
                 plans.values("subject_name")
                 .annotate(
                     total=Count("id"),
-                    approved=Count("id", filter=Q(status=LessonPlanStatus.APPROVED)),
+                    approved=Count("id", filter=Q(status__in=LESSON_PLAN_APPROVED_STATUSES)),
                     submitted=Count("id", filter=Q(status=LessonPlanStatus.SUBMITTED)),
                     missing=Count("id", filter=Q(status=LessonPlanStatus.MISSING)),
                 )
@@ -2060,7 +2177,7 @@ class LessonPlanReportsView(RoleRequiredMixin, TemplateView):
             # Weekly trend
             from django.db.models.functions import TruncWeek
             weekly_trend = (
-                plans.filter(status=LessonPlanStatus.APPROVED)
+                plans.filter(status__in=LESSON_PLAN_APPROVED_STATUSES)
                 .annotate(week=TruncWeek("week_start_date"))
                 .values("week")
                 .annotate(count=Count("id"))
@@ -2071,7 +2188,7 @@ class LessonPlanReportsView(RoleRequiredMixin, TemplateView):
             # Overall summary
             from django.db.models import Sum
             total_plans = plans.count()
-            approved_plans = plans.filter(status=LessonPlanStatus.APPROVED).count()
+            approved_plans = plans.filter(status__in=LESSON_PLAN_APPROVED_STATUSES).count()
             ctx["total_plans"] = total_plans
             ctx["approved_plans"] = approved_plans
             ctx["pending_rejected"] = total_plans - approved_plans

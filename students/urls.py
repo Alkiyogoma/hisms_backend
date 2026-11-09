@@ -5,6 +5,7 @@ app_name = "students"
 
 urlpatterns = [
     path("", views.StudentListView.as_view(), name="list"),
+    path("export/", views.StudentListExportView.as_view(), name="list_export"),
     path("<int:pk>/", views.StudentDetailView.as_view(), name="detail"),
     path("add/", views.StudentCreateView.as_view(), name="create"),
     path("<int:pk>/edit/", views.StudentEditView.as_view(), name="edit"),

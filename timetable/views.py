@@ -127,6 +127,9 @@ class TimetableView(RoleRequiredMixin, TemplateView):
                         LessonPlanStatus.DRAFT: 5,
                         LessonPlanStatus.REJECTED: 6,
                     }
+                    # Taught / reflected plans still show as approved on the slot.
+                    if p["status"] in (LessonPlanStatus.AWAITING_REFLECTION, LessonPlanStatus.COMPLETE):
+                        p["status"] = LessonPlanStatus.APPROVED
                     new_pri = priority.get(p["status"], 99)
                     existing_pri = lp_status_map.get(key, (None, 99, None))[1]
                     if new_pri < existing_pri:

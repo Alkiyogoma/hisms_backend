@@ -55,6 +55,14 @@
       <button class="lp-btn lp-btn-secondary" title="Take the plan back to edit it; it leaves the review queue">Withdraw</button>
     </form>
     {% endif %}
+  {% elif p.status == 'approved' or p.status == 'awaiting_reflection' %}
+    {# Only the teacher who taught the lesson marks it taught and reflects on it. #}
+    {% if p.teacher == user %}
+    <button type="button" class="lp-btn lp-btn-primary"
+      onclick="openReflectionModal({{ p.id }}, '{{ p.status }}', '{{ p.lesson_title|default:p.subject_name|escapejs }} - {{ p.class_name|escapejs }}')">
+      {% if p.status == 'approved' %}Mark as taught{% else %}Add reflection{% endif %}
+    </button>
+    {% endif %}
   {% endif %}
   {% endwith %}
 </div>

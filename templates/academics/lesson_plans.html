@@ -119,6 +119,10 @@
   .lp-btn-icon:hover { color: #DC2626; border-color: #FECACA; background: #FEF2F2; }
   .st-revisionrequested { background: #FFFBEB; color: #B45309; }
   .st-missing { background: #FEF2F2; color: #9B1C1C; }
+  .st-awaitingreflection { background: #EFF6FF; color: #1D4ED8; }
+  .st-complete { background: #DCFCE7; color: #14532D; }
+  .lp-reflection { margin-top: 8px; padding: 7px 10px; border-radius: 8px; font-size: 12px; line-height: 1.5; background: #F8FAFC; border: 1px solid var(--border); color: #334155; max-width: 520px; }
+  .lp-card .lp-reflection { max-width: none; }
   .lp-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
   .lp-when { font-size: 11.5px; color: var(--text-muted); font-weight: 600; white-space: nowrap; }
   .lp-card .lp-feedback { max-width: none; }
@@ -201,13 +205,14 @@
 {% else %}
 
   {# Stats Strip #}
-  <div class="metrics" style="margin-top:20px;margin-bottom:20px;grid-template-columns:repeat(5,minmax(0,1fr))">
+  <div class="metrics" style="margin-top:20px;margin-bottom:20px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
     {% include '_partials/stat_card.html' with label='Total Plans' value=total_plans_count|default:"0" variant='blue' link='?status=' %}
     {% if not can_review or user.role == 'super_admin' %}
     {% include '_partials/stat_card.html' with label='Draft' value=draft_count|default:"0" variant='grey' link='?status=draft' %}
     {% endif %}
     {% include '_partials/stat_card.html' with label='Approved' value=approved_count|default:"0" variant='green' link='?status=approved' %}
     {% include '_partials/stat_card.html' with label='Awaiting Review' value=queue_count|default:"0" variant='amber' link='?status=submitted' %}
+    {% include '_partials/stat_card.html' with label='Awaiting Reflection' value=awaiting_reflection_count|default:"0" variant='blue' link='?status=awaiting_reflection' %}
     {% if can_review %}
     {% include '_partials/stat_card.html' with label='Missing' value=missing_count|default:"0" variant='red' link='?status=missing' %}
     {% endif %}
@@ -239,6 +244,8 @@
         {% endif %}
         <option value="submitted" {% if status_filter == 'submitted' %}selected{% endif %}>Submitted</option>
         <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>Approved</option>
+        <option value="awaiting_reflection" {% if status_filter == 'awaiting_reflection' %}selected{% endif %}>Awaiting Reflection</option>
+        <option value="complete" {% if status_filter == 'complete' %}selected{% endif %}>Complete</option>
         <option value="rejected" {% if status_filter == 'rejected' %}selected{% endif %}>Rejected</option>
         <option value="revision_requested" {% if status_filter == 'revision_requested' %}selected{% endif %}>Revision Requested</option>
       </select>
@@ -275,6 +282,9 @@
       {% if p.reviewer_feedback %}
       <div class="lp-feedback lp-feedback-{{ p.status|cut:'_' }}"><strong>Feedback:</strong> {{ p.reviewer_feedback|truncatewords:24 }}</div>
       {% endif %}
+      {% if p.reflection %}
+      <div class="lp-reflection"><strong>Reflection:</strong> {{ p.reflection|truncatewords:24 }}</div>
+      {% endif %}
       <div class="lp-card-foot">{% include "academics/_lp_actions.html" %}</div>
     </div>
     {% empty %}
@@ -309,6 +319,9 @@
             <div class="lp-sub">{{ p.subject_name }} · {{ p.class_name }}</div>
             {% if p.reviewer_feedback %}
             <div class="lp-feedback lp-feedback-{{ p.status|cut:'_' }}"><strong>Feedback{% if p.reviewed_by %} from {{ p.reviewed_by.get_full_name|default:p.reviewed_by.get_username }}{% endif %}:</strong> {{ p.reviewer_feedback|truncatewords:30 }}</div>
+            {% endif %}
+            {% if p.reflection %}
+            <div class="lp-reflection" title="{{ p.reflection }}"><strong>Reflection:</strong> {{ p.reflection|truncatewords:30 }}</div>
             {% endif %}
           </td>
           {% if can_review %}
@@ -378,6 +391,26 @@
   </div>
 </div>
 
+<!-- Taught / reflection modal -->
+<div id="reflectionModal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); align-items:center; justify-content:center; padding:16px">
+  <div style="background:#fff; border-radius:16px; padding:24px; width:100%; max-width:480px; box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+    <h3 id="reflectionTitle" style="margin:0 0 6px; font-size:16px; font-weight:700; color:#1E293B">Reflection</h3>
+    <p id="reflectionPlanLabel" style="margin:0 0 4px; font-size:13px; color:#64748B"></p>
+    <p id="reflectionHelp" style="margin:0 0 14px; font-size:12.5px; color:#64748B; line-height:1.5"></p>
+    <form id="reflectionForm" method="post" action="">
+      {% csrf_token %}
+      <label for="reflectionText" style="display:block; font-size:12px; font-weight:700; color:#334155; margin-bottom:6px">How did the lesson go?</label>
+      <textarea id="reflectionText" name="reflection" rows="5" maxlength="2000" placeholder="What worked, what did not, and what you would change next time."
+        style="width:100%; padding:10px 14px; border:1px solid #E2E8F0; border-radius:8px; font-size:13px; resize:vertical; font-family:inherit"></textarea>
+      <div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; margin-top:16px">
+        <button type="button" onclick="closeReflectionModal()" class="btn-secondary" style="padding:8px 16px; font-size:13px">Cancel</button>
+        <button type="submit" id="reflectionLater" name="later" value="1" formnovalidate class="btn-secondary" style="padding:8px 16px; font-size:13px">Mark taught, reflect later</button>
+        <button type="submit" id="reflectionSubmit" class="btn-primary" style="padding:8px 20px; font-size:13px">Save reflection</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 {% include "academics/_lp_viewer.html" %}
 
 <script>
@@ -391,6 +424,31 @@ function openRejectModal(planId, label) {
 function closeRejectModal() {
   document.getElementById('rejectModal').style.display = 'none';
 }
+// ── Mark as taught / add reflection ──
+// An approved plan is marked taught here; with a reflection it is complete at
+// once, without one it waits on the reflection.
+function openReflectionModal(planId, status, label) {
+  var taught = status === 'approved';
+  var form = document.getElementById('reflectionForm');
+  var text = document.getElementById('reflectionText');
+  form.action = (taught ? '{% url "academics:mark_lesson_plan_taught" pk=0 %}' : '{% url "academics:lesson_plan_reflection" pk=0 %}').replace('/0/', '/' + planId + '/');
+  document.getElementById('reflectionTitle').textContent = taught ? 'Mark lesson as taught' : 'Add reflection';
+  document.getElementById('reflectionPlanLabel').textContent = label;
+  document.getElementById('reflectionHelp').textContent = taught
+    ? 'Write a short reflection on how the lesson went to complete the plan. If you reflect later, the plan shows as awaiting reflection until you do.'
+    : 'The plan is complete once your reflection is saved.';
+  document.getElementById('reflectionLater').style.display = taught ? '' : 'none';
+  text.required = true;
+  text.value = '';
+  document.getElementById('reflectionModal').style.display = 'flex';
+  text.focus();
+}
+function closeReflectionModal() {
+  document.getElementById('reflectionModal').style.display = 'none';
+}
+document.getElementById('reflectionLater').addEventListener('click', function () {
+  document.getElementById('reflectionText').value = '';
+});
 // ── View toggle (List/Grid) with localStorage persistence ──
 function setView(mode) {
   var container = document.getElementById('lp-page-container');
