@@ -128,7 +128,7 @@ class ParentLearnerProgressView(ParentOnlyMixin, TemplateView):
         children = list(services.children_for(self.request.user))
         student = next((c for c in children if c.pk == kwargs["student_id"]), None)
         if student is None:
-            raise Http404("No such learner.")
+            raise Http404("No such student.")
         services.attach_photos([student])
         term = services.current_term()
         academic = services.academic_progress(student, term, today)

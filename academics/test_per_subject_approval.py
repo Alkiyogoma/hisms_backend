@@ -496,7 +496,7 @@ class PerSubjectApprovalTests(TestCase):
         self.assertContains(resp, 'class="aq-scroll"')
         self.assertContains(resp, "Approve all (1)")
         self.assertContains(resp, f'data-name="{self.student.first_name} {self.student.last_name}"')
-        self.assertContains(resp, "tick learners to act on only those")
+        self.assertContains(resp, "tick students to act on only those")
         # The old buttons re-ticked the whole group before submitting.
         self.assertNotContains(resp, "allCbs.forEach(function(cb) { cb.checked = true; })")
 

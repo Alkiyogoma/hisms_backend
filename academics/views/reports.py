@@ -182,12 +182,7 @@ class HOSSignOffListView(AllowedRolesEnforcedMixin, RoleRequiredMixin, TemplateV
                         "can_sign_off_all": ready > 0,
                     })
             ctx["class_stats"] = class_stats
-            
-            # Action: generate missing reports
-            if "generate" in self.request.GET:
-                cls_to_gen = self.request.GET.get("generate")
-                generate_class_reports(term.id, cls_to_gen, self.request.user)
-                
+
         # Sign-off window gating
         from django.utils import timezone as _tz
         today = _tz.localdate()
@@ -251,7 +246,7 @@ class ReportCardListView(RoleRequiredMixin, TemplateView):
         ctx["class_name"] = class_name
         pf.pick_subject([], note="All subjects")
         pf.pick_type(note="Term report")
-        ctx["pf"] = pf.context(footnote="Each student's term report: marks, remarks and comments, signed off before parents see it.")
+        ctx["pf"] = pf.context()
 
         if class_name and term:
             reports = ReportCard.objects.filter(
@@ -784,14 +779,6 @@ class ReportReviewQueueView(AllowedRolesEnforcedMixin, RoleRequiredMixin, Templa
         dept_class_names = list(
             GradeClass.objects.filter(department__in=allowed_depts).values_list("name", flat=True)
         )
-
-        # Action: generate missing reports for a class
-        if "generate" in self.request.GET:
-            cls_to_gen = self.request.GET.get("generate")
-            if cls_to_gen in dept_class_names:
-                from academics.services import generate_class_reports
-                generate_class_reports(term.id, cls_to_gen, self.request.user)
-                messages.success(self.request, f"Generated missing report cards for {cls_to_gen}.")
 
         # Reports with comments submitted, not yet published -- includes ECD + Primary
         status_filter = self.request.GET.get("status", "")

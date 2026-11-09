@@ -17,23 +17,19 @@
 </div>
 {% endif %}
 <div class="section-hdr">
-  <span class="section-title">Pending Reports &middot; {{ current_term.name }}</span>
-  <div style="display:flex; gap:10px">
-    <a href="{% url 'academics:performance_report' %}" class="hf-btn hf-btn-secondary" style="font-size:12px; padding:6px 12px">Performance Report</a>
-    <span class="chip chip-blue">HOS Action Required</span>
-  </div>
+  <span class="section-title">Reports by class &middot; {{ current_term.name }}</span>
 </div>
 
 <div class="card" style="padding:0; overflow:hidden; border-top: 3px solid var(--hodari-blue);">
   <table class="h-table">
     <thead>
       <tr style="background: #F8FAFC">
-        <th style="padding-left:24px">Class Type / Grade</th>
+        <th style="padding-left:24px">Class</th>
         <th style="text-align:center">Reports</th>
         <th style="text-align:center">Published</th>
-        <th style="text-align:center">Pending Sign-off</th>
-        <th style="text-align:center">Blocked (Incomplete)</th>
-        <th style="text-align:right; padding-right:24px">Management Action</th>
+        <th style="text-align:center">Not published</th>
+        <th style="text-align:center">Status</th>
+        <th style="text-align:right; padding-right:24px"></th>
       </tr>
     </thead>
     <tbody>
@@ -41,7 +37,6 @@
         <tr class="hover-row">
           <td style="padding-left:24px;">
             <div style="font-weight:700; color:var(--hodari-blue); font-size:14px">{{ stats.class_name }}</div>
-            <div style="font-size:11px; color:var(--text-muted)">{{ stats.department|default:"Standard Curriculum" }}</div>
           </td>
           <td style="text-align:center; font-weight:500">{{ stats.total }}</td>
           <td style="text-align:center">
@@ -75,12 +70,12 @@
           <td style="text-align:right; padding-right:24px">
             <div style="display:flex; justify-content:flex-end; gap:8px">
                 <a href="{% url 'academics:report_card_list' %}?class_name={{ stats.class_name|urlencode }}" class="hf-btn hf-btn-secondary" style="font-size: 11px; padding: 5px 12px;">
-                  Review List
+                  Open
                 </a>
                 {% if perms.academics.change_reportcard %}
                     {% if stats.pending > 0 and not signoff_blocked %}
                         <button type="button" class="hf-btn hf-btn-primary" style="font-size: 11px; padding: 5px 12px;" {% if not stats.can_sign_off_all %}disabled title="No report in this class is ready to publish yet."{% endif %}
-                          onclick="confirmDeleteModal({title:'Publish {{ stats.class_name|escapejs }}?',body:'Sign off and publish <strong>{{ stats.ready }} ready report{{ stats.ready|pluralize }}</strong> for <strong>{{ stats.class_name|escapejs }}</strong>?',detail:'Reports become visible in the parent portal now and each learner\'s parents are notified. Reports that are not ready (awaiting ECD HOD approval or incomplete) stay unpublished.',confirmText:'Publish {{ stats.ready }}',url:'{% url 'academics:signoff_action' %}',type:'info',extraData:[{name:'class_name',value:'{{ stats.class_name|escapejs }}'},{name:'term_id',value:'{{ current_term.id }}'}]})">
+                          onclick="confirmDeleteModal({title:'Publish {{ stats.class_name|escapejs }}?',body:'Sign off and publish <strong>{{ stats.ready }} ready report{{ stats.ready|pluralize }}</strong> for <strong>{{ stats.class_name|escapejs }}</strong>?',detail:'Reports become visible in the parent portal now and each student\'s parents are notified. Reports that are not ready (awaiting ECD HOD approval or incomplete) stay unpublished.',confirmText:'Publish {{ stats.ready }}',url:'{% url 'academics:signoff_action' %}',type:'info',extraData:[{name:'class_name',value:'{{ stats.class_name|escapejs }}'},{name:'term_id',value:'{{ current_term.id }}'}]})">
                           Publish ready ({{ stats.ready }})
                         </button>
                     {% elif stats.pending > 0 and signoff_blocked %}
@@ -101,18 +96,7 @@
   </table>
 </div>
 
-<div style="margin-top:24px; background:linear-gradient(135deg, #F0F4FB 0%, #E8EEF9 100%); border-radius:12px; padding:20px; border:1px solid #BFCFE9; display:flex; gap:20px; align-items:center">
-    <div style="width:48px; height:48px; background:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(2,58,165,0.08); flex-shrink:0">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#023AA5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-    </div>
-    <div style="font-size:13.5px; color:#1A1A2E; line-height:1.6">
-        <strong style="color:var(--hodari-blue); font-weight:700">Management Information:</strong> 
-        When you publish, reports are moved from <span class="t-amber" style="font-weight:700">Pending</span> to <span class="t-green" style="font-weight:700">Published</span>. 
-        Published reports are immediately visible in the Parent Portal and each learner's parents get an in-app, email and SMS notice.
-        ECD reports must be approved by the ECD HOD first. Reports are <span class="t-red" style="font-weight:700">Blocked</span> if they lack mandatory teacher narratives (min. 50 chars).
-        To publish one learner, or a hand-picked set, use the <a href="{% url 'academics:report_review_queue' %}">Review Queue</a>.
-    </div>
-</div>
+<p style="margin-top:12px;font-size:12px;color:var(--text-muted)">Publishing makes reports visible to parents and notifies them. A report is not ready until the class teacher's comment is in (and, for ECD, the ECD HOD has approved). To publish selected students, use the <a href="{% url 'academics:report_review_queue' %}">Review Queue</a>.</p>
 
 <style>
   .hover-row:hover { background: #F8FAFC; }

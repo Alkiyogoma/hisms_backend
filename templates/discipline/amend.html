@@ -93,7 +93,7 @@
         <div class="hf2-group">
           <label class="hf2-label" for="id_summary">Incident summary *</label>
           <textarea name="summary" id="id_summary" class="hf2-textarea" rows="5" required>{{ form.summary.value|default:'' }}</textarea>
-          <div class="am-note">Do not name other learners. Describe them by class, for example &lsquo;a Grade 2 learner&rsquo;.</div>
+          <div class="am-note">Do not name other students. Describe them by class, for example &lsquo;a Grade 2 student&rsquo;.</div>
           {% for e in form.summary.errors %}<span class="am-err">{{ e }}</span>{% endfor %}
         </div>
         <div class="hf2-group" style="margin-top:14px">

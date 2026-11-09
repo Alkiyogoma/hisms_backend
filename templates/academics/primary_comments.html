@@ -2,7 +2,7 @@
 {% load role_tags hodari_forms %}
 {% block title %}Narrative Comments | {{ brand.school_name }}{% endblock %}
 {% block topbar_greeting %}Narrative Comments{% endblock %}
-{% block topbar_date %}{{ today_display }}{% endblock %}
+{% block topbar_date %}{{ current_term.academic_year.name }} &middot; {{ current_term.name }}{% endblock %}
 
 {% block extra_head %}
 <style>

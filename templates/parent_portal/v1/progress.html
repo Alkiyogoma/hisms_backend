@@ -25,7 +25,7 @@
 <section class="pp-card pp-lhero" aria-labelledby="learner-name">
   {% include "parent_portal/v1/includes/avatar.html" with student=student large=True %}
   <div class="pp-lhero-id">
-    <p class="pp-eyebrow pp-eyebrow-muted">Learner</p>
+    <p class="pp-eyebrow pp-eyebrow-muted">Student</p>
     <h1 id="learner-name">{{ student.first_name }} {{ student.last_name }}</h1>
     <p class="pp-muted">{{ student.class_name|default:"Class not set" }} &middot; {{ student.admission_no }}{% if term %} &middot; {{ term.short_name }}{% if term.academic_year %} {{ term.academic_year.name }}{% endif %}{% endif %}</p>
   </div>

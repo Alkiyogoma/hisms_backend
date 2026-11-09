@@ -117,7 +117,7 @@
             <span data-label>Return all ({{ group.score_count }})</span>
           </button>
         </div>
-        <div class="aq-hint">Approve or return one learner with the buttons on their row, or tick learners to act on only those.</div>
+        <div class="aq-hint">Approve or return one student with the buttons on their row, or tick students to act on only those.</div>
         {% endif %}
       </div>
 
@@ -125,7 +125,7 @@
       <table class="h-table">
         <thead>
           <tr>
-            {% if can_approve %}<th style="width:36px">{% if not group.block_reason %}<input type="checkbox" aria-label="Tick every learner in this group" id="cb-all-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}" onchange="toggleGroup('{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}', this.checked)">{% endif %}</th>{% endif %}
+            {% if can_approve %}<th style="width:36px">{% if not group.block_reason %}<input type="checkbox" aria-label="Tick every student in this group" id="cb-all-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}" onchange="toggleGroup('{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}', this.checked)">{% endif %}</th>{% endif %}
             <th>Student</th>
             <th>Score</th>
             <th>Entered By</th>

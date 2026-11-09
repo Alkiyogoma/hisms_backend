@@ -116,7 +116,7 @@
               <div class="hf2-group">
                 <label class="hf2-label">Previous incidents on record</label>
                 <div id="previous-incidents" class="hf2-input" style="background:#f8fafc;font-weight:600">Select a student</div>
-                <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Taken from the learner&rsquo;s own history. It cannot be changed here.</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Taken from the student&rsquo;s own history. It cannot be changed here.</div>
               </div>
             </div>
           </div>
@@ -191,7 +191,7 @@
             <div class="hf2-group">
               <label class="hf2-label">Brief Factual Description *</label>
               <textarea name="summary" class="hf2-textarea" rows="4" placeholder="Describe what happened clearly and factually..." required>{{ posted.summary|default:'' }}</textarea>
-              <div style="font-size:12px;color:#475569;margin-top:4px;padding:6px 10px;background:#F8FAFC;border:1px dashed #CBD5E1;border-radius:6px">Do not name other learners. Describe them by class, for example &lsquo;a Grade 2 learner&rsquo;.</div>
+              <div style="font-size:12px;color:#475569;margin-top:4px;padding:6px 10px;background:#F8FAFC;border:1px dashed #CBD5E1;border-radius:6px">Do not name other students. Describe them by class, for example &lsquo;a Grade 2 student&rsquo;.</div>
               {% if form.summary.errors %}<span class="field-error">{{ form.summary.errors.0 }}</span>{% endif %}
             </div>
             <div style="margin-top:20px">
@@ -301,7 +301,7 @@
         <div style="font-size:12px;color:#475569;line-height:1.6">
           <p style="margin:0 0 8px"><strong>Be factual</strong> &middot; Describe what was observed or reported, not assumptions.</p>
           <p style="margin:0 0 8px"><strong>Be specific</strong> &middot; Include times, locations, and any witnesses.</p>
-          <p style="margin:0 0 8px"><strong>Do not name other learners</strong> &middot; The record is sent home. Describe them by class, for example &lsquo;a Grade 2 learner&rsquo;.</p>
+          <p style="margin:0 0 8px"><strong>Do not name other students</strong> &middot; The record is sent home. Describe them by class, for example &lsquo;a Grade 2 student&rsquo;.</p>
           <p style="margin:0 0 8px"><strong>Level</strong> is the highest incident level ticked.</p>
           <p style="margin:0"><strong>Critical incidents</strong> should be reported directly to the Head of School.</p>
         </div>

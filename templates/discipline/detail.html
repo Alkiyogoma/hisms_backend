@@ -160,7 +160,7 @@
     <strong>Deleted {{ incident.deleted_at|date:"j M Y, H:i" }} by {{ deleted_by_name }}, {{ deleted_by_title }}.</strong>
     {% if incident.duplicate_of %}A repeat of <a href="{% url 'discipline:detail' incident.duplicate_of.pk %}">{{ incident.duplicate_of.reference }}</a>, which is kept.{% endif %}
     <div>Reason: {{ incident.deletion_reason }}</div>
-    <div style="margin-top:4px;font-size:12px">It is not on the learner&rsquo;s record, in the review queue or in any count. Only the super admin can see this page.</div>
+    <div style="margin-top:4px;font-size:12px">It is not on the student&rsquo;s record, in the review queue or in any count. Only the super admin can see this page.</div>
   </div>
   {% elif likely_duplicates %}
   <div class="ds-screen-only ds-alert ds-alert-warn">
@@ -258,7 +258,7 @@
         I acknowledge receipt of this record and have discussed the matter with my child.
         <div class="ds-sgrid">
           <div class="ds-sline">Parent / guardian name (please print)</div>
-          <div class="ds-sline">Relationship to learner</div>
+          <div class="ds-sline">Relationship to student</div>
           <div class="ds-sline">Signature</div>
           <div class="ds-sline">Date</div>
         </div>
