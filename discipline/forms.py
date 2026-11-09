@@ -272,11 +272,16 @@ class DisciplineAmendForm(forms.ModelForm):
             "actions_taken_detailed",
         ]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         incident = self.instance
+        current = Student.objects.filter(is_archived=False)
+        if user is not None and user.role == "teacher":
+            # A teacher may only move the incident to a student they teach.
+            from core.teacher_context import get_teacher_assigned_classes
+            current = current.filter(class_name__in=list(get_teacher_assigned_classes(user)))
         self.fields["student"].queryset = Student.objects.filter(
-            Q(is_archived=False) | Q(pk=incident.student_id)
+            Q(pk__in=current.values("pk")) | Q(pk=incident.student_id)
         ).order_by("class_name", "last_name", "first_name")
         self.fields["incident_date"].required = True
         self.fields["action_taken"].required = False

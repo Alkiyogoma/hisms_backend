@@ -72,9 +72,39 @@ SHARED_ACCOUNT_MESSAGE = (
 )
 
 
-def can_amend(user):
-    """The super admin and the Head of School may correct a submitted incident."""
-    return user.has_role(UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL)
+def is_open_incident(incident):
+    """Not yet reviewed and not escalated: still the reporter's to correct."""
+    return incident.status == IncidentStatus.PENDING_REVIEW and not incident.escalated
+
+
+def amend_block_reason(user, incident):
+    """Why ``user`` may not amend ``incident``, or "" if they may.
+
+    - Super admin: any incident.
+    - Head of School, and the head of the student's section: any incident,
+      including escalated and closed ones.
+    - The member of staff who reported it: while it is still open (pending
+      review and not escalated).
+    """
+    if incident.is_deleted:
+        return "A deleted incident cannot be amended."
+    if user.has_role(UserRole.SUPER_ADMIN):
+        return ""
+    if not user.has_perm("discipline.change_disciplineincident"):
+        return "You do not have permission to amend discipline incidents."
+    if user.has_role(UserRole.HEAD_OF_SCHOOL):
+        return ""
+    if user.section_departments and _heads_student_section(user, incident.student):
+        return ""
+    if incident.reported_by_id != user.pk:
+        return "Only the member of staff who reported this incident, the head of section or the super admin can amend it."
+    if not is_open_incident(incident):
+        return "This incident has been escalated or reviewed. Ask the head of section or the super admin to amend it."
+    return ""
+
+
+def can_amend(user, incident):
+    return not amend_block_reason(user, incident)
 
 
 def can_delete(user):
@@ -464,12 +494,11 @@ class DisciplineDetailView(RoleRequiredMixin, DetailView):
                      **parent_contact_initial(incident)},
         )
         ctx["reviewer_title"] = staff_title(self.request.user)
-        ctx["can_amend"] = live and can_amend(user)
+        ctx["can_amend"] = live and can_amend(user, incident)
         ctx["amendments"] = list(incident.amendments.select_related("changed_by"))
         for amendment in ctx["amendments"]:
             amendment.by_name = staff_name(amendment.changed_by)
             amendment.by_title = staff_title(amendment.changed_by)
-        ctx["last_amended"] = ctx["amendments"][-1].changed_at if ctx["amendments"] else None
 
         earlier = incident.earlier_incidents()
         ctx["previous_count"] = len(earlier)
@@ -595,21 +624,36 @@ class DisciplineAmendView(RoleRequiredMixin, UpdateView):
     form_class = DisciplineAmendForm
     template_name = "discipline/amend.html"
     context_object_name = "incident"
-    allowed_roles = [UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
+    allowed_roles = [
+        UserRole.TEACHER,
+        UserRole.PRIMARY_HOD,
+        UserRole.HEAD_OF_SCHOOL,
+        UserRole.SUPER_ADMIN,
+    ]
     required_permission = "discipline.view_disciplineincident"
 
-    def dispatch(self, request, *args, **kwargs):
-        if request.user.is_authenticated and not can_amend(request.user):
-            raise PermissionDenied("Only the super admin and the Head of School can amend an incident.")
-        return super().dispatch(request, *args, **kwargs)
-
     def get_queryset(self):
-        return super().get_queryset().select_related("student")
+        return visible_incidents(self.request.user)
+
+    def get_object(self, queryset=None):
+        # Cached: the permission check, the snapshot and the form share one copy.
+        if not hasattr(self, "_incident"):
+            incident = super().get_object(queryset)
+            block = amend_block_reason(self.request.user, incident)
+            if block:
+                raise PermissionDenied(block)
+            self._incident = incident
+        return self._incident
 
     def get_form(self, form_class=None):
         # Snapshot the record before the form writes the new values onto it.
         self.before = _amend_values(self.get_object())
         return super().get_form(form_class)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
 
     def form_valid(self, form):
         if is_shared_account(self.request.user):

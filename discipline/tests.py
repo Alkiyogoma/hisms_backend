@@ -283,7 +283,7 @@ class ReviewTests(IncidentBase):
         self.assertEqual(inc.status, IncidentStatus.RESOLVED)
 
 
-class AmendTests(IncidentBase):
+class AmendBase(IncidentBase):
     def amend_data(self, inc, **kw):
         data = {
             "student": inc.student_id, "incident_date": inc.incident_date.isoformat(),
@@ -298,6 +298,8 @@ class AmendTests(IncidentBase):
         self.client.force_login(user or self.hos)
         return self.client.post(reverse("discipline:amend", args=[inc.pk]), self.amend_data(inc, **kw))
 
+
+class AmendTests(AmendBase):
     def test_head_of_school_amends_with_reason_and_history_is_kept(self):
         inc = self.incident(incident_date=date(2026, 10, 8), status=IncidentStatus.RESOLVED,
                             reviewed_by=self.hos)
@@ -310,10 +312,8 @@ class AmendTests(IncidentBase):
         self.assertEqual(amendment.changes, [{"field": "Date of incident", "before": "8 October 2026",
                                               "after": "7 October 2026", "text": False}])
         page = self.client.get(reverse("discipline:detail", args=[inc.pk])).content.decode()
-        self.assertIn("Record of amendment", page)
-        self.assertIn("Date of incident changed from 8 October 2026 to 7 October 2026.", page)
+        self.assertIn("Amendment history", page)
         self.assertIn("Reason: Wrong date selected", page)
-        self.assertIn("replaces any earlier copy", page)
 
     def test_reason_is_mandatory(self):
         inc = self.incident()
@@ -337,23 +337,67 @@ class AmendTests(IncidentBase):
         fields = [c["field"] for c in IncidentAmendment.objects.get().changes]
         self.assertIn("Level", fields)
 
-    def test_old_summary_kept_on_screen_but_not_reprinted(self):
+    def test_printed_sheet_has_no_amendment_notes(self):
         inc = self.incident(summary="Pushed Amani from Grade 2.")
         self.amend(inc, summary="Pushed a Grade 2 learner.", reason="Another learner was named.")
         resp = self.client.get(reverse("discipline:detail", args=[inc.pk]))
         html = resp.content.decode()
         sheet = html[html.index('<div class="ds-sheet">'):html.index("Screen only: review notes")]
-        self.assertIn("Incident summary corrected.", sheet)
-        self.assertNotIn("Amani", sheet)
+        self.assertIn("Pushed a Grade 2 learner.", sheet)
+        for internal in ("Amani", "amend", "Amend", "corrected", "Another learner was named"):
+            self.assertNotIn(internal, sheet)
+        # The history stays on screen.
         self.assertIn("Pushed Amani from Grade 2.", html)
+        self.assertIn("Reason: Another learner was named.", html)
 
-    def test_only_super_admin_and_head_of_school(self):
-        inc = self.incident()
-        resp = self.amend(inc, user=self.hod, location="Playground")
-        self.assertEqual(resp.status_code, 403)
-        self.assertFalse(IncidentAmendment.objects.exists())
+
+class AmendPermissionTests(AmendBase):
+    def setUp(self):
+        super().setUp()
+        GradeClass.objects.create(name="Grade 8", department=Department.LOWER_SECONDARY)
+        self.teacher = User.objects.create_user("teacher", "t@x.edu", "pw", role=UserRole.TEACHER)
+        assign_role_group(self.teacher)
+        self.other_teacher = User.objects.create_user("teacher2", "t2@x.edu", "pw", role=UserRole.TEACHER)
+        assign_role_group(self.other_teacher)
+
+    def assert_amends(self, inc, user):
+        resp = self.amend(inc, user=user, location="Playground")
+        self.assertEqual(resp.status_code, 302, getattr(resp, "content", b"")[:300])
+        self.assertEqual(IncidentAmendment.objects.filter(incident=inc).get().changed_by, user)
         page = self.client.get(reverse("discipline:detail", args=[inc.pk]))
-        self.assertNotContains(page, "Amend record")
+        self.assertContains(page, "Amend record")
+
+    def assert_blocked(self, inc, user):
+        resp = self.amend(inc, user=user, location="Playground")
+        self.assertIn(resp.status_code, (403, 404))
+        self.assertFalse(IncidentAmendment.objects.filter(incident=inc).exists())
+        page = self.client.get(reverse("discipline:detail", args=[inc.pk]))
+        self.assertNotContains(page, "Amend record", status_code=page.status_code)
+
+    def test_reporter_amends_own_open_incident(self):
+        self.assert_amends(self.incident(reported_by=self.teacher), self.teacher)
+
+    def test_other_teacher_cannot_amend(self):
+        self.assert_blocked(self.incident(reported_by=self.teacher), self.other_teacher)
+
+    def test_reporter_cannot_amend_once_escalated_or_reviewed(self):
+        for kw in ({"escalated": True}, {"status": IncidentStatus.UNDER_INVESTIGATION},
+                   {"status": IncidentStatus.RESOLVED}, {"status": IncidentStatus.DISMISSED}):
+            self.assert_blocked(self.incident(reported_by=self.teacher, **kw), self.teacher)
+
+    def test_section_head_amends_any_incident_in_their_section(self):
+        inc = self.incident(reported_by=self.teacher, status=IncidentStatus.RESOLVED, escalated=True)
+        self.assert_amends(inc, self.hod)
+
+    def test_head_of_another_section_cannot_amend(self):
+        pupil8 = Student.objects.create(admission_no="ADM-800", first_name="Neema", last_name="Eight",
+                                        class_name="Grade 8")
+        self.assert_blocked(self.incident(student=pupil8, reported_by=self.teacher), self.hod)
+
+    def test_super_admin_and_head_of_school_amend_closed_incidents(self):
+        admin = User.objects.create_user("admin", "a@x.edu", "pw", role=UserRole.SUPER_ADMIN)
+        self.assert_amends(self.incident(status=IncidentStatus.DISMISSED), admin)
+        self.assert_amends(self.incident(status=IncidentStatus.RESOLVED, escalated=True), self.hos)
 
 
 class ListTests(IncidentBase):

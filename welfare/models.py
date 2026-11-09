@@ -150,7 +150,7 @@ class WelfareObservation(TimeStampedModel):
     """
     Welfare note about a learner, written by a teacher.
     Safeguarding notes are locked on submission; other notes can be corrected
-    by their author for WELFARE_EDIT_WINDOW_HOURS, and by a Super Admin at any
+    by their author or class teacher while open (for WELFARE_EDIT_WINDOW_HOURS), and by the HOD, Head of School or a Super Admin at any
     time. Every correction is kept in WelfareObservationRevision.
     FRD FR-WEL-001…010
     """
@@ -286,7 +286,10 @@ class WelfareObservation(TimeStampedModel):
         - Drafts: author only.
         - Safeguarding notes and follow-ups: never, once submitted.
         - Super Admin: any other note, at any time.
-        - Author: within the correction window and before HOD review.
+        - Head of School, and the HOD of the child's section: any other note,
+          including escalated (High/Critical) and reviewed ones.
+        - Author, or the child's class teacher: while the note is open (not
+          yet reviewed, not escalated) and within the correction window.
         """
         from django.utils import timezone
         from users.models import UserRole
@@ -301,18 +304,34 @@ class WelfareObservation(TimeStampedModel):
             )
         if user.role == UserRole.SUPER_ADMIN or user.is_superuser:
             return ""
-        if not is_author:
-            return "Only the teacher who wrote this note can correct it."
-        if self.hod_status != "pending":
-            return "This note has already been reviewed. Ask a Super Admin to correct it."
+        if user.has_role(UserRole.HEAD_OF_SCHOOL) or self._is_section_head(user):
+            return ""
+        from .visibility import class_teacher_classes
+        if not (is_author or self.student.class_name in class_teacher_classes(user)):
+            return "Only the teacher who wrote this note, the class teacher or the HOD can correct it."
+        if self.hod_status != "pending" or self.is_escalated:
+            return "This note has been escalated or reviewed. Ask the HOD or a Super Admin to correct it."
         deadline = self.correction_deadline
         if deadline and timezone.now() > deadline:
             hours = int(self.edit_window().total_seconds() // 3600)
             return (
                 f"The {hours}-hour correction window has closed. "
-                "Ask a Super Admin to correct it."
+                "Ask the HOD or a Super Admin to correct it."
             )
         return ""
+
+    @property
+    def is_escalated(self):
+        """High and Critical notes go to the HOD (and Head of School) for sign-off."""
+        return self.severity in (WelfareSeverity.HIGH, WelfareSeverity.CRITICAL)
+
+    def _is_section_head(self, user):
+        """True if ``user`` heads the section the child's class belongs to."""
+        depts = user.section_departments
+        if not depts:
+            return False
+        from academics.models import GradeClass
+        return GradeClass.objects.filter(name=self.student.class_name, department__in=depts).exists()
 
     def can_edit(self, user):
         return not self.edit_block_reason(user)
