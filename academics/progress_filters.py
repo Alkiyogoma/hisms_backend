@@ -79,9 +79,11 @@ class ProgressFilters:
         self.subject = value if value in self.subject_options else ""
         return self.subject
 
-    def pick_type(self, *, note=""):
-        """Choose an assessment type code; "" means all assessed so far."""
+    def pick_type(self, *, note="", all_label=""):
+        """Choose an assessment type code; "" means all assessed so far
+        (``all_label`` renames that option)."""
         self.type_note = note
+        self.type_all_label = all_label
         if note:
             return ""
         self.exam_types = list(ExamTypeConfiguration.objects.filter(is_active=True).order_by("display_order", "name"))
@@ -113,6 +115,7 @@ class ProgressFilters:
             "exam_types": self.exam_types,
             "exam_type": self.exam_type,
             "type_note": self.type_note,
+            "type_all_label": getattr(self, "type_all_label", ""),
             "footnote": footnote,
             "hidden": hidden or {},
             "views": views or [],

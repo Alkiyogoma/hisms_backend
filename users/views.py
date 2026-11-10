@@ -991,6 +991,8 @@ class UserListView(RoleRequiredMixin, ListView):
 
                     "is_class_teacher": tca.is_class_teacher,
 
+                    "is_assistant_class_teacher": tca.is_assistant_class_teacher,
+
                     "subjects_taught": tca.subjects_taught or [],
 
                 })

@@ -186,6 +186,67 @@ class ClassPositionTests(ClassFixture):
             self.assertNotIn(other, html)
 
 
+
+class ClassResultsTests(ClassFixture):
+    def test_rows_have_subject_marks_total_average_and_rank_like_the_report_card(self):
+        from academics.class_position import class_results
+        res = class_results("Grade 4", self.term1)
+        self.assertEqual([s["name"] for s in res["subjects"]], ["Mathematics", "Science"])  # Art is remark-only
+        self.assertEqual([s["label"] for s in res["subjects"]], ["S0", "S1"])
+        rows = {r["student"].first_name: r for r in res["rows"]}
+        # Ranked best first; Daudi (nothing approved) last and unranked; Eli is in another class.
+        self.assertEqual([r["student"].first_name for r in res["rows"]], ["Baraka", "Amani", "Caren", "Daudi"])
+        self.assertEqual(rows["Amani"]["marks"], [72.0, 70.0])
+        self.assertEqual(rows["Amani"]["total"], 142.0)
+        self.assertEqual(rows["Amani"]["average"], 71.0)
+        self.assertEqual(rows["Amani"]["position"], self.positions(self.amani)["overall"]["term"]["position"])
+        self.assertEqual(rows["Baraka"]["position"], 1)
+        self.assertEqual(rows["Daudi"]["marks"], [None, None])
+        self.assertIsNone(rows["Daudi"]["position"])
+        self.assertEqual(res["ranked"], 3)
+
+    def test_equal_averages_share_a_rank(self):
+        from academics.class_position import class_results
+        self.score(self.daudi, "Mathematics", "mid_term", 80)
+        self.score(self.daudi, "Science", "quiz", 80)
+        rows = {r["student"].first_name: r["position"] for r in class_results("Grade 4", self.term1)["rows"]}
+        self.assertEqual(rows, {"Baraka": 1, "Daudi": 1, "Amani": 3, "Caren": 4})
+
+    def test_single_exam_uses_only_that_exams_marks_and_positions(self):
+        from academics.class_position import class_results
+        res = class_results("Grade 4", self.term1, exam_type="quiz")
+        rows = {r["student"].first_name: r for r in res["rows"]}
+        self.assertEqual(rows["Amani"]["marks"], [90.0, 70.0])
+        self.assertEqual(rows["Amani"]["average"], 80.0)
+        for st in (self.amani, self.baraka, self.caren):
+            self.assertEqual(rows[st.first_name]["position"], self.positions(st)["quiz"]["term"]["position"])
+        mid = {r["student"].first_name: r for r in class_results("Grade 4", self.term1, exam_type="mid_term")["rows"]}
+        self.assertEqual(mid["Caren"]["marks"], [90.0])  # only Maths had a mid-term
+        self.assertIsNone(mid["Baraka"]["position"])
+
+    def test_report_list_page_exam_filter(self):
+        self.client.force_login(self.hos)
+        url = reverse("academics:report_card_list")
+        resp = self.client.get(url, {"class_name": "Grade 4", "term": self.term1.pk})
+        self.assertContains(resp, "Combined term report")
+        resp = self.client.get(url, {"class_name": "Grade 4", "term": self.term1.pk, "type": "quiz"})
+        self.assertContains(resp, "Quiz results")
+        self.assertEqual(resp.context["results"]["rows"][0]["average"], 80.0)
+
+    def test_report_list_page_shows_the_results_sheet_and_exports_it(self):
+        self.client.force_login(self.hos)
+        url = reverse("academics:report_card_list")
+        resp = self.client.get(url, {"class_name": "Grade 4", "term": self.term1.pk})
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Results for Term 1")
+        self.assertContains(resp, ">S0</th>")
+        self.assertContains(resp, reverse("academics:learner_report", args=[self.amani.pk]))
+        csv = self.client.get(url, {"class_name": "Grade 4", "term": self.term1.pk, "export": "csv"})
+        self.assertEqual(csv["Content-Type"], "text/csv")
+        lines = csv.content.decode().splitlines()
+        self.assertEqual(lines[0], "Admission No,Student,Sex,Mathematics,Science,Total,Average,Position,Grade")
+        self.assertTrue(lines[1].startswith("B1,"))
+
 class AssistantClassTeacherTests(ClassFixture):
     @classmethod
     def setUpTestData(cls):
@@ -275,3 +336,31 @@ class AssistantClassTeacherTests(ClassFixture):
         from ptc.models import PTCProgressTrendOverride
         self.assertFalse(PTCProgressTrendOverride.objects.exists())
         self.assertEqual(self.client.get(reverse("ptc:ptc_screen", args=[self.eli.pk])).status_code, 403)
+
+    def test_exam_scores_menu_opens_the_assessment_grid_without_timetable_slots(self):
+        # The assistant has class assignments but no timetabled lessons.
+        self.client.force_login(self.assistant)
+        resp = self.client.get(reverse("academics:exam_scores_entry"))
+        self.assertRedirects(resp, reverse("academics:primary_assessment"), fetch_redirect_response=False)
+
+    def test_performance_scope_covers_the_whole_assisted_class_in_other_terms(self):
+        # No assignment in Term 2: the scope falls back to current assignments
+        # and still gives every subject of the assisted class.
+        from academics.performance import resolve_scope
+        scope = resolve_scope(self.assistant, [self.term2])
+        self.assertIsNone(scope.pairs["Grade 4"])
+        self.assertEqual(scope.pairs["Grade 5"], {"Science"})
+
+    def test_user_edit_form_shows_the_assisted_class(self):
+        from users.forms import UserUpdateForm
+        form = UserUpdateForm(instance=self.assistant)
+        self.assertEqual(form.fields["teacher_role"].initial, "assistant_class_teacher")
+        self.assertEqual(form.fields["class_teacher_class"].initial, self.g4.pk)
+
+    def test_user_list_marks_the_assistant_class_teacher(self):
+        self.client.force_login(self._user("sa", UserRole.SUPER_ADMIN))
+        resp = self.client.get(reverse("users:user_list"))
+        self.assertEqual(resp.status_code, 200)
+        rows = resp.context["user_assignments"][self.assistant.pk]
+        g4 = next(r for r in rows if r["class_name"] == "Grade 4")
+        self.assertTrue(g4["is_assistant_class_teacher"])

@@ -60,7 +60,7 @@
     <div class="pf-fg">
       <label for="pfType">Assessment type</label>
       <select id="pfType" name="type">
-        <option value="">All assessed so far</option>
+        <option value="">{{ pf.type_all_label|default:"All assessed so far" }}</option>
         {% for e in pf.exam_types %}
           <option value="{{ e.code }}"{% if e.code == pf.exam_type %} selected{% endif %}>{{ e.name }}</option>
         {% endfor %}

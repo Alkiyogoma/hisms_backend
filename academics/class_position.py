@@ -161,3 +161,83 @@ def learner_positions(student, term, class_name, shared=None):
              "term": rank(table[("term", code)], student.pk),
              "year": rank(table[("year", code)], student.pk)}
             for code, label in measures]
+
+
+def _subject_label(name, code):
+    """Short column heading for a subject: its code, else its initials (or
+    first four letters for a one-word name)."""
+    if code:
+        return code.upper()
+    words = [w for w in name.replace("&", " ").split() if w[:1].isalnum()]
+    if len(words) > 1:
+        return "".join(w[0] for w in words[:4]).upper()
+    return name[:4].upper()
+
+
+def class_results(class_name, term, shared=None, exam_type=None):
+    """The class results sheet for ``term``: every learner in ``class_name``
+    with their mark in each subject, total, average, position and grade.
+
+    Staff-only (class teacher, HOD, Head of School): unlike
+    ``learner_positions`` it lists every learner's marks side by side.
+
+    Marks and positions are the same as the report card's "Overall average"
+    line: approved mark-bearing scores, each subject's mark the weighted
+    mean of its assessments, the average the mean of the learner's subject
+    marks, ties sharing a position. The total is the sum of the subject
+    marks. Learners in the class with no approved marks are listed last,
+    unranked.
+
+    With ``exam_type`` (an assessment type code, e.g. "mid_term") only that
+    exam counts: each subject's mark is the learner's percentage in it, and
+    the position is the one the report card gives for that exam.
+
+    Returns ``{"subjects": [{"name", "label"}], "rows": [...], "ranked": n}``
+    where each row has ``student``, ``marks`` (one per subject, None when
+    not marked), ``total``, ``average``, ``position``, ``grade``,
+    ``subjects`` (how many were marked).
+    """
+    from academics.grading_utils import get_grade_from_score
+    from academics.models import ExamTypeConfiguration, GradeClass, Subject
+    from students.models import Student
+
+    empty = {"subjects": [], "rows": [], "ranked": 0}
+    if term is None or not class_name:
+        return empty
+    year = term.academic_year
+    weights = {code: float(w) for code, w in ExamTypeConfiguration.objects.values_list("code", "weight_percentage")}
+    rows = _class_rows(class_name, year, [term], shared)
+    marks = _subject_marks(rows, exam_type, weights)
+    averages = _averages(rows, exam_type, weights)
+
+    # Columns: subjects with marks, in the order the class's subjects are
+    # listed, then any other marked subject by name.
+    marked = {subject for _, subject in marks}
+    gc = GradeClass.objects.filter(name=class_name).first()
+    class_subjects = list(gc.subjects.order_by("name").values_list("name", flat=True)) if gc else []
+    names = [s for s in class_subjects if s in marked] + sorted(marked - set(class_subjects))
+    codes = dict(Subject.objects.filter(name__in=names).values_list("name", "code"))
+    subjects = [{"name": n, "label": _subject_label(n, codes.get(n))} for n in names]
+
+    # Learners: the class now, plus anyone who was in it this term and has marks.
+    members = set(Student.objects.filter(class_name=class_name, is_archived=False).values_list("id", flat=True))
+    members |= set(averages)
+    students = Student.objects.filter(id__in=members).order_by("last_name", "first_name")
+
+    out = []
+    for st in students:
+        avg = averages.get(st.pk)
+        subject_marks = [marks.get((st.pk, n)) for n in names]
+        got = [m for m in subject_marks if m is not None]
+        pos = rank(averages, st.pk)
+        out.append({
+            "student": st,
+            "marks": subject_marks,
+            "subjects": len(got),
+            "total": round(sum(got), 1) if got else None,
+            "average": round(avg, 1) if avg is not None else None,
+            "position": pos["position"] if pos else None,
+            "grade": get_grade_from_score(avg) if avg is not None else None,
+        })
+    out.sort(key=lambda r: (r["position"] is None, r["position"] or 0))
+    return {"subjects": subjects, "rows": out, "ranked": len(averages)}

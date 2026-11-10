@@ -254,7 +254,7 @@
                 {% for a in classes %}
                   <span style="display:inline-flex;align-items:center;gap:4px;background:#EFF6FF;color:#1E40AF;padding:3px 10px;border-radius:99px;font-weight:600;font-size:11px;white-space:nowrap">
                     {{ a.class_name }}
-                    <span style="background:#DBEAFE;color:#1D4ED8;padding:1px 6px;border-radius:99px;font-size:9px;font-weight:700">{{ a.is_class_teacher|yesno:"CT,T" }}</span>
+                    <span style="background:#DBEAFE;color:#1D4ED8;padding:1px 6px;border-radius:99px;font-size:9px;font-weight:700">{% if a.is_class_teacher %}CT{% elif a.is_assistant_class_teacher %}ACT{% else %}T{% endif %}</span>
                   </span>
                 {% endfor %}
                 </div>

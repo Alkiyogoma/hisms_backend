@@ -245,7 +245,9 @@ class ReportCardListView(RoleRequiredMixin, TemplateView):
         class_name = None if ctx.get("class_error") else (pf.pick_class(available) or None)
         ctx["class_name"] = class_name
         pf.pick_subject([], note="All subjects")
-        pf.pick_type(note="Term report")
+        exam_type = pf.pick_type(all_label="Combined term report")
+        ctx["exam_type"] = exam_type
+        ctx["exam_type_name"] = next((e.name for e in pf.exam_types if e.code == exam_type), "")
         ctx["pf"] = pf.context()
 
         if class_name and term:
@@ -255,6 +257,15 @@ class ReportCardListView(RoleRequiredMixin, TemplateView):
             ).select_related("student").order_by("student__last_name", "student__first_name")
             ctx["reports"] = reports
             ctx["has_pending"] = reports.filter(status=ReportCardStatus.PENDING_SIGN_OFF).exists()
+            # Results sheet: every learner's subject marks, total, average and
+            # position (same figures as the report card), with their report.
+            from academics.class_position import class_results
+            results = class_results(class_name, term, exam_type=exam_type or None)
+            by_student = {r.student_id: r for r in reports}
+            for row in results["rows"]:
+                row["report"] = by_student.get(row["student"].pk)
+            ctx["results"] = results
+            ctx["print_all_report"] = next(iter(reports), None)
 
         # Sign-off window gating
         from django.utils import timezone as _tz
@@ -277,6 +288,33 @@ class ReportCardListView(RoleRequiredMixin, TemplateView):
 
         ctx["academics_tab"] = "reports"
         return ctx
+
+    def get(self, request, *args, **kwargs):
+        if request.GET.get("export") != "csv":
+            return super().get(request, *args, **kwargs)
+        ctx = self.get_context_data(**kwargs)
+        results = ctx.get("results")
+        if ctx.get("class_error"):
+            raise PermissionDenied(ctx["class_error"])
+        if not results:
+            return super().get(request, *args, **kwargs)
+        import csv
+        term = ctx["term"]
+        label = ctx["exam_type_name"] or "combined"
+        filename = f"{ctx['class_name']}_{term.name}_{label}_results.csv".replace(" ", "_")
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        writer = csv.writer(response)
+        writer.writerow(["Admission No", "Student", "Sex"] + [s["name"] for s in results["subjects"]]
+                        + ["Total", "Average", "Position", "Grade"])
+        for row in results["rows"]:
+            st = row["student"]
+            writer.writerow(
+                [st.admission_no, st.get_full_name(), (st.gender or "")[:1].upper()]
+                + ["" if m is None else m for m in row["marks"]]
+                + ["" if row[k] is None else row[k] for k in ("total", "average", "position", "grade")]
+            )
+        return response
 
 
 def _remark_rows(student, term, expected=None, remark_names=None):
