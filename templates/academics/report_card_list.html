@@ -9,15 +9,6 @@
 {% include "academics/_top_tabs_reports.html" %}
 {% include "academics/_progress_filters.html" %}
 
-{% if signoff_blocked %}
-<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:14px 20px;margin:16px 0;display:flex;align-items:center;gap:12px">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-    <div>
-        <div style="font-size:13px;font-weight:700;color:#991B1B">Sign-off blocked</div>
-        <div style="font-size:12px;color:#DC2626;margin-top:2px">{{ signoff_block_reason }}. Reports cannot be published until this date is reached.</div>
-    </div>
-</div>
-{% endif %}
 
 {% if class_error %}
   <div class="card" style="padding:24px; text-align:center; color:var(--red); font-weight:600">{{ class_error }}</div>

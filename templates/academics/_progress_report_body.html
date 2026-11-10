@@ -75,20 +75,6 @@
     <div class="empty">No approved marks for {{ student.first_name }} {% if term %}in {{ term.name }}, {{ term.academic_year.name }}{% endif %} yet. Marks appear once they are entered and approved.</div>
   {% endif %}
 
-  {% comment %}Class position: overall averages only, never by subject;
-     position and class size only, never other learners (academics/class_position.py).{% endcomment %}
-  {% if positions and academic_rows %}
-  <h2>CLASS POSITION <small>{{ class_name }} · averages across mark-bearing subjects · approved marks only</small></h2>
-  <div class="scroll"><table class="t pos">
-    <thead><tr><th></th>{% for p in positions %}<th class="ctr">{{ p.label }}</th>{% endfor %}</tr></thead>
-    <tbody>
-      <tr><td><b>This term</b></td>{% for p in positions %}<td class="ctr mono">{% include "academics/_class_position_cell.html" with pos=p.term %}</td>{% endfor %}</tr>
-      <tr><td><b>Year to date</b></td>{% for p in positions %}<td class="ctr mono">{% include "academics/_class_position_cell.html" with pos=p.year %}</td>{% endfor %}</tr>
-    </tbody>
-  </table></div>
-  <p class="pos-note">Position among students in the class with approved marks for that measure, e.g. &ldquo;4 of 26&rdquo;. There is no ranking by subject, and remark-only subjects are not included. Students with the same average share a position.</p>
-  {% endif %}
-
   {% if remark_rows %}
   <h2>Subjects assessed by remark <small>once per term · no marks</small></h2>
   <table class="t">
