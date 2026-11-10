@@ -9,7 +9,7 @@
     <div class="ptc-nowin-title">PTC dates are not set up yet</div>
     <p class="ptc-nowin-desc">
       {{ what|default:"This page" }} will open once a PTC date is added for this academic year.
-      {% if can_set_dates %}Add the Term 1 or Term 3 PTC date in Calendar Setup to get started.{% else %}Ask the Admin Officer to add the PTC dates in Calendar Setup.{% endif %}
+      {% if can_set_dates %}Add this term's PTC date in Calendar Setup to get started.{% else %}Ask the Admin Officer to add the PTC dates in Calendar Setup.{% endif %}
     </p>
     {% if can_set_dates %}
     <a href="{% url 'ptc:calendar_config' %}" class="hf-btn hf-btn-primary">

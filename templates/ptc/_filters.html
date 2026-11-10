@@ -1,0 +1,54 @@
+{# PTC filter bar: same look and behaviour as the progress-marking filters (pf-bar). #}
+<form method="get" class="pf-bar" id="ptcFilters">
+  <div class="pf-grid">
+    <div class="pf-fg">
+      <label for="pfPtc">PTC</label>
+      <select id="pfPtc" name="ptc"{% if not filters.windows %} disabled{% endif %}>
+        {% for w in filters.windows %}<option value="{{ w.pk }}"{% if w.selected %} selected{% endif %}>{{ w.label }}</option>{% empty %}<option value="">No PTC dates</option>{% endfor %}
+      </select>
+    </div>
+    <div class="pf-fg">
+      <label for="pfClass">Class</label>
+      <select id="pfClass" name="class"{% if not filters.classes %} disabled{% endif %}>
+        {% for c in filters.classes %}<option value="{{ c.name }}"{% if c.selected %} selected{% endif %}>{{ c.name }}</option>{% empty %}<option value="">No classes</option>{% endfor %}
+      </select>
+    </div>
+    {% if filters.pages|length > 1 %}
+    <div class="pf-fg">
+      <label for="pfEntry">Entry</label>
+      <select id="pfEntry" data-view>
+        {% for p in filters.pages %}<option value="{{ p.url }}"{% if p.active %} selected{% endif %}>{{ p.label }}</option>{% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    {% if filters.subjects %}
+    <div class="pf-fg">
+      <label for="pfSubject">Subject</label>
+      <select id="pfSubject" name="subject">
+        <option value="">All my subjects</option>
+        {% for s in filters.subjects %}<option value="{{ s }}"{% if s == filters.subject %} selected{% endif %}>{{ s }}</option>{% endfor %}
+      </select>
+    </div>
+    {% endif %}
+  </div>
+  <div class="pf-foot">
+    <span>{% if filters.footnote %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>{{ filters.footnote }}{% endif %}</span>
+    <noscript><button type="submit" class="hf-btn hf-btn-primary">Apply</button></noscript>
+  </div>
+</form>
+<script>
+(function () {
+  var form = document.getElementById('ptcFilters');
+  if (!form) return;
+  form.addEventListener('change', function (e) {
+    if (e.target.hasAttribute('data-view')) {
+      // Another PTC page: keep the PTC and class; subjects differ.
+      form.action = e.target.value;
+      if (form.subject) form.subject.disabled = true;
+    }
+    if (e.target.name === 'class' && form.subject) form.subject.disabled = true;
+    form.classList.add('is-loading');
+    form.submit();
+  });
+})();
+</script>

@@ -73,12 +73,6 @@ app.conf.beat_schedule = {
         'task': 'ptc.tasks.send_ptc_reminders_task',
         'schedule': crontab(hour=5, minute=0),  # 08:00 EAT
     },
-    # FR-PTC-009: Lock enrichment grades after term end.
-    # Runs daily at 06:00 EAT = 03:00 UTC.
-    'lock-enrichment-grades-post-term': {
-        'task': 'ptc.tasks.lock_enrichment_grades_post_term',
-        'schedule': crontab(hour=3, minute=0),  # 06:00 EAT
-    },
 
         # --- Admission assessment reminders (2 days before) ---
         'send-assessment-reminders-daily': {

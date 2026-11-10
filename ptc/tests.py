@@ -16,9 +16,6 @@ from academics.models import (
 from academics.models import ExamScore, ExamTypeConfiguration, ScoreStatus
 from hr.models import StaffProfile, TeacherClassAssignment
 from ptc.models import (
-    EnrichmentGrade,
-    EnrichmentLetterGrade,
-    EnrichmentSubject,
     LEARNER_ATTRIBUTES,
     LearnerAttributeRating,
     LearnerAttributeRatingEntry,
@@ -33,10 +30,8 @@ from ptc.services import (
     calculate_meets_expectations,
     calculate_progress_trend,
     can_enter_comment,
-    can_enter_enrichment_grade,
     can_open_ptc,
     get_core_subjects_for_student,
-    get_enrichment_grade_description,
 )
 from students.models import Student, StudentStatus
 from users.models import User, UserRole
@@ -124,14 +119,15 @@ def _create_ptc_window(academic_year, term_slot=TermSlot.TERM_1, ptc_date=None):
 
 
 # ---------------------------------------------------------------------------
-# FR-PTC-001: PTC windows  only Term 1 and Term 3
+# PTC windows: one per term
 # ---------------------------------------------------------------------------
 
 class PTCWindowTests(TestCase):
-    """FR-PTC-001: Only Term 1 and Term 3 PTC windows exist."""
+    """One PTC window per term (Term 1, Term 2, Term 3)."""
 
     def test_term_slot_choices(self):
         self.assertEqual(TermSlot.TERM_1, "term_1")
+        self.assertEqual(TermSlot.TERM_2, "term_2")
         self.assertEqual(TermSlot.TERM_3, "term_3")
 
     def test_ptc_window_creation(self):
@@ -189,87 +185,6 @@ class PTCDateChangeTests(TestCase):
         )
         self.assertEqual(log.old_ptc_date, date(2025, 11, 15))
         self.assertEqual(log.new_ptc_date, date(2025, 11, 22))
-
-
-# ---------------------------------------------------------------------------
-# FR-PTC-006: Seven fixed enrichment subjects
-# ---------------------------------------------------------------------------
-
-class EnrichmentSubjectTests(TestCase):
-    """FR-PTC-006: Enrichment subjects linked to academics.Subject with is_enrichment=True."""
-
-    def test_enrichment_subject_count(self):
-        count = Subject.objects.filter(is_enrichment=True).count()
-        self.assertEqual(count, 7)
-
-    def test_enrichment_subject_creation(self):
-        user = _create_user("music_teacher")
-        music_subject = Subject.objects.get_or_create(
-            name="Music", defaults={"is_enrichment": True, "is_active": True}
-        )[0]
-        enrichment, created = EnrichmentSubject.objects.get_or_create(
-            subject=music_subject,
-            defaults={"assigned_teacher": user, "is_active": True},
-        )
-        self.assertEqual(enrichment.subject.name, "Music")
-        self.assertTrue(enrichment.is_active)
-
-
-# ---------------------------------------------------------------------------
-# FR-PTC-007: Enrichment letter grades
-# ---------------------------------------------------------------------------
-
-class EnrichmentGradeTests(TestCase):
-    """FR-PTC-007: Enrichment letter grade bands."""
-
-    def test_letter_grade_choices(self):
-        self.assertEqual(len(EnrichmentLetterGrade), 6)
-
-    def test_enrichment_grade_description(self):
-        self.assertEqual(get_enrichment_grade_description("A*"), "Outstanding")
-        self.assertEqual(get_enrichment_grade_description("A"), "High")
-        self.assertEqual(get_enrichment_grade_description("B"), "Good")
-        self.assertEqual(get_enrichment_grade_description("C"), "Aspiring")
-        self.assertEqual(get_enrichment_grade_description("D"), "Basic")
-        self.assertEqual(get_enrichment_grade_description("E"), "Needs Improvement")
-        self.assertEqual(get_enrichment_grade_description("X"), "")
-
-    def test_enrichment_grade_creation(self):
-        ay = _create_academic_year()
-        term = _create_term(ay)
-        student = _create_student()
-        french = Subject.objects.get_or_create(
-            name="French", defaults={"is_enrichment": True, "is_active": True}
-        )[0]
-        subject, _ = EnrichmentSubject.objects.get_or_create(subject=french, defaults={"is_active": True})
-        teacher = _create_user("french_teacher")
-        subject.assigned_teacher = teacher
-        subject.save()
-
-        grade = EnrichmentGrade.objects.create(
-            student=student,
-            enrichment_subject=subject,
-            term=term,
-            letter_grade="A",
-            entered_by=teacher,
-        )
-        self.assertEqual(grade.letter_grade, "A")
-
-    def test_enrichment_grade_unique_together(self):
-        ay = _create_academic_year()
-        term = _create_term(ay)
-        student = _create_student()
-        pe = Subject.objects.get_or_create(
-            name="PE", defaults={"is_enrichment": True, "is_active": True}
-        )[0]
-        subject, _ = EnrichmentSubject.objects.get_or_create(subject=pe, defaults={"is_active": True})
-        EnrichmentGrade.objects.create(
-            student=student, enrichment_subject=subject, term=term, letter_grade="B",
-        )
-        with self.assertRaises(Exception):
-            EnrichmentGrade.objects.create(
-                student=student, enrichment_subject=subject, term=term, letter_grade="C",
-            )
 
 
 # ---------------------------------------------------------------------------
@@ -387,30 +302,6 @@ class LearnerAttributeRatingTests(TestCase):
             ).count(),
             12,
         )
-
-
-# ---------------------------------------------------------------------------
-# FR-PTC-024: Enrichment grade unique per student/subject/term
-# ---------------------------------------------------------------------------
-
-class EnrichmentGradeUniqueTests(TestCase):
-    """FR-PTC-024: Enrichment grade is one per student per subject per term."""
-
-    def test_unique_constraint(self):
-        ay = _create_academic_year()
-        term = _create_term(ay)
-        student = _create_student()
-        ict = Subject.objects.get_or_create(
-            name="ICT", defaults={"is_enrichment": True, "is_active": True, "department": Department.PRIMARY}
-        )[0]
-        subject, _ = EnrichmentSubject.objects.get_or_create(subject=ict, defaults={"is_active": True})
-        EnrichmentGrade.objects.create(
-            student=student, enrichment_subject=subject, term=term, letter_grade="A",
-        )
-        with self.assertRaises(Exception):
-            EnrichmentGrade.objects.create(
-                student=student, enrichment_subject=subject, term=term, letter_grade="B",
-            )
 
 
 # ---------------------------------------------------------------------------
@@ -620,43 +511,6 @@ class CanEnterCommentTests(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Services: can_enter_enrichment_grade
-# ---------------------------------------------------------------------------
-
-class CanEnterEnrichmentGradeTests(TestCase):
-    """Specialist teachers restricted to their assigned enrichment subject."""
-
-    def _get_or_create_enrichment(self, name, teacher=None, gc=None):
-        subj, _ = Subject.objects.get_or_create(
-            name=name, defaults={"is_enrichment": True, "is_active": True}
-        )
-        es, _ = EnrichmentSubject.objects.get_or_create(
-            subject=subj, defaults={"assigned_teacher": teacher, "assigned_class": gc, "is_active": True}
-        )
-        return es
-
-    def test_super_admin_always(self):
-        sa = _create_user("sa", UserRole.SUPER_ADMIN)
-        student = _create_student()
-        es = self._get_or_create_enrichment("Music")
-        self.assertTrue(can_enter_enrichment_grade(sa, student, es.id))
-
-    def test_unassigned_teacher(self):
-        teacher = _create_user("t")
-        student = _create_student()
-        es = self._get_or_create_enrichment("Music")
-        self.assertFalse(can_enter_enrichment_grade(teacher, student, es.id))
-
-    def test_wrong_subject(self):
-        teacher = _create_user("t")
-        other = _create_user("other")
-        gc = _create_grade_class()
-        es = self._get_or_create_enrichment("Music", teacher=other, gc=gc)
-        student = _create_student()
-        self.assertFalse(can_enter_enrichment_grade(teacher, student, es.id))
-
-
-# ---------------------------------------------------------------------------
 # Services: get_core_subjects_for_student
 # ---------------------------------------------------------------------------
 
@@ -677,18 +531,17 @@ class CoreSubjectTests(TestCase):
         self.assertIn("Mathematics", subjects)
         self.assertIn("English", subjects)
 
-    def test_excludes_enrichment(self):
+    def test_excludes_remark_only_subjects(self):
+        from academics.models import AssessmentMode
         gc = _create_grade_class()
         s1 = _create_subject("Mathematics")
-        enrichment, _ = Subject.objects.get_or_create(
-            name="Music", defaults={"is_enrichment": True, "is_active": True, "department": Department.PRIMARY}
-        )
-        EnrichmentSubject.objects.get_or_create(subject=enrichment, defaults={"is_active": True})
-        gc.subjects.add(s1, enrichment)
+        music = Subject.objects.create(name="MusicX", code="MUSX", department=Department.PRIMARY,
+                                       assessment_mode=AssessmentMode.REMARK)
+        gc.subjects.add(s1, music)
         student = _create_student()
         subjects = get_core_subjects_for_student(student)
         self.assertIn("Mathematics", subjects)
-        self.assertNotIn("Music", subjects)
+        self.assertNotIn("MusicX", subjects)
 
 
 # ---------------------------------------------------------------------------
@@ -709,24 +562,9 @@ class ModelConstraintTests(TestCase):
         with self.assertRaises(Exception):
             entry.clean()
 
-    def test_enrichment_grade_invalid_choice(self):
-        ay = _create_academic_year()
-        term = _create_term(ay)
-        student = _create_student()
-        pe = Subject.objects.get_or_create(
-            name="PE", defaults={"is_enrichment": True, "is_active": True}
-        )[0]
-        subject, _ = EnrichmentSubject.objects.get_or_create(subject=pe, defaults={"is_active": True})
-        grade = EnrichmentGrade(
-            student=student, enrichment_subject=subject,
-            term=term, letter_grade="Z",
-        )
-        with self.assertRaises(Exception):
-            grade.clean()
-
     def test_ptc_window_term_slot_validation(self):
         ay = _create_academic_year()
-        window = PTCWindow(academic_year=ay, term_slot="term_2", ptc_date=date(2025, 11, 15))
+        window = PTCWindow(academic_year=ay, term_slot="term_4", ptc_date=date(2025, 11, 15))
         with self.assertRaises(Exception):
             window.clean()
 

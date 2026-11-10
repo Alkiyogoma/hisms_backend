@@ -6,7 +6,7 @@
 #   since the User model has a single TEACHER role (no distinct class/subject/specialist roles).
 # - Weighted average reuses the existing ExamTypeConfiguration weights from academics app
 #   to avoid duplicating 20/30/50 logic.
-# - OI-PTC-01: attendance summary gated behind PTC_SHOW_ATTENDANCE_SUMMARY setting (default off).
+# - Attendance is always shown on the PTC report, per term (unmarked days excluded).
 # - OI-PTC-03: term-to-term comparison baseline used by default; isolated in its own function.
 
 from __future__ import annotations
@@ -26,15 +26,84 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
+# Per-request cache
+# ---------------------------------------------------------------------------
+# A PTC page asks for the current term, the user's class assignments and a
+# class's subjects many times over. Inside ``request_cache()`` (wrapped round
+# every PTC view) each is read once; outside it nothing is cached.
+
+import contextvars
+from contextlib import contextmanager
+
+_REQUEST_CACHE: contextvars.ContextVar = contextvars.ContextVar("ptc_request_cache", default=None)
+
+
+@contextmanager
+def request_cache():
+    token = _REQUEST_CACHE.set({})
+    try:
+        yield
+    finally:
+        _REQUEST_CACHE.reset(token)
+
+
+def _memo(key, compute):
+    cache = _REQUEST_CACHE.get()
+    if cache is None:
+        return compute()
+    if key not in cache:
+        cache[key] = compute()
+    return cache[key]
+
+
+def current_term():
+    from academics.utils import get_current_term
+    return _memo("current_term", get_current_term)
+
+
+def current_academic_year():
+    from academics.utils import get_current_academic_year
+    return _memo("current_academic_year", get_current_academic_year)
+
+
+def _teacher_assignments(user) -> list:
+    """The user's TeacherClassAssignment rows for the current term."""
+    from hr.models import TeacherClassAssignment
+
+    def compute():
+        term = current_term()
+        if not term or not getattr(user, "pk", None):
+            return []
+        return list(
+            TeacherClassAssignment.objects.filter(teacher__user=user, term=term).select_related("grade_class")
+        )
+    return _memo(("tca", getattr(user, "pk", None)), compute)
+
+
+def _grade_classes() -> dict:
+    """{class name: GradeClass}."""
+    from academics.models import GradeClass
+    return _memo("grade_classes", lambda: {gc.name: gc for gc in GradeClass.objects.all()})
+
+
+def _class_subjects(class_name: str) -> list[tuple[str, str]]:
+    """[(subject name, assessment mode)] of a class's active subjects, by name."""
+    def compute():
+        gc = _grade_classes().get(class_name)
+        if not gc:
+            return []
+        return list(
+            gc.subjects.filter(is_active=True).order_by("name").values_list("name", "assessment_mode")
+        )
+    return _memo(("class_subjects", class_name), compute)
+
+
+# ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
 IMPROVING_THRESHOLD = 3  # percentage points
 NEEDS_ATTENTION_THRESHOLD = -3
-
-# Feature flag: OI-PTC-01  attendance summary on PTC screen.
-# Defaults to off; set PTC_SHOW_ATTENDANCE_SUMMARY=True in settings to enable.
-SHOW_ATTENDANCE = getattr(settings, "PTC_SHOW_ATTENDANCE_SUMMARY", False)
 
 # Hardcoded ECD fallback names  used when Department.ECD lookup is unavailable.
 ECD_FALLBACK_NAMES = {"Pre-Kindergarten", "Kindergarten", "Pre-School", "ABC Class"}
@@ -42,11 +111,13 @@ ECD_FALLBACK_NAMES = {"Pre-Kindergarten", "Kindergarten", "Pre-School", "ABC Cla
 
 def _get_ecd_class_names() -> set:
     """Return ECD class names from the registry, falling back to hardcoded names."""
+    return set(_memo("ecd_class_names", _load_ecd_class_names))
+
+
+def _load_ecd_class_names() -> set:
     try:
-        from academics.models import GradeClass, Department
-        db_names = set(
-            GradeClass.objects.filter(department=Department.ECD).values_list("name", flat=True)
-        )
+        from academics.models import Department
+        db_names = {name for name, gc in _grade_classes().items() if gc.department == Department.ECD}
         if db_names:
             return db_names
     except Exception:
@@ -58,31 +129,24 @@ def _get_ecd_class_names() -> set:
 # Academic Performance Grid
 # ---------------------------------------------------------------------------
 
+def get_marks_subjects_for_class(class_name: str) -> list[str]:
+    """Mark-bearing subjects of a class (Quiz, Mid-Term, End-Term), by name.
+    These are the subjects with marks, an average and a PTC subject comment."""
+    from academics.models import AssessmentMode
+
+    return [n for n, mode in _class_subjects(class_name) if mode != AssessmentMode.REMARK]
+
+
+def get_remark_subjects_for_class(class_name: str) -> list[str]:
+    """Remark-only subjects of a class: no marks, one remark grade per term."""
+    from academics.models import AssessmentMode
+
+    return [n for n, mode in _class_subjects(class_name) if mode == AssessmentMode.REMARK]
+
+
 def get_core_subjects_for_student(student) -> list[str]:
-    """
-    Read the core subjects dynamically from the grade's subject configuration.
-    This avoids hardcoding the five subjects and allows future curriculum changes.
-    """
-    from academics.models import AssessmentMode, GradeClass, Subject
-    from ptc.models import EnrichmentSubject
-
-    grade_class = GradeClass.objects.filter(name=student.class_name).first()
-    if not grade_class:
-        return []
-
-    # Core subjects are those assigned to this grade class that are NOT
-    # enrichment and carry marks (remark-only subjects have no marks to average).
-    enrichment_subject_ids = EnrichmentSubject.objects.filter(
-        is_active=True
-    ).values_list("subject_id", flat=True)
-    subject_names = list(
-        grade_class.subjects.filter(is_active=True)
-        .exclude(id__in=enrichment_subject_ids)
-        .exclude(assessment_mode=AssessmentMode.REMARK)
-        .values_list("name", flat=True)
-        .order_by("name")
-    )
-    return subject_names
+    """The mark-bearing subjects of the student's class."""
+    return get_marks_subjects_for_class(student.class_name)
 
 
 def get_academic_performance_grid(student, academic_year) -> dict:
@@ -377,100 +441,54 @@ def get_attendance_summary(student, academic_year) -> dict:
 # ---------------------------------------------------------------------------
 
 def _get_teacher_class_names(user) -> set:
-    """Get set of class names assigned to this teacher via TeacherClassAssignment."""
-    from hr.models import TeacherClassAssignment
-    from academics.utils import get_current_term
-
-    current_term = get_current_term()
-    if not current_term:
-        return set()
-
-    return set(
-        TeacherClassAssignment.objects.filter(
-            teacher__user=user,
-            term=current_term,
-        ).values_list("grade_class__name", flat=True)
-    )
+    """Class names the teacher is assigned to this term."""
+    return {a.grade_class.name for a in _teacher_assignments(user)}
 
 
 def _get_teacher_subjects(user) -> set:
-    """Get set of subject names this teacher is assigned to teach."""
-    from hr.models import TeacherClassAssignment
-    from academics.utils import get_current_term
-
-    current_term = get_current_term()
-    if not current_term:
-        return set()
-
-    assignments = TeacherClassAssignment.objects.filter(
-        teacher__user=user,
-        term=current_term,
-    )
-    subjects = set()
-    for a in assignments:
-        if a.subjects_taught:
-            subjects.update(a.subjects_taught)
-    return subjects
+    """Subject names this teacher is assigned to teach this term."""
+    out = set()
+    for a in _teacher_assignments(user):
+        out.update(a.subjects_taught or [])
+    return out
 
 
 def _is_class_teacher(user, class_name: str = None) -> bool:
     """Check if user is a class teacher (optionally for a specific class)."""
-    from hr.models import TeacherClassAssignment
-    from academics.utils import get_current_term
-
-    current_term = get_current_term()
-    if not current_term:
-        return False
-
-    qs = TeacherClassAssignment.objects.filter(
-        teacher__user=user,
-        term=current_term,
-        is_class_teacher=True,
+    return any(
+        a.is_class_teacher and (not class_name or a.grade_class.name == class_name)
+        for a in _teacher_assignments(user)
     )
-    if class_name:
-        qs = qs.filter(grade_class__name=class_name)
-    return qs.exists()
 
 
 def _is_assistant_class_teacher(user, class_name: str = None) -> bool:
     """Assistant class teacher this term (optionally of ``class_name``). They
-    may view the PTC report of learners in that class, never change it."""
-    from hr.models import TeacherClassAssignment
-    from academics.utils import get_current_term
-
-    current_term = get_current_term()
-    if not current_term:
-        return False
-    qs = TeacherClassAssignment.objects.filter(
-        teacher__user=user, term=current_term, is_assistant_class_teacher=True,
+    may view the PTC report of students in that class, never change it."""
+    return any(
+        a.is_assistant_class_teacher and (not class_name or a.grade_class.name == class_name)
+        for a in _teacher_assignments(user)
     )
-    if class_name:
-        qs = qs.filter(grade_class__name=class_name)
-    return qs.exists()
 
 
 def _get_class_teacher_for_class(class_name: str):
     """Get the class teacher User for a given class name."""
     from hr.models import TeacherClassAssignment
-    from academics.utils import get_current_term
 
-    current_term = get_current_term()
-    if not current_term:
-        return None
-
-    assignment = TeacherClassAssignment.objects.filter(
-        term=current_term,
-        grade_class__name=class_name,
-        is_class_teacher=True,
-    ).select_related("teacher__user").first()
-
-    return assignment.teacher.user if assignment else None
+    def compute():
+        term = current_term()
+        if not term:
+            return None
+        assignment = TeacherClassAssignment.objects.filter(
+            term=term, grade_class__name=class_name, is_class_teacher=True,
+        ).select_related("teacher__user").first()
+        return assignment.teacher.user if assignment else None
+    return _memo(("class_teacher", class_name), compute)
 
 
 def _is_ecd_student(student) -> bool:
     """Check if student is in ECD (Grades < 1 or ECD department classes)."""
-    from academics.models import GradeClass, Department
-    grade_class = GradeClass.objects.filter(name=student.class_name).first()
+    from academics.models import Department
+    grade_class = _grade_classes().get(student.class_name)
     if grade_class:
         return grade_class.department == Department.ECD
     # Fallback: ECD class names
@@ -550,30 +568,6 @@ def can_enter_comment(user, student, subject_name: str, ptc_window) -> bool:
     return subject_name in teacher_subjects
 
 
-def can_enter_enrichment_grade(user, student, enrichment_subject_id: int) -> bool:
-    """Specialist teachers restricted to their assigned enrichment subject only."""
-    from users.models import UserRole
-    from ptc.models import EnrichmentSubject
-
-    if user.role == UserRole.SUPER_ADMIN:
-        return True
-
-    subject = EnrichmentSubject.objects.filter(
-        id=enrichment_subject_id,
-        assigned_teacher=user,
-        is_active=True,
-    ).first()
-
-    if not subject:
-        return False
-
-    # Check if the student's class matches the assigned class
-    if subject.assigned_class:
-        return student.class_name == subject.assigned_class.name
-
-    return False
-
-
 def get_primary_hod_classes(user):
     """Get classes scoped to Primary HOD."""
     from academics.models import GradeClass, Department
@@ -601,191 +595,449 @@ def get_subject_teacher_students(user, subject_name: str):
     return students.order_by("class_name", "last_name", "first_name")
 
 
-def get_specialist_teacher_students(user, enrichment_subject_id: int):
-    """Get all students a specialist teacher teaches for their enrichment subject."""
-    from students.models import Student
-    from ptc.models import EnrichmentSubject
+# ---------------------------------------------------------------------------
+# Teacher scope: which classes and subjects a user works with
+# ---------------------------------------------------------------------------
+
+PTC_ADMIN_ROLES = ("super_admin", "head_of_school", "primary_hod", "lower_secondary_hod")
+
+
+def is_ptc_admin(user) -> bool:
+    return getattr(user, "role", None) in PTC_ADMIN_ROLES
+
+
+def get_ptc_classes() -> list[str]:
+    """Every non-ECD class, in display order."""
     from academics.models import Department, GradeClass
 
-    subject = EnrichmentSubject.objects.filter(
-        id=enrichment_subject_id,
-        assigned_teacher=user,
-        is_active=True,
-    ).first()
-
-    if not subject:
-        return Student.objects.none()
-
-    ecd_names = _get_ecd_class_names()
-
-    if subject.assigned_class:
-        return Student.objects.filter(
-            is_archived=False,
-            status="active",
-            class_name=subject.assigned_class.name,
-        ).exclude(class_name__in=ecd_names).order_by("last_name", "first_name")
-
-    # If assigned to all classes for this subject
-    return Student.objects.filter(
-        is_archived=False,
-        status="active",
-    ).exclude(class_name__in=ecd_names).order_by("class_name", "last_name", "first_name")
+    ecd = _get_ecd_class_names()
+    classes = sorted(_grade_classes().values(), key=lambda gc: (gc.sort_order, gc.name))
+    return [gc.name for gc in classes if gc.department != Department.ECD and gc.name not in ecd]
 
 
-# ---------------------------------------------------------------------------
-# Compliance Summary (FR-PTC-011, FR-PTC-016, FR-PTC-024)
-# ---------------------------------------------------------------------------
+def get_teacher_subjects_by_class(user) -> dict[str, set]:
+    """{class name: subjects the user teaches there} for the current term."""
+    out: dict[str, set] = {}
+    for a in _teacher_assignments(user):
+        out.setdefault(a.grade_class.name, set()).update(a.subjects_taught or [])
+    return out
 
-def get_compliance_summary(academic_year, ptc_window, data_type: str) -> list:
-    """
-    One reusable function parameterized by data_type.
-    Returns per-teacher compliance data: [{teacher, total_students, completed, incomplete}]
 
-    data_type: "comments" | "enrichment_grades" | "attributes"
-    """
+def get_class_teacher_classes(user) -> list[str]:
+    """Classes the user is class teacher of in the current term."""
+    return sorted({a.grade_class.name for a in _teacher_assignments(user) if a.is_class_teacher})
+
+
+def comment_subjects_for(user, class_name: str) -> list[str]:
+    """Subjects the user writes PTC comments for in a class: the class's
+    mark-bearing subjects, limited to those the user teaches there (PTC admins
+    get all of them). Remark-only subjects never take a PTC comment."""
+    marks = get_marks_subjects_for_class(class_name)
+    if is_ptc_admin(user):
+        return marks
+    taught = get_teacher_subjects_by_class(user).get(class_name, set())
+    return [s for s in marks if s in taught]
+
+
+def comment_save_subjects_for(user, class_name: str) -> list[str]:
+    """Subjects whose PTC comment the user may save in a class: a Super Admin
+    any mark-bearing subject, anyone else only the subjects they teach there.
+    Head of School and HODs read every comment but do not write them."""
+    marks = get_marks_subjects_for_class(class_name)
+    if getattr(user, "role", None) == "super_admin":
+        return marks
+    taught = get_teacher_subjects_by_class(user).get(class_name, set())
+    return [s for s in marks if s in taught]
+
+
+def can_rate_attributes(user, class_name: str) -> bool:
+    """Student attributes are rated by the class teacher (or a Super Admin)."""
+    return getattr(user, "role", None) == "super_admin" or _is_class_teacher(user, class_name)
+
+
+def active_students_in_class(class_name: str):
     from students.models import Student
-    from academics.models import GradeClass, Department
-    from hr.models import TeacherClassAssignment
-    from ptc.models import (
-        PTCSubjectComment,
-        EnrichmentGrade,
-        LearnerAttributeRatingEntry,
-        EnrichmentSubject,
+
+    return Student.objects.filter(
+        is_archived=False, status="active", class_name=class_name,
+    ).order_by("last_name", "first_name")
+
+
+# ---------------------------------------------------------------------------
+# PTC windows and terms
+# ---------------------------------------------------------------------------
+
+def get_current_ptc_window(academic_year=None):
+    """The PTC window entry pages work on: the one whose entry window is open,
+    else the next one coming up, else the most recent one. Prefers windows of
+    the current academic year."""
+    return _memo(("ptc_window", getattr(academic_year, "pk", None)), lambda: _find_current_ptc_window(academic_year))
+
+
+def year_ptc_windows(academic_year) -> list:
+    """The PTC windows of a year, by term slot (read once per request)."""
+    from ptc.models import PTCWindow
+
+    if academic_year is None:
+        return []
+    return _memo(
+        ("year_windows", academic_year.pk),
+        lambda: list(PTCWindow.objects.filter(academic_year=academic_year).select_related("academic_year").order_by("term_slot")),
     )
 
-    results = []
 
-    ecd_names = _get_ecd_class_names()
+def _pick_current(windows, today):
+    open_now = sorted(
+        (w for w in windows
+         if w.comment_entry_window_opens_at and w.comment_entry_window_closes_at
+         and w.comment_entry_window_opens_at <= today <= w.comment_entry_window_closes_at),
+        key=lambda w: w.ptc_date,
+    )
+    if open_now:
+        return open_now[0]
+    upcoming = sorted((w for w in windows if w.ptc_date >= today), key=lambda w: w.ptc_date)
+    if upcoming:
+        return upcoming[0]
+    return max(windows, key=lambda w: w.ptc_date) if windows else None
 
-    # Get the term matching the PTC window's term_slot (shared across all branches)
-    target_term = ptc_window.academic_year.terms.filter(
-        name__icontains=ptc_window.get_term_slot_display()
-    ).first() or ptc_window.academic_year.terms.first()
 
-    # Get all students (non-ECD)
-    all_students = Student.objects.filter(
-        is_archived=False,
-        status="active",
-    ).exclude(class_name__in=ecd_names)
+def _find_current_ptc_window(academic_year):
+    from ptc.models import PTCWindow
 
-    if data_type == "comments":
-        # Group by subject teacher
-        teacher_assignments = TeacherClassAssignment.objects.filter(
-            term=target_term,
-        ).select_related("teacher__user", "grade_class")
+    today = timezone.now().date()
+    windows = year_ptc_windows(academic_year)
+    if not windows:
+        windows = list(PTCWindow.objects.select_related("academic_year"))
+    return _pick_current(windows, today)
 
-        for ta in teacher_assignments:
-            teacher_user = ta.teacher.user
-            teacher_subjects = ta.subjects_taught or []
-            if not teacher_subjects:
-                continue
 
-            students = all_students.filter(class_name=ta.grade_class.name)
-            total = students.count()
-            if total == 0:
-                continue
+def term_number_of(term) -> int | None:
+    from academics.models import term_number_from_name
 
-            completed = 0
-            for student in students:
-                student_comments = PTCSubjectComment.objects.filter(
-                    student=student,
-                    ptc_window=ptc_window,
-                    subject_name__in=teacher_subjects,
-                )
-                if student_comments.count() >= len(teacher_subjects):
-                    completed += 1
+    return term.term_number or term_number_from_name(term.name)
 
-            results.append({
-                "teacher": teacher_user,
-                "total_students": total,
-                "completed": completed,
-                "incomplete": total - completed,
-            })
 
-    elif data_type == "enrichment_grades":
-        enrichment_subjects = EnrichmentSubject.objects.filter(is_active=True)
-        for es in enrichment_subjects:
-            if not es.assigned_teacher:
-                continue
+def get_year_terms(academic_year) -> list:
+    """The terms of a year in order (at most three)."""
+    if not academic_year:
+        return []
+    terms = list(_memo(("year_terms", academic_year.pk), lambda: list(academic_year.terms.all())))
+    terms.sort(key=lambda t: (term_number_of(t) or 9, t.start_date or timezone.now().date(), t.pk))
+    return terms[:3]
 
-            teacher_user = es.assigned_teacher
-            students = all_students
-            if es.assigned_class:
-                students = students.filter(class_name=es.assigned_class.name)
 
-            total = students.count()
-            if total == 0:
-                continue
+def window_for_term(windows, term):
+    n = term_number_of(term)
+    for w in windows:
+        if w.term_number == n:
+            return w
+    return None
 
-            completed = EnrichmentGrade.objects.filter(
-                enrichment_subject=es,
-                term=target_term,
-                student__in=students,
-            ).exclude(letter_grade="").count()
 
-            results.append({
-                "teacher": teacher_user,
-                "subject": es.subject.name,
-                "total_students": total,
-                "completed": completed,
-                "incomplete": total - completed,
-            })
-
-    elif data_type == "attributes":
-        # Class teachers responsible for attribute ratings
-        teacher_assignments = TeacherClassAssignment.objects.filter(
-            term=target_term,
-            is_class_teacher=True,
-        ).select_related("teacher__user", "grade_class")
-
-        for ta in teacher_assignments:
-            teacher_user = ta.teacher.user
-            students = all_students.filter(class_name=ta.grade_class.name)
-            total = students.count()
-            if total == 0:
-                continue
-
-            completed = 0
-            for student in students:
-                rated_count = LearnerAttributeRatingEntry.objects.filter(
-                    student=student,
-                    ptc_window=ptc_window,
-                ).exclude(rating="").count()
-                if rated_count >= 12:  # All 12 attributes rated
-                    completed += 1
-
-            results.append({
-                "teacher": teacher_user,
-                "total_students": total,
-                "completed": completed,
-                "incomplete": total - completed,
-            })
-
-    return results
+def term_for_window(window):
+    if not window:
+        return None
+    for t in get_year_terms(window.academic_year):
+        if term_number_of(t) == window.term_number:
+            return t
+    return None
 
 
 # ---------------------------------------------------------------------------
-# Letter grade for enrichment (FR-PTC-007)
+# Completion (used on Comments, Attributes and Students pages)
 # ---------------------------------------------------------------------------
 
-ENRICHMENT_GRADE_BANDS = {
-    "A*": (90, 100),
-    "A": (80, 89),
-    "B": (70, 79),
-    "C": (60, 69),
-    "D": (50, 59),
-    "E": (0, 49),
-}
+def comment_completion(students, ptc_window, subjects_by_class: dict) -> dict:
+    """{student_id: True when every required subject has a non-empty comment}.
+    ``subjects_by_class`` maps class name to the required subject names."""
+    from ptc.models import PTCSubjectComment
 
-
-def get_enrichment_grade_description(grade: str) -> str:
-    """Return the descriptive label for an enrichment letter grade."""
-    descriptions = {
-        "A*": "Outstanding",
-        "A": "High",
-        "B": "Good",
-        "C": "Aspiring",
-        "D": "Basic",
-        "E": "Needs Improvement",
+    have: dict[int, set] = {}
+    if ptc_window:
+        for sid, subj in (
+            PTCSubjectComment.objects.filter(ptc_window=ptc_window, student__in=students)
+            .exclude(comment_text="").values_list("student_id", "subject_name")
+        ):
+            have.setdefault(sid, set()).add(subj)
+    return {
+        s.id: bool(ptc_window) and set(subjects_by_class.get(s.class_name, [])) <= have.get(s.id, set())
+        for s in students
     }
-    return descriptions.get(grade, "")
+
+
+def attribute_completion(students, ptc_window) -> dict:
+    """{student_id: True when all 12 attributes are rated}."""
+    from django.db.models import Count
+    from ptc.models import LEARNER_ATTRIBUTES, LearnerAttributeRatingEntry
+
+    counts = {}
+    if ptc_window:
+        counts = dict(
+            LearnerAttributeRatingEntry.objects.filter(ptc_window=ptc_window, student__in=students)
+            .exclude(rating="").values("student_id").annotate(n=Count("id")).values_list("student_id", "n")
+        )
+    return {s.id: counts.get(s.id, 0) >= len(LEARNER_ATTRIBUTES) for s in students}
+
+
+# ---------------------------------------------------------------------------
+# PTC report (all three terms side by side)
+# ---------------------------------------------------------------------------
+
+RATING_BANDS = [
+    (90, "Outstanding", "out"),
+    (80, "High", "high"),
+    (70, "Good", "good"),
+    (60, "Aspiring", "asp"),
+    (50, "Basic", "basic"),
+    (0, "Needs Improvement", "needs"),
+]
+REMARK_CSS = {label: css for _, label, css in RATING_BANDS}
+
+ASSESSMENTS = [
+    # (exam type code, label, default weight)
+    ("quiz", "Quiz", 20),
+    ("mid_term", "Mid-Term", 30),
+    ("end_of_term", "End-Term", 50),
+]
+
+
+def rating_for(average):
+    """(label, css key) for a running average out of 100, or (None, None)."""
+    if average is None:
+        return None, None
+    for floor, label, css in RATING_BANDS:
+        if average >= floor:
+            return label, css
+    return RATING_BANDS[-1][1], RATING_BANDS[-1][2]
+
+
+def _assessment_weights() -> dict:
+    from academics.models import ExamTypeConfiguration
+
+    configured = {
+        c.code: float(c.weight_percentage)
+        for c in ExamTypeConfiguration.objects.filter(code__in=[a[0] for a in ASSESSMENTS])
+    }
+    return {code: configured.get(code, default) for code, _, default in ASSESSMENTS}
+
+
+def _term_started(term, today) -> bool:
+    return bool(term.start_date and term.start_date <= today)
+
+
+def _attendance_for_term(student, term, today) -> dict | None:
+    """Days present (incl. late), absent (incl. excused), late and the rate.
+    Unmarked (unconfirmed) days are left out. None for a term not started."""
+    from django.db.models import Count
+    from attendance.models import AttendanceEntry, AttendanceStatus
+
+    if not _term_started(term, today):
+        return None
+    end = min(term.end_date or today, today)
+    counts = {
+        row["status"]: row["n"]
+        for row in AttendanceEntry.objects.filter(student=student, date__range=[term.start_date, end])
+        .values("status").annotate(n=Count("id"))
+    }
+    late = counts.get(AttendanceStatus.LATE, 0)
+    present = counts.get(AttendanceStatus.PRESENT, 0) + late
+    absent = counts.get(AttendanceStatus.ABSENT, 0) + counts.get(AttendanceStatus.EXCUSED, 0)
+    marked = present + absent
+    return {
+        "present": present,
+        "absent": absent,
+        "late": late,
+        "rate": round(present * 100 / marked, 1) if marked else None,
+    }
+
+
+def _incidents_for_year(student, academic_year, terms) -> list[dict]:
+    """Welfare notes and discipline incidents of the year, oldest first.
+    Discipline rows carry the level only; safeguarding notes and dismissed
+    incidents are left out."""
+    from discipline.models import DisciplineIncident, IncidentStatus
+    from welfare.models import WelfareNoteType, WelfareObservation
+
+    start = academic_year.start_date or min((t.start_date for t in terms if t.start_date), default=None)
+    end = academic_year.end_date or max((t.end_date for t in terms if t.end_date), default=None)
+
+    def term_label(d):
+        for t in terms:
+            if t.start_date and t.end_date and t.start_date <= d <= t.end_date:
+                return t.name
+        return ""
+
+    def in_year(d):
+        return d and (not start or d >= start) and (not end or d <= end)
+
+    rows = []
+    for inc in DisciplineIncident.objects.filter(student=student).exclude(status=IncidentStatus.DISMISSED):
+        d = inc.incident_date or inc.created_at.date()
+        if not in_year(d):
+            continue
+        rows.append({
+            "date": d, "term": term_label(d), "type": "Discipline",
+            "level": inc.get_severity_display().split(" - ")[0], "summary": "",
+        })
+    for note in WelfareObservation.objects.filter(student=student).exclude(note_type=WelfareNoteType.SAFEGUARDING):
+        d = note.observation_date
+        if not in_year(d):
+            continue
+        kind = note.get_note_type_display() if note.note_type else note.get_concern_type_display()
+        rows.append({
+            "date": d, "term": term_label(d), "type": f"Welfare ({kind.lower()})",
+            "level": ", ".join(note.tags or []) or note.get_concern_type_display(),
+            "summary": note.observation_text,
+        })
+    rows.sort(key=lambda r: r["date"])
+    return rows
+
+
+def build_ptc_report(student, academic_year, current_window=None) -> dict:
+    """Everything the PTC report shows, for all three terms of the year.
+
+    Marks: only HOD-approved scores. Each mark is converted to its term weight
+    (Quiz 20, Mid-Term 30, End-Term 50); the running average is the converted
+    marks rescaled over the assessments marked so far. Unmarked assessments
+    are left out (never counted as zero) and, once the term has started, are
+    flagged as missing. The overall average is over subjects that have marks.
+    """
+    from academics.models import ExamScore, ScoreStatus, SubjectTermRemark
+    from ptc.models import LEARNER_ATTRIBUTES, LearnerAttributeRatingEntry, PTCSubjectComment, PTCWindow
+
+    today = timezone.now().date()
+    terms = get_year_terms(academic_year)
+    marks_subjects = get_marks_subjects_for_class(student.class_name)
+    remark_subjects = get_remark_subjects_for_class(student.class_name)
+    weights = _assessment_weights()
+    pass_mark = float(get_pass_mark())
+    windows = year_ptc_windows(academic_year)
+
+    scores: dict = {}
+    for sc in ExamScore.objects.filter(
+        student=student, term__in=terms, status=ScoreStatus.APPROVED, subject_name__in=marks_subjects,
+    ):
+        max_score = float(sc.max_score or 100) or 100.0
+        scores[(sc.term_id, sc.subject_name, sc.exam_type)] = float(sc.score) / max_score * weights.get(sc.exam_type, 0)
+
+    remarks = {
+        (r.term_id, r.subject_name): r.remark
+        for r in SubjectTermRemark.objects.filter(student=student, term__in=terms, subject_name__in=remark_subjects)
+    }
+    window_ids = [w.pk for w in windows]
+    comments = {
+        (c.ptc_window_id, c.subject_name): c.comment_text
+        for c in PTCSubjectComment.objects.filter(student=student, ptc_window_id__in=window_ids)
+    }
+    ratings = {
+        (r.ptc_window_id, r.attribute_number): r.rating
+        for r in LearnerAttributeRatingEntry.objects.filter(student=student, ptc_window_id__in=window_ids)
+    }
+
+    term_cols = []
+    for term in terms:
+        started = _term_started(term, today)
+        has_marks = any(k[0] == term.pk for k in scores)
+        term_cols.append({
+            "term": term,
+            "label": term.name,
+            "started": started or has_marks,
+            "window": window_for_term(windows, term),
+        })
+
+    # Marks subjects
+    marks_rows = []
+    overall = {t["term"].pk: [] for t in term_cols}
+    for subj in marks_subjects:
+        cells = []
+        for col in term_cols:
+            term = col["term"]
+            parts = []
+            total = weight_marked = 0.0
+            for code, _, _ in ASSESSMENTS:
+                v = scores.get((term.pk, subj, code))
+                if v is not None:
+                    total += v
+                    weight_marked += weights.get(code, 0)
+                parts.append({"value": v, "missing": v is None and col["started"]})
+            avg = round(total / weight_marked * 100, 1) if weight_marked else None
+            label, css = rating_for(avg)
+            if avg is not None:
+                overall[term.pk].append(avg)
+            cells.append({"parts": parts, "avg": avg, "rating": label, "css": css, "started": col["started"]})
+        marks_rows.append({"subject": subj, "cells": cells})
+
+    summary = []
+    for col in term_cols:
+        avgs = overall[col["term"].pk]
+        avg = round(sum(avgs) / len(avgs), 1) if avgs else None
+        label, css = rating_for(avg)
+        summary.append({
+            "avg": avg, "rating": label, "css": css, "started": col["started"],
+            "meets": None if avg is None else ("Yes" if avg >= pass_mark else "No"),
+        })
+
+    remark_rows = [
+        {"subject": subj, "cells": [
+            {"remark": remarks.get((c["term"].pk, subj)), "css": REMARK_CSS.get(remarks.get((c["term"].pk, subj)))}
+            for c in term_cols
+        ]}
+        for subj in remark_subjects
+    ]
+    comment_rows = [
+        {"subject": subj, "cells": [
+            (comments.get((c["window"].pk, subj)) or "") if c["window"] else "" for c in term_cols
+        ]}
+        for subj in marks_subjects
+    ]
+    attribute_rows = [
+        {"number": n, "label": label, "cells": [
+            (ratings.get((c["window"].pk, n)) or "") if c["window"] else "" for c in term_cols
+        ]}
+        for n, label in LEARNER_ATTRIBUTES
+    ]
+    attendance = [_attendance_for_term(student, c["term"], today) for c in term_cols]
+
+    # "Before the PTC" check, for the term of the current PTC window
+    check = None
+    check_term = term_for_window(current_window) if current_window else None
+    if current_window and current_window.academic_year_id == getattr(academic_year, "pk", None):
+        check_col = next((c for c in term_cols if check_term and c["term"].pk == check_term.pk), None)
+        missing_comments = [
+            s for s in marks_subjects if not (comments.get((current_window.pk, s)) or "").strip()
+        ]
+        missing_remarks = [
+            s for s in remark_subjects if not (check_term and remarks.get((check_term.pk, s)))
+        ]
+        end_term_outstanding = [
+            s for s in marks_subjects if not (check_term and scores.get((check_term.pk, s, "end_of_term")) is not None)
+        ]
+        check = {
+            "term_label": check_term.name if check_term else current_window.get_term_slot_display(),
+            "marks_total": len(marks_subjects),
+            "remark_total": len(remark_subjects),
+            "comments_done": len(marks_subjects) - len(missing_comments),
+            "remarks_done": len(remark_subjects) - len(missing_remarks),
+            "missing_comments": missing_comments,
+            "missing_remarks": missing_remarks,
+            "end_term_outstanding": end_term_outstanding,
+            "all_clear": not (missing_comments or missing_remarks or end_term_outstanding),
+            "term_started": bool(check_col and check_col["started"]),
+        }
+
+    return {
+        "terms": term_cols,
+        "weights": weights,
+        "assessments": [{"code": c, "label": l, "weight": weights[c]} for c, l, _ in ASSESSMENTS],
+        "marks_rows": marks_rows,
+        "summary": summary,
+        "remark_rows": remark_rows,
+        "comment_rows": comment_rows,
+        "attribute_rows": attribute_rows,
+        "attendance": attendance,
+        "incidents": _incidents_for_year(student, academic_year, terms) if academic_year else [],
+        "check": check,
+        "pass_mark": pass_mark,
+        "marks_subjects": marks_subjects,
+        "remark_subjects": remark_subjects,
+    }

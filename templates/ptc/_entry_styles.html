@@ -1,0 +1,74 @@
+{# Shared layout for the PTC entry pages, matching the ECD marking page. #}
+<style>
+  .pe-top { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin:4px 0 16px; }
+  .pe-top-title { font-size:15px; font-weight:700; color:var(--text-primary); }
+  .pe-top-sub { font-size:12px; color:var(--text-muted); margin-top:2px; }
+  .pe-progress { display:flex; align-items:center; gap:10px; }
+  .pe-progress-track { width:160px; height:8px; background:#EDF1F7; border-radius:99px; overflow:hidden; }
+  .pe-progress-fill { height:100%; width:0; background:var(--green); border-radius:99px; transition:width .3s; }
+  .pe-progress-text { font-size:12px; color:var(--text-muted); white-space:nowrap; }
+  .pe-progress-text b { color:var(--text-primary); }
+  .pe-note { display:flex; align-items:center; gap:8px; margin:0 0 14px; padding:10px 14px; border-radius:8px; font-size:12.5px; background:var(--amber-bg, #FFF6E5); border:1px solid var(--amber-bd, #F3DDBA); color:#7C4A03; }
+  .pe-shell { container-type:inline-size; }
+  .pe-layout { display:grid; grid-template-columns:250px minmax(0, 1fr); gap:16px; align-items:start; }
+  .pe-list { padding:8px 0; position:sticky; top:16px; max-height:calc(100vh - 32px); overflow-y:auto; }
+  .pe-list-head { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-muted); padding:4px 14px 8px; }
+  .pe-learner { display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; padding:8px 14px; border:0; background:none; text-align:left; cursor:pointer; border-left:3px solid transparent; font:inherit; color:inherit; }
+  .pe-learner:hover { background:var(--hodari-blue-pale); }
+  .pe-learner.active { background:var(--hodari-blue-light); border-left-color:var(--hodari-blue); }
+  .pe-learner-name { font-size:13px; color:var(--text-primary); }
+  .pe-learner.active .pe-learner-name { font-weight:600; }
+  .pe-learner-meta { font-size:11px; color:var(--text-muted); }
+  .pe-learner .chip { font-size:10.5px; padding:2px 8px; flex-shrink:0; }
+  .pe-picker { display:none; }
+  #mainContent { overflow-x:clip; }
+  .pe-form-head { position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 12px; margin:-4px -4px 14px; padding:10px 4px 12px; background:var(--bg-card, #fff); border-bottom:1px solid var(--border); }
+  .pe-name { font-size:17px; font-weight:700; color:var(--text-primary); }
+  .pe-meta { font-size:12px; color:var(--text-muted); margin-top:2px; }
+  .pe-head-tools { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .pe-save-state { font-size:12px; color:var(--text-muted); min-width:70px; text-align:right; }
+  .pe-save-state.ok { color:var(--green); }
+  .pe-save-state.err { color:var(--red); }
+  .pe-cols-wrap { container-type:inline-size; }
+  .pe-cols { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:14px; align-items:start; }
+  .pe-cols.single { grid-template-columns:1fr; }
+  @container (max-width:760px) { .pe-cols { grid-template-columns:1fr; } }
+  .pe-sec { border:1px solid var(--border); border-radius:10px; overflow:hidden; min-width:0; }
+  .pe-sec-head { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 12px; background:#1F3864; color:#fff; font-size:12.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; }
+  .pe-sec-head span { font-weight:500; text-transform:none; letter-spacing:0; opacity:.8; }
+  .pe-sec textarea { display:block; width:100%; min-height:150px; border:0; padding:10px 12px; font:inherit; font-size:13px; line-height:1.55; resize:vertical; color:var(--text-primary); background:#fff; }
+  .pe-sec textarea:focus { outline:none; box-shadow:inset 0 0 0 2px var(--hodari-blue); }
+  .pe-sec textarea[readonly] { background:#F7F9FC; color:var(--text-secondary); }
+  .pe-sec.empty .pe-sec-head { background:#475569; }
+  .pe-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 8px 7px 12px; border-top:1px solid #EEF2F7; }
+  .pe-row:first-of-type { border-top:0; }
+  .pe-row.missing { background:#FFFBEB; }
+  .pe-label { flex:1; min-width:0; font-size:13px; color:var(--text-primary); overflow-wrap:anywhere; }
+  .pe-scale { display:inline-flex; gap:4px; flex-shrink:0; }
+  .pe-opt { min-width:34px; height:32px; padding:0 6px; border-radius:8px; border:1.5px solid var(--border); background:#fff; font-size:13px; font-weight:700; color:var(--text-secondary); cursor:pointer; transition:background .12s, border-color .12s, color .12s; font-family:inherit; }
+  .pe-opt:hover:not([disabled]) { border-color:var(--border-strong, #B9C4D6); }
+  .pe-opt:focus-visible { outline:2px solid var(--hodari-blue); outline-offset:1px; }
+  .pe-opt[disabled] { cursor:not-allowed; }
+  .pe-opt.on.g-E { background:var(--green); border-color:var(--green); color:#fff; }
+  .pe-opt.on.g-G { background:var(--hodari-blue); border-color:var(--hodari-blue); color:#fff; }
+  .pe-opt.on.g-S { background:#D97706; border-color:#D97706; color:#fff; }
+  .pe-opt.on.g-N { background:var(--red); border-color:var(--red); color:#fff; }
+  .pe-key { display:flex; flex-wrap:wrap; gap:4px 12px; font-size:12px; color:var(--text-muted); margin-bottom:10px; }
+  .pe-key b { color:var(--text-primary); }
+  .pe-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-top:16px; padding-top:14px; border-top:1px solid var(--border); }
+  .pe-actions-hint { font-size:12px; color:var(--text-muted); }
+  .pe-actions-btns { display:flex; gap:8px; flex-wrap:wrap; }
+  .pe-form.saving { opacity:.7; }
+  @container (max-width:860px) {
+    .pe-layout { grid-template-columns:1fr; }
+    .pe-list { display:none; }
+    .pe-picker { display:flex; gap:8px; align-items:center; margin-bottom:12px; }
+    .pe-picker select { flex:1; min-width:0; }
+    #pePrev, #peNext { display:none; }
+  }
+  @media (max-width:520px) {
+    .pe-row { flex-direction:column; align-items:stretch; }
+    .pe-scale { justify-content:flex-end; }
+    .pe-progress-track { width:100px; }
+  }
+</style>

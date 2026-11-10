@@ -16,9 +16,14 @@ from core.models import TimeStampedModel
 # ---------------------------------------------------------------------------
 
 class TermSlot(models.TextChoices):
-    # FR-PTC-001: Only Term 1 and Term 3 PTC windows exist.
+    # One PTC window per term: subject comments and student attributes are
+    # entered for each term and shown side by side on the PTC report.
     TERM_1 = "term_1", "Term 1"
+    TERM_2 = "term_2", "Term 2"
     TERM_3 = "term_3", "Term 3"
+
+
+TERM_SLOT_NUMBER = {TermSlot.TERM_1: 1, TermSlot.TERM_2: 2, TermSlot.TERM_3: 3}
 
 
 class EnrichmentLetterGrade(models.TextChoices):
@@ -66,7 +71,7 @@ LEARNER_ATTRIBUTES = [
 class PTCWindow(TimeStampedModel):
     """
     Defines the PTC schedule for a given academic year and term slot.
-    Two windows per year: Term 1 and Term 3 (FR-PTC-001).
+    Up to one window per term (Term 1, Term 2, Term 3).
     """
 
     academic_year = models.ForeignKey(
@@ -77,7 +82,7 @@ class PTCWindow(TimeStampedModel):
     term_slot = models.CharField(
         max_length=10,
         choices=TermSlot.choices,
-        help_text="Term 1 or Term 3 (FR-PTC-001)",
+        help_text="The term this PTC belongs to",
     )
     ptc_date = models.DateField(
         help_text="The date the parent-teacher conference is held",
@@ -147,7 +152,7 @@ class PTCWindow(TimeStampedModel):
     def clean(self):
         super().clean()
         if self.term_slot not in dict(TermSlot.choices):
-            raise ValidationError("term_slot must be 'term_1' or 'term_3'.")
+            raise ValidationError("term_slot must be 'term_1', 'term_2' or 'term_3'.")
         # Ensure notification window is strictly wider than comment entry window
         if self.notification_window_days <= self.comment_entry_window_days:
             raise ValidationError(
@@ -192,6 +197,10 @@ class PTCWindow(TimeStampedModel):
         if not self.comment_entry_window_opens_at or not self.comment_entry_window_closes_at:
             return False
         return self.comment_entry_window_opens_at <= today <= self.comment_entry_window_closes_at
+
+    @property
+    def term_number(self) -> int:
+        return TERM_SLOT_NUMBER.get(self.term_slot, 0)
 
     @property
     def days_until_ptc(self):
@@ -433,7 +442,10 @@ class LearnerAttributeRatingEntry(TimeStampedModel):
 
 class PTCGenerationLog(TimeStampedModel):
     """
-    Read-only log visible to Primary HOD and HOS (FR-PTC-030).
+    Read-only log visible to Primary HOD and HOS (FR-PTC-030). One row every
+    time anyone opens a learner's PTC report. ``class_teacher`` holds the
+    person who opened it, whatever their role; during "View as" it is the
+    real signed-in user and ``viewed_as`` is the user being viewed as.
     """
 
     student = models.ForeignKey(
@@ -452,6 +464,18 @@ class PTCGenerationLog(TimeStampedModel):
         null=True,
         blank=True,
         related_name="generation_logs",
+    )
+    viewed_as = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ptc_generation_logs_viewed_as",
+        help_text="The user being viewed as, when opened in 'View as' mode",
+    )
+    class_name = models.CharField(
+        max_length=80, blank=True, default="",
+        help_text="The learner's class when the report was opened",
     )
     opened_at = models.DateTimeField(auto_now_add=True)
 

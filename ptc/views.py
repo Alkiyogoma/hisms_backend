@@ -6,49 +6,52 @@
 
 from __future__ import annotations
 
+import re
+
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.utils import timezone
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
 from django.views import View
 from django.views.generic import TemplateView
 
 from core.permissions import RoleRequiredMixin
 from ptc.models import (
-    EnrichmentGrade,
-    EnrichmentLetterGrade,
-    EnrichmentSubject,
     LEARNER_ATTRIBUTES,
     LearnerAttributeRating,
     LearnerAttributeRatingEntry,
     PTCDateChangeLog,
     PTCGenerationLog,
-    PTCProgressTrendOverride,
     PTCSubjectComment,
     PTCWindow,
     TermSlot,
 )
 from ptc.services import (
     _get_class_teacher_for_class,
-    get_core_subjects_for_student,
-    get_subject_teacher_students,
+    _get_ecd_class_names,
     _get_teacher_class_names,
-    _get_teacher_subjects,
     _is_class_teacher,
     _is_ecd_student,
-    _get_ptc_eligible_students,
-    calculate_progress_trend,
-    can_enter_comment,
-    can_enter_enrichment_grade,
+    active_students_in_class,
+    attribute_completion,
+    build_ptc_report,
     can_open_ptc,
-    get_academic_performance_grid,
-    get_attendance_summary,
-    get_compliance_summary,
+    can_rate_attributes,
+    comment_save_subjects_for,
+    comment_subjects_for,
+    current_academic_year,
+    get_class_teacher_classes,
+    get_current_ptc_window,
+    get_marks_subjects_for_class,
+    get_ptc_classes,
+    get_teacher_subjects_by_class,
+    is_ptc_admin,
+    request_cache,
+    year_ptc_windows,
 )
-from ptc.forms import EnrichmentSubjectConfigForm
 from users.models import UserRole
 
 
@@ -56,38 +59,42 @@ from users.models import UserRole
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _current_ptc_window():
-    """Get the most recent PTC window (by ptc_date descending)."""
-    return PTCWindow.objects.order_by("-ptc_date").first()
-
-
 def _active_academic_year():
-    from academics.utils import get_current_academic_year
-    return get_current_academic_year()
+    return current_academic_year()
+
+
+class PTCCacheMixin:
+    """Reads the current term, the user's class assignments and class
+    subjects once per request (see ptc.services.request_cache)."""
+
+    def dispatch(self, request, *args, **kwargs):
+        with request_cache():
+            return super().dispatch(request, *args, **kwargs)
+
+
+def _current_ptc_window():
+    """The PTC window the entry pages and the report's "before the PTC"
+    check work on (open entry window, else next upcoming, else latest)."""
+    return get_current_ptc_window(_active_academic_year())
+
+
+def _slug(name: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9]+", "-", name).strip("-").lower()
+
+
+def _is_ajax(request) -> bool:
+    return request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
+
+def _real_user(request):
+    """The signed-in person, even while they use "View as"."""
+    return getattr(request, "real_user", None) or request.user
 
 
 def _is_ecd_teacher(user):
     """Check if a teacher is assigned only to ECD classes."""
-    from academics.models import Department, GradeClass
-    from academics.utils import get_current_term
-    from hr.models import TeacherClassAssignment
-
-    current_term = get_current_term()
-    if not current_term:
-        return False
-
-    assignments = TeacherClassAssignment.objects.filter(
-        teacher__user=user, term=current_term,
-    ).select_related("grade_class")
-
-    if not assignments:
-        return False
-
-    ecd_class_names = set(
-        GradeClass.objects.filter(department=Department.ECD).values_list("name", flat=True)
-    )
-    assigned_class_names = {a.grade_class.name for a in assignments}
-    return assigned_class_names.issubset(ecd_class_names)
+    names = _get_teacher_class_names(user)
+    return bool(names) and names.issubset(_get_ecd_class_names())
 
 
 def _get_academic_years():
@@ -95,11 +102,79 @@ def _get_academic_years():
     return AcademicYear.objects.all().order_by("-is_current", "-name")
 
 
+def _class_choice(request, options: list[str], defaults: list[str]) -> str | None:
+    """The class picked in the ?class= filter, else the user's first default
+    class, else the first option."""
+    wanted = (request.GET.get("class") or request.POST.get("class") or "").strip()
+    if wanted in options:
+        return wanted
+    for d in defaults:
+        if d in options:
+            return d
+    if options:
+        # Otherwise the first class that has students, not an empty one.
+        from students.models import Student
+        filled = set(
+            Student.objects.filter(is_archived=False, status="active", class_name__in=options)
+            .values_list("class_name", flat=True).distinct()
+        )
+        return next((c for c in options if c in filled), options[0])
+    return None
+
+
+def _window_choice(request):
+    """(selected PTC window, windows to choose from). ``?ptc=<id>`` picks a
+    window of the current year; default is the current window."""
+    year = _active_academic_year()
+    windows = list(year_ptc_windows(year))
+    current = _current_ptc_window()
+    if current and current not in windows:
+        windows.append(current)
+    wanted = str(request.GET.get("ptc") or request.POST.get("ptc") or "")
+    selected = next((w for w in windows if str(w.pk) == wanted), current)
+    return selected, windows
+
+
+def _entry_pages(user):
+    """The PTC pages listed in the Entry filter: (url name, label)."""
+    pages = [("ptc:student_picker", "Students overview")]
+    if user.has_perm("ptc.change_ptcsubjectcomment"):
+        pages.append(("ptc:comment_entry", "Subject comments"))
+    if user.role in (UserRole.TEACHER, UserRole.SUPER_ADMIN) and user.has_perm("ptc.change_learnerattributeratingentry"):
+        pages.append(("ptc:attribute_entry", "Student attributes"))
+    return pages
+
+
+def _filter_context(user, page, window, windows, class_options, selected_class,
+                    subjects=None, subject="", footnote=""):
+    """Context for templates/ptc/_filters.html (same look as the progress
+    marking filters)."""
+    return {
+        "windows": [
+            {"pk": w.pk, "selected": window and w.pk == window.pk,
+             "label": f"{w.get_term_slot_display()} \u00b7 PTC {w.ptc_date:%d %b %Y}"}
+            for w in windows
+        ],
+        "classes": [{"name": c, "selected": c == selected_class} for c in class_options],
+        "pages": [
+            {"url": reverse(name), "label": label, "active": name == page}
+            for name, label in _entry_pages(user)
+        ],
+        "subjects": subjects,
+        "subject": subject,
+        "footnote": footnote,
+    }
+
+
 # ===========================================================================
-# CLASS TEACHER  Student Picker
+# Students overview: students as rows, subjects as columns
 # ===========================================================================
 
-class PTCStudentPickerView(RoleRequiredMixin, TemplateView):
+def _initials(name: str) -> str:
+    return (name[:4] if len(name) > 4 else name).upper()
+
+
+class PTCStudentPickerView(PTCCacheMixin, RoleRequiredMixin, TemplateView):
     template_name = "ptc/student_picker.html"
     allowed_roles = [UserRole.TEACHER, UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD]
     required_permission = "ptc.view_ptcsubjectcomment"
@@ -111,118 +186,78 @@ class PTCStudentPickerView(RoleRequiredMixin, TemplateView):
         if user.role == UserRole.TEACHER and _is_ecd_teacher(user):
             raise PermissionDenied("ECD teachers do not access the PTC module.")
 
-        students = _get_ptc_eligible_students(user)
-
-        # Build class list from GradeClass model (excluding ECD)  not just from student data
-        from academics.models import GradeClass, Department
-        is_admin = user.role in {
-            UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD,
-        }
-        if is_admin:
-            all_db_classes = GradeClass.objects.exclude(
-                department=Department.ECD
-            ).order_by("name").values_list("name", flat=True)
+        window, windows = _window_choice(self.request)
+        all_classes = get_ptc_classes()
+        if is_ptc_admin(user):
+            options, defaults = all_classes, []
         else:
-            teacher_class_names = _get_teacher_class_names(user)
-            all_db_classes = GradeClass.objects.filter(
-                name__in=teacher_class_names
-            ).exclude(
-                department=Department.ECD
-            ).order_by("name").values_list("name", flat=True)
+            taught = _get_teacher_class_names(user)
+            options = [c for c in all_classes if c in taught]
+            defaults = get_class_teacher_classes(user)
+        selected = _class_choice(self.request, options, defaults)
 
-        # Group students by class_name, include classes even if empty
-        student_map = {}
-        for s in students:
-            student_map.setdefault(s.class_name, []).append(s)
-        classes = {cn: student_map.get(cn, []) for cn in all_db_classes}
-
-        # Compute PTC completion per student and per class
-        ptc_window = _current_ptc_window()
-        student_ids = [s.id for s in students]
-
-        # Bulk query attribute counts and comment counts to avoid N+1
-        attr_counts = {}
-        if ptc_window and student_ids:
+        students = list(active_students_in_class(selected)) if selected else []
+        subjects = get_marks_subjects_for_class(selected) if selected else []
+        have = set()
+        rated = {}
+        if window and students:
+            have = set(
+                PTCSubjectComment.objects.filter(ptc_window=window, student__in=students, subject_name__in=subjects)
+                .exclude(comment_text="").values_list("student_id", "subject_name")
+            )
             from django.db.models import Count
-            attr_rows = (
-                LearnerAttributeRatingEntry.objects
-                .filter(ptc_window=ptc_window, student_id__in=student_ids)
-                .exclude(rating="")
-                .values("student_id")
-                .annotate(cnt=Count("id"))
-                .values_list("student_id", "cnt")
+            rated = dict(
+                LearnerAttributeRatingEntry.objects.filter(ptc_window=window, student__in=students)
+                .exclude(rating="").values("student_id").annotate(n=Count("id")).values_list("student_id", "n")
             )
-            attr_counts = dict(attr_rows)
-
-        comment_counts = {}
-        if ptc_window and student_ids:
-            comment_rows = (
-                PTCSubjectComment.objects
-                .filter(ptc_window=ptc_window, student_id__in=student_ids)
-                .exclude(comment_text="")
-                .values("student_id")
-                .annotate(cnt=Count("id"))
-                .values_list("student_id", "cnt")
-            )
-            comment_counts = dict(comment_rows)
-
-        # Get total core subjects count per student (to verify all comments entered)
-        # Core subjects depend only on the class: look them up once per class.
-        core_by_class = {}
-        core_subject_counts = {}
+        n_attr = len(LEARNER_ATTRIBUTES)
+        can_open = bool(students) and can_open_ptc(user, students[0])
+        rows = []
         for s in students:
-            if s.class_name not in core_by_class:
-                core_by_class[s.class_name] = len(get_core_subjects_for_student(s))
-            core_subject_counts[s.id] = core_by_class[s.class_name]
+            ticks = [(s.id, subj) in have for subj in subjects]
+            attrs = rated.get(s.id, 0)
+            rows.append({
+                "student": s,
+                "ticks": ticks,
+                "attrs": attrs,
+                "attrs_done": attrs >= n_attr,
+                "done": all(ticks) and bool(subjects) and attrs >= n_attr,
+            })
 
-        # Determine completion per student
-        student_completion = {}
-        for s in students:
-            attrs_ok = attr_counts.get(s.id, 0) >= 12
-            comments_ok = comment_counts.get(s.id, 0) >= core_subject_counts.get(s.id, 1)
-            is_done = attrs_ok and comments_ok
-            student_completion[s.id] = is_done
-            s.ptc_complete = is_done  # Attach for template access
-
-        # Compute per-class completion stats
-        class_completion = {}
-        total_complete = 0
-        for cn, students_list in classes.items():
-            class_complete = sum(1 for s in students_list if student_completion.get(s.id, False))
-            class_completion[cn] = (class_complete, len(students_list))
-            total_complete += class_complete
-
-        total_students_count = sum(len(st) for st in classes.values())
-
-        # Sorted class names with student counts and completion for tab UI
-        class_tabs = []
-        for cn in classes:
-            cnt = len(classes[cn])
-            comp, _ = class_completion.get(cn, (0, cnt))
-            class_tabs.append({"name": cn, "count": cnt, "complete": comp})
-
-        ctx["classes"] = classes
-        ctx["class_tabs"] = class_tabs
-        ctx["total_students"] = total_students_count
-        ctx["total_complete"] = total_complete
-        ctx["is_admin_view"] = is_admin
-        ctx["ptc_window"] = ptc_window
+        ctx["filters"] = _filter_context(user, "ptc:student_picker", window, windows, options, selected)
+        ctx["ptc_window"] = window
+        ctx["selected_class"] = selected
+        ctx["subjects"] = [{"name": s, "short": _initials(s)} for s in subjects]
+        ctx["rows"] = rows
+        ctx["attr_total"] = n_attr
+        ctx["can_open"] = can_open
+        ctx["complete_count"] = sum(1 for r in rows if r["done"])
+        ctx["total_students"] = len(rows)
         ctx["active_academic_year"] = _active_academic_year()
-        ctx["is_class_teacher"] = _is_class_teacher(user)
         return ctx
 
 
 # ===========================================================================
-# CLASS TEACHER  PTC Screen (FR-PTC-025, FR-PTC-026)
+# PTC report: all three terms side by side
 # ===========================================================================
 
-class PTCScreenView(RoleRequiredMixin, TemplateView):
-    """
-    Full PTC display for a student. Sections in order per FR-PTC-026:
-    1. Learner Info  2. Academic Performance Grid  3. Average % & Meets Expectations
-    4. Overall Progress Trend  5. Subject Teacher Comments  6. Enrichment Grades
-    7. Learner Attributes
-    """
+def _log_ptc_open(request, student, ptc_window):
+    """Record every opening of a PTC report, whoever opens it."""
+    real = _real_user(request)
+    viewed_as = request.user if getattr(request, "is_impersonating", False) else None
+    PTCGenerationLog.objects.create(
+        student=student,
+        class_teacher=real,
+        viewed_as=viewed_as if viewed_as and viewed_as.pk != real.pk else None,
+        ptc_window=ptc_window,
+        class_name=student.class_name or "",
+    )
+
+
+class PTCScreenView(PTCCacheMixin, RoleRequiredMixin, TemplateView):
+    """The learner's PTC report: marks subjects, subject teacher comments,
+    remark-only subjects, student attributes, attendance and (when there are
+    any) welfare and discipline incidents, for all three terms of the year."""
     template_name = "ptc/ptc_screen.html"
     allowed_roles = [UserRole.TEACHER, UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD]
     required_permission = "ptc.view_ptcsubjectcomment"
@@ -234,676 +269,335 @@ class PTCScreenView(RoleRequiredMixin, TemplateView):
             raise PermissionDenied("You do not have access to this student's PTC.")
         if _is_ecd_student(student):
             raise PermissionDenied("ECD students are not eligible for PTC (FR-PTC-032).")
+        self.student = student
+        self.ptc_window, _windows = _window_choice(request)
+        _log_ptc_open(request, student, self.ptc_window)
         return super().get(request, *args, **kwargs)
-
-    def post(self, request, *args, **kwargs):
-        """Handle progress trend override (FR-PTC-029)."""
-        from students.models import Student
-        student = get_object_or_404(Student, pk=kwargs["student_pk"])
-        user = request.user
-
-        if not _is_class_teacher(user, student.class_name):
-            messages.error(request, "Only the class teacher can override the progress trend.")
-            return redirect("ptc:ptc_screen", student_pk=student.pk)
-
-        ptc_window = _current_ptc_window()
-        if not ptc_window:
-            messages.error(request, "No PTC window configured.")
-            return redirect("ptc:ptc_screen", student_pk=student.pk)
-
-        trend_value = request.POST.get("progress_trend_override", "").strip()
-        valid_trends = ["improving", "stable", "needs_attention"]
-
-        if trend_value not in valid_trends:
-            messages.error(request, "Invalid trend value.")
-            return redirect("ptc:ptc_screen", student_pk=student.pk)
-
-        PTCProgressTrendOverride.objects.update_or_create(
-            student=student, ptc_window=ptc_window,
-            defaults={"overridden_trend": trend_value, "entered_by": user},
-        )
-        messages.success(request, f"Progress trend updated to {trend_value.replace('_', ' ').title()}.")
-        return redirect("ptc:ptc_screen", student_pk=student.pk)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        from academics.grading_utils import get_pass_mark
-        ctx["pass_mark"] = int(get_pass_mark())
-        ctx["ptc_tab"] = "student_picker"
-        from students.models import Student
-        from academics.models import GradeClass
+        from academics.views.reports import _photo_data_uri
 
-        student = get_object_or_404(Student, pk=self.kwargs["student_pk"])
+        student = self.student
         user = self.request.user
-
-        # Log PTC generation (FR-PTC-030)  only class teachers trigger generation logs
-        # Deduplicate: skip if same teacher viewed same student in same window within 5 minutes
-        from datetime import timedelta
-        ptc_window = _current_ptc_window()
-        if _is_class_teacher(user, student.class_name):
-            five_min_ago = timezone.now() - timedelta(minutes=5)
-            recent_log = PTCGenerationLog.objects.filter(
-                student=student, class_teacher=user, ptc_window=ptc_window, opened_at__gte=five_min_ago
-            ).exists()
-            if not recent_log:
-                PTCGenerationLog.objects.create(student=student, class_teacher=user, ptc_window=ptc_window)
-        elif user.has_role(UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD):
-            from audit.models import log_event
-            five_min_ago = timezone.now() - timedelta(minutes=5)
-            recent_audit = PTCGenerationLog.objects.filter(
-                student=student, class_teacher=user, ptc_window=ptc_window, opened_at__gte=five_min_ago
-            ).exists()
-            if not recent_audit:
-                log_event(
-                    actor=user,
-                    action_type="PTC_SCREEN_ACCESSED",
-                    model_name="Student",
-                    object_id=student.pk,
-                    description=f"PTC screen accessed for {student.admission_no} by {user.get_full_name()} ({user.get_role_display()})",
-                    request=self.request,
-                )
-
         academic_year = _active_academic_year()
-
-        # 1. Learner Information
+        ctx["ptc_tab"] = "student_picker"
         ctx["student"] = student
-        ctx["grade_class"] = GradeClass.objects.filter(name=student.class_name).first()
+        ctx["photo_src"] = _photo_data_uri(student)
+        ctx["photo_checked"] = True
         ctx["class_teacher"] = _get_class_teacher_for_class(student.class_name)
-
-        # 2. Academic Performance Grid
-        perf_grid = get_academic_performance_grid(student, academic_year)
-        ctx["performance_grid"] = perf_grid
-        ctx["subjects"] = perf_grid["subjects"]
-        ctx["terms_data"] = perf_grid["terms"]
-        ctx["exam_weights"] = perf_grid.get("exam_weights", {})
-
-        # 3. Overall Progress Trend (FR-PTC-029) with override support
-        latest_avg = None
-        for td in reversed(perf_grid["terms"]):
-            if td["overall_average"] is not None:
-                latest_avg = td["overall_average"]
-                break
-        ctx["latest_overall_average"] = latest_avg
-        auto_trend = calculate_progress_trend(
-            student, latest_avg, academic_year,
-            all_terms_averages=perf_grid["all_terms_averages"],
-        )
-        # Check for teacher override
-        trend_override = None
-        if ptc_window and _is_class_teacher(user, student.class_name):
-            trend_override = PTCProgressTrendOverride.objects.filter(
-                student=student, ptc_window=ptc_window
-            ).first()
-        ctx["progress_trend"] = {
-            "trend": trend_override.overridden_trend.replace("_", " ").title() if trend_override else auto_trend["trend"],
-            "auto_derived": auto_trend["auto_derived"],
-            "previous_average": auto_trend["previous_average"],
-            "is_overridden": trend_override is not None,
-            "auto_trend": auto_trend["trend"],
-        }
-        ctx["trend_override"] = trend_override
-
-        # 4. Subject Teacher Comments
-        ctx["ptc_comments"] = {}
-        ctx["prev_ptc_comments"] = {}
-        if ptc_window:
-            comments = PTCSubjectComment.objects.filter(student=student, ptc_window=ptc_window)
-            ctx["ptc_comments"] = {c.subject_name: c for c in comments}
-            prev_window = PTCWindow.objects.filter(academic_year=academic_year).exclude(
-                pk=ptc_window.pk
-            ).order_by("-ptc_date").first()
-            if prev_window:
-                prev_comments = PTCSubjectComment.objects.filter(student=student, ptc_window=prev_window)
-                ctx["prev_ptc_comments"] = {c.subject_name: c for c in prev_comments}
-
-        ctx["ptc_window"] = ptc_window
         ctx["academic_year"] = academic_year
-        ctx["core_subjects"] = get_core_subjects_for_student(student)
-
-        # 5. Enrichment Grades
-        enrichment_subjects = list(EnrichmentSubject.objects.filter(is_active=True).select_related("subject"))
-        terms = list(academic_year.terms.all()) if academic_year else []
-        # Every grade of this learner in one query, not one per subject and term.
-        grades = {}
-        for g in EnrichmentGrade.objects.filter(
-                student=student, enrichment_subject__in=enrichment_subjects, term__in=terms).order_by("-pk"):
-            grades[(g.enrichment_subject_id, g.term_id)] = g  # first() kept the lowest pk
-        enrichment_grades = {
-            es.subject.name: {term.name: grades.get((es.pk, term.pk)) for term in terms}
-            for es in enrichment_subjects
-        }
-        ctx["enrichment_subjects"] = enrichment_subjects
-        ctx["enrichment_grades"] = enrichment_grades
-        ctx["enrichment_terms"] = terms
-
-        # 6. Learner Attributes
-        ctx["current_attribute_ratings"] = {}
-        ctx["prev_attribute_ratings"] = {}
-        ctx["prev_ptc_window"] = None
-        if ptc_window:
-            current_ratings = LearnerAttributeRatingEntry.objects.filter(student=student, ptc_window=ptc_window)
-            ctx["current_attribute_ratings"] = {r.attribute_number: r.rating for r in current_ratings}
-            prev_window = PTCWindow.objects.filter(academic_year=academic_year).exclude(
-                pk=ptc_window.pk
-            ).order_by("-ptc_date").first()
-            if prev_window:
-                prev_ratings = LearnerAttributeRatingEntry.objects.filter(student=student, ptc_window=prev_window)
-                ctx["prev_attribute_ratings"] = {r.attribute_number: r.rating for r in prev_ratings}
-                ctx["prev_ptc_window"] = prev_window
-
-        ctx["learner_attributes"] = LEARNER_ATTRIBUTES
-
-        # 7. Attendance summary (OI-PTC-01, gated by feature flag)
-        from ptc.services import SHOW_ATTENDANCE
-        ctx["show_attendance"] = SHOW_ATTENDANCE
-        if SHOW_ATTENDANCE:
-            ctx["attendance_summary"] = get_attendance_summary(student, academic_year)
-
-        # 8. Edit permissions
-        ctx["can_edit_attributes"] = _is_class_teacher(user, student.class_name)
-        ctx["is_readonly"] = (
-            not _is_class_teacher(user, student.class_name)
-            and not user.has_role(UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD)
+        ctx["ptc_window"] = self.ptc_window
+        ctx["report"] = build_ptc_report(student, academic_year, self.ptc_window)
+        from urllib.parse import urlencode
+        back = {"class": self.request.GET.get("class") or student.class_name}
+        if self.ptc_window:
+            back["ptc"] = self.ptc_window.pk
+        ctx["back_url"] = f"{reverse('ptc:student_picker')}?{urlencode(back)}"
+        is_ct = _is_class_teacher(user, student.class_name)
+        ctx["can_edit_attributes"] = is_ct
+        ctx["is_readonly"] = not is_ct and not user.has_role(
+            UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD,
         )
         return ctx
 
 
 # ===========================================================================
-# SUBJECT TEACHER  Comment Entry (FR-PTC-012 to FR-PTC-017)
+# SUBJECT TEACHER  Comment Entry (mark-bearing subjects only)
 # ===========================================================================
 
-class PTCCommentEntryView(RoleRequiredMixin, TemplateView):
+class PTCCommentEntryView(PTCCacheMixin, RoleRequiredMixin, TemplateView):
     template_name = "ptc/comment_entry.html"
     allowed_roles = [UserRole.TEACHER, UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD]
     required_permission = "ptc.view_ptcsubjectcomment"
+
+    def _class_options(self, user):
+        """Classes the user can pick, and those to default to."""
+        all_classes = get_ptc_classes()
+        if is_ptc_admin(user):
+            return all_classes, []
+        by_class = get_teacher_subjects_by_class(user)
+        mine = [c for c in all_classes if c in by_class and comment_subjects_for(user, c)]
+        return mine, mine
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["ptc_tab"] = "comment_entry"
         user = self.request.user
-        ptc_window = _current_ptc_window()
-        academic_year = _active_academic_year()
+        ptc_window, windows = _window_choice(self.request)
         ctx["ptc_window"] = ptc_window
-        ctx["academic_year"] = academic_year
-
+        ctx["academic_year"] = _active_academic_year()
+        ctx["students_data"] = []
         if not ptc_window:
-            ctx["students_data"] = []
-            ctx["message"] = "No PTC window configured."
             return ctx
 
         ctx["is_window_open"] = ptc_window.is_comment_entry_window_open
-        teacher_subjects = _get_teacher_subjects(user)
+        ctx["term_label"] = ptc_window.get_term_slot_display()
 
-        # Super admin / users with no assignments get all subjects from all teachers
-        if not teacher_subjects:
-            from hr.models import TeacherClassAssignment
-            from academics.utils import get_current_term
-            current_term = get_current_term()
-            if current_term:
-                all_subs = set()
-                for a in TeacherClassAssignment.objects.filter(term=current_term).exclude(
-                    subjects_taught={}
-                ).exclude(subjects_taught=[]):
-                    if a.subjects_taught:
-                        all_subs.update(a.subjects_taught)
-                teacher_subjects = all_subs
-
-        ctx["teacher_subjects"] = teacher_subjects
-
-        if user.role == UserRole.SUPER_ADMIN:
-            students = _get_ptc_eligible_students(user)
-        else:
-            teacher_classes = _get_teacher_class_names(user)
-            students = get_subject_teacher_students(user, "").filter(class_name__in=teacher_classes)
-
-        students_data = []
-        # Batch query all comments in one go instead of N*M queries
-        all_comments = PTCSubjectComment.objects.filter(
-            student__in=students, ptc_window=ptc_window, subject_name__in=teacher_subjects
+        options, defaults = self._class_options(user)
+        selected = _class_choice(self.request, options, defaults)
+        subjects = comment_subjects_for(user, selected) if selected else []
+        writable = comment_save_subjects_for(user, selected) if selected else []
+        ctx["may_write"] = bool(writable)
+        ctx["can_save"] = bool(writable) and (
+            ptc_window.is_comment_entry_window_open or user.role == UserRole.SUPER_ADMIN
         )
-        comment_map = {}
-        for c in all_comments:
-            comment_map[(c.student_id, c.subject_name)] = c
+        students = list(active_students_in_class(selected)) if selected else []
 
-        for student in students:
-            student_comments = {}
-            for subj in teacher_subjects:
-                student_comments[subj] = comment_map.get((student.id, subj))
-            students_data.append({"student": student, "comments": student_comments, "is_complete": False})
-
-        ctx["students_data"] = students_data
-        ctx["total_students"] = len(students_data)
-
-        # Compact JSON for client-side rendering
-        import json
+        comment_map = {
+            (c.student_id, c.subject_name): c.comment_text
+            for c in PTCSubjectComment.objects.filter(
+                ptc_window=ptc_window, student__in=students, subject_name__in=subjects,
+            )
+        }
         compact = []
-        complete_count = 0
-        for item in students_data:
-            s = item["student"]
-            comments = item["comments"]
-            comments_dict = {}
-            is_complete = True
-            for subj in teacher_subjects:
-                c = comments.get(subj)
-                text = c.comment_text if c and c.comment_text else ""
-                comments_dict[subj] = text
-                if not text:
-                    is_complete = False
-            if is_complete:
-                complete_count += 1
-            item["is_complete"] = is_complete
+        done = 0
+        for s in students:
+            comments = {subj: comment_map.get((s.id, subj), "") for subj in subjects}
+            ok = bool(subjects) and all(v.strip() for v in comments.values())
+            done += ok
             compact.append({
-                "id": s.id,
-                "first": s.first_name,
-                "last": s.last_name,
-                "class": s.class_name,
-                "adm": s.admission_no,
-                "comments": comments_dict,
-                "ok": is_complete,
+                "id": s.id, "first": s.first_name, "last": s.last_name,
+                "class": s.class_name, "adm": s.admission_no, "comments": comments, "ok": ok,
             })
-        ctx["complete_count"] = complete_count
-        ctx["comments_json"] = json.dumps(compact)
-        ctx["teacher_subjects_json"] = json.dumps(list(teacher_subjects))
+
+        subject = self.request.GET.get("subject", "")
+        shown = [subject] if subject in subjects else subjects
+        ctx["filters"] = _filter_context(
+            user, "ptc:comment_entry", ptc_window, windows, options, selected,
+            subjects=subjects, subject=subject if subject in subjects else "",
+            footnote="Only mark-bearing subjects take a PTC comment. Write a full paragraph for each.",
+        )
+        ctx["class_options"] = options
+        ctx["selected_class"] = selected
+        ctx["subjects"] = subjects
+        ctx["shown_subjects"] = shown
+        ctx["students_data"] = compact
+        ctx["total_students"] = len(students)
+        ctx["complete_count"] = done
+        ctx["comments_data"] = compact
+        ctx["subjects_data"] = [{"name": s, "slug": _slug(s)} for s in shown]
+        ctx["start_student"] = self.request.GET.get("student", "")
         return ctx
 
     def post(self, request, *args, **kwargs):
-        user = request.user
-        ptc_window = _current_ptc_window()
-        if not ptc_window:
-            messages.error(request, "No PTC window configured.")
-            return redirect("ptc:comment_entry")
-
-        if not ptc_window.is_comment_entry_window_open and user.role != UserRole.SUPER_ADMIN:
-            messages.error(request, "The comment entry window is currently closed.")
-            return redirect("ptc:comment_entry")
-
+        """Save one learner's comments. Answers JSON for the page's fetch
+        call; a plain form post is redirected back to the same learner."""
         from students.models import Student
-        teacher_subjects = _get_teacher_subjects(user)
-        # Super admin / users with no assignments get all subjects
-        if not teacher_subjects:
-            from hr.models import TeacherClassAssignment
-            from academics.utils import get_current_term
-            current_term = get_current_term()
-            if current_term:
-                all_subs = set()
-                for a in TeacherClassAssignment.objects.filter(term=current_term).exclude(
-                    subjects_taught={}
-                ).exclude(subjects_taught=[]):
-                    if a.subjects_taught:
-                        all_subs.update(a.subjects_taught)
-                teacher_subjects = all_subs
-        # Build slug→name lookup for case-insensitive subject matching
-        subject_slug_map = {}
-        for s in teacher_subjects:
-            import re
-            slug = re.sub(r"[^a-zA-Z0-9]+", "-", s).strip("-").lower()
-            subject_slug_map[slug] = s
-        updated = 0
 
-        # POST field format: comment_{student_id}_{subject_slug}
-        # subject_slug uses Django's slugify (lowercase, hyphens)
-        for key, value in request.POST.items():
-            if not key.startswith("comment_") or key == "comment_":
-                continue
-            parts = key.split("_", 2)
-            if len(parts) < 3:
-                continue
-            student_id = parts[1]
-            subject_slug = parts[2].lower()
+        user = request.user
+        ptc_window, _windows = _window_choice(request)
 
-            if not student_id.isdigit():
-                continue
+        def fail(msg, status=400):
+            if _is_ajax(request):
+                return JsonResponse({"ok": False, "error": msg}, status=status)
+            messages.error(request, msg)
+            return redirect(f"{request.path}?class={request.POST.get('class', '')}&ptc={request.POST.get('ptc', '')}")
 
-            subject_name = subject_slug_map.get(subject_slug, subject_slug.replace("-", " "))
-            if subject_name not in teacher_subjects and user.role != UserRole.SUPER_ADMIN:
-                continue
+        if not ptc_window:
+            return fail("No PTC date is set up yet, so comments cannot be saved.")
+        if not ptc_window.is_comment_entry_window_open and user.role != UserRole.SUPER_ADMIN:
+            return fail("The comment entry window is closed, so comments cannot be changed.", 403)
 
-            student = get_object_or_404(Student, pk=int(student_id))
-            if not can_enter_comment(user, student, subject_name, ptc_window):
-                continue
+        student_id = request.POST.get("student_id", "")
+        if not student_id.isdigit():
+            return fail("No student was chosen.")
+        student = get_object_or_404(Student, pk=int(student_id))
+        allowed = comment_save_subjects_for(user, student.class_name)
+        if not allowed:
+            if is_ptc_admin(user):
+                return fail("Subject comments are written by the subject teacher. You can read them here but not change them.", 403)
+            return fail(f"You do not teach a mark-bearing subject in {student.class_name}, so you cannot save comments there.", 403)
 
-            PTCSubjectComment.objects.update_or_create(
-                student=student, ptc_window=ptc_window, subject_name=subject_name,
-                defaults={"comment_text": (value or "").strip(), "entered_by": user},
-            )
-            updated += 1
+        by_slug = {_slug(s): s for s in allowed}
+        saved = []
+        with transaction.atomic():
+            for key, value in request.POST.items():
+                if not key.startswith("comment_"):
+                    continue
+                subject = by_slug.get(key[len("comment_"):].lower())
+                if not subject:
+                    continue
+                PTCSubjectComment.objects.update_or_create(
+                    student=student, ptc_window=ptc_window, subject_name=subject,
+                    defaults={"comment_text": (value or "").strip(), "entered_by": user},
+                )
+                saved.append(subject)
 
+        if saved:
             from audit.models import log_event
             log_event(
-                actor=user,
-                action_type="PTC_COMMENT_SAVED",
-                model_name="PTCSubjectComment",
+                actor=user, action_type="PTC_COMMENT_SAVED", model_name="PTCSubjectComment",
                 object_id=student.pk,
-                description=f"PTC comment saved for {student.admission_no} - {subject_name}",
-                request=request
+                description=f"PTC comments saved for {student.admission_no}: {', '.join(saved)}",
+                request=request,
             )
 
-        messages.success(request, f"Saved {updated} comment(s).")
-        return redirect("ptc:comment_entry")
+        stored = dict(
+            PTCSubjectComment.objects.filter(student=student, ptc_window=ptc_window, subject_name__in=allowed)
+            .values_list("subject_name", "comment_text")
+        )
+        comments = {s: stored.get(s, "") for s in allowed}
+        done = all((v or "").strip() for v in comments.values())
+
+        if _is_ajax(request):
+            return JsonResponse({"ok": True, "saved": len(saved), "done": done, "comments": comments})
+        messages.success(request, f"Saved comments for {student.get_full_name()}.")
+        return redirect(f"{request.path}?class={student.class_name}&ptc={ptc_window.pk}&student={student.pk}")
 
 
 # ===========================================================================
-# CLASS TEACHER  Learner Attributes Entry Grid (FR-PTC-018 to FR-PTC-022)
+# CLASS TEACHER  Student Attributes (E / G / S / N)
 # ===========================================================================
 
-class PTCAttributeEntryView(RoleRequiredMixin, TemplateView):
+class PTCAttributeEntryView(PTCCacheMixin, RoleRequiredMixin, TemplateView):
     template_name = "ptc/attribute_entry.html"
     allowed_roles = [UserRole.TEACHER, UserRole.SUPER_ADMIN]
     required_permission = "ptc.view_learnerattributeratingentry"
 
     def get(self, request, *args, **kwargs):
-        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        if _is_ajax(request):
             return self._ajax_completion_count(request)
         return super().get(request, *args, **kwargs)
+
+    def _class_options(self, user):
+        all_classes = get_ptc_classes()
+        if user.role == UserRole.SUPER_ADMIN:
+            return all_classes, []
+        mine = get_class_teacher_classes(user)
+        taught = _get_teacher_class_names(user)
+        return [c for c in all_classes if c in taught], mine
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["ptc_tab"] = "attribute_entry"
         user = self.request.user
-        ptc_window = _current_ptc_window()
-        academic_year = _active_academic_year()
+        ptc_window, windows = _window_choice(self.request)
         ctx["ptc_window"] = ptc_window
-        ctx["academic_year"] = academic_year
-
+        ctx["academic_year"] = _active_academic_year()
+        ctx["students_data"] = []
         if not ptc_window:
-            ctx["students_data"] = []
-            ctx["message"] = "No PTC window configured."
             return ctx
 
         ctx["is_window_open"] = ptc_window.is_comment_entry_window_open
+        options, defaults = self._class_options(user)
+        selected = _class_choice(self.request, options, defaults)
+        students = list(active_students_in_class(selected)) if selected else []
+        may_rate = bool(selected) and can_rate_attributes(user, selected)
+        ctx["can_rate"] = may_rate
+        ctx["can_save"] = may_rate and (ptc_window.is_comment_entry_window_open or user.role == UserRole.SUPER_ADMIN)
+        ctx["class_teacher"] = _get_class_teacher_for_class(selected) if selected else None
 
-        from students.models import Student
-        from academics.models import GradeClass, Department
-        ecd_names = set(GradeClass.objects.filter(department=Department.ECD).values_list("name", flat=True))
-
-        if user.role == UserRole.SUPER_ADMIN:
-            students = Student.objects.filter(is_archived=False, status="active").exclude(
-                class_name__in=ecd_names
-            ).order_by("class_name", "last_name")
-        else:
-            teacher_classes = _get_teacher_class_names(user)
-            students = Student.objects.filter(
-                is_archived=False, status="active", class_name__in=teacher_classes,
-            ).order_by("last_name", "first_name")
-
-        # Batch fetch all ratings in 2 queries instead of N*12
-        from collections import defaultdict
-        all_ratings = LearnerAttributeRatingEntry.objects.filter(
-            ptc_window=ptc_window, student__in=students,
-        ).values("student_id", "attribute_number", "rating")
-        ratings_by_student = defaultdict(dict)
-        for r in all_ratings:
-            ratings_by_student[r["student_id"]][r["attribute_number"]] = r["rating"]
-
-        students_data = []
-        complete_count = 0
-        for student in students:
-            student_ratings = ratings_by_student.get(student.id, {})
-            ratings = {}
-            is_complete = True
-            for attr_num, _ in LEARNER_ATTRIBUTES:
-                rating = student_ratings.get(attr_num, "")
-                ratings[attr_num] = rating
-                if not rating:
-                    is_complete = False
-            if is_complete:
-                complete_count += 1
-            students_data.append({"student": student, "ratings": ratings, "is_complete": is_complete})
-
-        ctx["students_data"] = students_data
-        ctx["total_students"] = len(students_data)
-        ctx["complete_count"] = complete_count
-        import json
-        ctx["learner_attributes"] = LEARNER_ATTRIBUTES
-        ctx["learner_attributes_json"] = json.dumps(LEARNER_ATTRIBUTES)
-
-        # Compact JSON for client-side rendering (avoids rendering 40×12 rows server-side)
+        ratings = {}
+        for r in LearnerAttributeRatingEntry.objects.filter(ptc_window=ptc_window, student__in=students).exclude(rating=""):
+            ratings.setdefault(r.student_id, {})[r.attribute_number] = r.rating
         compact = []
-        for item in students_data:
-            s = item["student"]
+        done = 0
+        for s in students:
+            r = ratings.get(s.id, {})
+            ok = len(r) >= len(LEARNER_ATTRIBUTES)
+            done += ok
             compact.append({
-                "id": s.id,
-                "first": s.first_name,
-                "last": s.last_name,
-                "class": s.class_name,
-                "adm": s.admission_no,
-                "r": item["ratings"],
-                "ok": item["is_complete"],
+                "id": s.id, "first": s.first_name, "last": s.last_name,
+                "class": s.class_name, "adm": s.admission_no, "r": r, "ok": ok,
             })
-        ctx["ratings_json"] = json.dumps(compact)
+
+        ctx["filters"] = _filter_context(
+            user, "ptc:attribute_entry", ptc_window, windows, options, selected,
+            footnote="Rated by the class teacher: E Excellent, G Good, S Satisfactory, N Needs improvement.",
+        )
+        ctx["class_options"] = options
+        ctx["selected_class"] = selected
+        ctx["students_data"] = compact
+        ctx["total_students"] = len(students)
+        ctx["complete_count"] = done
+        ctx["learner_attributes"] = LEARNER_ATTRIBUTES
+        ctx["attributes_data"] = LEARNER_ATTRIBUTES
+        ctx["ratings_data"] = compact
+        ctx["start_student"] = self.request.GET.get("student", "")
         return ctx
 
     def post(self, request, *args, **kwargs):
-        user = request.user
-        ptc_window = _current_ptc_window()
-        if not ptc_window:
-            messages.error(request, "No PTC window configured.")
-            return redirect("ptc:attribute_entry")
-
-        if not ptc_window.is_comment_entry_window_open and user.role != UserRole.SUPER_ADMIN:
-            messages.error(request, "The attribute entry window is currently closed.")
-            return redirect("ptc:attribute_entry")
-
+        """Save one learner's ratings. JSON for the page's fetch call; a plain
+        form post is redirected back to the same learner."""
         from students.models import Student
-        teacher_classes = _get_teacher_class_names(user)
-        students = Student.objects.filter(is_archived=False, status="active", class_name__in=teacher_classes)
 
-        updated = 0
-        for student in students:
-            for attr_num, _ in LEARNER_ATTRIBUTES:
-                rating = request.POST.get(f"attr_{student.id}_{attr_num}", "").strip()
-                if rating and rating not in dict(LearnerAttributeRating.choices):
-                    continue
-                if not _is_class_teacher(user, student.class_name):
-                    continue
-                LearnerAttributeRatingEntry.objects.update_or_create(
-                    student=student, ptc_window=ptc_window, attribute_number=attr_num,
-                    defaults={"rating": rating, "entered_by": user},
-                )
-                updated += 1
+        user = request.user
+        ptc_window, _windows = _window_choice(request)
 
-        if updated > 0:
-            from audit.models import log_event
-            log_event(
-                actor=user,
-                action_type="PTC_ATTRIBUTES_SAVED",
-                model_name="LearnerAttributeRatingEntry",
-                object_id=ptc_window.pk,
-                description=f"Attribute ratings saved for {updated} student(s) in window {ptc_window}",
-                request=request
+        def fail(msg, status=400):
+            if _is_ajax(request):
+                return JsonResponse({"ok": False, "error": msg}, status=status)
+            messages.error(request, msg)
+            return redirect(f"{request.path}?class={request.POST.get('class', '')}&ptc={request.POST.get('ptc', '')}")
+
+        if not ptc_window:
+            return fail("No PTC date is set up yet, so ratings cannot be saved.")
+        if not ptc_window.is_comment_entry_window_open and user.role != UserRole.SUPER_ADMIN:
+            return fail("The attribute entry window is closed, so ratings cannot be changed.", 403)
+
+        student_id = request.POST.get("student_id", "")
+        if not student_id.isdigit():
+            return fail("No student was chosen.")
+        student = get_object_or_404(Student, pk=int(student_id))
+        if not can_rate_attributes(user, student.class_name):
+            return fail(
+                f"Only the class teacher of {student.class_name} can save student attributes. "
+                "Your ratings were not saved.", 403,
             )
 
-        messages.success(request, "Saved attribute ratings for your class.")
-        return redirect("ptc:attribute_entry")
+        valid = dict(LearnerAttributeRating.choices)
+        changed = 0
+        with transaction.atomic():
+            for num, _label in LEARNER_ATTRIBUTES:
+                key = f"attr_{num}"
+                if key not in request.POST:
+                    continue
+                rating = request.POST.get(key, "").strip().upper()
+                if rating and rating not in valid:
+                    transaction.set_rollback(True)
+                    return fail(f"'{rating}' is not a valid rating for attribute {num}.")
+                LearnerAttributeRatingEntry.objects.update_or_create(
+                    student=student, ptc_window=ptc_window, attribute_number=num,
+                    defaults={"rating": rating, "entered_by": user},
+                )
+                changed += 1
+
+        if changed:
+            from audit.models import log_event
+            log_event(
+                actor=user, action_type="PTC_ATTRIBUTES_SAVED", model_name="LearnerAttributeRatingEntry",
+                object_id=student.pk,
+                description=f"Attribute ratings saved for {student.admission_no} in window {ptc_window}",
+                request=request,
+            )
+
+        stored = dict(
+            LearnerAttributeRatingEntry.objects.filter(student=student, ptc_window=ptc_window)
+            .exclude(rating="").values_list("attribute_number", "rating")
+        )
+        done = len(stored) >= len(LEARNER_ATTRIBUTES)
+        if _is_ajax(request):
+            return JsonResponse({"ok": True, "saved": changed, "done": done, "ratings": stored})
+        messages.success(request, f"Saved ratings for {student.get_full_name()}.")
+        return redirect(f"{request.path}?class={student.class_name}&ptc={ptc_window.pk}&student={student.pk}")
 
     def _ajax_completion_count(self, request):
-        user = request.user
         ptc_window = _current_ptc_window()
         if not ptc_window:
             return JsonResponse({"complete": 0, "total": 0})
-
-        teacher_classes = _get_teacher_class_names(user)
-        from students.models import Student
-        students = Student.objects.filter(is_archived=False, status="active", class_name__in=teacher_classes)
-        total = students.count()
-        # Batch count ratings per student in a single query instead of N queries
-        from django.db.models import Count
-        rating_counts = dict(
-            LearnerAttributeRatingEntry.objects.filter(
-                student__in=students, ptc_window=ptc_window,
-            ).exclude(rating="").values("student_id").annotate(
-                cnt=Count("id")
-            ).values_list("student_id", "cnt")
-        )
-        complete = sum(1 for s in students if rating_counts.get(s.id, 0) >= 12)
-        return JsonResponse({"complete": complete, "total": total})
+        options, defaults = self._class_options(request.user)
+        selected = _class_choice(request, options, defaults)
+        students = list(active_students_in_class(selected)) if selected else []
+        done = attribute_completion(students, ptc_window)
+        return JsonResponse({"class": selected, "complete": sum(done.values()), "total": len(students)})
 
 
 # ===========================================================================
-# SPECIALIST TEACHER  Enrichment Grade Entry (FR-PTC-006 to FR-PTC-010)
+# PTC Log: every opening of a PTC report
 # ===========================================================================
 
-class PTCEnrichmentGradeEntryView(RoleRequiredMixin, TemplateView):
-    template_name = "ptc/enrichment_entry.html"
-    allowed_roles = [UserRole.TEACHER, UserRole.SUPER_ADMIN]
-    required_permission = "ptc.view_enrichmentgrade"
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["ptc_tab"] = "enrichment_entry"
-        user = self.request.user
-
-        my_subjects = list(EnrichmentSubject.objects.filter(assigned_teacher=user, is_active=True))
-        if user.role == UserRole.SUPER_ADMIN:
-            my_subjects = list(EnrichmentSubject.objects.filter(is_active=True))
-
-        academic_year = _active_academic_year()
-        current_term = academic_year.terms.filter(is_locked=False).first() if academic_year else None
-
-        from students.models import Student
-        from academics.models import GradeClass, Department
-        ecd_names = set(GradeClass.objects.filter(department=Department.ECD).values_list("name", flat=True))
-
-        # Collect all unique students across all subjects
-        student_ids = set()
-        for es in my_subjects:
-            qs = Student.objects.filter(is_archived=False, status="active").exclude(class_name__in=ecd_names)
-            if es.assigned_class:
-                qs = qs.filter(class_name=es.assigned_class.name)
-            student_ids.update(qs.values_list("id", flat=True))
-        all_students = Student.objects.filter(id__in=student_ids).order_by("last_name", "first_name")
-
-        # Batch fetch all grades for current term
-        from collections import defaultdict
-        grades_by_student_subject = {}
-        if current_term:
-            all_grades = EnrichmentGrade.objects.filter(
-                student__in=all_students, enrichment_subject__in=my_subjects, term=current_term,
-            ).select_related("enrichment_subject")
-            for g in all_grades:
-                grades_by_student_subject[(g.student_id, g.enrichment_subject_id)] = g
-
-        students_data = []
-        for student in all_students:
-            subject_grades = []
-            for es in my_subjects:
-                grade = grades_by_student_subject.get((student.id, es.id))
-                is_locked = grade.is_locked if grade else False
-                subject_grades.append({
-                    "subject_id": es.id,
-                    "subject_name": es.subject.name,
-                    "grade": grade.letter_grade if grade else "",
-                    "is_locked": is_locked,
-                })
-            students_data.append({"student": student, "subject_grades": subject_grades})
-
-        import json
-        ctx["students_data"] = students_data
-        ctx["enrichment_json"] = json.dumps([{
-            "id": s["student"].id,
-            "first": s["student"].first_name,
-            "last": s["student"].last_name,
-            "class": s["student"].class_name,
-            "adm": s["student"].admission_no,
-            "subjects": s["subject_grades"],
-        } for s in students_data])
-        ctx["enrichment_subjects_json"] = json.dumps([{"id": es.id, "name": es.subject.name} for es in my_subjects])
-        ctx["academic_year"] = academic_year
-        ctx["current_term"] = current_term
-        ctx["is_window_open"] = True  # enrichment doesn't use window gating
-        return ctx
-
-    def post(self, request, *args, **kwargs):
-        user = request.user
-        academic_year = _active_academic_year()
-        if not academic_year:
-            messages.error(request, "No active academic year found.")
-            return redirect("ptc:enrichment_entry")
-
-        current_term = academic_year.terms.filter(is_locked=False).first()
-        if not current_term:
-            messages.error(request, "No active term found.")
-            return redirect("ptc:enrichment_entry")
-
-        from students.models import Student
-        updated = 0
-        for key, value in request.POST.items():
-            if not key.startswith("grade_"):
-                continue
-            parts = key.split("_", 2)
-            if len(parts) < 3:
-                continue
-            student = get_object_or_404(Student, pk=parts[1])
-            enrichment_subject = get_object_or_404(EnrichmentSubject, pk=parts[2])
-
-            if not can_enter_enrichment_grade(user, student, enrichment_subject.id):
-                if user.role != UserRole.SUPER_ADMIN:
-                    continue
-
-            letter_grade = (value or "").strip()
-            if letter_grade and letter_grade not in dict(EnrichmentLetterGrade.choices):
-                continue
-
-            existing_grade = EnrichmentGrade.objects.filter(
-                student=student, enrichment_subject=enrichment_subject, term=current_term
-            ).first()
-            if existing_grade and existing_grade.is_locked and user.role != UserRole.SUPER_ADMIN:
-                continue
-
-            EnrichmentGrade.objects.update_or_create(
-                student=student, enrichment_subject=enrichment_subject, term=current_term,
-                defaults={"letter_grade": letter_grade, "entered_by": user},
-            )
-            updated += 1
-
-        if updated > 0:
-            from audit.models import log_event
-            log_event(
-                actor=user,
-                action_type="ENRICHMENT_GRADE_SAVED",
-                model_name="EnrichmentGrade",
-                object_id=current_term.pk,
-                description=f"Enrichment grades saved: {updated} grade(s) in {current_term}",
-                request=request
-            )
-
-        messages.success(request, f"Saved {updated} enrichment grade(s).")
-        return redirect("ptc:enrichment_entry")
-
-
-# ===========================================================================
-# PRIMARY HOD  Compliance Dashboard (FR-PTC-011, FR-PTC-016, FR-PTC-024)
-# ===========================================================================
-
-class PTCComplianceDashboardView(RoleRequiredMixin, TemplateView):
-    template_name = "ptc/compliance_dashboard.html"
-    allowed_roles = [UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD, UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL]
-    required_permission = "ptc.view_ptcsubjectcomment"
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["ptc_tab"] = "compliance_dashboard"
-        ptc_window = _current_ptc_window()
-        academic_year = _active_academic_year()
-        ctx["ptc_window"] = ptc_window
-        ctx["academic_year"] = academic_year
-
-        if ptc_window:
-            ctx["comment_compliance"] = get_compliance_summary(academic_year, ptc_window, "comments")
-            ctx["enrichment_compliance"] = get_compliance_summary(academic_year, ptc_window, "enrichment_grades")
-            ctx["attribute_compliance"] = get_compliance_summary(academic_year, ptc_window, "attributes")
-        else:
-            ctx["comment_compliance"] = []
-            ctx["enrichment_compliance"] = []
-            ctx["attribute_compliance"] = []
-        return ctx
-
-
-# ===========================================================================
-# HOS  PTC Generation Log (FR-PTC-030)
-# ===========================================================================
-
-class PTCGenerationLogView(RoleRequiredMixin, TemplateView):
+class PTCGenerationLogView(PTCCacheMixin, RoleRequiredMixin, TemplateView):
     template_name = "ptc/generation_log.html"
     allowed_roles = [UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN, UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD]
     required_permission = "ptc.view_ptcgenerationlog"
@@ -911,7 +605,7 @@ class PTCGenerationLogView(RoleRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["ptc_tab"] = "generation_log"
-        logs = PTCGenerationLog.objects.select_related("student", "class_teacher", "ptc_window").all()
+        logs = PTCGenerationLog.objects.select_related("student", "class_teacher", "viewed_as", "ptc_window").all()
 
         date_from = self.request.GET.get("date_from")
         date_to = self.request.GET.get("date_to")
@@ -920,17 +614,22 @@ class PTCGenerationLogView(RoleRequiredMixin, TemplateView):
         if date_to:
             logs = logs.filter(opened_at__date__lte=date_to)
 
-        teacher_id = self.request.GET.get("teacher")
-        if teacher_id:
-            logs = logs.filter(class_teacher_id=teacher_id)
+        opener_id = self.request.GET.get("teacher")
+        if opener_id and opener_id.isdigit():
+            logs = logs.filter(class_teacher_id=opener_id)
 
-        ctx["logs"] = logs[:200]
+        from django.core.paginator import Paginator
+        page_obj = Paginator(logs.order_by("-opened_at", "-pk"), 50).get_page(self.request.GET.get("page"))
+        ctx["page_obj"] = page_obj
+        ctx["logs"] = page_obj.object_list
         ctx["date_from"] = date_from or ""
         ctx["date_to"] = date_to or ""
-        ctx["teacher_filter"] = teacher_id or ""
+        ctx["teacher_filter"] = opener_id or ""
 
         from users.models import User
-        ctx["class_teachers"] = User.objects.filter(role=UserRole.TEACHER, is_active=True).order_by("last_name")
+        ctx["class_teachers"] = User.objects.filter(
+            pk__in=PTCGenerationLog.objects.values("class_teacher_id")
+        ).order_by("first_name", "last_name")
         return ctx
 
 
@@ -938,7 +637,7 @@ class PTCGenerationLogView(RoleRequiredMixin, TemplateView):
 # ADMIN OFFICER  PTC Calendar Configuration (FR-PTC-001, FR-PTC-002)
 # ===========================================================================
 
-class PTCCalendarConfigView(RoleRequiredMixin, TemplateView):
+class PTCCalendarConfigView(PTCCacheMixin, RoleRequiredMixin, TemplateView):
     template_name = "ptc/calendar_config.html"
     allowed_roles = [UserRole.ADMIN_OFFICER, UserRole.SUPER_ADMIN, UserRole.HEAD_OF_SCHOOL, UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD]
     required_permission = "ptc.view_ptcwindow"
@@ -1002,10 +701,10 @@ class PTCCalendarConfigView(RoleRequiredMixin, TemplateView):
             messages.error(request, f"A PTC window for {dict(TermSlot.choices)[term_slot]} already exists.")
             return redirect("ptc:calendar_config")
 
-        # FR-PTC-002: Maximum 2 PTC dates per academic year
+        # One PTC window per term: at most three per academic year
         existing_count = PTCWindow.objects.filter(academic_year=academic_year).count()
-        if existing_count >= 2:
-            messages.error(request, "Maximum of 2 PTC dates per academic year reached.")
+        if existing_count >= 3:
+            messages.error(request, "Maximum of 3 PTC dates per academic year (one per term) reached.")
             return redirect("ptc:calendar_config")
 
         PTCWindow.objects.create(
@@ -1079,146 +778,20 @@ class PTCCalendarConfigView(RoleRequiredMixin, TemplateView):
 
 
 # ===========================================================================
-# ENRICHMENT SUBJECT CONFIGURATION  Create / Update (OP 9.4)
-# ===========================================================================
-
-class PTCEnrichmentConfigView(RoleRequiredMixin, TemplateView):
-    """
-    Super Admin configuration page for enrichment subjects.
-    Allows creating, updating, and managing enrichment subject assignments
-    (teacher, class, weight percentage, active status).
-
-    RBAC: Permission-gated via ptc.manage_enrichment_config (configurable
-    in the Role Management UI, not hard-coded to a specific role).
-    """
-    template_name = "ptc/enrichment_config.html"
-    allowed_roles = [UserRole.SUPER_ADMIN]
-    required_permission = "ptc.manage_enrichment_config"
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["ptc_tab"] = "enrichment_config"
-        ctx["subjects"] = EnrichmentSubject.objects.select_related(
-            "subject", "assigned_teacher", "assigned_class",
-        ).all()
-        from users.models import User as _U
-        ctx["teachers"] = (
-            _U.objects.filter(is_active=True, role=UserRole.TEACHER)
-            .order_by("last_name", "first_name")
-        )
-        from academics.models import GradeClass, Subject
-        ctx["classes"] = GradeClass.objects.all().order_by("name")
-        ctx["available_subjects"] = Subject.objects.filter(
-            is_enrichment=True, is_active=True
-        ).exclude(
-            id__in=EnrichmentSubject.objects.values_list("subject_id", flat=True)
-        )
-        ctx["form"] = EnrichmentSubjectConfigForm()
-        ctx["editing_id"] = None
-        return ctx
-
-    def post(self, request, *args, **kwargs):
-        user = request.user
-        action = request.POST.get("action", "create")
-
-        if action == "create":
-            return self._create_subject(request, user)
-        elif action == "update":
-            return self._update_subject(request, user)
-        elif action == "toggle_active":
-            return self._toggle_active(request, user)
-        return redirect("ptc:enrichment_config")
-
-    def _create_subject(self, request, user):
-        form = EnrichmentSubjectConfigForm(request.POST)
-        if form.is_valid():
-            subject = form.save()
-            from audit.models import log_event
-            log_event(
-                actor=user,
-                action_type="ENRICHMENT_SUBJECT_CREATED",
-                model_name="EnrichmentSubject",
-                object_id=subject.pk,
-                description=(
-                    f"Enrichment subject created: {subject.subject.name} "
-                    f"(teacher={subject.assigned_teacher}, "
-                    f"class={subject.assigned_class}, "
-                    f"weight={subject.weight_percentage}%)"
-                ),
-                request=request,
-            )
-            messages.success(request, f"Enrichment subject '{subject.subject.name}' created successfully.")
-        else:
-            messages.error(request, "Could not create enrichment subject. Please check the form.")
-        return redirect("ptc:enrichment_config")
-
-    def _update_subject(self, request, user):
-        subject = get_object_or_404(EnrichmentSubject, pk=request.POST.get("subject_id"))
-        form = EnrichmentSubjectConfigForm(request.POST, instance=subject)
-        if form.is_valid():
-            old_name = subject.subject.name
-            subject = form.save()
-            from audit.models import log_event
-            log_event(
-                actor=user,
-                action_type="ENRICHMENT_SUBJECT_UPDATED",
-                model_name="EnrichmentSubject",
-                object_id=subject.pk,
-                description=(
-                    f"Enrichment subject updated: {old_name} "
-                    f"(teacher={subject.assigned_teacher}, "
-                    f"class={subject.assigned_class}, "
-                    f"weight={subject.weight_percentage}%, "
-                    f"active={subject.is_active})"
-                ),
-                request=request,
-            )
-            messages.success(request, f"Enrichment subject '{subject.subject.name}' updated successfully.")
-        else:
-            messages.error(request, "Could not update enrichment subject. Please check the form.")
-        return redirect("ptc:enrichment_config")
-
-    def _toggle_active(self, request, user):
-        subject = get_object_or_404(EnrichmentSubject, pk=request.POST.get("subject_id"))
-        subject.is_active = not subject.is_active
-        subject.save(update_fields=["is_active"])
-        from audit.models import log_event
-        log_event(
-            actor=user,
-            action_type="ENRICHMENT_SUBJECT_TOGGLED",
-            model_name="EnrichmentSubject",
-            object_id=subject.pk,
-            description=f"Enrichment subject '{subject.subject.name}' active status set to {subject.is_active}",
-            request=request,
-        )
-        status = "activated" if subject.is_active else "deactivated"
-        messages.success(request, f"Enrichment subject '{subject.subject.name}' {status}.")
-        return redirect("ptc:enrichment_config")
-
-
-# ===========================================================================
 # API: Attribute Entry Completion Count (FR-PTC-022)
 # ===========================================================================
 
-class PTCAttributeCompletionAPIView(RoleRequiredMixin, LoginRequiredMixin, View):
+class PTCAttributeCompletionAPIView(PTCCacheMixin, RoleRequiredMixin, LoginRequiredMixin, View):
     allowed_roles = [UserRole.TEACHER, UserRole.SUPER_ADMIN, UserRole.PRIMARY_HOD, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL]
     required_permission = "ptc.view_learnerattributeratingentry"
 
     def get(self, request):
-
         ptc_window = _current_ptc_window()
         if not ptc_window:
             return JsonResponse({"complete": 0, "total": 0})
-
-        teacher_classes = _get_teacher_class_names(request.user)
         from students.models import Student
-        from django.db.models import Count, Q
-        students = Student.objects.filter(is_archived=False, status="active", class_name__in=teacher_classes)
-        total = students.count()
-        complete = students.annotate(
-            rated_count=Count(
-                "ptc_attribute_ratings",
-                filter=Q(ptc_attribute_ratings__ptc_window=ptc_window) & ~Q(ptc_attribute_ratings__rating=""),
-            )
-        ).filter(rated_count__gte=12).count()
-        return JsonResponse({"complete": complete, "total": total})
+        students = list(Student.objects.filter(
+            is_archived=False, status="active", class_name__in=_get_teacher_class_names(request.user),
+        ))
+        done = attribute_completion(students, ptc_window)
+        return JsonResponse({"complete": sum(done.values()), "total": len(students)})

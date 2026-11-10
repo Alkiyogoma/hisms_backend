@@ -14,7 +14,7 @@
 {% has_perm user "ptc.change_ptcwindow" as can_change %}
 {% include "ptc/_top_tabs.html" %}
 <div class="ptc-page" style="max-width:960px">
-  <div class="ptc-head"><p>Each academic year has two PTC dates: Term 1 and Term 3. Teachers can enter comments and ratings in the window before each date.</p></div>
+  <div class="ptc-head"><p>Each term can have one PTC date (Term 1, Term 2 and Term 3). Teachers enter subject comments and student attributes in the window before each date.</p></div>
 
   {% if ptc_windows %}
   <div class="table-wrap" style="margin-bottom:20px">
@@ -83,7 +83,7 @@
       <input type="hidden" name="action" value="create">
       <div class="grid-3">
         <div>
-          <label class="hf-label">Academic Year</label>
+          <label class="hf-label">Academic year</label>
           <select name="academic_year_id" required class="hf-select">
             <option value="">Choose a year</option>
             {% for ay in academic_years %}
@@ -92,19 +92,20 @@
           </select>
         </div>
         <div>
-          <label class="hf-label">Term Slot</label>
+          <label class="hf-label">Term</label>
           <select name="term_slot" required class="hf-select">
             <option value="term_1">Term 1</option>
+            <option value="term_2">Term 2</option>
             <option value="term_3">Term 3</option>
           </select>
         </div>
         <div>
-          <label class="hf-label">PTC Date</label>
+          <label class="hf-label">PTC date</label>
           <input type="date" name="ptc_date" required class="hf-input">
         </div>
       </div>
       <div style="margin-top:14px;text-align:right">
-        <button type="submit" class="hf-btn hf-btn-primary" style="padding:10px 24px;font-size:14px">Add PTC date</button>
+        <c-button type="submit">Add PTC date</c-button>
       </div>
     </form>
   </div>
@@ -119,22 +120,22 @@
 {% if can_change %}
 <div id="editModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:16px;max-width:420px;width:92%;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
-    <h3 style="font-size:16px;font-weight:700;margin-bottom:14px">Edit PTC Date</h3>
+    <h3 style="font-size:16px;font-weight:700;margin-bottom:14px">Change PTC date</h3>
     <form method="post">
       {% csrf_token %}
       <input type="hidden" name="action" value="edit_date">
       <input type="hidden" name="window_id" id="edit_window_id">
       <div style="margin-bottom:12px">
-        <label class="hf-label">New PTC Date</label>
+        <label class="hf-label">New PTC date</label>
         <input type="date" name="new_ptc_date" id="edit_new_date" required class="hf-input">
       </div>
       <div style="margin-bottom:14px">
-        <label class="hf-label">Reason for Change</label>
+        <label class="hf-label">Reason for the change</label>
         <textarea name="reason" rows="2" required class="hf-input" style="resize:vertical" placeholder="Required for audit trail"></textarea>
       </div>
       <div style="display:flex;gap:10px;justify-content:flex-end">
-        <button type="button" class="hf-btn hf-btn-secondary" onclick="closeEditModal()">Cancel</button>
-        <button type="submit" class="hf-btn hf-btn-primary">Save Change</button>
+        <c-button variant="secondary" onclick="closeEditModal()">Cancel</c-button>
+        <c-button type="submit">Save change</c-button>
       </div>
     </form>
   </div>

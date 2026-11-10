@@ -1,8 +1,6 @@
 from django.contrib import admin
 
 from ptc.models import (
-    EnrichmentGrade,
-    EnrichmentSubject,
     LearnerAttributeRatingEntry,
     PTCDateChangeLog,
     PTCGenerationLog,
@@ -23,18 +21,6 @@ class PTCWindowAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(EnrichmentSubject)
-class EnrichmentSubjectAdmin(admin.ModelAdmin):
-    list_display = ("subject", "assigned_teacher", "assigned_class", "is_active")
-    list_filter = ("is_active",)
-
-
-@admin.register(EnrichmentGrade)
-class EnrichmentGradeAdmin(admin.ModelAdmin):
-    list_display = ("student", "enrichment_subject", "term", "letter_grade", "entered_by", "is_locked")
-    list_filter = ("enrichment_subject", "term", "is_locked")
-
-
 @admin.register(PTCSubjectComment)
 class PTCSubjectCommentAdmin(admin.ModelAdmin):
     list_display = ("student", "subject_name", "ptc_window", "entered_by")
@@ -49,7 +35,7 @@ class LearnerAttributeRatingEntryAdmin(admin.ModelAdmin):
 
 @admin.register(PTCGenerationLog)
 class PTCGenerationLogAdmin(admin.ModelAdmin):
-    list_display = ("student", "class_teacher", "ptc_window", "opened_at")
+    list_display = ("student", "class_name", "class_teacher", "viewed_as", "ptc_window", "opened_at")
     list_filter = ("ptc_window", "opened_at")
     readonly_fields = ("opened_at",)
 
