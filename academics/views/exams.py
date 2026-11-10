@@ -78,7 +78,12 @@ class ExamScoreEntryView(RoleRequiredMixin, TemplateView):
             from timetable.models import TimetableSlot
             primary_names = grade_class_names_for_department(Department.PRIMARY)
             ls_names = grade_class_names_for_department(Department.LOWER_SECONDARY)
-            teacher_classes = list(set(TimetableSlot.objects.filter(teacher=request.user).values_list("class_name", flat=True)))
+            teacher_classes = set(TimetableSlot.objects.filter(teacher=request.user).values_list("class_name", flat=True))
+            # Opening the page, class assignments count too: an assistant
+            # class teacher may hold a class with no lessons timetabled.
+            # A save posted here keeps going through this page's own checks.
+            if request.method == "GET":
+                teacher_classes |= get_teacher_assigned_classes(request.user)
             has_primary = any(c in primary_names for c in teacher_classes)
             has_ls = any(c in ls_names for c in teacher_classes)
             if has_primary and not has_ls:

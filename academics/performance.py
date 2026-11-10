@@ -94,7 +94,7 @@ def resolve_scope(user, terms) -> Scope | None:
 
 
 def _teacher_scope(user, terms, order) -> Scope:
-    from core.teacher_context import get_teacher_assigned_classes_from_tca
+    from core.teacher_context import get_teacher_assigned_classes_from_tca, sees_whole_class
     from hr.models import TeacherClassAssignment
 
     assignments = {}
@@ -110,7 +110,7 @@ def _teacher_scope(user, terms, order) -> Scope:
 
     pairs = {}
     for cls, info in assignments.items():
-        if info["is_class_teacher"]:
+        if sees_whole_class(info):
             pairs[cls] = None
         elif info["subjects"]:
             pairs[cls] = set(info["subjects"])

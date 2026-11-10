@@ -19,86 +19,115 @@
 </div>
 {% endif %}
 
-<div class="section-hdr">
-  <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap">
-    {% is_hod_like user as can_signoff %}
-    {% if has_pending and can_signoff and not signoff_blocked %}
-      <button type="button" class="hf-btn hf-btn-primary" style="font-size:12px; padding:6px 14px"
-        onclick="confirmDeleteModal({title:'Publish {{ class_name|escapejs }}?',body:'Publish every ready report for <strong>{{ class_name }}</strong>?',detail:'Parents can see them straight away and are notified. Reports that are not ready stay unpublished.',confirmText:'Publish',url:'{% url 'academics:signoff_action' %}',type:'info',extraData:[{name:'class_name',value:'{{ class_name }}'},{name:'term_id',value:'{{ term.id }}'}]})">
-        Publish ready reports
-      </button>
-    {% elif has_pending and can_signoff and signoff_blocked %}
-      <span class="hf-btn hf-btn-secondary" style="font-size:12px; padding:6px 14px; opacity:0.5; cursor:not-allowed" title="{{ signoff_block_reason }}">
-        Publish ready reports
-      </span>
-    {% endif %}
-  </div>
-</div>
-
 {% if class_error %}
   <div class="card" style="padding:24px; text-align:center; color:var(--red); font-weight:600">{{ class_error }}</div>
 {% elif class_name %}
-<div class="card" style="padding:0; overflow:hidden; border-top: 3px solid var(--hodari-blue);">
-  <table class="h-table">
+{% is_hod_like user as can_signoff %}
+<div class="card rc-card">
+  <div class="rc-head">
+    <h2 class="rc-title">{% if exam_type_name %}{{ exam_type_name }} results &middot; {{ term.name }}{% else %}Results for {{ term.name }}{% endif %}</h2>
+    <div class="rc-tools">
+      {% if has_pending and can_signoff and not signoff_blocked %}
+      <button type="button" class="hf-btn hf-btn-primary"
+        onclick="confirmDeleteModal({title:'Publish {{ class_name|escapejs }}?',body:'Publish every ready report for <strong>{{ class_name }}</strong>?',detail:'Parents can see them straight away and are notified. Reports that are not ready stay unpublished.',confirmText:'Publish',url:'{% url 'academics:signoff_action' %}',type:'info',extraData:[{name:'class_name',value:'{{ class_name }}'},{name:'term_id',value:'{{ term.id }}'}]})">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>
+        Publish ready reports
+      </button>
+      {% elif has_pending and can_signoff and signoff_blocked %}
+      <span class="hf-btn hf-btn-secondary" style="opacity:0.5; cursor:not-allowed" title="{{ signoff_block_reason }}">Publish report</span>
+      {% endif %}
+      {% if print_all_report %}
+      <a href="{% url 'academics:report_preview_class' print_all_report.pk %}" target="_blank" class="hf-btn hf-btn-secondary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Print All
+      </a>
+      {% endif %}
+      {% if results.rows %}
+      <a href="{% querystring export='csv' %}" class="hf-btn hf-btn-secondary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/></svg>
+        Export
+      </a>
+      {% endif %}
+    </div>
+  </div>
+  <div class="rc-scroll">
+  <table class="h-table rc-table">
     <thead>
-      <tr style="background: #F8FAFC">
-        <th style="padding-left:24px; width:140px">Admission No</th>
-        <th>Student</th>
-        <th style="text-align:center">Report Status</th>
-        <th style="text-align:right; padding-right:24px">Actions</th>
+      <tr>
+        <th class="rc-name">Student</th>
+        <th class="rc-c">Sex</th>
+        {% for s in results.subjects %}<th class="rc-c{% if forloop.first %} rc-sep{% endif %}" title="{{ s.name }}">{{ s.label }}</th>{% endfor %}
+        <th class="rc-c rc-sep">Total</th>
+        <th class="rc-c">Avg</th>
+        <th class="rc-c">Rank</th>
+        <th class="rc-c">Grade</th>
+        <th class="rc-c">Report</th>
+        <th class="rc-actions"></th>
       </tr>
     </thead>
     <tbody>
-      {% for report in reports %}
+      {% for row in results.rows %}
+      {% with st=row.student report=row.report %}
         <tr class="hover-row">
-          <td style="padding-left:24px; font-family:var(--font-mono); font-size:12px; color:var(--text-secondary)">{{ report.student.admission_no }}</td>
-          <td style="font-weight:700; color:var(--hodari-blue); font-size:14px">{{ report.student.get_full_name }}</td>
-          <td style="text-align:center">
-            {% if report.status == 'published' %}
-              <div style="display:flex; flex-direction:column; align-items:center">
-                <span class="chip chip-green" style="font-weight:700">Published</span>
-              </div>
-            {% elif report.status == 'pending_sign_off' %}
-              <div style="display:flex; flex-direction:column; align-items:center">
-                <span class="chip chip-amber" style="font-weight:700">Awaiting sign-off</span>
-              </div>
-            {% else %}
-              <div style="display:flex; flex-direction:column; align-items:center">
-                <span class="chip chip-grey">Not submitted</span>
-              </div>
-            {% endif %}
+          <td class="rc-name">
+            <div class="rc-student">{{ st.get_full_name }}</div>
           </td>
-          <td style="text-align:right; padding-right:24px">
-            <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px;">
-                <a href="{% url 'academics:report_preview' report.pk %}" target="_blank" class="hf-btn hf-btn-secondary" style="font-size:11px; padding:5px 12px">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:4px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                    Preview
+          <td class="rc-c rc-muted">{{ st.gender|slice:":1"|upper|default:"–" }}</td>
+          {% for m in row.marks %}<td class="rc-c{% if forloop.first %} rc-sep{% endif %}">{% if m is None %}<span class="rc-muted">&ndash;</span>{% else %}{{ m|floatformat:"-1" }}{% endif %}</td>{% endfor %}
+          <td class="rc-c rc-sep">{% if row.total is None %}<span class="rc-muted">&ndash;</span>{% else %}{{ row.total|floatformat:"-1" }}{% endif %}</td>
+          <td class="rc-c rc-strong">{% if row.average is None %}<span class="rc-muted">&ndash;</span>{% else %}{{ row.average|floatformat:"-1" }}{% endif %}</td>
+          <td class="rc-c">{% if row.position %}{{ row.position }}{% else %}<span class="rc-muted">&ndash;</span>{% endif %}</td>
+          <td class="rc-c rc-strong">{{ row.grade|default:"–" }}</td>
+          <td class="rc-c">
+            {% if not report %}<span class="chip chip-grey">Not generated</span>
+            {% elif report.status == 'published' %}<span class="chip chip-green">Published</span>
+            {% elif report.status == 'pending_sign_off' %}<span class="chip chip-amber">Awaiting sign-off</span>
+            {% else %}<span class="chip chip-grey">Not submitted</span>{% endif %}
+          </td>
+          <td class="rc-actions">
+            <div class="rc-icons">
+              {% if report and report.status == 'pending_sign_off' and can_signoff and not signoff_blocked %}
+                <button type="button" class="rc-icon rc-ok" title="Sign off and publish" aria-label="Sign off {{ st.get_full_name }}"
+                  onclick="confirmDeleteModal({title:'Sign Off Report?',body:'Sign off and publish the report for <strong>{{ st.get_full_name|escapejs }}</strong>?',detail:'This report will become visible to parents immediately.',confirmText:'Sign Off',url:'{% url 'academics:signoff_action' %}',type:'info',extraData:[{name:'report_id',value:'{{ report.id }}'},{name:'action',value:'approve'}]})">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>
+                </button>
+                <button type="button" class="rc-icon rc-bad" title="Return for correction" aria-label="Return {{ st.get_full_name }}"
+                  onclick="confirmDeleteModal({title:'Return for Correction?',body:'Return the report for <strong>{{ st.get_full_name|escapejs }}</strong> to the teacher for correction?',detail:'The report moves back to Draft. Scores are not changed: use the Review Queue to reopen specific subjects.',confirmText:'Return Report',url:'{% url 'academics:signoff_action' %}',type:'warning',extraData:[{name:'report_id',value:'{{ report.id }}'},{name:'action',value:'reject'}]})">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>
+                </button>
+              {% endif %}
+              {% if report %}
+                <a href="{% url 'academics:report_preview' report.pk %}" target="_blank" class="rc-icon" title="View report card" aria-label="View report card for {{ st.get_full_name }}">
+              {% else %}
+                <a href="{% url 'academics:learner_report' st.pk %}?term={{ term.id }}" target="_blank" class="rc-icon" title="View progress report" aria-label="View progress report for {{ st.get_full_name }}">
+              {% endif %}
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 </a>
-                
-                {% is_hod_like user as can_signoff %}
-                {% if report.status == 'pending_sign_off' and can_signoff and not signoff_blocked %}
-                    <button type="button" class="hf-btn hf-btn-primary" style="font-size:11px; padding:5px 12px; background:#10b981; border-color:#059669"
-                      onclick="confirmDeleteModal({title:'Sign Off Report?',body:'Sign off and publish the report for <strong>{{ report.student.get_full_name }}</strong>?',detail:'This report will become visible to parents immediately.',confirmText:'Sign Off',url:'{% url 'academics:signoff_action' %}',type:'info',extraData:[{name:'report_id',value:'{{ report.id }}'},{name:'action',value:'approve'}]})">
-                      Sign Off
-                    </button>
-
-                    <button type="button" class="hf-btn hf-btn-secondary" style="font-size:11px; padding:5px 12px; color:var(--red); border-color:var(--red)"
-                      onclick="confirmDeleteModal({title:'Return for Correction?',body:'Return the report for <strong>{{ report.student.get_full_name }}</strong> to the teacher for correction?',detail:'The report moves back to Draft. Scores are not changed: use the Review Queue to reopen specific subjects.',confirmText:'Return Report',url:'{% url 'academics:signoff_action' %}',type:'warning',extraData:[{name:'report_id',value:'{{ report.id }}'},{name:'action',value:'reject'}]})">
-                      Return
-                    </button>
-                {% elif report.status == 'pending_sign_off' and can_signoff and signoff_blocked %}
-                    <span class="hf-btn hf-btn-secondary" style="font-size:11px; padding:5px 12px; opacity:0.5; cursor:not-allowed" title="{{ signoff_block_reason }}">Sign Off</span>
-                {% endif %}
+              {% if report %}
+                <a href="{% url 'academics:report_pdf_download' report.pk %}" class="rc-icon" title="Download report card PDF" aria-label="Print report card for {{ st.get_full_name }}">
+              {% else %}
+                <a href="{% url 'academics:learner_report' st.pk %}?term={{ term.id }}" target="_blank" class="rc-icon" title="Print progress report" aria-label="Print progress report for {{ st.get_full_name }}">
+              {% endif %}
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                </a>
             </div>
           </td>
         </tr>
+      {% endwith %}
       {% empty %}
         <tr>
-          <td colspan="4">{% include '_partials/empty_state.html' with title='No report cards found' desc='Report cards will appear here once generated.' icon='doc' icon_color='grey' %}</td>
+          <td colspan="{{ results.subjects|length|add:8 }}">{% include '_partials/empty_state.html' with title='No students found' desc='Students in this class and their approved marks will appear here.' icon='doc' icon_color='grey' %}</td>
         </tr>
       {% endfor %}
     </tbody>
   </table>
+  </div>
+  {% if results.rows %}<div class="rc-foot">{% if exam_type_name %}Showing {{ exam_type_name }} marks only. View and print open the full term report card.{% else %}Combined term report: each subject's mark is the weighted average of its approved assessments this term.{% endif %}</div>{% endif %}
+  {% if results.rows and results.ranked < results.rows|length %}
+  <div class="rc-foot">Students with no approved marks this term are listed last and are not ranked. Marks are approved, weighted subject marks; students with equal averages share a rank.</div>
+  {% elif results.rows %}
+  <div class="rc-foot">Marks are approved, weighted subject marks; students with equal averages share a rank.</div>
+  {% endif %}
 </div>
 {% else %}
 <div class="card" style="padding:40px; text-align:center; color:var(--text-muted)">
@@ -108,5 +137,34 @@
 
 <style>
   .hover-row:hover { background: #F8FAFC; }
+  .rc-card { padding:0; overflow:hidden; }
+  .rc-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:18px 24px; border-bottom:1px solid var(--border, #E5E7EB); }
+  .rc-title { margin:0; font-family:inherit; font-size:20px; font-weight:700; color:var(--text-primary, #111827); }
+  .rc-tools { display:flex; gap:10px; flex-wrap:wrap; }
+  .rc-tools .hf-btn { display:inline-flex; align-items:center; gap:8px; }
+  .rc-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .rc-table { width:100%; min-width:max-content; }
+  .rc-table th { background:#F8FAFC; text-transform:uppercase; font-size:12px; letter-spacing:.04em; white-space:nowrap; }
+  .rc-table td, .rc-table th { padding:12px 14px; }
+  .rc-table .rc-name { padding-left:24px; min-width:200px; position:sticky; left:0; background:var(--surface, #fff); z-index:1; }
+  .rc-table th.rc-name { background:#F8FAFC; }
+  .rc-table tr.hover-row:hover td.rc-name { background:#F8FAFC; }
+  .rc-student { font-weight:600; color:var(--text-primary, #111827); text-transform:uppercase; }
+  .rc-c { text-align:center; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .rc-sep { border-left:1px solid var(--border, #E5E7EB); }
+  .rc-strong { font-weight:700; }
+  .rc-muted { color:var(--text-muted, #9CA3AF); }
+  .rc-actions { text-align:right; padding-right:20px; white-space:nowrap; }
+  .rc-icons { display:flex; justify-content:flex-end; gap:4px; }
+  .rc-icon { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:8px; border:0; background:none; color:var(--text-primary, #111827); cursor:pointer; }
+  .rc-icon:hover { background:#EEF2F7; }
+  .rc-ok { color:#059669; }
+  .rc-bad { color:var(--red, #DC2626); }
+  .rc-foot { padding:12px 24px; font-size:12px; color:var(--text-muted); border-top:1px solid var(--border, #E5E7EB); }
+  @media (max-width: 640px) {
+    .rc-head { padding:14px 16px; }
+    .rc-title { font-size:17px; }
+    .rc-table .rc-name { padding-left:16px; min-width:150px; }
+  }
 </style>
 {% endblock %}

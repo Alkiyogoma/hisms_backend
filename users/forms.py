@@ -733,17 +733,23 @@ class UserUpdateForm(StaffAssignmentFieldsMixin, forms.ModelForm):
         all_subjects = set()
         teacher_role = "normal"
         repeat = False
+        asst_class = None
         for ass in assignments:
             if ass.is_class_teacher:
                 ct_class = ass.grade_class_id
                 teacher_role = "class_teacher"
-            elif ass.is_assistant_class_teacher and teacher_role != "class_teacher":
-                teacher_role = "assistant_class_teacher"
+            elif ass.is_assistant_class_teacher:
+                asst_class = ass.grade_class_id
             teaching_class_ids.append(str(ass.grade_class_id))
             if isinstance(ass.subjects_taught, list):
                 all_subjects.update(ass.subjects_taught)
             if ass.repeat_across_terms:
                 repeat = True
+        # The form has one class picker shared by both roles: a class
+        # teacher post wins; otherwise show the class they assist.
+        if not ct_class and asst_class:
+            ct_class = asst_class
+            teacher_role = "assistant_class_teacher"
         self.fields["teacher_role"].initial = teacher_role
         if ct_class:
             self.fields["class_teacher_class"].initial = ct_class
