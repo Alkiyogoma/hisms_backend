@@ -225,8 +225,12 @@ class Command(BaseCommand):
                 term=window.academic_year.terms.first(),
             ).select_related("teacher__user", "grade_class")
 
+            from ptc.services import get_marks_subjects_for_class
+
             for ta in assignments:
-                subjects = ta.subjects_taught or []
+                # Only mark-bearing subjects take a PTC comment.
+                marks = set(get_marks_subjects_for_class(ta.grade_class.name))
+                subjects = [s for s in (ta.subjects_taught or []) if s in marks]
                 if not subjects:
                     continue
 

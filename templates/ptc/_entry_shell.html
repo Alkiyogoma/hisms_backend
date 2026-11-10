@@ -1,0 +1,56 @@
+{# Student list + form card shared by the PTC entry pages. The page fills #peBody. #}
+<div class="pe-top">
+  <div>
+    <div class="pe-top-title">{{ shell_title }}</div>
+    <div class="pe-top-sub">{{ selected_class }} &middot; {{ ptc_window.get_term_slot_display }} &middot; PTC {{ ptc_window.ptc_date|date:"d M Y" }}</div>
+  </div>
+  <div class="pe-progress">
+    <div class="pe-progress-track" aria-hidden="true"><div class="pe-progress-fill" id="peProgressFill" style="width:{% if total_students %}{% widthratio complete_count total_students 100 %}{% else %}0{% endif %}%"></div></div>
+    <span class="pe-progress-text" id="peProgressText"><b>{{ complete_count }} of {{ total_students }}</b> students done</span>
+  </div>
+</div>
+
+<div class="pe-shell"><div class="pe-layout">
+  <nav class="card pe-list" aria-label="Students">
+    <div class="pe-list-head">Students</div>
+    <div id="peList"></div>
+  </nav>
+
+  <div>
+    <div class="pe-picker">
+      <c-button variant="secondary" size="sm" id="pePrevM" aria-label="Previous student">&lsaquo;</c-button>
+      <select class="hf-select" id="pePicker" aria-label="Student"></select>
+      <c-button variant="secondary" size="sm" id="peNextM" aria-label="Next student">&rsaquo;</c-button>
+    </div>
+
+    <section class="card pe-form" id="peForm" aria-live="polite">
+      <div class="pe-form-head">
+        <div>
+          <div class="pe-name" id="peName">Select a student</div>
+          <div class="pe-meta" id="peMeta"></div>
+        </div>
+        <div class="pe-head-tools">
+          <span class="ee-mini pe-learner-meta" id="peMini"></span>
+          <span class="pe-save-state" id="peSaveState" role="status"></span>
+          <span class="chip chip-grey" id="peStatus">—</span>
+          <c-button variant="secondary" size="sm" id="pePrev" aria-label="Previous student">&lsaquo; Prev</c-button>
+          <c-button variant="secondary" size="sm" id="peNext" aria-label="Next student">Next &rsaquo;</c-button>
+        </div>
+      </div>
+
+      {% if shell_key %}<div class="pe-key">{{ shell_key|safe }}</div>{% endif %}
+      <div class="pe-cols-wrap"><div id="peBody"></div></div>
+
+      {% if can_save %}
+      <div class="pe-actions">
+        <span class="pe-actions-hint">Unsaved work is kept when you move between students. Ctrl+S saves.</span>
+        <div class="pe-actions-btns">
+          <c-button variant="secondary" id="peSave">Save</c-button>
+          <c-button variant="success" id="peSaveNext">Save &amp; next student</c-button>
+        </div>
+      </div>
+      {% endif %}
+    </section>
+  </div>
+</div></div>
+{% csrf_token %}

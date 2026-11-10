@@ -10,15 +10,6 @@
   {% if perms.ptc.change_learnerattributeratingentry %}
   <a href="{% url 'ptc:attribute_entry' %}" class="sub-tab {% if ptc_tab == 'attribute_entry' %}active{% endif %}">Attributes</a>
   {% endif %}
-  {% if perms.ptc.change_enrichmentgrade %}
-  <a href="{% url 'ptc:enrichment_entry' %}" class="sub-tab {% if ptc_tab == 'enrichment_entry' %}active{% endif %}">Enrichment</a>
-  {% endif %}
-  {% if perms.ptc.manage_enrichment_config %}
-  <a href="{% url 'ptc:enrichment_config' %}" class="sub-tab {% if ptc_tab == 'enrichment_config' %}active{% endif %}">Enrichment Setup</a>
-  {% endif %}
-  {% if perms.ptc.view_ptcwindow %}
-  <a href="{% url 'ptc:compliance_dashboard' %}" class="sub-tab {% if ptc_tab == 'compliance_dashboard' %}active{% endif %}">Compliance</a>
-  {% endif %}
   {% if perms.ptc.view_ptcwindow %}
   <a href="{% url 'ptc:generation_log' %}" class="sub-tab {% if ptc_tab == 'generation_log' %}active{% endif %}">Log</a>
   {% endif %}

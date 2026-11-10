@@ -1,0 +1,95 @@
+{% comment %}Shared behaviour of the PTC entry pages. Each page calls PTCEntry({...}) with its data and how to draw, send and take back one student's entries.{% endcomment %}
+<script>
+window.PTCEntry = function (cfg) {
+  'use strict';
+  var DATA = cfg.data, idx = 0;
+  DATA.forEach(function (d) { d.dirty = false; });
+  var $ = function (id) { return document.getElementById(id); };
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+  function status(d) { return d.dirty ? ['chip-amber', 'Unsaved'] : d.ok ? ['chip-green', 'Done'] : ['chip-grey', 'Pending']; }
+
+  function renderList() {
+    var list = $('peList'), picker = $('pePicker');
+    list.innerHTML = ''; picker.innerHTML = '';
+    DATA.forEach(function (d, i) {
+      var b = el('button', 'pe-learner' + (i === idx ? ' active' : ''));
+      b.type = 'button'; b.onclick = function () { show(i); };
+      var who = el('span'); who.style.minWidth = '0';
+      who.appendChild(el('div', 'pe-learner-name', d.first + ' ' + d.last));
+      who.appendChild(el('div', 'pe-learner-meta', d.adm || ''));
+      var st = status(d);
+      b.appendChild(who); b.appendChild(el('span', 'chip ' + st[0], st[1]));
+      list.appendChild(b);
+      var o = el('option', null, d.first + ' ' + d.last + ' · ' + st[1]); o.value = i; o.selected = i === idx;
+      picker.appendChild(o);
+    });
+    var done = DATA.filter(function (d) { return d.ok; }).length;
+    $('peProgressText').innerHTML = '';
+    var b = el('b', null, done + ' of ' + DATA.length); $('peProgressText').appendChild(b);
+    $('peProgressText').appendChild(document.createTextNode(' students done'));
+    $('peProgressFill').style.width = (DATA.length ? Math.round(done * 100 / DATA.length) : 0) + '%';
+    var st = status(DATA[idx]);
+    $('peStatus').className = 'chip ' + st[0]; $('peStatus').textContent = st[1];
+    if (cfg.mini) $('peMini').textContent = cfg.mini(DATA[idx]);
+  }
+
+  function changed() { DATA[idx].dirty = true; state('', ''); renderList(); }
+
+  function show(i) {
+    if (i < 0 || i >= DATA.length) return;
+    idx = i;
+    var d = DATA[i];
+    $('peName').textContent = d.first + ' ' + d.last;
+    $('peMeta').textContent = d['class'] + ' · ' + (d.adm || '');
+    cfg.render(d, $('peBody'), changed);
+    state('', '');
+    renderList();
+    var a = document.querySelector('.pe-learner.active');
+    if (a && a.scrollIntoView) a.scrollIntoView({ block: 'nearest' });
+  }
+
+  function state(kind, text) { var s = $('peSaveState'); s.className = 'pe-save-state ' + kind; s.textContent = text; }
+
+  function save(next) {
+    var d = DATA[idx];
+    var fd = new FormData();
+    fd.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    fd.append('student_id', d.id);
+    fd.append('class', cfg.className);
+    fd.append('ptc', cfg.ptc);
+    cfg.serialize(d, fd);
+    var form = $('peForm'); form.classList.add('saving'); state('', 'Saving…');
+    fetch(window.location.pathname, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+      .then(function (r) {
+        if ((r.headers.get('Content-Type') || '').indexOf('application/json') === -1)
+          throw new Error('Not saved: the server did not confirm (View as mode or signed out?).');
+        return r.json().then(function (j) { if (!r.ok || !j.ok) throw new Error(j.error || 'Not saved.'); return j; });
+      })
+      .then(function (j) {
+        cfg.applySaved(d, j); d.ok = j.done; d.dirty = false;
+        if (next && idx < DATA.length - 1) { show(idx + 1); state('ok', 'Saved ' + d.first); }
+        else { show(idx); state('ok', 'Saved'); }
+      })
+      .catch(function (e) { state('err', e.message || 'Not saved.'); })
+      .finally(function () { form.classList.remove('saving'); });
+  }
+
+  [['pePrev', -1], ['peNext', 1], ['pePrevM', -1], ['peNextM', 1]].forEach(function (p) {
+    var b = $(p[0]); if (b) b.addEventListener('click', function () { show(idx + p[1]); });
+  });
+  $('pePicker').addEventListener('change', function () { show(+this.value); });
+  if ($('peSave')) $('peSave').addEventListener('click', function () { save(false); });
+  if ($('peSaveNext')) $('peSaveNext').addEventListener('click', function () { save(true); });
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's' && $('peSave')) { e.preventDefault(); save(false); }
+  });
+  window.addEventListener('beforeunload', function (e) {
+    if (DATA.some(function (d) { return d.dirty; })) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  var start = 0;
+  DATA.forEach(function (d, i) { if (String(d.id) === String(cfg.start)) start = i; });
+  show(start);
+};
+</script>

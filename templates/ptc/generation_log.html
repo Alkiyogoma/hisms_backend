@@ -1,44 +1,44 @@
 {% extends "base.html" %}
-{% block title %}PTC Generation Log{% endblock %}
+{% block title %}PTC Log{% endblock %}
 
 {% block extra_head %}
 {% include "ptc/_styles.html" %}
 {% endblock %}
 
 {% block topbar_greeting %}
-<h1 class="topbar-title">PTC Generation Log</h1>
+<h1 class="topbar-title">PTC Log</h1>
 {% endblock %}
 
 {% block content %}
 {% include "ptc/_top_tabs.html" %}
 <div class="ptc-page" style="max-width:1000px">
-  <div class="ptc-head"><p>Read-only record of whose PTC report was opened, by whom and when.</p></div>
+  <div class="ptc-head"><p>Every time a student's PTC report is opened: the student, their class, who opened it and when. Read only.</p></div>
 
-  <form method="get" class="hf-filterbar">
-    <div class="hf-filters">
-      <div class="hf-fg">
+  <form method="get" class="pf-bar" id="logFilters">
+    <div class="pf-grid">
+      <div class="pf-fg">
         <label for="lg-from">From</label>
-        <input id="lg-from" type="date" name="date_from" value="{{ date_from }}" onchange="this.form.submit()">
+        <input id="lg-from" type="date" name="date_from" value="{{ date_from }}">
       </div>
-      <div class="hf-fg">
+      <div class="pf-fg">
         <label for="lg-to">To</label>
-        <input id="lg-to" type="date" name="date_to" value="{{ date_to }}" onchange="this.form.submit()">
+        <input id="lg-to" type="date" name="date_to" value="{{ date_to }}">
       </div>
-      <div class="hf-fg wide">
-        <label for="lg-teacher">Class teacher</label>
-        <select id="lg-teacher" name="teacher" onchange="this.form.submit()">
-          <option value="">All teachers</option>
+      <div class="pf-fg">
+        <label for="lg-teacher">Opened by</label>
+        <select id="lg-teacher" name="teacher">
+          <option value="">Anyone</option>
           {% for t in class_teachers %}
-          <option value="{{ t.id }}" {% if teacher_filter == t.id|stringformat:"d" %}selected{% endif %}>{{ t.get_full_name }}</option>
+          <option value="{{ t.id }}" {% if teacher_filter == t.id|stringformat:"d" %}selected{% endif %}>{{ t.get_full_name|default:t.username }}</option>
           {% endfor %}
         </select>
       </div>
     </div>
-    <div class="hf-filterfoot">
+    <div class="pf-foot">
       <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>Filters apply as you choose them.</span>
       <span>
         <noscript><button type="submit" class="hf-btn hf-btn-primary">Apply</button></noscript>
-        {% if date_from or date_to or teacher_filter %}<a class="hf-reset" href="{% url 'ptc:generation_log' %}">Clear filters</a>{% endif %}
+        {% if date_from or date_to or teacher_filter %}<a class="pf-reset" href="{% url 'ptc:generation_log' %}">Clear filters</a>{% endif %}
       </span>
     </div>
   </form>
@@ -50,7 +50,7 @@
         <tr>
           <th>Student</th>
           <th>Class</th>
-          <th>Opened By</th>
+          <th>Opened by</th>
           <th>Date &amp; Time</th>
         </tr>
       </thead>
@@ -58,8 +58,8 @@
         {% for log in logs %}
         <tr>
           <td style="font-weight:600">{{ log.student.get_full_name }}</td>
-          <td style="color:var(--text-secondary)">{{ log.student.class_name }}</td>
-          <td>{{ log.class_teacher.get_full_name }}</td>
+          <td style="color:var(--text-secondary)">{{ log.class_name|default:log.student.class_name }}</td>
+          <td>{{ log.class_teacher.get_full_name|default:log.class_teacher.username }} <span style="color:var(--text-muted);font-size:12px">({{ log.class_teacher.get_role_display }})</span>{% if log.viewed_as %}<div style="font-size:12px;color:var(--text-muted)">viewing as {{ log.viewed_as.get_full_name|default:log.viewed_as.username }}</div>{% endif %}</td>
           <td style="color:var(--text-secondary);font-variant-numeric:tabular-nums">{{ log.opened_at|date:"d M Y H:i" }}
           </td>
         </tr>
@@ -67,14 +67,25 @@
       </tbody>
     </table>
   </div>
+  <c-pagination :page_obj="page_obj" label="openings" />
   {% else %}
   <div class="card">
     {% if date_from or date_to or teacher_filter %}
     {% include '_partials/empty_state.html' with icon='search' icon_color='grey' title='Nothing matches these filters' desc='Try a wider date range or another teacher.' %}
     {% else %}
-    {% include '_partials/empty_state.html' with icon='doc' icon_color='grey' title='No PTC reports opened yet' desc="Each time a class teacher opens a student's PTC report it is logged here." %}
+    {% include '_partials/empty_state.html' with icon='doc' icon_color='grey' title='No PTC reports opened yet' desc="Each time anyone opens a student's PTC report it is logged here." %}
     {% endif %}
   </div>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var f = document.getElementById('logFilters');
+  if (!f) return;
+  f.addEventListener('change', function () { f.classList.add('is-loading'); f.submit(); });
+})();
+</script>
 {% endblock %}

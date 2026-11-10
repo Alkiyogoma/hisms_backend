@@ -364,3 +364,38 @@ class AssistantClassTeacherTests(ClassFixture):
         rows = resp.context["user_assignments"][self.assistant.pk]
         g4 = next(r for r in rows if r["class_name"] == "Grade 4")
         self.assertTrue(g4["is_assistant_class_teacher"])
+
+
+class StaleEnrolmentClassTests(ClassFixture):
+    """A learner admitted to one class and later moved to another in the same
+    year (a correction that writes no history) is ranked and reported in their
+    current class, not the stale admission class."""
+
+    def setUp(self):
+        from students.models import EnrollmentHistory
+        # Eli was admitted to Grade 4 this year, then corrected to Grade 5.
+        EnrollmentHistory.objects.create(student=self.eli, academic_year=self.year,
+                                         class_name="Grade 4", action="enrolled")
+
+    def test_current_year_uses_current_class(self):
+        from academics.performance import _classes_for_year
+        self.assertEqual(_classes_for_year([self.eli.pk], self.year, {self.term1.pk})[self.eli.pk], "Grade 5")
+
+    def test_not_ranked_in_admission_class(self):
+        self.assertEqual(self.positions(self.amani)["quiz"]["term"]["of"], 3)
+        self.assertEqual(self.positions(self.eli)["quiz"]["term"], {"position": 1, "of": 1})
+
+    def test_transfer_tied_to_the_term_still_wins(self):
+        from academics.performance import _classes_for_year
+        from students.models import EnrollmentHistory
+        EnrollmentHistory.objects.create(student=self.eli, academic_year=self.year, term=self.term1,
+                                         class_name="Grade 4", action="transferred")
+        self.assertEqual(_classes_for_year([self.eli.pk], self.year, {self.term1.pk})[self.eli.pk], "Grade 4")
+
+    def test_past_year_still_uses_history(self):
+        from academics.performance import _classes_for_year
+        from students.models import EnrollmentHistory
+        past = AcademicYear.objects.create(name="2025/2026")
+        EnrollmentHistory.objects.create(student=self.eli, academic_year=past, class_name="Grade 4",
+                                         action="promoted")
+        self.assertEqual(_classes_for_year([self.eli.pk], past, set())[self.eli.pk], "Grade 4")

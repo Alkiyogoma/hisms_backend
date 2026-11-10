@@ -135,12 +135,22 @@ def _teacher_scope(user, terms, order) -> Scope:
 def _classes_for_year(student_ids, year, term_ids):
     """Class each student was in during ``year`` (latest enrolment record,
     preferring one tied to a selected term), so past years are grouped by the
-    class a learner was actually in rather than their current one."""
-    from students.models import EnrollmentHistory
+    class a learner was actually in rather than their current one.
+
+    In the learner's own current year their current class is the truth: a
+    year-long row there (e.g. the class given at admission) goes stale when
+    the class is corrected later, since that writes no history. Only a row
+    tied to one of the selected terms (a mid-year transfer) overrides it."""
+    from students.models import EnrollmentHistory, Student
 
     found = {}
     if year is None:
         return found
+    current = {}
+    for sid, ay_id, cls in Student.objects.filter(id__in=student_ids).values_list(
+            "id", "academic_year_id", "class_name"):
+        if cls and (ay_id == year.pk or (ay_id is None and year.is_current)):
+            current[sid] = cls
     rows = (
         EnrollmentHistory.objects.filter(student_id__in=student_ids, academic_year=year)
         .order_by("created_at", "id")
@@ -149,8 +159,12 @@ def _classes_for_year(student_ids, year, term_ids):
     for sid, tid, cls in rows:
         if not cls:
             continue
+        if sid in current and tid not in term_ids:
+            continue
         if tid is None or tid in term_ids or sid not in found:
             found[sid] = cls
+    for sid, cls in current.items():
+        found.setdefault(sid, cls)
     return found
 
 

@@ -3,35 +3,11 @@
 
 {% block extra_head %}
 {% include "ptc/_styles.html" %}
-<style>
-  .cmt-grid { display:grid; grid-template-columns: 280px 1fr; gap:20px; align-items:start; }
-  .sidebar-card { background:#fff; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
-  .sidebar-hdr { padding:12px 16px; background:var(--hodari-blue); color:#fff; font-size:13px; font-weight:700; display:flex; align-items:center; gap:8px; }
-  .sidebar-list { max-height:calc(100vh - 220px); overflow-y:auto; }
-  .s-item { display:flex; align-items:center; gap:10px; padding:10px 16px; cursor:pointer; border-bottom:1px solid #F0F4FB; transition:background .1s; }
-  .s-item:hover { background:#F7F9FC; }
-  .s-item.active { background:var(--hodari-blue-pale,#E8EEF9); border-left:3px solid var(--hodari-blue); }
-  .s-avatar { width:32px; height:32px; border-radius:50%; background:var(--hodari-blue-pale,#E8EEF9); color:var(--hodari-blue); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0; }
-  .s-name { flex:1; font-size:13px; font-weight:600; color:var(--text-primary); }
-  .s-class { font-size:10px; color:var(--text-muted); }
-  .s-status { font-size:10px; font-weight:700; padding:1px 8px; border-radius:99px; }
-  .s-done { background:#E8F5EC; color:#1B7B34; }
-  .s-pending { background:#FEF2F2; color:#9B1C1C; }
-  .content-card { background:#fff; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
-  .content-hdr { padding:14px 20px; background:var(--hodari-blue); color:#fff; display:flex; align-items:center; gap:12px; }
-  .content-hdr h3 { margin:0; font-size:15px; font-weight:700; }
-  .content-hdr .sub { font-size:11px; opacity:.75; }
-  .cmt-row { padding:16px 20px; border-bottom:1px solid #F0F4FB; }
-  .cmt-label { display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--hodari-blue); margin-bottom:4px; }
-  .cmt-textarea { width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:6px; font-size:13px; font-family:inherit; resize:vertical; box-sizing:border-box; }
-  .cmt-textarea:focus { outline:none; border-color:var(--hodari-blue); box-shadow:0 0 0 3px rgba(26,86,196,.1); }
-  .char-hint { font-size:10px; color:var(--text-muted); margin-top:2px; }
-  @media (max-width:768px) { .cmt-grid { grid-template-columns:1fr; } .sidebar-list { max-height:200px; } }
-</style>
+{% include "ptc/_entry_styles.html" %}
 {% endblock %}
 
 {% block topbar_greeting %}
-<h1 class="topbar-title">Subject Comments</h1>
+<h1 class="topbar-title">PTC Subject Comments</h1>
 {% endblock %}
 
 {% block content %}
@@ -40,178 +16,86 @@
 
   {% if not ptc_window %}
   {% include "ptc/_no_window.html" with what="Subject comment entry" %}
+  {% else %}
+  {% include "ptc/_filters.html" %}
+
+  {% if subjects and not may_write %}
+  <div class="pe-note">Read only. Subject comments are written by each subject's teacher.</div>
+  {% elif not is_window_open %}
+  <div class="pe-note">{% if can_save %}The comment window for this PTC is closed. As Super Admin you can still save.{% else %}The comment window for this PTC is closed. You can read the comments but not change them.{% endif %}</div>
   {% endif %}
 
-  {% if not is_window_open and ptc_window %}
-  <div class="ptc-closed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg><span><strong>Entry window closed.</strong> You can read existing comments but not change them.</span></div>
+  {% if not class_options %}
+  <c-empty-state title="No classes to comment on" desc="Only mark-bearing subjects (English, Humanities, Kiswahili, Mathematics, Science) take a PTC comment, and you are not assigned to teach one of them this term." icon="users" />
+  {% elif not subjects %}
+  <c-empty-state title="No mark-bearing subjects" desc="You do not teach a mark-bearing subject in this class." icon="doc" />
+  {% elif students_data %}
+  {% include "ptc/_entry_shell.html" with shell_title="Subject comments" %}
+  {% else %}
+  <c-empty-state title="No students in this class" desc="There are no active students in the selected class." icon="users" />
   {% endif %}
-
-  {% if students_data %}
-
-  <form method="post" id="commentForm">
-    {% csrf_token %}
-    <div class="cmt-grid">
-      <!-- Sidebar: student list -->
-      <div class="sidebar-card">
-        <div class="sidebar-hdr">
-          <span>Students</span>
-          <span style="margin-left:auto;font-size:11px;opacity:.8" id="completionBadge">{{ complete_count }}/{{ total_students }}</span>
-        </div>
-        <div class="sidebar-list" id="studentSidebar">
-          {% for item in students_data %}
-          <div class="s-item {% if forloop.first %}active{% endif %}" data-id="{{ item.student.id }}" onclick="selectStudent(this)">
-            <div class="s-avatar">{{ item.student.first_name|slice:":1" }}{{ item.student.last_name|slice:":1" }}</div>
-            <div style="flex:1;min-width:0">
-              <div class="s-name">{{ item.student.first_name }} {{ item.student.last_name|first }}.</div>
-              <div class="s-class">{{ item.student.class_name }}</div>
-            </div>
-            <span class="s-status {% if item.is_complete %}s-done{% else %}s-pending{% endif %}">
-              {% if item.is_complete %}Done{% else %}Pending{% endif %}
-            </span>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-
-      <!-- Main panel: populated by JS -->
-      <div>
-        <div class="content-card" id="studentContent">
-          <div class="content-hdr">
-            <h3 id="contentName">Select a student</h3>
-            <span class="sub" id="contentMeta"></span>
-            <span style="margin-left:auto;font-size:12px;opacity:.85" id="contentStatus"></span>
-          </div>
-          <div id="contentRows"></div>
-        </div>
-
-        <div style="display:flex;gap:10px;margin-top:14px;justify-content:space-between">
-          <button type="button" class="hf-btn" id="prevBtn" onclick="prevStudent()" style="padding:8px 18px;font-size:13px">Previous</button>
-          {% if is_window_open %}
-          <button type="submit" style="padding:8px 24px;border-radius:7px;font-size:13px;font-weight:600;background:var(--hodari-blue);color:#fff;border:none;cursor:pointer">
-            Save All Comments
-          </button>
-          {% endif %}
-          <button type="button" class="hf-btn hf-btn-primary" id="nextBtn" onclick="nextStudent()" style="padding:8px 18px;font-size:13px">Next</button>
-        </div>
-      </div>
-    </div>
-    <div id="hiddenInputs"></div>
-  </form>
-  {% elif ptc_window %}
-  <div class="card">
-    {% include '_partials/empty_state.html' with icon='users' icon_color='grey' title='No students found' desc='No students found for your assigned subjects and classes.' %}
-  </div>
   {% endif %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
+{% if students_data and subjects %}
+{{ comments_data|json_script:"ptc-data" }}
+{{ subjects_data|json_script:"ptc-subjects" }}
+{% include "ptc/_entry_js.html" %}
 <script>
-var SUBJECTS = {{ teacher_subjects_json|safe }};
-var DATA = {{ comments_json|safe }};
-var isOpen = {{ is_window_open|yesno:"true,false" }};
-var activeId = null;
+(function () {
+  var SUBJECTS = JSON.parse(document.getElementById('ptc-subjects').textContent);
+  var CAN_SAVE = {{ can_save|yesno:"true,false" }};
 
-function renderStudent(id) {
-  var d = DATA.find(function(x) { return x.id == id; });
-  if (!d) return;
-  activeId = id;
-  document.getElementById('contentName').textContent = d.first + ' ' + d.last;
-  document.getElementById('contentMeta').textContent = d.class + ' | ' + d.adm;
-  document.getElementById('contentStatus').textContent = d.ok ? 'All comments entered' : 'Incomplete';
-  var rowsHtml = '';
-  for (var i = 0; i < SUBJECTS.length; i++) {
-    var subj = SUBJECTS[i];
-    var slug = subj.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    var val = d.comments[subj] || '';
-    rowsHtml += '<div class="cmt-row">';
-    rowsHtml += '<label class="cmt-label">' + subj + '</label>';
-    rowsHtml += '<textarea name="comment_' + id + '_' + slug + '" rows="3" class="cmt-textarea"';
-    if (!isOpen) rowsHtml += ' readonly style="background:#F7F9FC;color:var(--text-muted)"';
-    rowsHtml += ' placeholder="Enter your comment (recommended min 30 characters)...">' + val + '</textarea>';
-    if (isOpen) {
-      rowsHtml += '<div class="char-hint"></div>';
-    } else {
-      rowsHtml += '<div class="char-hint" style="color:#1B7B34">' + (val ? val.length + ' chars' : '') + '</div>';
+  function count(n) { return n ? n + ' characters' : 'Not written'; }
+
+  PTCEntry({
+    data: JSON.parse(document.getElementById('ptc-data').textContent),
+    className: "{{ selected_class|escapejs }}",
+    ptc: "{{ ptc_window.pk }}",
+    start: "{{ start_student|escapejs }}",
+    mini: function (d) {
+      var n = SUBJECTS.filter(function (s) { return (d.comments[s.name] || '').trim(); }).length;
+      return n + ' of ' + SUBJECTS.length + ' written';
+    },
+    render: function (d, body, changed) {
+      body.innerHTML = '';
+      var grid = document.createElement('div');
+      grid.className = 'pe-cols' + (SUBJECTS.length === 1 ? ' single' : '');
+      SUBJECTS.forEach(function (s) {
+        var sec = document.createElement('div');
+        var text = d.comments[s.name] || '';
+        sec.className = 'pe-sec' + (text.trim() ? '' : ' empty');
+        var head = document.createElement('label');
+        head.className = 'pe-sec-head';
+        head.htmlFor = 'c_' + s.slug;
+        head.textContent = s.name;
+        var n = document.createElement('span'); n.textContent = count(text.trim().length);
+        head.appendChild(n);
+        var ta = document.createElement('textarea');
+        ta.id = 'c_' + s.slug; ta.rows = 7; ta.value = text;
+        ta.placeholder = 'A full paragraph about ' + d.first + '’s progress in ' + s.name + '.';
+        if (!CAN_SAVE) ta.readOnly = true;
+        ta.addEventListener('input', function () {
+          d.comments[s.name] = ta.value;
+          n.textContent = count(ta.value.trim().length);
+          sec.classList.toggle('empty', !ta.value.trim());
+          changed();
+        });
+        sec.appendChild(head); sec.appendChild(ta);
+        grid.appendChild(sec);
+      });
+      body.appendChild(grid);
+    },
+    serialize: function (d, fd) {
+      SUBJECTS.forEach(function (s) { fd.append('comment_' + s.slug, d.comments[s.name] || ''); });
+    },
+    applySaved: function (d, j) {
+      Object.keys(j.comments).forEach(function (k) { d.comments[k] = j.comments[k]; });
     }
-    rowsHtml += '</div>';
-  }
-  document.getElementById('contentRows').innerHTML = rowsHtml;
-
-  // Attach char-hint listeners
-  if (isOpen) {
-    document.querySelectorAll('#contentRows textarea').forEach(function(ta) {
-      var hint = ta.parentNode.querySelector('.char-hint');
-      if (!hint) return;
-      function update() {
-        var len = ta.value.length;
-        if (len === 0) {
-          hint.textContent = '';
-        } else if (len < 30) {
-          hint.textContent = (30 - len) + ' more chars recommended';
-          hint.style.color = '#92550A';
-        } else {
-          hint.textContent = len + ' chars';
-          hint.style.color = '#1B7B34';
-        }
-      }
-      ta.addEventListener('input', update);
-      update();
-    });
-  }
-}
-
-function selectStudent(el) {
-  document.querySelectorAll('.s-item').forEach(function(s) { s.classList.remove('active'); });
-  el.classList.add('active');
-  renderStudent(el.getAttribute('data-id'));
-}
-
-function nextStudent() {
-  var active = document.querySelector('.s-item.active');
-  var next = active ? active.nextElementSibling : null;
-  if (next) selectStudent(next);
-}
-
-function prevStudent() {
-  var active = document.querySelector('.s-item.active');
-  var prev = active ? active.previousElementSibling : null;
-  if (prev) selectStudent(prev);
-}
-
-function updateSidebar() {
-  document.querySelectorAll('.s-item').forEach(function(item) {
-    var sid = item.getAttribute('data-id');
-    var d = DATA.find(function(x) { return x.id == sid; });
-    if (!d) return;
-    var allDone = true;
-    for (var i = 0; i < SUBJECTS.length; i++) {
-      var ta = document.querySelector('textarea[name="comment_' + sid + '_' + SUBJECTS[i].toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '"]');
-      if (!ta || !ta.value.trim()) { allDone = false; break; }
-    }
-    d.ok = allDone;
-    var status = item.querySelector('.s-status');
-    if (allDone) { status.className = 's-status s-done'; status.textContent = 'Done'; }
-    else { status.className = 's-status s-pending'; status.textContent = '-'; }
   });
-  var done = DATA.filter(function(x) { return x.ok; }).length;
-  document.getElementById('completionBadge').textContent = done + '/' + DATA.length;
-  if (activeId) {
-    var ad = DATA.find(function(x) { return x.id == activeId; });
-    document.getElementById('contentStatus').textContent = ad && ad.ok ? 'All comments entered' : 'Incomplete';
-  }
-}
-
-// Listen for input changes to update sidebar status
-document.addEventListener('input', function(e) {
-  if (e.target.matches('#contentRows textarea')) {
-    updateSidebar();
-  }
-});
-
-// Init: show first student
-document.addEventListener('DOMContentLoaded', function() {
-  if (DATA.length > 0) renderStudent(DATA[0].id);
-});
+})();
 </script>
+{% endif %}
 {% endblock %}
