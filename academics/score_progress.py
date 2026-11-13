@@ -182,7 +182,18 @@ def report_grade(mark):
     return ("A*" if grade == "A+" else grade), get_grade_label(grade)
 
 
-def exam_summary(student, term, expected_subjects=None, types=None, remark_names=None):
+def exam_scores_for(student_ids, term_ids):
+    """{(student_id, term_id): [score tuples]} of approved, mark-bearing scores,
+    in one query, for exam_summary(scores=...)."""
+    out = {}
+    for sid, tid, subject, code, score, max_score in ExamScore.objects.filter(
+            student_id__in=list(student_ids), term_id__in=list(term_ids), status=ScoreStatus.APPROVED,
+    ).mark_bearing().values_list("student_id", "term_id", "subject_name", "exam_type", "score", "max_score"):
+        out.setdefault((sid, tid), []).append((subject, code, score, max_score))
+    return out
+
+
+def exam_summary(student, term, expected_subjects=None, types=None, remark_names=None, scores=None):
     """
     The marks table of a learner's progress report, from approved scores of
     mark-bearing subjects only. Remark-only subjects never count.
@@ -192,6 +203,10 @@ def exam_summary(student, term, expected_subjects=None, types=None, remark_names
     every assessment is approved. The exam average, total and grade are given
     only when every mark-bearing subject of the class is fully assessed;
     otherwise they are None and the report shows "Awaiting end of term".
+
+    ``scores`` lets a caller that summarises many learners load their marks
+    in one query: (subject_name, exam_type, score, max_score) tuples of this
+    learner's approved, mark-bearing scores for this term (exam_scores_for).
     """
     from academics.models import ExamTypeConfiguration
     from academics.remarks import remark_subject_names
@@ -203,10 +218,12 @@ def exam_summary(student, term, expected_subjects=None, types=None, remark_names
     if remark_names is None:
         remark_names = remark_subject_names()
 
-    points = {}
-    for subject, code, score, max_score in ExamScore.objects.filter(
+    if scores is None:
+        scores = ExamScore.objects.filter(
             student=student, term=term, status=ScoreStatus.APPROVED,
-    ).mark_bearing().values_list("subject_name", "exam_type", "score", "max_score"):
+        ).mark_bearing().values_list("subject_name", "exam_type", "score", "max_score")
+    points = {}
+    for subject, code, score, max_score in scores:
         cfg = next((t for t in types if t.code == code), None)
         if cfg is None:
             continue

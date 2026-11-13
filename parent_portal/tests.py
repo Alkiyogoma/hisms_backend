@@ -113,10 +113,11 @@ class HomeTests(PortalTestBase):
         self.assertIn("Esther", page)
         self.assertIn("Term 2", page)
         self.assertIn("2026/2027", page)
-        # Marks never appear on Home.
+        # Running-term marks never appear on Home; with no completed term
+        # marked yet, the card says so.
         self.assertNotIn("16.6", page)
         self.assertNotIn("83", page)
-        self.assertNotIn("average", page.lower())
+        self.assertIn("No completed term yet", page)
         # One explicit button per learner; the card itself is not a link.
         progress = reverse("parent_portal:progress", args=[self.child.pk])
         self.assertEqual(page.count(f'href="{progress}"'), 1)
@@ -304,9 +305,9 @@ class MarksTests(PortalTestBase):
         self.assertEqual((charts["quiz"]["max"], charts["mid_term"]["max"]), (20, 30))
 
         page = self._progress().content.decode()
-        self.assertIn("Upcoming", page)
+        self.assertIn("Term 3 has not started.", page)
         self.assertIn("Running", page)
-        # Upcoming terms get no bar at all.
+        # Upcoming terms get no card and no bar at all.
         self.assertEqual(page.count('class="pp-bar pp-bar-running"') + page.count('class="pp-bar"'), 3)
 
 
@@ -419,9 +420,157 @@ class NavigationTests(PortalTestBase):
         page = self._progress().content.decode()
         self.assertIn(reverse("parent_portal:progress", args=[sibling.pk]), page)
         self.assertNotIn(reverse("parent_portal:progress", args=[self.other_child.pk]), page)
-        # No approved marks at all this year: a short message, no empty bars.
-        self.assertIn("No approved Quiz marks yet this year.", page)
-        self.assertNotIn('class="pp-bar', page)
+        # No approved marks at all this year: one card per started term (Term 1
+        # and Term 2), each with its three assessments as empty placeholders;
+        # Term 3 has not started, so it gets a line, not an empty card.
+        self.assertIn("Not yet", page)
+        self.assertIn("Term 3 has not started.", page)
+        self.assertNotIn('class="pp-bar-val"', page)
+        self.assertEqual(page.count('class="pp-bar pp-bar-empty"'), 6)
+
+
+class HomeLastTermTests(PortalTestBase):
+    def test_home_shows_last_completed_term_not_running_term(self):
+        for subject in ("Mathematics", "English"):
+            self._score(subject, "quiz", 80, term=self.t1)
+            self._score(subject, "mid_term", 70, term=self.t1)
+            self._score(subject, "end_of_term", 90, term=self.t1)
+        self._score("Mathematics", "quiz", 41)  # running Term 2: never on Home
+        expected = exam_summary(self.child, self.t1)["running_average"]
+        self.client.force_login(self.parent)
+        page = self.client.get(reverse("parent_portal:dashboard")).content.decode()
+        self.assertIn("Term 1 2026/2027 average", page)
+        self.assertIn(f"{expected:g}%", page)
+        # The running Term 2 figure is never on Home (checked by label, since a
+        # bare number can appear by chance in tokens on the page).
+        self.assertNotIn("Term 2 2026/2027 average", page)
+        self.assertIn("Performance, report cards and attendance", page)
+
+
+class TodayTimesTests(PortalTestBase):
+    def test_check_in_and_out_times_shown_when_recorded(self):
+        AttendanceEntry.objects.create(student=self.child, date=self.today, status=AttendanceStatus.PRESENT,
+                                       check_in_time=time(7, 42), check_out_time=time(15, 30),
+                                       class_name="Grade 5", marked_by=self.teacher)
+        self.client.force_login(self.parent)
+        for url in (reverse("parent_portal:dashboard"), reverse("parent_portal:progress", args=[self.child.pk])):
+            page = self.client.get(url).content.decode()
+            self.assertIn("07:42", page)
+            self.assertIn("15:30", page)
+            self.assertNotIn("Not checked out", page)
+
+
+class TermAttendanceExportTests(PortalTestBase):
+    def test_month_picker_and_download_link_on_progress_page(self):
+        self.client.force_login(self.parent)
+        page = self._progress().content.decode()
+        self.assertIn('name="month"', page)
+        self.assertIn(reverse("parent_portal:term_attendance", args=[self.child.pk]), page)
+        # Term 3 has not started, so it is not offered for download.
+        self.assertIn(f'value="{self.t2.pk}"', page)
+        self.assertNotIn(f'value="{self.t3.pk}"', page)
+
+    def test_term_record_for_own_child_without_excuse_reasons(self):
+        AttendanceEntry.objects.create(student=self.child, date=self.today - timedelta(days=1),
+                                       status=AttendanceStatus.EXCUSED, reason="Private family matter",
+                                       class_name="Grade 5", marked_by=self.teacher)
+        self.client.force_login(self.parent)
+        url = reverse("parent_portal:term_attendance", args=[self.child.pk])
+        resp = self.client.get(url, {"term": self.t2.pk})
+        self.assertEqual(resp.status_code, 200)
+        page = resp.content.decode()
+        self.assertIn("Student Attendance Record", page)
+        self.assertIn("Sherissa", page)
+        self.assertIn("Requested by", page)
+        self.assertNotIn("Private family matter", page)
+        self.assertNotIn(reverse("attendance:reports"), page)
+        self.assertIn(reverse("parent_portal:progress", args=[self.child.pk]), page)
+
+    def test_other_childs_record_is_404_and_staff_print_stays_closed(self):
+        self.client.force_login(self.parent)
+        url = reverse("parent_portal:term_attendance", args=[self.other_child.pk])
+        self.assertEqual(self.client.get(url).status_code, 404)
+        resp = self.client.get(reverse("attendance:print"), {"kind": "student", "student": self.child.pk})
+        self.assertNotEqual(resp.status_code, 200)
+
+
+class V11LayoutTests(PortalTestBase):
+    def _complete_term2(self):
+        for subject in ("Mathematics", "English"):
+            self._score(subject, "quiz", 80)
+            self._score(subject, "mid_term", 70)
+            self._score(subject, "end_of_term", 90)
+
+    def test_complete_term_is_labelled_complete_not_running(self):
+        self._complete_term2()
+        self.client.force_login(self.parent)
+        page = self._progress().content.decode()
+        self.assertIn(">Complete<", page)
+        self.assertIn("Term average", page)
+        self.assertNotIn("is in progress", page)
+
+    def test_report_cards_sit_above_performance(self):
+        self._report(self.child, self.t1, ReportCardStatus.PUBLISHED)
+        self.client.force_login(self.parent)
+        page = self._progress().content.decode()
+        self.assertLess(page.index('id="report-cards"'), page.index('id="performance"'))
+        self.assertLess(page.index('id="today"'), page.index('id="report-cards"'))
+
+    def test_late_pickups_follow_the_school_setting_and_never_show_fees_due(self):
+        from core.models import SchoolSettings
+        settings_obj = SchoolSettings.get_settings()
+        settings_obj.late_pickup_after = time(17, 0)
+        settings_obj.late_pickup_fee = 10000
+        settings_obj.save()
+        day = self.today.replace(day=1)
+        while day.weekday() > 3:  # a Mon-Thu inside this month, on or before today
+            day += timedelta(days=1)
+        if day > self.today:
+            self.skipTest("No earlier weekday in this month.")
+        AttendanceEntry.objects.create(student=self.child, date=day, status=AttendanceStatus.PRESENT,
+                                       check_in_time=time(7, 30), check_out_time=time(17, 35),
+                                       class_name="Grade 5", marked_by=self.teacher)
+        self.client.force_login(self.parent)
+        page = self._progress().content.decode()
+        self.assertIn('class="pp-tbar pp-tbar-late"', page)
+        self.assertIn("35 min", page)
+        self.assertIn("TZS 10,000", page)
+        self.assertNotIn("Due", page)
+        # Moving the setting later clears it.
+        settings_obj.late_pickup_after = time(18, 0)
+        settings_obj.save()
+        page = self._progress().content.decode()
+        self.assertNotIn('class="pp-tbar pp-tbar-late"', page)
+
+    def test_ecd_student_sees_published_progress_report_not_marks(self):
+        from academics.models import ECDItem, ECDSection, ECDEvaluation
+        kid = Student.objects.create(admission_no="PS-001", first_name="Zawadi", last_name="K",
+                                     class_name="Pre-School", academic_year=self.year, status=StudentStatus.ACTIVE)
+        StudentGuardian.objects.create(student=kid, guardian=ParentGuardian.objects.get(user=self.parent),
+                                       relationship="mother")
+        self.client.force_login(self.parent)
+        url = reverse("parent_portal:progress", args=[kid.pk])
+        page = self.client.get(url).content.decode()
+        self.assertIn("Academic progress", page)
+        self.assertIn("No progress report yet", page)
+        self.assertNotIn("Quiz", page)
+        # A draft report's ratings are never shown.
+        section = ECDSection.objects.create(class_type="pre_school", title="Numeracy",
+                                            part=ECDSection.Part.ACADEMIC)
+        item = ECDItem.objects.create(section=section, label="Counting")
+        draft = self._report(kid, self.t1, ReportCardStatus.DRAFT)
+        draft.is_ecd_report = True
+        draft.save()
+        ECDEvaluation.objects.create(report_card=draft, item=item, domain="Counting", rating="3")
+        self.assertIn("No progress report yet", self.client.get(url).content.decode())
+        draft.status = ReportCardStatus.PUBLISHED
+        draft.published_at = timezone.now()
+        draft.save()
+        page = self.client.get(url).content.decode()
+        self.assertIn("3.0", page)
+        self.assertIn(reverse("parent_portal:report_card", args=[kid.pk, draft.pk]), page)
+        home = self.client.get(reverse("parent_portal:dashboard")).content.decode()
+        self.assertIn("average point", home)
 
 
 class DeploymentAndStaffViewTests(PortalTestBase):

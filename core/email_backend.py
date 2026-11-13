@@ -55,11 +55,23 @@ def resolve_delivery():
         user = getattr(settings, "EMAIL_HOST_USER", "")
         security = "SSL" if getattr(settings, "EMAIL_USE_SSL", False) else (
             "STARTTLS" if getattr(settings, "EMAIL_USE_TLS", False) else "none")
+        password = getattr(settings, "EMAIL_HOST_PASSWORD", "")
+        # Django only logs in when BOTH user and password are set; otherwise it
+        # sends unauthenticated and Gmail/Workspace rejects every message with
+        # "530 5.7.0 Authentication Required". Catch that before sending.
+        needs_auth = bool(user) or "gmail" in host.lower() or "google" in host.lower()
+        if not host:
+            detail = "Not configured: EMAIL_HOST is empty in the server's .env file."
+        elif needs_auth and not (user and password):
+            missing = "EMAIL_HOST_PASSWORD" if user else "EMAIL_HOST_USER and EMAIL_HOST_PASSWORD"
+            detail = (f"Not configured: {missing} is empty in the server's .env file, so "
+                      f"{host} refuses to send. Add the mailbox App Password, then restart the web and worker services.")
+        else:
+            detail = f"SMTP {host}:{port}" + (f" as {user}" if user else "")
         info = {
-            "mode": "smtp", "delivering": bool(host),
+            "mode": "smtp", "delivering": bool(host) and not (needs_auth and not (user and password)),
             "host": host, "port": port, "security": security, "user": user, "from_email": default_from,
-            "detail": f"SMTP {host}:{port}" + (f" as {user}" if user else "") if host
-                      else "Not configured: EMAIL_HOST is empty in the server's .env file.",
+            "detail": detail,
         }
         return get_connection(fail_silently=False), default_from, info
 

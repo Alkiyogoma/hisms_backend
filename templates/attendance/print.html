@@ -111,7 +111,7 @@
 <div class="toolbar">
   <span>A4 {% if kind == 'register' %}landscape {% endif %}document. In the print dialog choose <b>Save as PDF</b> to export, or download it directly.</span>
   <div class="btns">
-    <a class="btn btn-outline" href="{% if kind == 'register' %}{% url 'attendance:register' %}{% elif kind == 'today' %}{% url 'attendance:today' %}{% else %}{% url 'attendance:reports' %}{% endif %}{% querystring kind=None autoprint=None format=None %}">&larr; Back</a>
+    <a class="btn btn-outline" href="{% if back_url %}{{ back_url }}{% elif kind == 'register' %}{% url 'attendance:register' %}{% elif kind == 'today' %}{% url 'attendance:today' %}{% else %}{% url 'attendance:reports' %}{% endif %}{% if not back_url %}{% querystring kind=None autoprint=None format=None %}{% endif %}">&larr; Back</a>
     <a class="btn btn-outline" href="{% querystring format='pdf' autoprint=None %}">Download PDF</a>
     <button class="btn btn-primary" type="button" onclick="window.print()">Print</button>
   </div>
@@ -134,7 +134,7 @@
     <div><span>Admitted</span><b>{{ student.enrolment_date|date:"j M Y"|default:"—" }}</b></div>
     <div><span>Period</span><b>{{ period.label }}</b></div>
     <div><span>School days</span><b>{{ period.days|length }}{% if row and row.admitted_in_period %} · {{ row.on_roll_days }} on roll{% endif %}</b></div>
-    <div><span>Prepared by</span><b>{{ request.user.get_full_name|default:request.user.username }}</b></div>
+    <div><span>{% if for_parent %}Requested by{% else %}Prepared by{% endif %}</span><b>{{ request.user.get_full_name|default:request.user.username }}</b></div>
     <div><span>Generated</span><b>{{ generated_at|date:"j M Y, H:i" }}</b></div>
   </div>
   {% if row %}

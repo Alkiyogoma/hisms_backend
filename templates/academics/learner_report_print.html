@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Progress Report | {{ student.first_name }} {{ student.last_name }}{% if term %} | {{ term.name }} {{ term.academic_year.name }}{% endif %}</title>
+<title>Progress Report | {{ student.first_name }} {{ student.last_name }}{% if term %} | {{ term.name }}{% if term.academic_year.name not in term.name %} {{ term.academic_year.name }}{% endif %}{% endif %}</title>
 {% if not is_pdf %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
@@ -17,7 +17,7 @@
   <div class="btns">
     {% if record.history|length > 1 %}
     <select aria-label="Term" onchange="var q=new URLSearchParams(location.search);q.set('term',this.value);q.delete('autoprint');location.search=q.toString()">
-      {% for h in record.history %}<option value="{{ h.term.pk }}"{% if h.term == term %} selected{% endif %}>{{ h.term.name }} · {{ h.term.academic_year.name }}</option>{% endfor %}
+      {% for h in record.history %}<option value="{{ h.term.pk }}"{% if h.term == term %} selected{% endif %}>{{ h.term.name }}{% if h.term.academic_year.name not in h.term.name %} · {{ h.term.academic_year.name }}{% endif %}</option>{% endfor %}
     </select>
     {% endif %}
     <a class="btn btn-outline" href="{% url 'students:detail' student.pk %}{% if term %}?term={{ term.pk }}{% endif %}#performance">&larr; Back to profile</a>

@@ -323,18 +323,25 @@ class AttendancePrintView(AttendanceAccessMixin, TemplateView):
     def render_to_response(self, context, **kwargs):
         if not context["is_pdf"]:
             return super().render_to_response(context, **kwargs)
-        html = render_to_string(self.template_name, context, request=self.request)
-        try:
-            from weasyprint import HTML
-            pdf = HTML(string=html, base_url=self.request.build_absolute_uri("/")).write_pdf()
-        except (ImportError, OSError):
-            # No PDF engine on this server: open the document with the print
-            # dialog, where "Save as PDF" gives the same file.
-            return super().render_to_response({**context, "is_pdf": False, "print_now": True}, **kwargs)
         name = context.get("class_name") or "school"
         if context["kind"] == "student":
             name = context["student"].admission_no
         filename = f"attendance-{context['kind']}-{name}-{context.get('start', context.get('date'))}".replace(" ", "-")
-        resp = HttpResponse(pdf, content_type="application/pdf")
-        resp["Content-Disposition"] = f'attachment; filename="{filename}.pdf"'
-        return resp
+        return pdf_or_print_response(
+            self.request, self.template_name, context, filename,
+            fallback=lambda ctx: super(AttendancePrintView, self).render_to_response(ctx, **kwargs))
+
+
+def pdf_or_print_response(request, template_name, context, filename, fallback):
+    """The print document as a PDF download. Without a PDF engine on the
+    server, ``fallback`` renders it in the browser with the print dialog open,
+    where "Save as PDF" gives the same file."""
+    html = render_to_string(template_name, context, request=request)
+    try:
+        from weasyprint import HTML
+        pdf = HTML(string=html, base_url=request.build_absolute_uri("/")).write_pdf()
+    except (ImportError, OSError):
+        return fallback({**context, "is_pdf": False, "print_now": True})
+    resp = HttpResponse(pdf, content_type="application/pdf")
+    resp["Content-Disposition"] = f'attachment; filename="{filename}.pdf"'
+    return resp

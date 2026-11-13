@@ -14,7 +14,9 @@ urlpatterns = [
          name="report_card"),
     path("learner/<int:student_id>/reports/<int:report_id>/download/",
          views.ParentReportCardDownloadView.as_view(), name="report_download"),
-    path("calendar/", views.ParentCalendarView.as_view(), name="calendar"),
+    path("learner/<int:student_id>/term-attendance/",views.ParentTermAttendanceView.as_view(),
+         name="term_attendance"),
+    path("calendar/",views.ParentCalendarView.as_view(), name="calendar"),
 
     # Earlier portal pages redirect to v1 (welfare, finance and messages are not in v1).
     path("children/", views.LegacyRedirectView.as_view(), name="children_list"),

@@ -1,3 +1,5 @@
+import datetime
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -155,7 +157,16 @@ class SchoolSettings(TimeStampedModel):
     school_name = models.CharField(max_length=100, default="Hodari Christian School")
     attendance_threshold_warn = models.PositiveIntegerField(default=85, help_text="Attendance % below which a warning is triggered.")
     attendance_threshold_critical = models.PositiveIntegerField(default=75, help_text="Attendance % below which critical alert is triggered.")
-    
+    late_pickup_after = models.TimeField(
+        default=datetime.time(17, 0),
+        help_text="A card check-out after this time counts as a late pick-up (parent portal).",
+    )
+    late_pickup_fee = models.PositiveIntegerField(
+        default=0,
+        help_text="Late pick-up fee in TZS per pick-up, stated to parents as school policy. 0 hides it. "
+                  "The portal does not show fees as due or paid.",
+    )
+
     # Admissions
     admission_fee = models.DecimalField(max_digits=10, decimal_places=2, default=2500.00)
     assessment_fee = models.DecimalField(max_digits=10, decimal_places=2, default=30000.00, help_text="Assessment fee amount in TSh. Set by finance, not editable by admissions staff.")

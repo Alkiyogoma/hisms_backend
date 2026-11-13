@@ -207,6 +207,8 @@
         <div class="set-grid-2">
             {% field form.attendance_threshold_warn label="Warning (%)" hint="Students below this receive a warning notification." %}
             {% field form.attendance_threshold_critical label="Critical (%)" hint="Students below this are flagged as critically absent." %}
+            {% field form.late_pickup_after label="Late pick-up after" hint="Card check-outs after this time are shown to parents as late pick-ups." %}
+            {% field form.late_pickup_fee label="Late pick-up fee (TZS)" hint="Stated to parents as the policy, per late pick-up. 0 hides it. Not tracked as due or paid." %}
         </div>
     </div>
 

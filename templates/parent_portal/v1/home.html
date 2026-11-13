@@ -22,7 +22,7 @@
   {% if learners %}
     <ul class="pp-learners" role="list">
       {% for item in learners %}
-        {% include "parent_portal/v1/includes/learner_card.html" with student=item.student today=item.today %}
+        {% include "parent_portal/v1/includes/learner_card.html" with student=item.student today=item.today last_term=item.last_term is_ecd=item.is_ecd ecd=item.ecd %}
       {% endfor %}
     </ul>
   {% else %}

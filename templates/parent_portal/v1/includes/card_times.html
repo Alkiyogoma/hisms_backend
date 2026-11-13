@@ -1,0 +1,42 @@
+{# Card-reader check-in and check-out for the month picked above. Late pick-up = check-out after the school's setting. No fee is ever shown as due or paid. #}
+<div class="pp-card pp-times" aria-labelledby="times-heading">
+  <h3 class="pp-card-title" id="times-heading">Check-in and check-out &middot; {{ month.month|date:"F Y" }}</h3>
+  <dl class="pp-stats pp-stats-3">
+    <div><dt>Average check-in</dt><dd class="pp-c-blue">{{ times.avg_in|default:"–" }}</dd></div>
+    <div><dt>Average check-out</dt><dd class="pp-c-blue">{{ times.avg_out|default:"–" }}</dd></div>
+    <div><dt>Late pick-ups</dt><dd class="{% if times.late %}pp-c-bad{% else %}pp-c-ok{% endif %}">{{ times.late|length }}</dd></div>
+  </dl>
+  {% if times.days %}
+    <div class="pp-tchart-wrap">
+      <ul class="pp-tchart" role="list" aria-label="Check-out time each school day">
+        <li class="pp-tline" style="bottom:{{ times.line_pct|stringformat:'s' }}%" aria-hidden="true"><span>{{ times.late_after|time:"g:i A" }}</span></li>
+        {% for d in times.days %}
+          <li class="pp-tcol">
+            <span class="pp-tbar{% if d.late %} pp-tbar-late{% endif %}" style="height:{{ d.pct|stringformat:'s' }}%" title="{{ d.date|date:'D j M' }} {{ d.out }}"></span>
+            <span class="pp-tlab" aria-hidden="true">{{ d.date|date:"j" }}</span>
+            <span class="pp-sr">{{ d.date|date:"l j F" }}: checked out {{ d.out }}{% if d.late %}, late pick-up{% endif %}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+    <p class="pp-note">Each bar is one day&rsquo;s check-out time. Bars above the dashed line ({{ times.late_after|time:"g:i A" }}) are late pick-ups.</p>
+  {% else %}
+    <p class="pp-chart-empty">No card check-outs recorded this month.</p>
+  {% endif %}
+  {% if times.late %}
+    <div class="pp-table-wrap">
+      <table class="pp-table">
+        <caption class="pp-sr">Late pick-ups in {{ month.month|date:"F Y" }}</caption>
+        <thead><tr><th scope="col">Date</th><th scope="col" class="num">Collected</th><th scope="col" class="num">After {{ times.late_after|time:"g:i A" }}</th></tr></thead>
+        <tbody>
+          {% for l in times.late %}
+            <tr><th scope="row">{{ l.date|date:"D j M" }}</th><td class="num">{{ l.out|time:"g:i A" }}</td><td class="num">{{ l.minutes_after }} min</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+  {% if late_pickup_fee %}
+    <p class="pp-note">School policy: a late pick-up fee of TZS {{ late_pickup_fee }} applies to each pick-up after {{ times.late_after|time:"g:i A" }}. Please contact the school office about any fees.</p>
+  {% endif %}
+</div>

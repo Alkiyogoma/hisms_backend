@@ -8,7 +8,26 @@
     </div>
   </div>
   {% include "parent_portal/v1/includes/today.html" with info=today compact=True %}
-  <a class="pp-btn pp-btn-primary pp-btn-block" href="{% url 'parent_portal:progress' student.pk %}">
-    View {{ student.first_name }}&rsquo;s progress <span aria-hidden="true">&rarr;</span>
+  {# Last completed term only; the running term stays on the progress page. #}
+  <dl class="pp-lastterm">
+    {% if is_ecd %}
+      {% if ecd and ecd.average is not None %}
+        <dt>{{ ecd.term.short_name }}{% if ecd.term.academic_year %} {{ ecd.term.academic_year.name }}{% endif %} average point</dt>
+        <dd><b>{{ ecd.average|floatformat:1 }}</b>{% if ecd.remarks %} <span class="pp-chip pp-chip-gold">{{ ecd.remarks }}</span>{% endif %}</dd>
+      {% else %}
+        <dt>Average point</dt>
+        <dd><span class="pp-muted">Shown once a report is published</span></dd>
+      {% endif %}
+    {% elif last_term %}
+      <dt>{{ last_term.term.short_name }}{% if last_term.term.academic_year %} {{ last_term.term.academic_year.name }}{% endif %} average</dt>
+      <dd><b>{{ last_term.average|floatformat:"-2" }}%</b>{% if last_term.grade %} <span class="pp-chip pp-chip-gold">{{ last_term.grade }}</span>{% endif %}</dd>
+    {% else %}
+      <dt>Last term average</dt>
+      <dd><span class="pp-muted">No completed term yet</span></dd>
+    {% endif %}
+  </dl>
+  <a class="pp-btn pp-btn-primary pp-btn-block pp-btn-cta" href="{% url 'parent_portal:progress' student.pk %}">
+    <span>View {{ student.first_name }}&rsquo;s progress<small>{% if is_ecd %}Progress report{% else %}Performance, report cards{% endif %} and attendance</small></span>
+    <span aria-hidden="true">&rarr;</span>
   </a>
 </li>

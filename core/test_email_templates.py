@@ -126,6 +126,17 @@ class DeliveryTests(TestCase):
         self.assertEqual(info["mode"], "smtp")
         self.assertEqual((conn.host, conn.port, conn.use_tls, conn.username), ("smtp.example.test", 587, True, "u"))
 
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend", EMAIL_HOST="smtp.gmail.com",
+                       EMAIL_PORT=587, EMAIL_USE_TLS=True, EMAIL_HOST_USER="noreply@example.test",
+                       EMAIL_HOST_PASSWORD="", DEBUG=False)
+    def test_missing_app_password_is_reported_instead_of_gmail_530(self):
+        from core.email_backend import resolve_delivery
+        _conn, _from, info = resolve_delivery()
+        self.assertFalse(info["delivering"])
+        self.assertIn("EMAIL_HOST_PASSWORD is empty", info["detail"])
+        self.assertFalse(send_email_safe("a@x.test", "S", "B"))
+        self.assertIn("EMAIL_HOST_PASSWORD", EmailSendLog.objects.get().error_message)
+
     def test_messaging_form_has_no_smtp_fields(self):
         from core.forms import SchoolSettingsMessagingForm
         self.assertFalse({f for f in SchoolSettingsMessagingForm().fields if f.startswith("email_") or f == "default_from_email"})

@@ -58,6 +58,25 @@ def learner_photo(student):
     return f
 
 
+def photo_data_uri(student, max_bytes=2_000_000):
+    """The learner's photo inlined as a data: URI for print documents (the PDF
+    engine can't use the parent's signed-in session to fetch it). None when
+    there is no usable photo."""
+    import base64
+    import mimetypes
+    f = learner_photo(student)
+    if f is None:
+        return None
+    try:
+        with f.open("rb") as handle:
+            data = handle.read(max_bytes + 1)
+    except (OSError, ValueError):
+        return None
+    if len(data) > max_bytes:
+        return None
+    return f"data:{mimetypes.guess_type(f.name)[0]};base64,{base64.b64encode(data).decode()}"
+
+
 def attach_photos(students):
     """Mark each learner with photo_version (None = show initials). The version
     changes when the photo does, so browsers don't keep showing an old one."""
@@ -203,12 +222,24 @@ def academic_progress(student, term, today):
     types = current["types"]
 
     charts = [{"type": t, "max": _weight(t), "bars": []} for t in types]
+    term_cards, upcoming = [], []
     for t in year_terms(term):
         state = term_state(t, term, today)
         values = [None] * len(types)
         if state != UPCOMING:
             summary = current if t.pk == term.pk else _summary(student, t, expected)
             values = summary["type_averages"]
+            # One card per started term: its Quiz, Mid-Term and End-Term side by side.
+            label = ("Complete" if summary["complete"] else "Running") if state == RUNNING else "Final"
+            term_cards.append({
+                "term": t, "state": state, "label": label, "complete": summary["complete"],
+                "average": summary["running_average"],
+                "bars": [{"type": ty, "max": _weight(ty), "value": v,
+                          "pct": round(v / _weight(ty) * 100, 1) if v is not None and _weight(ty) else 0}
+                         for ty, v in zip(types, values)],
+            })
+        else:
+            upcoming.append(t)
         for i, chart in enumerate(charts):
             v = values[i]
             chart["bars"].append({
@@ -237,7 +268,44 @@ def academic_progress(student, term, today):
         "average": current["running_average"],
         "grade": current["running_grade"],
         "charts": charts,
+        "term_cards": term_cards,
+        "upcoming_terms": upcoming,
     }
+
+
+def last_completed_term_averages(students, today, lookback=3):
+    """{student_id: {"term", "average", "grade"} or None} for Home.
+
+    The latest term that has ended (end date before today) in which the student
+    has approved marks; the current, running term is never used, so Home shows
+    a settled figure. Same calculation as the printed report card.
+    """
+    from academics.models import ExamTypeConfiguration
+    from academics.remarks import remark_subject_names
+    from academics.score_progress import exam_scores_for, exam_summary, expected_subjects_for_class
+    out = {s.pk: None for s in students}
+    terms = [with_short_name(t) for t in Term.objects.filter(end_date__lt=today)
+             .select_related("academic_year").order_by("-end_date")[:lookback]]
+    if not students or not terms:
+        return out
+    # One query for every child's marks, so Home doesn't slow down per child.
+    scores = exam_scores_for([s.pk for s in students], [t.pk for t in terms])
+    types = list(ExamTypeConfiguration.objects.filter(is_active=True).order_by("display_order", "name"))
+    remark_names = remark_subject_names()
+    expected_by_class = {}
+    for s in students:
+        for t in terms:
+            if (s.pk, t.pk) not in scores:
+                continue
+            if s.class_name not in expected_by_class:
+                expected_by_class[s.class_name] = expected_subjects_for_class(s.class_name)
+            summary = exam_summary(s, t, expected_by_class[s.class_name], types=types,
+                                   remark_names=remark_names, scores=scores[(s.pk, t.pk)])
+            if summary["running_average"] is not None:
+                out[s.pk] = {"term": t, "average": summary["running_average"],
+                             "grade": summary["running_grade"]}
+                break
+    return out
 
 
 def _weight(exam_type):
@@ -253,6 +321,74 @@ def term_attendance_rate(student, term, today):
     start, end = analytics.term_range(term, today)
     row = analytics.learner_attendance(student, start, end, today)["row"] or {}
     return row.get("rate")
+
+
+def _minutes(t):
+    return t.hour * 60 + t.minute
+
+
+def _clock(m):
+    return f"{m // 60:02d}:{m % 60:02d}" if m is not None else None
+
+
+def month_card_times(student, month_start, today, late_after, chart_from=14 * 60, chart_to=18 * 60):
+    """Card-reader times for one month: average check-in and check-out, one
+    check-out bar per school day with a time, and the check-outs after the
+    school's late pick-up time (SchoolSettings.late_pickup_after).
+
+    Days without a card scan simply have no bar: a child collected without a
+    scan can't be counted as late.
+    """
+    from attendance.models import AttendanceEntry, has_real_check_in
+    last = _calendar.monthrange(month_start.year, month_start.month)[1]
+    entries = (AttendanceEntry.objects
+               .filter(student=student, date__gte=month_start, date__lte=min(month_start.replace(day=last), today))
+               .only("date", "check_in_time", "check_out_time").order_by("date"))
+    cutoff = _minutes(late_after)
+    ins, outs, days, late = [], [], [], []
+    for e in entries:
+        if e.date.weekday() > 4:
+            continue
+        t_in = _minutes(e.check_in_time) if has_real_check_in(e) else None
+        t_out = _minutes(e.check_out_time) if e.check_out_time else None
+        if t_in is not None:
+            ins.append(t_in)
+        if t_out is None:
+            continue
+        outs.append(t_out)
+        is_late = t_out > cutoff
+        days.append({"date": e.date, "out": _clock(t_out), "late": is_late, "minutes": t_out})
+        if is_late:
+            late.append({"date": e.date, "out": e.check_out_time, "minutes_after": t_out - cutoff})
+    lo = min([chart_from] + outs)
+    hi = max([chart_to] + [m + 15 for m in outs])
+    span = hi - lo or 1
+    for d in days:
+        d["pct"] = max(4, round((d.pop("minutes") - lo) / span * 100, 1))
+    return {
+        "avg_in": _clock(round(sum(ins) / len(ins))) if ins else None,
+        "avg_out": _clock(round(sum(outs) / len(outs))) if outs else None,
+        "days": days, "late": late, "late_after": late_after,
+        "line_pct": round((cutoff - lo) / span * 100, 1),
+    }
+
+
+def started_terms(term, today):
+    """Terms of the current academic year that have started, latest first:
+    the terms a parent can download an attendance record for."""
+    return [t for t in reversed(year_terms(term)) if t.start_date and t.start_date <= today]
+
+
+def attendance_months(term, today):
+    """Months a parent can pick on the attendance calendar, latest first: from
+    the start of the academic year (its first term) to this month."""
+    terms = [t for t in year_terms(term) if t.start_date]
+    first = (terms[0].start_date if terms else today).replace(day=1)
+    months, m = [], today.replace(day=1)
+    while m >= first and len(months) < 24:
+        months.append(m)
+        m = (m - timedelta(days=1)).replace(day=1)
+    return months
 
 
 def parse_month(value, today):
@@ -310,6 +446,29 @@ def month_attendance(student, month_start, today):
         "prev": prev_month,
         "next": next_month if next_month <= today.replace(day=1) else None,
     }
+
+
+# -- ECD (Pre-K, Kindergarten, Pre-School, ABC) ----------------------------------
+
+def is_ecd(student):
+    """ECD classes are rated on skills (points 4-1), not Quiz/Mid-Term/End-Term marks."""
+    from academics.ecd_utils import ecd_template_type_from_class_name
+    return ecd_template_type_from_class_name(student.class_name) is not None
+
+
+def ecd_latest(student, reports=None):
+    """The latest published ECD report with its average point and remark, or
+    None. ECD ratings live on the report card itself and are drafts until the
+    Head of School publishes it, so nothing unpublished is ever read."""
+    from academics import ecd_report
+    reports = published_reports(student) if reports is None else reports
+    for report in reports:
+        structure = ecd_report.structure_for_report(report)
+        if structure is None:
+            continue
+        s = ecd_report.summary(report, structure)
+        return {"report": report, "term": report.term, "average": s["average"], "remarks": s["remarks"]}
+    return None
 
 
 # -- reports and calendar ------------------------------------------------------
