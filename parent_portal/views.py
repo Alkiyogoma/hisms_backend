@@ -79,7 +79,8 @@ def _portal_ctx(request, active):
 # ---------------------------------------------------------------------------
 
 class ParentDashboardView(ParentOnlyMixin, TemplateView):
-    """Home: greeting, current term context and one card per learner. No marks."""
+    """Home: greeting, current term context and one card per learner, with the
+    average of the last completed term (never the running term)."""
     template_name = "parent_portal/v1/home.html"
 
     def get_context_data(self, **kwargs):
@@ -92,13 +93,19 @@ class ParentDashboardView(ParentOnlyMixin, TemplateView):
         name = (user.first_name or (guardian.full_name.split()[0] if guardian and guardian.full_name else "")
                 or user.get_username())
         today_map = services.today_statuses(children, today)
+        marked = [c for c in children if not services.is_ecd(c)]
+        last_term = services.last_completed_term_averages(marked, today)
+        # ECD children: the average point of their latest published report.
+        ecd = {c.pk: services.ecd_latest(c) for c in children if c not in marked}
         ctx.update(_portal_ctx(self.request, "home"))
         ctx.update({
             "today": today,
             "greeting": services.greeting(),
             "parent_name": name,
             "term_info": services.term_context(term, today),
-            "learners": [{"student": c, "today": today_map[c.pk]} for c in children],
+            "learners": [{"student": c, "today": today_map[c.pk], "last_term": last_term.get(c.pk),
+                          "is_ecd": c.pk in ecd, "ecd": ecd.get(c.pk)}
+                         for c in children],
         })
         return ctx
 
@@ -113,13 +120,22 @@ def _ring(value):
             "offset": round(RING_CIRCUMFERENCE * (1 - pct / 100), 2)}
 
 
+def _point_ring(point):
+    """Ring for an ECD average point (1-4): filled in proportion, labelled with
+    the point itself rather than a percentage."""
+    ring = _ring(point / 4 * 100 if point is not None else None)
+    ring["display"] = f"{point:.1f}" if point is not None else None
+    return ring
+
+
 # ---------------------------------------------------------------------------
 # Learner progress
 # ---------------------------------------------------------------------------
 
 class ParentLearnerProgressView(ParentOnlyMixin, TemplateView):
-    """One learner: rings, today, assessment charts, subject marks, published
-    report cards and attendance."""
+    """One learner: rings, today, published report cards, performance by term
+    (or, for ECD classes, their published progress report), card check-in and
+    check-out times, and attendance."""
     template_name = "parent_portal/v1/progress.html"
 
     def get_context_data(self, **kwargs):
@@ -130,8 +146,13 @@ class ParentLearnerProgressView(ParentOnlyMixin, TemplateView):
         if student is None:
             raise Http404("No such student.")
         services.attach_photos([student])
+        from core.models import SchoolSettings
+        school = SchoolSettings.get_settings()
         term = services.current_term()
-        academic = services.academic_progress(student, term, today)
+        reports = services.published_reports(student)
+        is_ecd = services.is_ecd(student)
+        academic = None if is_ecd else services.academic_progress(student, term, today)
+        ecd = services.ecd_latest(student, reports) if is_ecd else None
         month = services.parse_month(self.request.GET.get("month"), today)
         ctx.update(_portal_ctx(self.request, "progress"))
         ctx.update({
@@ -140,11 +161,18 @@ class ParentLearnerProgressView(ParentOnlyMixin, TemplateView):
             "siblings": [c for c in children if c.pk != student.pk],
             "term": term,
             "academic": academic,
-            "average_ring": _ring(academic["average"] if academic else None),
+            "is_ecd": is_ecd,
+            "ecd": ecd,
+            "average_ring": _point_ring(ecd["average"] if ecd else None) if is_ecd
+            else _ring(academic["average"] if academic else None),
             "attendance_ring": _ring(services.term_attendance_rate(student, term, today)),
             "today_info": services.today_status(student, today),
             "month": services.month_attendance(student, month, today),
-            "reports": services.published_reports(student),
+            "month_choices": services.attendance_months(term, today),
+            "attendance_terms": services.started_terms(term, today),
+            "card_times": services.month_card_times(student, month, today, school.late_pickup_after),
+            "late_pickup_fee": f"{school.late_pickup_fee:,}" if school.late_pickup_fee else None,
+            "reports": reports,
         })
         return ctx
 
@@ -167,6 +195,46 @@ class ParentLearnerPhotoView(ParentOnlyMixin, View):
         response["Cache-Control"] = "private, max-age=86400"
         response["X-Content-Type-Options"] = "nosniff"
         return response
+
+
+class ParentTermAttendanceView(ParentOnlyMixin, TemplateView):
+    """A term's full attendance record for the parent's own child: the school's
+    A4 "Student Attendance Record", as a PDF (?format=pdf) or ready to print.
+    Excuse reasons are never included."""
+    template_name = "attendance/print.html"
+
+    def get_context_data(self, **kwargs):
+        from attendance import analytics
+        from attendance.views_reports import learner_context
+        ctx = super().get_context_data(**kwargs)
+        today = timezone.localdate()
+        student = services.child_or_404(self.request.user, kwargs["student_id"])
+        terms = services.started_terms(services.current_term(), today)
+        term = next((t for t in terms if str(t.pk) == self.request.GET.get("term")), terms[0] if terms else None)
+        if term is None:
+            raise Http404("No term to report on.")
+        start, end = analytics.term_range(term, today)
+        ctx.update(learner_context(self.request, student, start, end, today, for_print=True))
+        ctx.update({
+            "kind": "student", "for_parent": True,
+            "is_pdf": self.request.GET.get("format") == "pdf",
+            "doc_title": "Student Attendance Record",
+            "generated_at": timezone.localtime(),
+            "back_url": reverse("parent_portal:progress", args=[student.pk]) + "#attendance",
+            "photo_checked": True, "photo_src": services.photo_data_uri(student),
+            "term": term,
+        })
+        return ctx
+
+    def render_to_response(self, context, **kwargs):
+        from attendance.views_reports import pdf_or_print_response
+        if not context["is_pdf"]:
+            return super().render_to_response(context, **kwargs)
+        student, term = context["student"], context["term"]
+        filename = f"attendance-{student.admission_no}-{term.short_name}".replace(" ", "-")
+        return pdf_or_print_response(
+            self.request, self.template_name, context, filename,
+            fallback=lambda ctx: super(ParentTermAttendanceView, self).render_to_response(ctx, **kwargs))
 
 
 # ---------------------------------------------------------------------------

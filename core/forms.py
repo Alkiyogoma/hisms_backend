@@ -19,6 +19,8 @@ class SchoolSettingsSystemForm(forms.ModelForm):
             "school_name",
             "attendance_threshold_warn",
             "attendance_threshold_critical",
+            "late_pickup_after",
+            "late_pickup_fee",
             "admission_fee",
             "assessment_fee",
             "enable_online_inquiry",
@@ -32,6 +34,7 @@ class SchoolSettingsSystemForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["late_pickup_after"].widget = forms.TimeInput(attrs={"type": "time"}, format="%H:%M")
         _style_fields(self)
 
 

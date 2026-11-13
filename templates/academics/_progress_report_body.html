@@ -6,7 +6,7 @@
 <main class="sheet">
   {% include "includes/hodari_print_header.html" %}
 
-  <div class="doc-title"><h1>Student Progress Report</h1><span class="scope">{% if term %}{{ term.name }} · {{ term.academic_year.name }}{% else %}No term{% endif %}</span></div>
+  <div class="doc-title"><h1>Student Progress Report</h1><span class="scope">{% if term %}{{ term.name }}{% if term.academic_year.name not in term.name %} · {{ term.academic_year.name }}{% endif %}{% else %}No term{% endif %}</span></div>
   <div class="meta">
     <div><span>Student</span><b>{{ student.first_name }} {{ student.last_name }}</b></div>
     <div><span>Admission no.</span><b>{{ student.admission_no }}</b></div>

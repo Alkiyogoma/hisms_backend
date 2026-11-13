@@ -1,5 +1,29 @@
 {# One month of attendance, Mon-Fri. Excused shows the status only, never the reason. #}
 <div class="pp-card">
+  <div class="pp-att-tools">
+    <form method="get" action="#attendance" class="pp-month-pick">
+      <label for="att-month-pick">Month</label>
+      <select id="att-month-pick" name="month" onchange="this.form.submit()">
+        {% for m in month_choices %}<option value="{{ m|date:'Y-m' }}"{% if m == month.month %} selected{% endif %}>{{ m|date:"F Y" }}</option>{% endfor %}
+        {% if month.month not in month_choices %}<option value="{{ month.month|date:'Y-m' }}" selected>{{ month.month|date:"F Y" }}</option>{% endif %}
+      </select>
+      <noscript><button type="submit" class="pp-btn pp-btn-small">Show</button></noscript>
+    </form>
+    {% if attendance_terms %}
+    <form method="get" action="{% url 'parent_portal:term_attendance' student.pk %}" class="pp-month-pick pp-att-export">
+      <input type="hidden" name="format" value="pdf">
+      {% if attendance_terms|length > 1 %}
+        <label for="att-term-pick">Term</label>
+        <select id="att-term-pick" name="term">
+          {% for t in attendance_terms %}<option value="{{ t.pk }}">{{ t.short_name }}{% if t.academic_year %} {{ t.academic_year.name }}{% endif %}</option>{% endfor %}
+        </select>
+      {% else %}
+        <input type="hidden" name="term" value="{{ attendance_terms.0.pk }}">
+      {% endif %}
+      <button type="submit" class="pp-btn pp-btn-small pp-btn-primary">Download {% if attendance_terms|length == 1 %}{{ attendance_terms.0.short_name }} {% else %}term {% endif %}attendance (PDF)</button>
+    </form>
+    {% endif %}
+  </div>
   <div class="pp-month-nav">
     <a class="pp-btn pp-btn-small" href="?month={{ month.prev|date:'Y-m' }}#attendance" aria-label="Previous month, {{ month.prev|date:'F Y' }}"><span aria-hidden="true">&larr;</span> {{ month.prev|date:"M" }}</a>
     <h3 class="pp-card-title" id="att-month">{{ month.month|date:"F Y" }}</h3>

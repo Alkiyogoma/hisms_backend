@@ -1,0 +1,26 @@
+{# One started term: its Quiz, Mid-Term and End-Term side by side. Upcoming terms get no card. #}
+<section class="pp-card pp-chart-card" aria-labelledby="term-{{ card.term.pk }}">
+  <h3 id="term-{{ card.term.pk }}" class="pp-card-title pp-term-title">
+    <span>{{ card.term.short_name }}{% if card.term.academic_year %} &middot; {{ card.term.academic_year.name }}{% endif %}</span>
+    <span class="pp-chip {% if card.label == 'Running' %}pp-chip-gold{% else %}pp-chip-blue{% endif %}">{{ card.label }}</span>
+  </h3>
+  <ul class="pp-chart" role="list">
+    {% for bar in card.bars %}
+      <li class="pp-bar-col">
+        {% if bar.value is not None %}
+          <span class="pp-bar-val">{{ bar.value|floatformat:"-1" }}<small>/{{ bar.max }}</small></span>
+          <span class="pp-bar{% if card.label == 'Running' %} pp-bar-running{% endif %}" style="height:{{ bar.pct|stringformat:'s' }}%"></span>
+          <span class="pp-sr">{{ bar.type.name }}: {{ bar.value|floatformat:"-1" }} out of {{ bar.max }}</span>
+        {% else %}
+          <span class="pp-bar pp-bar-empty"></span>
+          <span class="pp-sr">{{ bar.type.name }}: no approved marks yet</span>
+        {% endif %}
+        <span class="pp-bar-lbl" aria-hidden="true">{{ bar.type.name }}<em>{{ bar.max }}%{% if bar.value is None %} &middot; Not yet{% endif %}</em></span>
+      </li>
+    {% endfor %}
+  </ul>
+  {# Past terms show their average here; the current term's is at the foot of the subject table. #}
+  {% if card.state == 'final' and card.average is not None %}
+    <p class="pp-term-avg">{% if card.complete %}Term average{% else %}Average (incomplete){% endif %} <b>{{ card.average|floatformat:"-2" }}%</b></p>
+  {% endif %}
+</section>

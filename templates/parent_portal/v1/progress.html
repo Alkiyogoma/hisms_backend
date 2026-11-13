@@ -30,7 +30,13 @@
     <p class="pp-muted">{{ student.class_name|default:"Class not set" }} &middot; {{ student.admission_no }}{% if term %} &middot; {{ term.short_name }}{% if term.academic_year %} {{ term.academic_year.name }}{% endif %}{% endif %}</p>
   </div>
   <div class="pp-rings">
-    {% if term %}{% with label=term.short_name|add:" average" %}
+    {% if is_ecd %}
+      {% if ecd %}{% with label=ecd.term.short_name|add:" average point" %}
+        {% include "parent_portal/v1/includes/ring.html" with ring=average_ring label=label note=ecd.remarks tone="gold" %}
+      {% endwith %}{% else %}
+        {% include "parent_portal/v1/includes/ring.html" with ring=average_ring label="Average point" note="once published" tone="gold" %}
+      {% endif %}
+    {% elif term %}{% with label=term.short_name|add:" average" %}
       {% include "parent_portal/v1/includes/ring.html" with ring=average_ring label=label note=academic.complete|yesno:",running" tone="gold" precision="-2" %}
     {% endwith %}{% else %}
       {% include "parent_portal/v1/includes/ring.html" with ring=average_ring label="Term average" tone="gold" precision="-2" %}
@@ -41,8 +47,8 @@
 
 <nav class="pp-jump" aria-label="On this page">
   <a href="#today">Today</a>
-  <a href="#performance">Performance</a>
   {% if reports %}<a href="#report-cards">Report cards</a>{% endif %}
+  <a href="#performance">{% if is_ecd %}Academic progress{% else %}Performance{% endif %}</a>
   <a href="#attendance">Attendance</a>
 </nav>
 
@@ -53,26 +59,7 @@
   </div>
 </section>
 
-<section id="performance" class="pp-section" aria-labelledby="performance-heading">
-  <div class="pp-section-head">
-    <h2 id="performance-heading">Performance</h2>
-    {% if term %}<span class="pp-muted">{% if term.academic_year %}{{ term.academic_year.name }} &middot; {% endif %}by term</span>{% endif %}
-  </div>
-  {% if academic %}
-    {% if not academic.complete %}
-      <p class="pp-banner">{{ term.short_name }} is in progress. Marks appear once each assessment is approved and are labelled &ldquo;running&rdquo; until the term&rsquo;s assessments are complete.</p>
-    {% endif %}
-    <div class="pp-charts">
-      {% for chart in academic.charts %}
-        {% include "parent_portal/v1/includes/assessment_chart.html" with chart=chart %}
-      {% endfor %}
-    </div>
-    {% include "parent_portal/v1/includes/subject_table.html" with academic=academic %}
-  {% else %}
-    {% include "parent_portal/v1/includes/empty.html" with title="No term in progress" text="Performance appears here once the school opens a term." hide_phone=True %}
-  {% endif %}
-</section>
-
+{# Report cards sit straight under Today; shown only once published, never drafts. #}
 {% if reports %}
 <section id="report-cards" class="pp-section" aria-labelledby="reports-heading">
   <div class="pp-section-head"><h2 id="reports-heading">Report cards</h2><span class="pp-muted">Published by the Head of School</span></div>
@@ -84,7 +71,7 @@
           {% if report.published_at %}<p class="pp-muted">Published {{ report.published_at|date:"j F Y" }}</p>{% endif %}
         </div>
         <div class="pp-report-actions">
-          <a class="pp-btn pp-btn-small" href="{% url 'parent_portal:report_card' student.pk report.pk %}">View<span class="pp-sr"> {{ report.term.short_name }} report card</span></a>
+          <a class="pp-btn pp-btn-small" href="{% url 'parent_portal:report_card' student.pk report.pk %}">View report<span class="pp-sr"> for {{ report.term.short_name }}</span></a>
           <a class="pp-btn pp-btn-small pp-btn-primary" href="{% url 'parent_portal:report_download' student.pk report.pk %}">Download PDF<span class="pp-sr"> of the {{ report.term.short_name }} report card</span></a>
         </div>
       </li>
@@ -93,8 +80,49 @@
 </section>
 {% endif %}
 
+{% if is_ecd %}
+<section id="performance" class="pp-section" aria-labelledby="performance-heading">
+  <div class="pp-section-head"><h2 id="performance-heading">Academic progress</h2><span class="pp-muted">Skills rated 4 to 1</span></div>
+  {% if ecd %}
+    <div class="pp-card pp-ecd">
+      <dl class="pp-stats pp-stats-3">
+        <div><dt>Average point</dt><dd class="pp-c-blue">{% if ecd.average is not None %}{{ ecd.average|floatformat:1 }}{% else %}&ndash;{% endif %}</dd></div>
+        <div><dt>Remark</dt><dd>{{ ecd.remarks|default:"–" }}</dd></div>
+        <div><dt>Term</dt><dd>{{ ecd.term.short_name }}</dd></div>
+      </dl>
+      <p class="pp-note">Points: 4 Outstanding &middot; 3 Good &middot; 2 Satisfactory &middot; 1 Not yet. Every skill, the general traits and the class teacher&rsquo;s comment are in the report.</p>
+      <a class="pp-btn pp-btn-primary" href="{% url 'parent_portal:report_card' student.pk ecd.report.pk %}">View {{ ecd.term.short_name }} progress report <span aria-hidden="true">&rarr;</span></a>
+    </div>
+  {% else %}
+    {% include "parent_portal/v1/includes/empty.html" with title="No progress report yet" text="Skills, traits and the class teacher's comment appear here once the Head of School publishes the term's progress report." hide_phone=True %}
+  {% endif %}
+</section>
+{% else %}
+<section id="performance" class="pp-section" aria-labelledby="performance-heading">
+  <div class="pp-section-head">
+    <h2 id="performance-heading">Performance</h2>
+    {% if term %}<span class="pp-muted">{% if term.academic_year %}{{ term.academic_year.name }} &middot; {% endif %}by term</span>{% endif %}
+  </div>
+  {% if academic %}
+    {% if not academic.complete %}
+      <p class="pp-banner">{{ term.short_name }} is in progress. Marks appear once each assessment is approved and are labelled &ldquo;running&rdquo; until the term&rsquo;s assessments are complete.</p>
+    {% endif %}
+    <div class="pp-charts">
+      {% for card in academic.term_cards %}
+        {% include "parent_portal/v1/includes/term_card.html" with card=card %}
+      {% endfor %}
+    </div>
+    <p class="pp-note pp-term-note">Term mark = {% for t in academic.types %}{{ t.type.name }} {{ t.max }}%{% if not forloop.last %} + {% endif %}{% endfor %}. Each bar is the average converted mark across subjects.{% if academic.upcoming_terms %} {% for t in academic.upcoming_terms %}{{ t.short_name }}{% if not forloop.last %} and {% endif %}{% endfor %} {{ academic.upcoming_terms|length|pluralize:"has,have" }} not started.{% endif %}</p>
+    {% include "parent_portal/v1/includes/subject_table.html" with academic=academic %}
+  {% else %}
+    {% include "parent_portal/v1/includes/empty.html" with title="No term in progress" text="Performance appears here once the school opens a term." hide_phone=True %}
+  {% endif %}
+</section>
+{% endif %}
+
 <section id="attendance" class="pp-section" aria-labelledby="attendance-heading">
   <div class="pp-section-head"><h2 id="attendance-heading">Attendance</h2><span class="pp-muted">Checked in and out by card</span></div>
   {% include "parent_portal/v1/includes/attendance_month.html" with month=month %}
+  {% include "parent_portal/v1/includes/card_times.html" with times=card_times month=month %}
 </section>
 {% endblock %}
