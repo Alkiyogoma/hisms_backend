@@ -447,10 +447,9 @@ class HISMSLoginView(LoginView):
             logger.warning("Failed to send lockout alert to Super Admin: %s", exc)
 
     def get_success_url(self):
+        from core.redirects import safe_next_url
         next_url = self.request.POST.get("next") or self.request.GET.get("next") or ""
-        if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={self.request.get_host()}):
-            return next_url
-        return settings.LOGIN_REDIRECT_URL or "/"
+        return safe_next_url(self.request, next_url, settings.LOGIN_REDIRECT_URL or "/")
 
 
 class HISMSLoginAPIView(View):
@@ -543,9 +542,9 @@ class HISMSLoginAPIView(View):
         if authed.must_change_password:
             return JsonResponse({"ok": True, "redirect": "/accounts/password-change/"})
 
-        next_url = body.get("next") or request.POST.get("next") or request.GET.get("next") or "/"
-        if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
-            next_url = settings.LOGIN_REDIRECT_URL or "/"
+        from core.redirects import safe_next_url
+        next_url = body.get("next") or request.POST.get("next") or request.GET.get("next") or ""
+        next_url = safe_next_url(request, next_url, settings.LOGIN_REDIRECT_URL or "/")
         return JsonResponse({"ok": True, "redirect": next_url})
 
 
@@ -621,10 +620,9 @@ class ParentOTPVerifyView(View):
                         f"({'email' if by_email else 'SMS'} code)",
             request=request,
         )
+        from core.redirects import safe_next_url
         next_url = body.get("next") or ""
-        if not next_url or next_url == "/" or not url_has_allowed_host_and_scheme(
-                next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
-            next_url = "/parent/"
+        next_url = "/parent/" if next_url == "/" else safe_next_url(request, next_url, "/parent/")
         return JsonResponse({"ok": True, "redirect": next_url})
 
 

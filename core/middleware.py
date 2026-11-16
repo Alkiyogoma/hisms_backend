@@ -5,6 +5,10 @@ from django.contrib import messages
 from django.shortcuts import redirect
 from django.utils import timezone
 
+from core.redirects import (
+    PARENT_LOGIN_URL, is_background_request, login_url_for, page_to_return_to,
+    redirect_background_to_login,
+)
 from core.threadlocal import reset_current_request, set_current_request
 
 SESSION_IDLE_TIMEOUT = getattr(settings, "SESSION_IDLE_TIMEOUT", 1800)  # 30 min (matches settings.py default)
@@ -56,20 +60,20 @@ class SessionTimeoutMiddleware:
                     except Exception:
                         pass
                     from django.contrib.auth import logout
-                    current_path = request.path
                     from users.models import UserRole
                     is_parent = getattr(request.user, "role", "") == UserRole.PARENT
+                    # Remember the *page* the user was on, never a partial, API or
+                    # POST target  returning there after sign-in was the 404.
+                    # PWA expiry goes to the dashboard instead.
+                    next_path = "" if request.path.startswith("/attendance/pwa/") else page_to_return_to(request)
                     logout(request)
                     # FR-CAL-003: Use query param instead of messages framework
                     # to avoid stale messages persisting after re-login.
-                    # Preserve the next param so user returns to their page after re-login,
-                    # except for PWA paths  session expiry should go to dashboard.
-                    next_param = "" if current_path.startswith("/attendance/pwa/") else f"&next={current_path}"
-                    if is_parent:
-                        from urllib.parse import quote
-                        return redirect(f"/parent/login/?next={quote(current_path)}")
                     # Staff land on the Staff tab (Parent Login is the default tab).
-                    return redirect(f"{settings.LOGIN_URL}?session_expired=1&staff=1{next_param}")
+                    login_url = login_url_for(is_parent, next_path, session_expired=True)
+                    if is_background_request(request):
+                        return redirect_background_to_login(request, login_url)
+                    return redirect(login_url)
 
                 # Don't reset timestamp for the check API  otherwise the frontend
                 # poll always sees a fresh session and the warning modal never triggers.
@@ -79,7 +83,24 @@ class SessionTimeoutMiddleware:
                 request.session_expiry_seconds = max(0, int(SESSION_IDLE_TIMEOUT - idle_seconds))
                 request.session_warning_at = max(0, int(SESSION_IDLE_TIMEOUT - self.WARNING_BEFORE_SECONDS - idle_seconds))
 
-        return self.get_response(request)
+        response = self.get_response(request)
+        return self._redirect_signed_out_background_request(request, response)
+
+    @staticmethod
+    def _redirect_signed_out_background_request(request, response):
+        """A signed-out htmx/fetch request redirected to a login page would
+        otherwise swap the login page into a fragment (or fail to parse as
+        JSON). Turn it into a full-page redirect back to the current page."""
+        if request.user.is_authenticated or response.status_code not in (301, 302):
+            return response
+        if not is_background_request(request):
+            return response
+        location = response.get("Location", "")
+        login_paths = (settings.LOGIN_URL, PARENT_LOGIN_URL, "/login/")
+        if not location.split("?", 1)[0].endswith(login_paths):
+            return response
+        is_parent = PARENT_LOGIN_URL in location or request.path.startswith("/parent/")
+        return redirect_background_to_login(request, login_url_for(is_parent, page_to_return_to(request)))
 
 
 class ImpersonationMiddleware:

@@ -246,9 +246,14 @@ class LoginFlowIntegrationTests(TestCase):
         self.assertTrue(response.wsgi_request.user.is_authenticated)
 
     def test_valid_login_with_next_param_redirects(self):
+        response = self.client.post(f"{self.login_url}?next=/students/", {"username": "flowtest", "password": "FlowPass123!"})
+        self.assertIn(response.status_code, [302, 303])
+        self.assertEqual(response.url, "/students/")
+
+    def test_login_with_next_to_missing_page_goes_home_not_404(self):
         response = self.client.post(f"{self.login_url}?next=/dashboard/", {"username": "flowtest", "password": "FlowPass123!"})
         self.assertIn(response.status_code, [302, 303])
-        self.assertIn("/dashboard/", response.url)
+        self.assertEqual(response.url, "/")
 
     def test_must_change_password_redirects(self):
         self.user.must_change_password = True

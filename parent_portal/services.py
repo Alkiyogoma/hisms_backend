@@ -209,7 +209,7 @@ def _summary(student, term, expected):
 
 def academic_progress(student, term, today):
     """Subject table (current term), header average, and one bar chart per
-    assessment type with one bar per term of the year.
+    term of the year with one bar per assessment type.
 
     Uses only HOD-approved marks of mark-bearing subjects, converted to points
     out of each assessment's weight (Quiz /20, Mid-Term /30, End-Term /50).
@@ -221,34 +221,30 @@ def academic_progress(student, term, today):
     current = _summary(student, term, expected)
     types = current["types"]
 
-    charts = [{"type": t, "max": _weight(t), "bars": []} for t in types]
+    # One card per term of the year (Term 1, 2, 3), with that term's Quiz,
+    # Mid-Term and End-Term side by side. Upcoming terms keep their card so the
+    # parent always sees the whole year; it just has no bars yet.
     term_cards, upcoming = [], []
     for t in year_terms(term):
         state = term_state(t, term, today)
-        values = [None] * len(types)
+        values, summary = [None] * len(types), None
         if state != UPCOMING:
             summary = current if t.pk == term.pk else _summary(student, t, expected)
             values = summary["type_averages"]
-            # One card per started term: its Quiz, Mid-Term and End-Term side by side.
             label = ("Complete" if summary["complete"] else "Running") if state == RUNNING else "Final"
-            term_cards.append({
-                "term": t, "state": state, "label": label, "complete": summary["complete"],
-                "average": summary["running_average"],
-                "bars": [{"type": ty, "max": _weight(ty), "value": v,
-                          "pct": round(v / _weight(ty) * 100, 1) if v is not None and _weight(ty) else 0}
-                         for ty, v in zip(types, values)],
-            })
         else:
+            label = "Upcoming"
             upcoming.append(t)
-        for i, chart in enumerate(charts):
-            v = values[i]
-            chart["bars"].append({
-                "term": t, "state": state, "value": v,
-                "pct": round(v / chart["max"] * 100, 1) if v is not None and chart["max"] else 0,
-            })
-
-    for chart in charts:
-        chart["has_marks"] = any(b["value"] is not None for b in chart["bars"])
+        bars = [{"type": ty, "max": _weight(ty), "value": v,
+                 "pct": round(v / _weight(ty) * 100, 1) if v is not None and _weight(ty) else 0}
+                for ty, v in zip(types, values)]
+        term_cards.append({
+            "term": t, "state": state, "label": label,
+            "complete": bool(summary and summary["complete"]),
+            "average": summary["running_average"] if summary else None,
+            "bars": bars,
+            "has_marks": any(b["value"] is not None for b in bars),
+        })
 
     rows = []
     for r in current["rows"]:
@@ -267,7 +263,6 @@ def academic_progress(student, term, today):
         "total_subjects": current["total_subjects"],
         "average": current["running_average"],
         "grade": current["running_grade"],
-        "charts": charts,
         "term_cards": term_cards,
         "upcoming_terms": upcoming,
     }
