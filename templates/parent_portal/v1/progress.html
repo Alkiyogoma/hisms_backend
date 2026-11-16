@@ -112,7 +112,7 @@
         {% include "parent_portal/v1/includes/term_card.html" with card=card %}
       {% endfor %}
     </div>
-    <p class="pp-note pp-term-note">Term mark = {% for t in academic.types %}{{ t.type.name }} {{ t.max }}%{% if not forloop.last %} + {% endif %}{% endfor %}. Each bar is the average converted mark across subjects.{% if academic.upcoming_terms %} {% for t in academic.upcoming_terms %}{{ t.short_name }}{% if not forloop.last %} and {% endif %}{% endfor %} {{ academic.upcoming_terms|length|pluralize:"has,have" }} not started.{% endif %}</p>
+    <p class="pp-note pp-term-note">Term mark = {% for t in academic.types %}{{ t.type.name }} {{ t.max }}%{% if not forloop.last %} + {% endif %}{% endfor %}. Each bar is the average converted mark across subjects, shown out of that assessment&rsquo;s maximum, so bar heights compare fairly.</p>
     {% include "parent_portal/v1/includes/subject_table.html" with academic=academic %}
   {% else %}
     {% include "parent_portal/v1/includes/empty.html" with title="No term in progress" text="Performance appears here once the school opens a term." hide_phone=True %}

@@ -281,8 +281,9 @@ class ParentLoginView(View):
         except Exception:
             logger.exception("Could not audit parent sign-in")
 
-        next_url = request.POST.get("next") or ""
-        if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+        from core.redirects import safe_next_url
+        next_url = safe_next_url(request, request.POST.get("next") or "")
+        if next_url and next_url != "/":
             return redirect(next_url)
         return redirect("parent_portal:dashboard")
 

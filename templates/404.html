@@ -41,6 +41,13 @@
       Double-check the URL or head back to where you came from.
     </p>
 
+    {% if not user.is_authenticated %}
+    <p class="error-desc" style="margin-top:-12px">If you were signed out for being inactive, please sign in again.</p>
+    <div style="margin-bottom:12px">
+      <a href="/accounts/login/?staff=1" class="btn-home">Staff sign in</a>
+      <a href="/parent/login/" class="btn-back">Parent sign in</a>
+    </div>
+    {% endif %}
     <div>
       <a href="/" class="btn-home">
         <svg width="14" height="14" viewBox="0 0 17 17" fill="none"><path d="M2 8.5L8.5 2 15 8.5M3.5 7V15h4V11h2v4h4V7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>

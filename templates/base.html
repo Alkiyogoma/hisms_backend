@@ -1072,8 +1072,15 @@
         if (bar) bar.style.width = Math.max(0, (secondsLeft / 120) * 100) + '%';
         if (secondsLeft <= 0) {
           clearInterval(countdownInterval);
-          window.location.href = '/accounts/login/?staff=1&next=' + encodeURIComponent(window.location.pathname);
+          goToLogin();
         }
+      }
+
+      // Parents sign in on the parent portal; staff on the Staff tab.
+      var LOGIN_BASE = '{% if request.user.role == "parent" %}/parent/login/?{% else %}/accounts/login/?session_expired=1&staff=1&{% endif %}';
+      function goToLogin(url) {
+        window.location.href = url || (LOGIN_BASE + 'next=' +
+          encodeURIComponent(window.location.pathname + window.location.search));
       }
 
       function showModal(remaining) {
@@ -1106,9 +1113,12 @@
       };
 
       function pollSession() {
-        fetch('{% url "core:session_check" %}')
-          .then(function (r) { return r.json(); })
-          .then(function (data) {
+        fetch('{% url "core:session_check" %}', { headers: { 'Accept': 'application/json' } })
+          .then(function (r) { return r.json().then(function (data) { return { status: r.status, data: data }; }); })
+          .then(function (res) {
+            var data = res.data;
+            // Session already gone (e.g. laptop slept through the countdown).
+            if (res.status === 401) { goToLogin(data.redirect); return; }
             if (data.seconds_remaining <= WARNING_THRESHOLD) {
               showModal(data.seconds_remaining);
             }

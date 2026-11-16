@@ -291,24 +291,44 @@ class MarksTests(PortalTestBase):
         self.assertNotIn("Running average", page)
         self.assertIn("84%", page)
 
-    def test_charts_one_bar_per_assessed_term(self):
+    def test_charts_one_card_per_term_with_assessments_as_bars(self):
         self._score("Mathematics", "quiz", 75, term=self.t1)           # 15 /20, Term 1 final
         self._score("Mathematics", "quiz", 90)                         # 18 /20, Term 2 running
         self._score("English", "quiz", 80)                             # 16 /20
         self._score("Mathematics", "mid_term", 50, term=self.t1)       # 15 /30
         self.client.force_login(self.parent)
-        charts = {c["type"].code: c for c in self._progress().context["academic"]["charts"]}
-        quiz = [(b["term"].name, b["state"], b["value"]) for b in charts["quiz"]["bars"]]
-        self.assertEqual(quiz, [("Term 1", "final", 15.0), ("Term 2", "running", 17.0), ("Term 3", "upcoming", None)])
-        mid = [(b["state"], b["value"]) for b in charts["mid_term"]["bars"]]
-        self.assertEqual(mid, [("final", 15.0), ("running", None), ("upcoming", None)])
-        self.assertEqual((charts["quiz"]["max"], charts["mid_term"]["max"]), (20, 30))
+        resp = self._progress()
+        cards = resp.context["academic"]["term_cards"]
+        self.assertEqual([(c["term"].name, c["state"], c["label"]) for c in cards],
+                         [("Term 1", "final", "Final"), ("Term 2", "running", "Running"),
+                          ("Term 3", "upcoming", "Upcoming")])
+        bars = {c["term"].name: [(b["type"].code, b["max"], b["value"]) for b in c["bars"]] for c in cards}
+        self.assertEqual(bars["Term 1"][:2], [("quiz", 20, 15.0), ("mid_term", 30, 15.0)])
+        self.assertEqual(bars["Term 2"][:2], [("quiz", 20, 17.0), ("mid_term", 30, None)])
+        self.assertEqual([c["has_marks"] for c in cards], [True, True, False])
+        # Bars are scaled to their own maximum, so heights compare fairly.
+        self.assertEqual(cards[0]["bars"][0]["pct"], 75.0)
+        self.assertEqual(cards[0]["bars"][1]["pct"], 50.0)
 
-        page = self._progress().content.decode()
-        self.assertIn("Term 3 has not started.", page)
-        self.assertIn("Running", page)
-        # Upcoming terms get no card and no bar at all.
+        page = resp.content.decode()
+        self.assertIn(">Upcoming<", page)
+        self.assertIn(">Running<", page)
+        self.assertIn("No approved marks yet for Term 3", page)
+        self.assertIn("<em>/20", page)
+        self.assertIn("<em>/30", page)
+        self.assertIn("&middot; Upcoming", page)
+        # Filled bars only where there are marks: Term 1 (quiz, mid) and Term 2 (quiz).
         self.assertEqual(page.count('class="pp-bar pp-bar-running"') + page.count('class="pp-bar"'), 3)
+        # Every term card shows all three assessment columns, so the cards line up.
+        self.assertEqual(page.count('class="pp-bar-col"'), 3 * len(cards[0]["bars"]))
+
+    def test_started_term_without_marks_gets_its_own_empty_message(self):
+        self._score("Mathematics", "quiz", 90)                         # Term 2 only
+        self.client.force_login(self.parent)
+        page = self._progress().content.decode()
+        self.assertIn("No approved marks yet for Term 1", page)
+        self.assertIn("No approved marks yet for Term 3", page)
+        self.assertNotIn("No approved marks yet for Term 2", page)
 
 
 class AttendanceTests(PortalTestBase):
@@ -420,13 +440,13 @@ class NavigationTests(PortalTestBase):
         page = self._progress().content.decode()
         self.assertIn(reverse("parent_portal:progress", args=[sibling.pk]), page)
         self.assertNotIn(reverse("parent_portal:progress", args=[self.other_child.pk]), page)
-        # No approved marks at all this year: one card per started term (Term 1
-        # and Term 2), each with its three assessments as empty placeholders;
-        # Term 3 has not started, so it gets a line, not an empty card.
+        # No approved marks at all this year: one card per term, each with its
+        # three assessments as empty placeholders and its own empty message.
         self.assertIn("Not yet", page)
-        self.assertIn("Term 3 has not started.", page)
+        for name in ("Term 1", "Term 2", "Term 3"):
+            self.assertIn(f"No approved marks yet for {name}", page)
         self.assertNotIn('class="pp-bar-val"', page)
-        self.assertEqual(page.count('class="pp-bar pp-bar-empty"'), 6)
+        self.assertEqual(page.count('class="pp-bar pp-bar-empty"'), 9)
 
 
 class HomeLastTermTests(PortalTestBase):
@@ -597,7 +617,7 @@ class DeploymentAndStaffViewTests(PortalTestBase):
         self.assertIn("Term 2 &middot; 2026/2027", home)
         self.assertNotIn("2026/2027 &middot; 2026/2027", home)
         resp = self._progress()
-        self.assertEqual([b["term"].short_name for b in resp.context["academic"]["charts"][0]["bars"]],
+        self.assertEqual([c["term"].short_name for c in resp.context["academic"]["term_cards"]],
                          ["Term 1", "Term 2", "Term 3"])
         self.assertIn("Term 2 average", resp.content.decode())
 
