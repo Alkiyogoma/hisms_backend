@@ -163,8 +163,8 @@ class SchoolSettings(TimeStampedModel):
     )
     late_pickup_fee = models.PositiveIntegerField(
         default=0,
-        help_text="Late pick-up fee in TZS per pick-up, stated to parents as school policy. 0 hides it. "
-                  "The portal does not show fees as due or paid.",
+        help_text="Late pick-up fee in TZS per pick-up after the late pick-up time. The parent portal "
+                  "shows it as due on each late pick-up. 0 hides it.",
     )
 
     # Admissions

@@ -154,6 +154,9 @@ class ParentLearnerProgressView(ParentOnlyMixin, TemplateView):
         academic = None if is_ecd else services.academic_progress(student, term, today)
         ecd = services.ecd_latest(student, reports) if is_ecd else None
         month = services.parse_month(self.request.GET.get("month"), today)
+        month_grid = services.month_attendance(student, month, today)
+        entries = services.month_entries(student, month, today)
+        check_log = services.month_check_log(student, month_grid, today, entries)
         ctx.update(_portal_ctx(self.request, "progress"))
         ctx.update({
             "today": today,
@@ -167,12 +170,14 @@ class ParentLearnerProgressView(ParentOnlyMixin, TemplateView):
             else _ring(academic["average"] if academic else None),
             "attendance_ring": _ring(services.term_attendance_rate(student, term, today)),
             "today_info": services.today_status(student, today),
-            "month": services.month_attendance(student, month, today),
+            "month": month_grid,
+            "check_log": check_log,
             "month_choices": services.attendance_months(term, today),
             "attendance_terms": services.started_terms(term, today),
-            "card_times": services.month_card_times(student, month, today, school.late_pickup_after),
-            "late_pickup_fee": f"{school.late_pickup_fee:,}" if school.late_pickup_fee else None,
+            "card_times": services.month_card_times(student, month, today, school.late_pickup_after,
+                                                     school.late_pickup_fee, entries),
             "reports": reports,
+            "term_report_published": bool(term and any(r.term_id == term.pk for r in reports)),
         })
         return ctx
 

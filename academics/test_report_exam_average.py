@@ -101,7 +101,7 @@ class ReportExamAverageTests(TestCase):
 
     def test_complete_term_prints_average_total_and_grade(self):
         for code, score in (("quiz", 90), ("mid_term", 90), ("end_of_term", 90)):
-            self._approve("Alg", code, score)      # 18 + 27 + 45 = 90 -> A*
+            self._approve("Alg", code, score)      # 18 + 27 + 45 = 90 -> A+
         for code, score in (("quiz", 70), ("mid_term", 80), ("end_of_term", 80)):
             self._approve("Geo", code, score)      # 14 + 24 + 40 = 78 -> B
         SubjectTermRemark.objects.create(student=self.student, term=self.term, subject_name="Choir",
@@ -111,7 +111,7 @@ class ReportExamAverageTests(TestCase):
         s = exam_summary(self.student, self.term)
         self.assertTrue(s["complete"])
         self.assertEqual([(r["total"], r["grade"], r["label"]) for r in s["rows"]],
-                         [(90.0, "A*", "Outstanding"), (78.0, "B", "Good")])
+                         [(90.0, "A+", "Outstanding"), (78.0, "B", "Good")])
         self.assertEqual(s["column_averages"], [16.0, 25.5, 42.5])
         self.assertEqual((s["average"], s["grade"], s["label"]), (84.0, "A", "High"))
 

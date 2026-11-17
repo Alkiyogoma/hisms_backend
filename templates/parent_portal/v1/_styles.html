@@ -8,11 +8,11 @@
   --pp-bad: #B3261E; --pp-bad-bg: #FDE8E6; --pp-grey: #5F6878; --pp-grey-bg: #EEF0F5;
   --pp-purple: #4B3AA6; --pp-purple-bg: #ECE8FB;
   --pp-focus: 0 0 0 3px #fff, 0 0 0 5px var(--pp-blue);
-  --pp-serif: 'Times New Roman', Times, serif;
+  --pp-serif: Roboto, Arial, Helvetica, sans-serif; /* all portal text is Roboto */
   --pp-radius: 12px;
   --pp-header-h: 63px; /* .pp-top: 60px row + 3px gold rule */
   margin: 0; background: var(--pp-bg); color: var(--pp-ink);
-  font: 15px/1.5 Roboto, Arial, sans-serif;
+  font: 15px/1.5 Roboto, Arial, Helvetica, sans-serif;
   -webkit-text-size-adjust: 100%;
 }
 .pp *, .pp *::before, .pp *::after { box-sizing: border-box; }
@@ -114,17 +114,31 @@
 .pp-term-empty { margin: 4px 0 -14px; font-size: 13px; color: var(--pp-grey); }
 .pp-stats.pp-stats-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .pp-ecd .pp-btn { margin-top: 12px; }
-.pp-times { margin-top: 16px; }
-.pp-tchart-wrap { overflow-x: auto; padding: 22px 0 4px; }
-.pp-tchart { position: relative; display: flex; align-items: flex-end; gap: 4px; height: 150px; min-width: 100%; border-bottom: 1px solid var(--pp-line); padding-bottom: 0; }
+
+.pp-tchart-wrap { overflow-x: auto; padding: 26px 0 22px; -webkit-overflow-scrolling: touch; }
+.pp-tchart { position: relative; display: flex; align-items: flex-end; gap: 6px; height: 170px; min-width: 640px; border-bottom: 1px solid var(--pp-line); padding-bottom: 0; }
 .pp-tcol { flex: 1 0 14px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; position: relative; }
-.pp-tbar { width: 100%; max-width: 22px; border-radius: 5px 5px 2px 2px; background: var(--pp-blue2); }
+.pp-tval { position: relative; z-index: 3; background: var(--pp-card); padding: 0 2px; border-radius: 3px; font-size: 10px; font-weight: 700; color: var(--pp-navy); margin-bottom: 3px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pp-tbar { width: 100%; max-width: 28px; border-radius: 5px 5px 2px 2px; background: var(--pp-blue2); }
 .pp-tbar-late { background: var(--pp-bad); }
 .pp-tlab { position: absolute; bottom: -18px; font-size: 10px; color: var(--pp-muted); }
 .pp-tline { position: absolute; left: 0; right: 0; border-top: 2px dashed var(--pp-bad); z-index: 2; pointer-events: none; }
 .pp-tline span { position: absolute; right: 0; top: -18px; background: #fff; color: var(--pp-bad); font-size: 11px; font-weight: 700; padding-left: 6px; }
-.pp-times .pp-note { margin-top: 24px; }
+.pp-times { margin-bottom: 16px; }
+.pp-times .pp-note { margin-top: 4px; }
+.pp-stats.pp-stats-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+#checkins > .pp-stats div { background: var(--pp-card); border: 1px solid var(--pp-line); }
+.pp-stats dd.pp-stat-money { font-size: 17px; }
+.pp-late-count { color: var(--pp-navy); text-transform: none; letter-spacing: 0; font-size: 13px; }
+.pp-fee { white-space: nowrap; }
+.pp-table.pp-table-late { min-width: 0; }
+.pp-fee .pp-chip { margin-left: 6px; font-size: 12px; padding: 2px 8px; }
+.pp-term-upcoming { min-height: 180px; }
+.pp-btn-disabled { background: var(--pp-grey-bg); color: var(--pp-grey); border-color: transparent; cursor: default; }
 .pp-times .pp-table-wrap { margin-top: 12px; }
+.pp-check-log { margin-top: 16px; }
+.pp-table.pp-table-log { min-width: 0; }
+.pp-table.pp-table-log .pp-chip { font-size: 12px; padding: 2px 8px; }
 .pp-att-tools {display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--pp-line); }
 .pp-month-pick { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .pp-month-pick label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--pp-muted); }
@@ -268,7 +282,13 @@
   .pp-stats div { padding: 8px 4px; }
   .pp-stats dt { font-size: 10px; letter-spacing: .02em; }
   .pp-stats div:last-child { grid-column: 1 / -1; display: flex; justify-content: center; align-items: baseline; gap: 10px; }
-  .pp-stats.pp-stats-3 div:last-child { grid-column: auto; display: block; }
+  .pp-stats.pp-stats-3 div:last-child, .pp-stats.pp-stats-4 div:last-child { grid-column: auto; display: block; }
+  .pp-stats.pp-stats-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pp-hide-sm { display: none; }
+  .pp-table.pp-table-late { font-size: 13px; }
+  .pp-table.pp-table-late th, .pp-table.pp-table-late td { padding: 8px 5px; }
+  .pp-fee { white-space: normal; }
+  .pp-fee .pp-chip { margin: 2px 0 0; }
   .pp-stats.pp-stats-3 dd { font-size: 17px; }
   .pp-cal { border-spacing: 3px; margin: 0 -3px; width: calc(100% + 6px); }
   .pp-day { height: 52px; padding: 4px; }

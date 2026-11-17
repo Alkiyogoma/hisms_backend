@@ -47,8 +47,9 @@
 
 <nav class="pp-jump" aria-label="On this page">
   <a href="#today">Today</a>
-  {% if reports %}<a href="#report-cards">Report cards</a>{% endif %}
+  <a href="#report-cards">Report card</a>
   <a href="#performance">{% if is_ecd %}Academic progress{% else %}Performance{% endif %}</a>
+  <a href="#checkins">Check-in and check-out</a>
   <a href="#attendance">Attendance</a>
 </nav>
 
@@ -59,11 +60,19 @@
   </div>
 </section>
 
-{# Report cards sit straight under Today; shown only once published, never drafts. #}
-{% if reports %}
+{# Report cards sit straight under Today. Only published reports open; the current term's shows "Not yet published" until then, never a draft. #}
 <section id="report-cards" class="pp-section" aria-labelledby="reports-heading">
-  <div class="pp-section-head"><h2 id="reports-heading">Report cards</h2><span class="pp-muted">Published by the Head of School</span></div>
+  <div class="pp-section-head"><h2 id="reports-heading">Report card</h2><span class="pp-muted">Published by the Head of School</span></div>
   <ul class="pp-card pp-reports" role="list">
+    {% if term and not term_report_published %}
+      <li class="pp-report">
+        <div>
+          <p class="pp-report-title">{{ term.short_name }}{% if term.academic_year %} &middot; {{ term.academic_year.name }}{% endif %}</p>
+          <p class="pp-muted">Appears here once the Head of School publishes it</p>
+        </div>
+        <div class="pp-report-actions"><span class="pp-btn pp-btn-small pp-btn-disabled" aria-disabled="true">Not yet published</span></div>
+      </li>
+    {% endif %}
     {% for report in reports %}
       <li class="pp-report">
         <div>
@@ -71,14 +80,14 @@
           {% if report.published_at %}<p class="pp-muted">Published {{ report.published_at|date:"j F Y" }}</p>{% endif %}
         </div>
         <div class="pp-report-actions">
-          <a class="pp-btn pp-btn-small" href="{% url 'parent_portal:report_card' student.pk report.pk %}">View report<span class="pp-sr"> for {{ report.term.short_name }}</span></a>
-          <a class="pp-btn pp-btn-small pp-btn-primary" href="{% url 'parent_portal:report_download' student.pk report.pk %}">Download PDF<span class="pp-sr"> of the {{ report.term.short_name }} report card</span></a>
+          <a class="pp-btn pp-btn-small pp-btn-primary" href="{% url 'parent_portal:report_card' student.pk report.pk %}">Preview report<span class="pp-sr"> for {{ report.term.short_name }}</span></a>
+          <a class="pp-btn pp-btn-small" href="{% url 'parent_portal:report_download' student.pk report.pk %}">Download PDF<span class="pp-sr"> of the {{ report.term.short_name }} report card</span></a>
         </div>
       </li>
     {% endfor %}
   </ul>
+  <p class="pp-note">Parents see a report only after it is published. Drafts are never shown.</p>
 </section>
-{% endif %}
 
 {% if is_ecd %}
 <section id="performance" class="pp-section" aria-labelledby="performance-heading">
@@ -120,9 +129,10 @@
 </section>
 {% endif %}
 
+{% include "parent_portal/v1/includes/checkins.html" with times=card_times month=month check_log=check_log %}
+
 <section id="attendance" class="pp-section" aria-labelledby="attendance-heading">
-  <div class="pp-section-head"><h2 id="attendance-heading">Attendance</h2><span class="pp-muted">Checked in and out by card</span></div>
+  <div class="pp-section-head"><h2 id="attendance-heading">Attendance</h2><span class="pp-muted">{{ month.month|date:"F Y" }}</span></div>
   {% include "parent_portal/v1/includes/attendance_month.html" with month=month %}
-  {% include "parent_portal/v1/includes/card_times.html" with times=card_times month=month %}
 </section>
 {% endblock %}

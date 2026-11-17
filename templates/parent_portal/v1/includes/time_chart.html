@@ -1,0 +1,14 @@
+{# One bar per school day, its time above it. `line` draws the late pick-up line; late bars are red. #}
+<div class="pp-tchart-wrap">
+  <ul class="pp-tchart" role="list" aria-label="{{ label }}">
+    {% if line %}<li class="pp-tline" style="bottom:{{ line_pct|stringformat:'s' }}%" aria-hidden="true"><span>{{ line|time:"g:i A" }}</span></li>{% endif %}
+    {% for d in days %}
+      <li class="pp-tcol">
+        <span class="pp-tval" aria-hidden="true">{{ d.short }}</span>
+        <span class="pp-tbar{% if d.late %} pp-tbar-late{% endif %}" style="height:{{ d.pct|stringformat:'s' }}%" title="{{ d.date|date:'D j M' }} {{ d.time }}"></span>
+        <span class="pp-tlab" aria-hidden="true">{{ d.date|date:"j" }}</span>
+        <span class="pp-sr">{{ d.date|date:"l j F" }}: {{ d.time }}{% if d.late %}, late pick-up{% endif %}</span>
+      </li>
+    {% endfor %}
+  </ul>
+</div>
