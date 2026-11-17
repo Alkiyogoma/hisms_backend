@@ -129,12 +129,17 @@ def term_state(term, current, today):
 
 
 def year_terms(term):
-    """The terms of the term's academic year, in order."""
+    """The terms of the term's academic year, in order. Kept on the term
+    object, so one page asks the database once however many sections use it."""
     if term is None:
         return []
-    qs = Term.objects.filter(academic_year_id=term.academic_year_id) if term.academic_year_id else \
-        Term.objects.filter(pk=term.pk)
-    return [with_short_name(t) for t in qs.select_related("academic_year").order_by("start_date", "name")]
+    cached = getattr(term, "_year_terms", None)
+    if cached is None:
+        qs = Term.objects.filter(academic_year_id=term.academic_year_id) if term.academic_year_id else \
+            Term.objects.filter(pk=term.pk)
+        cached = [with_short_name(t) for t in qs.select_related("academic_year").order_by("start_date", "name")]
+        term._year_terms = cached
+    return cached
 
 
 def term_context(term, today):
@@ -354,7 +359,17 @@ def _time_bars(points, lo, hi):
             for d, m in points]
 
 
-def month_card_times(student, month_start, today, late_after, late_fee=0,
+def month_entries(student, month_start, today):
+    """The learner's attendance records for one month up to today, in date
+    order: one query shared by the check-in charts and the daily log."""
+    from attendance.models import AttendanceEntry
+    last = _calendar.monthrange(month_start.year, month_start.month)[1]
+    return list(AttendanceEntry.objects
+                .filter(student=student, date__gte=month_start, date__lte=min(month_start.replace(day=last), today))
+                .only("date", "status", "check_in_time", "check_out_time").order_by("date"))
+
+
+def month_card_times(student, month_start, today, late_after, late_fee=0, entries=None,
                      out_from=14 * 60 + 30, out_to=18 * 60, in_from=7 * 60, in_to=8 * 60 + 45):
     """Card-reader times for one month's school days (Mon-Fri, up to today):
     average check-in and check-out, a check-out chart with the late pick-up
@@ -365,11 +380,9 @@ def month_card_times(student, month_start, today, late_after, late_fee=0,
     late pick-up: the school has no payment record for it yet. Days without a
     card scan have no bar; a child collected without a scan can't be late.
     """
-    from attendance.models import AttendanceEntry, has_real_check_in
-    last = _calendar.monthrange(month_start.year, month_start.month)[1]
-    entries = (AttendanceEntry.objects
-               .filter(student=student, date__gte=month_start, date__lte=min(month_start.replace(day=last), today))
-               .only("date", "check_in_time", "check_out_time").order_by("date"))
+    from attendance.models import has_real_check_in
+    if entries is None:
+        entries = month_entries(student, month_start, today)
     cutoff = _minutes(late_after)
     ins, outs, late = [], [], []
     for e in entries:
@@ -476,18 +489,17 @@ def month_attendance(student, month_start, today):
     }
 
 
-def month_check_log(student, month, today):
+def month_check_log(student, month, today, entries=None):
     """One row per school day of ``month`` (from month_attendance) up to today:
     the day's status, whether the learner was checked in and the check-out
     time. Built from the same records as the Today panel."""
-    from attendance.models import AttendanceEntry
     days = [d for week in month["weeks"] for d in week
             if d and d["code"] in ("P", "L", "A", "E", "U") and d["date"] <= today]
     if not days:
         return []
-    entries = {e.date: e for e in AttendanceEntry.objects.filter(
-        student=student, date__in=[d["date"] for d in days]).only(
-        "date", "status", "check_in_time", "check_out_time")}
+    if entries is None:
+        entries = month_entries(student, month["month"], today)
+    entries = {e.date: e for e in entries}
     rows = []
     for d in reversed(days):  # latest first
         entry = entries.get(d["date"])

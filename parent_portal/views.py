@@ -155,7 +155,8 @@ class ParentLearnerProgressView(ParentOnlyMixin, TemplateView):
         ecd = services.ecd_latest(student, reports) if is_ecd else None
         month = services.parse_month(self.request.GET.get("month"), today)
         month_grid = services.month_attendance(student, month, today)
-        check_log = services.month_check_log(student, month_grid, today)
+        entries = services.month_entries(student, month, today)
+        check_log = services.month_check_log(student, month_grid, today, entries)
         ctx.update(_portal_ctx(self.request, "progress"))
         ctx.update({
             "today": today,
@@ -174,7 +175,7 @@ class ParentLearnerProgressView(ParentOnlyMixin, TemplateView):
             "month_choices": services.attendance_months(term, today),
             "attendance_terms": services.started_terms(term, today),
             "card_times": services.month_card_times(student, month, today, school.late_pickup_after,
-                                                     school.late_pickup_fee),
+                                                     school.late_pickup_fee, entries),
             "reports": reports,
             "term_report_published": bool(term and any(r.term_id == term.pk for r in reports)),
         })

@@ -1,6 +1,6 @@
 {# Check-in and check-out trends for the month picked under Attendance: school days only, from the card reader. The late pick-up time and fee are school settings. #}
 <section id="checkins" class="pp-section" aria-labelledby="checkins-heading">
-  <div class="pp-section-head"><h2 id="checkins-heading">Check-in and check-out</h2><span class="pp-muted">{{ month.month|date:"F Y" }} &middot; school days</span></div>
+  <div class="pp-section-head"><h2 id="checkins-heading">Check-in and check-out</h2><span class="pp-muted">School days &middot; card reader</span></div>
   <div class="pp-month-nav pp-month-nav-bare">
     <a class="pp-btn pp-btn-small" href="?month={{ month.prev|date:'Y-m' }}#checkins" aria-label="Check-in and check-out for {{ month.prev|date:'F Y' }}"><span aria-hidden="true">&larr;</span> {{ month.prev|date:"M" }}</a>
     <span class="pp-card-title">{{ month.month|date:"F Y" }}</span>

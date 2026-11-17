@@ -663,6 +663,16 @@ class V11LayoutTests(PortalTestBase):
         self.assertIn("Check-in times", page)
         self.assertIn("TZS 20,000", page)
 
+    def test_check_in_section_has_its_own_month_navigation(self):
+        self.client.force_login(self.parent)
+        prev_month = (self.today.replace(day=1) - timedelta(days=1)).replace(day=1)
+        page = self._progress().content.decode()
+        section = page[page.index('id="checkins"'):page.index('id="attendance"')]
+        self.assertIn(f'href="?month={prev_month:%Y-%m}#checkins"', section)
+        page = self._progress(month=f"{prev_month:%Y-%m}").content.decode()
+        section = page[page.index('id="checkins"'):page.index('id="attendance"')]
+        self.assertIn(f'<span class="pp-card-title">{prev_month:%B %Y}</span>', section)
+
     def test_no_fee_setting_hides_fees_and_shows_minutes_past(self):
         from core.models import SchoolSettings
         settings_obj = SchoolSettings.get_settings()
