@@ -1,0 +1,23 @@
+{# Day-by-day status and check-out time for the month picked above, latest first. Same records as the Today panel; the check-in time is never shown. #}
+<div class="pp-card pp-check-log" aria-labelledby="check-log-heading">
+  <h3 class="pp-card-title" id="check-log-heading">Daily check-in and check-out &middot; {{ month.month|date:"F Y" }}</h3>
+  {% if rows %}
+    <div class="pp-table-wrap">
+      <table class="pp-table pp-table-log">
+        <caption class="pp-sr">Status and check-out time for each school day in {{ month.month|date:"F Y" }}</caption>
+        <thead><tr><th scope="col">Date</th><th scope="col">Status</th><th scope="col">Checked out</th></tr></thead>
+        <tbody>
+          {% for r in rows %}
+            <tr>
+              <th scope="row">{{ r.date|date:"D j M" }}</th>
+              <td><span class="pp-chip pp-chip-{{ r.code }}">{{ r.label }}</span></td>
+              <td>{% if r.check_out %}<time>{{ r.check_out|time:"g:i A" }}</time>{% elif r.in_school %}<span class="pp-chip pp-chip-P">In-School</span>{% else %}<span class="pp-muted">&mdash;</span>{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="pp-chart-empty">No school days recorded yet this month.</p>
+  {% endif %}
+</div>

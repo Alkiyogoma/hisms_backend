@@ -166,10 +166,20 @@ def greeting(now=None):
 
 # -- today ---------------------------------------------------------------------
 
+def was_checked_in(entry, code):
+    """Whether the learner came to school, read from the same record as the
+    day's status so the two never disagree: marked present/late on the
+    register, scanned in by card, or scanned out all count."""
+    from attendance.models import has_real_check_in
+    if entry is None:
+        return False
+    return code in ("P", "L") or has_real_check_in(entry) or bool(entry.check_out_time)
+
+
 def today_statuses(students, today):
     """{student_id: today's attendance} for several learners in two queries."""
     from attendance import analytics
-    from attendance.models import AttendanceEntry, has_real_check_in
+    from attendance.models import AttendanceEntry
 
     school_day = bool(analytics.build_period(today, today, today).days)
     entries = {e.student_id: e for e in AttendanceEntry.objects.filter(
@@ -179,7 +189,6 @@ def today_statuses(students, today):
     for s in students:
         entry = entries.get(s.pk)
         code = analytics.CODES.get(entry.status) if entry else None
-        check_in = entry.check_in_time if entry and has_real_check_in(entry) else None
         check_out = entry.check_out_time if entry else None
         if code:
             status, label = code, DAY_LABELS[code]
@@ -187,16 +196,18 @@ def today_statuses(students, today):
             status, label = "H", "No school today"
         else:
             status, label = "U", "Not yet marked"
+        checked_in = was_checked_in(entry, code)
         out[s.pk] = {
             "school_day": school_day, "code": status, "label": label,
-            "check_in": check_in, "check_out": check_out,
-            "not_checked_out": bool(check_in and not check_out),
+            "checked_in": checked_in, "check_out": check_out,
+            "in_school": checked_in and not check_out,
         }
     return out
 
 
 def today_status(student, today):
-    """Attendance status, check-in and check-out for today."""
+    """Today's attendance status, whether the learner is checked in, and the
+    check-out time once there is one (the check-in time is never shown)."""
     return today_statuses([student], today)[student.pk]
 
 
@@ -323,16 +334,36 @@ def _minutes(t):
 
 
 def _clock(m):
-    return f"{m // 60:02d}:{m % 60:02d}" if m is not None else None
+    """Minutes after midnight as a 12-hour time ("4:30 PM"), the portal's one time format."""
+    if m is None:
+        return None
+    h, mins = divmod(m, 60)
+    return f"{(h % 12) or 12}:{mins:02d} {'AM' if h < 12 else 'PM'}"
 
 
-def month_card_times(student, month_start, today, late_after, chart_from=14 * 60, chart_to=18 * 60):
-    """Card-reader times for one month: average check-in and check-out, one
-    check-out bar per school day with a time, and the check-outs after the
-    school's late pick-up time (SchoolSettings.late_pickup_after).
+def tzs(amount):
+    """Shillings as shown to parents: "TZS 10,000"."""
+    return f"TZS {amount:,}"
 
-    Days without a card scan simply have no bar: a child collected without a
-    scan can't be counted as late.
+
+def _time_bars(points, lo, hi):
+    """Bar heights (% of the chart) for (date, minutes) points on a lo..hi scale."""
+    span = (hi - lo) or 1
+    return [{"date": d, "time": _clock(m), "short": _clock(m).split()[0],
+             "pct": max(4, round(min(max(m - lo, 0), span) / span * 100, 1))}
+            for d, m in points]
+
+
+def month_card_times(student, month_start, today, late_after, late_fee=0,
+                     out_from=14 * 60 + 30, out_to=18 * 60, in_from=7 * 60, in_to=8 * 60 + 45):
+    """Card-reader times for one month's school days (Mon-Fri, up to today):
+    average check-in and check-out, a check-out chart with the late pick-up
+    line, a check-in chart, and every check-out after the school's late
+    pick-up time (SchoolSettings.late_pickup_after) with its fee.
+
+    The fee (SchoolSettings.late_pickup_fee, 0 = none) shows as due on every
+    late pick-up: the school has no payment record for it yet. Days without a
+    card scan have no bar; a child collected without a scan can't be late.
     """
     from attendance.models import AttendanceEntry, has_real_check_in
     last = _calendar.monthrange(month_start.year, month_start.month)[1]
@@ -340,31 +371,33 @@ def month_card_times(student, month_start, today, late_after, chart_from=14 * 60
                .filter(student=student, date__gte=month_start, date__lte=min(month_start.replace(day=last), today))
                .only("date", "check_in_time", "check_out_time").order_by("date"))
     cutoff = _minutes(late_after)
-    ins, outs, days, late = [], [], [], []
+    ins, outs, late = [], [], []
     for e in entries:
         if e.date.weekday() > 4:
             continue
-        t_in = _minutes(e.check_in_time) if has_real_check_in(e) else None
-        t_out = _minutes(e.check_out_time) if e.check_out_time else None
-        if t_in is not None:
-            ins.append(t_in)
-        if t_out is None:
-            continue
-        outs.append(t_out)
-        is_late = t_out > cutoff
-        days.append({"date": e.date, "out": _clock(t_out), "late": is_late, "minutes": t_out})
-        if is_late:
-            late.append({"date": e.date, "out": e.check_out_time, "minutes_after": t_out - cutoff})
-    lo = min([chart_from] + outs)
-    hi = max([chart_to] + [m + 15 for m in outs])
-    span = hi - lo or 1
-    for d in days:
-        d["pct"] = max(4, round((d.pop("minutes") - lo) / span * 100, 1))
+        if has_real_check_in(e):
+            ins.append((e.date, _minutes(e.check_in_time)))
+        if e.check_out_time:
+            t_out = _minutes(e.check_out_time)
+            outs.append((e.date, t_out))
+            if t_out > cutoff:
+                late.append({"date": e.date, "out": _clock(t_out), "minutes_after": t_out - cutoff,
+                             "fee": tzs(late_fee) if late_fee else None})
+    out_lo = min([out_from] + [m for _, m in outs])
+    out_hi = max([out_to, cutoff + 30] + [m + 15 for _, m in outs])
+    in_lo = min([in_from] + [m - 10 for _, m in ins])
+    in_hi = max([in_to] + [m + 10 for _, m in ins])
+    out_days = _time_bars(outs, out_lo, out_hi)
+    for bar, (_, m) in zip(out_days, outs):
+        bar["late"] = m > cutoff
+    avg = lambda pts: _clock(round(sum(m for _, m in pts) / len(pts))) if pts else None
     return {
-        "avg_in": _clock(round(sum(ins) / len(ins))) if ins else None,
-        "avg_out": _clock(round(sum(outs) / len(outs))) if outs else None,
-        "days": days, "late": late, "late_after": late_after,
-        "line_pct": round((cutoff - lo) / span * 100, 1),
+        "avg_in": avg(ins), "avg_out": avg(outs),
+        "out_days": out_days, "in_days": _time_bars(ins, in_lo, in_hi),
+        "late": late, "late_after": late_after, "late_fee": tzs(late_fee) if late_fee else None,
+        "fees_due": tzs(late_fee * len(late)) if late_fee else None,
+        "minutes_past": sum(l["minutes_after"] for l in late),
+        "line_pct": round((cutoff - out_lo) / ((out_hi - out_lo) or 1) * 100, 1),
     }
 
 
@@ -441,6 +474,31 @@ def month_attendance(student, month_start, today):
         "prev": prev_month,
         "next": next_month if next_month <= today.replace(day=1) else None,
     }
+
+
+def month_check_log(student, month, today):
+    """One row per school day of ``month`` (from month_attendance) up to today:
+    the day's status, whether the learner was checked in and the check-out
+    time. Built from the same records as the Today panel."""
+    from attendance.models import AttendanceEntry
+    days = [d for week in month["weeks"] for d in week
+            if d and d["code"] in ("P", "L", "A", "E", "U") and d["date"] <= today]
+    if not days:
+        return []
+    entries = {e.date: e for e in AttendanceEntry.objects.filter(
+        student=student, date__in=[d["date"] for d in days]).only(
+        "date", "status", "check_in_time", "check_out_time")}
+    rows = []
+    for d in reversed(days):  # latest first
+        entry = entries.get(d["date"])
+        checked_in = was_checked_in(entry, d["code"])
+        check_out = entry.check_out_time if entry else None
+        rows.append({
+            "date": d["date"], "code": d["code"], "label": d["label"] or DAY_LABELS["U"],
+            "checked_in": checked_in, "check_out": check_out,
+            "in_school": checked_in and not check_out and d["date"] == today,
+        })
+    return rows
 
 
 # -- ECD (Pre-K, Kindergarten, Pre-School, ABC) ----------------------------------

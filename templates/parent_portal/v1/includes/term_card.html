@@ -1,11 +1,14 @@
-{# One term of the year: its Quiz, Mid-Term and End-Term side by side, each labelled with its maximum. #}
+{# One term of the year: its Quiz /20, Mid-Term /30 and End-Term /50 side by side, each with its share of the term mark. A term not started shows "Upcoming" and no bars. #}
 <section class="pp-card pp-chart-card" aria-labelledby="term-{{ card.term.pk }}">
   <h3 id="term-{{ card.term.pk }}" class="pp-card-title pp-term-title">
     <span>{{ card.term.short_name }}{% if card.term.academic_year %} &middot; {{ card.term.academic_year.name }}{% endif %}</span>
     <span class="pp-chip {% if card.label == 'Running' %}pp-chip-gold{% elif card.label == 'Upcoming' %}{% else %}pp-chip-blue{% endif %}">{{ card.label }}</span>
   </h3>
+  {% if card.state == 'upcoming' %}
+    <p class="pp-chart-empty pp-term-upcoming">{{ card.term.short_name }} has not started. Marks appear once each exam is approved.</p>
+  {% else %}
   {% if not card.has_marks %}
-    <p class="pp-term-empty">No approved marks yet for {{ card.term.short_name }}{% if card.state == 'upcoming' %}. It hasn&rsquo;t started{% endif %}.</p>
+    <p class="pp-term-empty">No approved marks yet for {{ card.term.short_name }}.</p>
   {% endif %}
     <ul class="pp-chart" role="list">
       {% for bar in card.bars %}
@@ -16,12 +19,13 @@
             <span class="pp-sr">{{ bar.type.name }}: {{ bar.value|floatformat:"-1" }} out of {{ bar.max }}{% if card.label == 'Running' %}, running{% endif %}</span>
           {% else %}
             <span class="pp-bar pp-bar-empty"></span>
-            <span class="pp-sr">{{ bar.type.name }} (out of {{ bar.max }}): {% if card.state == 'upcoming' %}upcoming{% else %}no approved marks yet{% endif %}</span>
+            <span class="pp-sr">{{ bar.type.name }} (out of {{ bar.max }}, {{ bar.max }}% of the term): no approved marks yet</span>
           {% endif %}
-          <span class="pp-bar-lbl" aria-hidden="true">{{ bar.type.name }}<em>/{{ bar.max }}{% if card.state == 'upcoming' %} &middot; Upcoming{% elif bar.value is None %} &middot; Not yet{% endif %}</em></span>
+          <span class="pp-bar-lbl" aria-hidden="true">{{ bar.type.name }} /{{ bar.max }}<em>{{ bar.max }}% &middot; {% if bar.value is None %}Not yet{% elif card.label == 'Running' %}Running{% else %}{{ card.label }}{% endif %}</em></span>
         </li>
       {% endfor %}
     </ul>
+  {% endif %}
   {# Past terms show their average here; the current term's is at the foot of the subject table. #}
   {% if card.state == 'final' and card.average is not None %}
     <p class="pp-term-avg">{% if card.complete %}Term average{% else %}Average (incomplete){% endif %} <b>{{ card.average|floatformat:"-2" }}%</b></p>

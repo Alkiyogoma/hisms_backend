@@ -1,0 +1,72 @@
+{# Check-in and check-out trends for the month picked under Attendance: school days only, from the card reader. The late pick-up time and fee are school settings. #}
+<section id="checkins" class="pp-section" aria-labelledby="checkins-heading">
+  <div class="pp-section-head"><h2 id="checkins-heading">Check-in and check-out</h2><span class="pp-muted">{{ month.month|date:"F Y" }} &middot; school days</span></div>
+  <div class="pp-month-nav pp-month-nav-bare">
+    <a class="pp-btn pp-btn-small" href="?month={{ month.prev|date:'Y-m' }}#checkins" aria-label="Check-in and check-out for {{ month.prev|date:'F Y' }}"><span aria-hidden="true">&larr;</span> {{ month.prev|date:"M" }}</a>
+    <span class="pp-card-title">{{ month.month|date:"F Y" }}</span>
+    {% if month.next %}
+      <a class="pp-btn pp-btn-small" href="?month={{ month.next|date:'Y-m' }}#checkins" aria-label="Check-in and check-out for {{ month.next|date:'F Y' }}">{{ month.next|date:"M" }} <span aria-hidden="true">&rarr;</span></a>
+    {% else %}<span class="pp-month-spacer"></span>{% endif %}
+  </div>
+  <p class="pp-banner">Times come from the card reader. Any pick-up after {{ times.late_after|time:"g:i A" }} is shown in red and listed below.</p>
+
+  <dl class="pp-stats pp-stats-4">
+    <div><dt>Average check-in</dt><dd class="pp-c-blue">{{ times.avg_in|default:"–" }}</dd></div>
+    <div><dt>Average check-out</dt><dd class="pp-c-blue">{{ times.avg_out|default:"–" }}</dd></div>
+    <div><dt>Late pick-ups</dt><dd class="{% if times.late %}pp-c-bad{% else %}pp-c-ok{% endif %}">{{ times.late|length }}</dd></div>
+    {% if times.late_fee %}
+      <div><dt>Late fees due</dt><dd class="pp-stat-money {% if times.late %}pp-c-bad{% else %}pp-c-ok{% endif %}">{% if times.late %}{{ times.fees_due }}{% else %}None{% endif %}</dd></div>
+    {% else %}
+      <div><dt>Minutes past {{ times.late_after|time:"g:i A" }}</dt><dd class="{% if times.late %}pp-c-bad{% else %}pp-c-ok{% endif %}">{{ times.minutes_past }}</dd></div>
+    {% endif %}
+  </dl>
+
+  <div class="pp-card pp-times">
+    <h3 class="pp-card-title">Check-out times &middot; pick-up</h3>
+    {% if times.out_days %}
+      {% include "parent_portal/v1/includes/time_chart.html" with days=times.out_days line=times.late_after line_pct=times.line_pct label="Check-out time each school day" %}
+      <p class="pp-note">Dashed line marks {{ times.late_after|time:"g:i A" }}. Bars above it are late pick-ups.</p>
+    {% else %}
+      <p class="pp-chart-empty">No card check-outs recorded this month.</p>
+    {% endif %}
+  </div>
+
+  <div class="pp-card pp-times">
+    <h3 class="pp-card-title">Check-in times &middot; arrival</h3>
+    {% if times.in_days %}
+      {% include "parent_portal/v1/includes/time_chart.html" with days=times.in_days label="Check-in time each school day" %}
+      <p class="pp-note">Each bar is one school day. Late arrivals are marked on the attendance calendar.</p>
+    {% else %}
+      <p class="pp-chart-empty">No card check-ins recorded this month.</p>
+    {% endif %}
+  </div>
+
+  <div class="pp-card pp-times" aria-labelledby="late-heading">
+    <h3 class="pp-card-title pp-term-title" id="late-heading"><span>Late pick-ups after {{ times.late_after|time:"g:i A" }}</span><span class="pp-late-count">{% if times.late %}{{ times.late|length }} this month{% else %}None this month{% endif %}</span></h3>
+    {% if times.late %}
+      <div class="pp-table-wrap">
+        <table class="pp-table pp-table-late">
+          <caption class="pp-sr">Late pick-ups in {{ month.month|date:"F Y" }}, with minutes after {{ times.late_after|time:"g:i A" }}</caption>
+          <thead><tr><th scope="col">Date</th><th scope="col" class="num">Collected</th><th scope="col" class="num">Minutes<span class="pp-hide-sm"> after {{ times.late_after|time:"g:i A" }}</span></th>{% if times.late_fee %}<th scope="col">Late fee</th>{% endif %}</tr></thead>
+          <tbody>
+            {% for l in times.late %}
+              <tr>
+                <th scope="row">{{ l.date|date:"D j M" }}</th>
+                <td class="num">{{ l.out }}</td>
+                <td class="num">{{ l.minutes_after }} min</td>
+                {% if times.late_fee %}<td class="pp-fee">{{ l.fee }} <span class="pp-chip pp-chip-L">Due</span></td>{% endif %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="pp-chart-empty">No late pick-ups this month.</p>
+    {% endif %}
+    {% if times.late_fee %}
+      <p class="pp-note">Late pick-up fee: {{ times.late_fee }} for each pick-up after {{ times.late_after|time:"g:i A" }}. Each fee shows as due until the school records payment.</p>
+    {% endif %}
+  </div>
+
+  {% include "parent_portal/v1/includes/check_log.html" with rows=check_log month=month %}
+</section>

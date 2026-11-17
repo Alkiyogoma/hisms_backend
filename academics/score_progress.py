@@ -176,10 +176,10 @@ def is_ready_for_sign_off(student, term):
 # -- the report's ACADEMIC PROGRESS table ------------------------------------
 
 def report_grade(mark):
-    """(grade, label) on the printed report's scale (A* for 90+)."""
+    """(grade, label) on the printed report's scale (A+ for 90+, Outstanding)."""
     from academics.grading_utils import get_grade_from_score, get_grade_label
     grade = get_grade_from_score(mark)
-    return ("A*" if grade == "A+" else grade), get_grade_label(grade)
+    return grade, get_grade_label(grade)
 
 
 def exam_scores_for(student_ids, term_ids):

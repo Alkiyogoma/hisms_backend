@@ -99,6 +99,17 @@ class PortalTestBase(TestCase):
         return ReportCard.objects.create(student=student, term=term, generated_by=self.teacher, status=status,
                                          published_at=timezone.now() if status == ReportCardStatus.PUBLISHED else None)
 
+    @staticmethod
+    def _today_panel(page):
+        """The Today panel's markup: the only place check-in must never show a time."""
+        panel = page[page.index('<dl class="pp-today'):]
+        return panel[:panel.index("</dl>")]
+
+    @staticmethod
+    def _check_log(page):
+        log = page[page.index('id="check-log-heading"'):]
+        return log[:log.index("</table>")]
+
     def _progress(self, student=None, **params):
         return self.client.get(reverse("parent_portal:progress", args=[(student or self.child).pk]), params)
 
@@ -135,22 +146,65 @@ class HomeTests(PortalTestBase):
                          "Fix markers", "Mockup"):
                 self.assertNotIn(text, page, f"{text!r} on {url}")
 
-    def test_today_shows_not_checked_out(self):
+    def test_today_checked_in_shows_in_school_without_time(self):
         AttendanceEntry.objects.create(student=self.child, date=self.today, status=AttendanceStatus.PRESENT,
                                        check_in_time=time(7, 42), class_name="Grade 5", marked_by=self.teacher)
         self.client.force_login(self.parent)
         for url in (reverse("parent_portal:dashboard"), reverse("parent_portal:progress", args=[self.child.pk])):
             page = self.client.get(url).content.decode()
-            self.assertIn("07:42", page)
-            self.assertIn("Not checked out", page)
+            today_panel = self._today_panel(page)
+            self.assertNotIn("7:42", today_panel)
+            self.assertIn("In-School", today_panel)
+            self.assertIn("Checked in", today_panel)
+            self.assertNotIn("Not checked in", today_panel)
+
+    def test_register_present_without_card_scan_counts_as_checked_in(self):
+        # Marked present on the class register, never scanned: Status and
+        # Checked in must agree.
+        AttendanceEntry.objects.create(student=self.child, date=self.today, status=AttendanceStatus.PRESENT,
+                                       class_name="Grade 5", marked_by=self.teacher)
+        info = services.today_status(self.child, self.today)
+        self.assertEqual((info["label"], info["checked_in"], info["in_school"]), ("Present", True, True))
+        self.client.force_login(self.parent)
+        page = self.client.get(reverse("parent_portal:dashboard")).content.decode()
+        self.assertNotIn("Not checked in", page)
+
+    def test_absent_is_not_checked_in(self):
+        AttendanceEntry.objects.create(student=self.child, date=self.today, status=AttendanceStatus.ABSENT,
+                                       class_name="Grade 5", marked_by=self.teacher)
+        info = services.today_status(self.child, self.today)
+        self.assertEqual((info["checked_in"], info["in_school"]), (False, False))
 
     def test_checked_out_time_shown(self):
         AttendanceEntry.objects.create(student=self.child, date=self.today, status=AttendanceStatus.LATE,
-                                       check_in_time=time(8, 21), check_out_time=time(15, 30),
+                                       check_in_time=time(8, 21), check_out_time=time(15, 42),
                                        class_name="Grade 5", marked_by=self.teacher)
         info = services.today_status(self.child, self.today)
-        self.assertEqual((info["label"], info["not_checked_out"]), ("Late", False))
-        self.assertEqual(info["check_out"], time(15, 30))
+        self.assertEqual((info["label"], info["checked_in"], info["in_school"]), ("Late", True, False))
+        self.assertEqual(info["check_out"], time(15, 42))
+        self.client.force_login(self.parent)
+        page = self.client.get(reverse("parent_portal:progress", args=[self.child.pk])).content.decode()
+        self.assertIn("Checked out <time>3:42 PM</time>", self._today_panel(page))
+        self.assertNotIn("8:21", self._today_panel(page))
+
+    def test_daily_check_log_lists_each_school_day(self):
+        day = self.today.replace(day=1)
+        while day.weekday() > 4:
+            day += timedelta(days=1)
+        if day >= self.today:
+            self.skipTest("No earlier weekday in this month.")
+        AttendanceEntry.objects.create(student=self.child, date=day, status=AttendanceStatus.PRESENT,
+                                       check_in_time=time(7, 30), check_out_time=time(16, 5),
+                                       class_name="Grade 5", marked_by=self.teacher)
+        self.client.force_login(self.parent)
+        resp = self.client.get(reverse("parent_portal:progress", args=[self.child.pk]))
+        rows = {r["date"]: r for r in resp.context["check_log"]}
+        self.assertEqual((rows[day]["label"], rows[day]["checked_in"], rows[day]["check_out"]),
+                         ("Present", True, time(16, 5)))
+        page = resp.content.decode()
+        self.assertIn("Daily check-in and check-out", page)
+        self.assertIn("4:05 PM", self._check_log(page))
+        self.assertNotIn("7:30", self._check_log(page))
 
 
 class OwnershipTests(PortalTestBase):
@@ -206,10 +260,11 @@ class ReportPublicationTests(PortalTestBase):
         draft = self._report(self.child, self.t1, ReportCardStatus.DRAFT)
         self.client.force_login(self.parent)
         page = self._progress().content.decode()
-        # No report section, navigation or "awaiting" placeholder before publication.
-        self.assertNotIn("Report cards", page)
-        self.assertNotIn("report-cards", page)
-        self.assertNotIn("Not yet published", page)
+        # Before publication: "Not yet published" for the current term only, no
+        # link to the draft, and nothing from the draft itself.
+        self.assertIn("Not yet published", page)
+        self.assertNotIn(reverse("parent_portal:report_card", args=[self.child.pk, draft.pk]), page)
+        self.assertNotIn(reverse("parent_portal:report_download", args=[self.child.pk, draft.pk]), page)
         for name in ("report_card", "report_download"):
             self.assertEqual(self.client.get(reverse(f"parent_portal:{name}", args=[self.child.pk, draft.pk]))
                              .status_code, 404)
@@ -223,7 +278,8 @@ class ReportPublicationTests(PortalTestBase):
         draft.published_at = timezone.now()
         draft.save(update_fields=["status", "published_at"])
         page = self._progress().content.decode()
-        self.assertIn("Report cards", page)
+        self.assertIn("Preview report", page)
+        self.assertIn(reverse("parent_portal:report_download", args=[self.child.pk, draft.pk]), page)
         view_url = reverse("parent_portal:report_card", args=[self.child.pk, draft.pk])
         self.assertIn(view_url, page)
         resp = self.client.get(view_url)
@@ -313,22 +369,22 @@ class MarksTests(PortalTestBase):
         page = resp.content.decode()
         self.assertIn(">Upcoming<", page)
         self.assertIn(">Running<", page)
-        self.assertIn("No approved marks yet for Term 3", page)
-        self.assertIn("<em>/20", page)
-        self.assertIn("<em>/30", page)
-        self.assertIn("&middot; Upcoming", page)
+        # Term 3 has not started: "Upcoming", a line and no bars at all.
+        self.assertIn("Term 3 has not started.", page)
+        self.assertIn("Quiz /20<em>20%", page)
+        self.assertIn("Mid-Term /30<em>30%", page)
         # Filled bars only where there are marks: Term 1 (quiz, mid) and Term 2 (quiz).
         self.assertEqual(page.count('class="pp-bar pp-bar-running"') + page.count('class="pp-bar"'), 3)
-        # Every term card shows all three assessment columns, so the cards line up.
-        self.assertEqual(page.count('class="pp-bar-col"'), 3 * len(cards[0]["bars"]))
+        # Started terms show all three assessment columns; Term 3 shows none.
+        self.assertEqual(page.count('class="pp-bar-col"'), 2 * len(cards[0]["bars"]))
 
     def test_started_term_without_marks_gets_its_own_empty_message(self):
         self._score("Mathematics", "quiz", 90)                         # Term 2 only
         self.client.force_login(self.parent)
         page = self._progress().content.decode()
         self.assertIn("No approved marks yet for Term 1", page)
-        self.assertIn("No approved marks yet for Term 3", page)
         self.assertNotIn("No approved marks yet for Term 2", page)
+        self.assertIn("Term 3 has not started.", page)
 
 
 class AttendanceTests(PortalTestBase):
@@ -440,13 +496,14 @@ class NavigationTests(PortalTestBase):
         page = self._progress().content.decode()
         self.assertIn(reverse("parent_portal:progress", args=[sibling.pk]), page)
         self.assertNotIn(reverse("parent_portal:progress", args=[self.other_child.pk]), page)
-        # No approved marks at all this year: one card per term, each with its
-        # three assessments as empty placeholders and its own empty message.
+        # No approved marks at all this year: one card per term. Started terms
+        # show their three assessments as empty placeholders; Term 3 has none.
         self.assertIn("Not yet", page)
-        for name in ("Term 1", "Term 2", "Term 3"):
+        for name in ("Term 1", "Term 2"):
             self.assertIn(f"No approved marks yet for {name}", page)
+        self.assertIn("Term 3 has not started.", page)
         self.assertNotIn('class="pp-bar-val"', page)
-        self.assertEqual(page.count('class="pp-bar pp-bar-empty"'), 9)
+        self.assertEqual(page.count('class="pp-bar pp-bar-empty"'), 6)
 
 
 class HomeLastTermTests(PortalTestBase):
@@ -468,16 +525,18 @@ class HomeLastTermTests(PortalTestBase):
 
 
 class TodayTimesTests(PortalTestBase):
-    def test_check_in_and_out_times_shown_when_recorded(self):
+    def test_check_out_time_shown_check_in_time_never(self):
         AttendanceEntry.objects.create(student=self.child, date=self.today, status=AttendanceStatus.PRESENT,
                                        check_in_time=time(7, 42), check_out_time=time(15, 30),
                                        class_name="Grade 5", marked_by=self.teacher)
         self.client.force_login(self.parent)
         for url in (reverse("parent_portal:dashboard"), reverse("parent_portal:progress", args=[self.child.pk])):
             page = self.client.get(url).content.decode()
-            self.assertIn("07:42", page)
-            self.assertIn("15:30", page)
-            self.assertNotIn("Not checked out", page)
+            # Today: check-out time always shown, check-in time never.
+            panel = self._today_panel(page)
+            self.assertNotIn("7:42", panel)
+            self.assertIn("3:30 PM", panel)
+            self.assertNotIn("In-School", panel)
 
 
 class TermAttendanceExportTests(PortalTestBase):
@@ -536,7 +595,7 @@ class V11LayoutTests(PortalTestBase):
         self.assertLess(page.index('id="report-cards"'), page.index('id="performance"'))
         self.assertLess(page.index('id="today"'), page.index('id="report-cards"'))
 
-    def test_late_pickups_follow_the_school_setting_and_never_show_fees_due(self):
+    def test_late_pickups_follow_the_school_setting_and_show_fee_due(self):
         from core.models import SchoolSettings
         settings_obj = SchoolSettings.get_settings()
         settings_obj.late_pickup_after = time(17, 0)
@@ -554,13 +613,78 @@ class V11LayoutTests(PortalTestBase):
         page = self._progress().content.decode()
         self.assertIn('class="pp-tbar pp-tbar-late"', page)
         self.assertIn("35 min", page)
-        self.assertIn("TZS 10,000", page)
-        self.assertNotIn("Due", page)
+        # Each late pick-up shows the fee as due; the tile totals them.
+        self.assertIn('TZS 10,000 <span class="pp-chip pp-chip-L">Due</span>', page)
+        self.assertIn("Late fees due", page)
+        self.assertIn("1 this month", page)
         # Moving the setting later clears it.
         settings_obj.late_pickup_after = time(18, 0)
         settings_obj.save()
         page = self._progress().content.decode()
         self.assertNotIn('class="pp-tbar pp-tbar-late"', page)
+
+    def test_v11_section_and_jump_link_order(self):
+        self.client.force_login(self.parent)
+        page = self._progress().content.decode()
+        ids = ['id="today"', 'id="report-cards"', 'id="performance"', 'id="checkins"', 'id="attendance"']
+        positions = [page.index(i) for i in ids]
+        self.assertEqual(positions, sorted(positions))
+        jump = page[page.index('class="pp-jump"'):]
+        jump = jump[:jump.index("</nav>")]
+        links = ["#today", "#report-cards", "#performance", "#checkins", "#attendance"]
+        self.assertEqual([jump.index(l) for l in links], sorted(jump.index(l) for l in links))
+
+    def test_late_fees_due_total_and_check_in_trend(self):
+        from core.models import SchoolSettings
+        settings_obj = SchoolSettings.get_settings()
+        settings_obj.late_pickup_after = time(17, 0)
+        settings_obj.late_pickup_fee = 10000
+        settings_obj.save()
+        days, d = [], self.today.replace(day=1)
+        while d < self.today and len(days) < 3:
+            if d.weekday() < 5:
+                days.append(d)
+            d += timedelta(days=1)
+        if len(days) < 3:
+            self.skipTest("Fewer than three earlier weekdays this month.")
+        for day, out in zip(days, (time(17, 20), time(18, 5), time(16, 0))):
+            AttendanceEntry.objects.create(student=self.child, date=day, status=AttendanceStatus.PRESENT,
+                                           check_in_time=time(7, 40), check_out_time=out,
+                                           class_name="Grade 5", marked_by=self.teacher)
+        self.client.force_login(self.parent)
+        resp = self._progress()
+        times = resp.context["card_times"]
+        self.assertEqual(times["avg_in"], "7:40 AM")
+        self.assertEqual(len(times["in_days"]), 3)
+        self.assertEqual([l["minutes_after"] for l in times["late"]], [20, 65])
+        self.assertEqual(times["fees_due"], "TZS 20,000")
+        page = resp.content.decode()
+        self.assertIn("Average check-in", page)
+        self.assertIn("Check-in times", page)
+        self.assertIn("TZS 20,000", page)
+
+    def test_no_fee_setting_hides_fees_and_shows_minutes_past(self):
+        from core.models import SchoolSettings
+        settings_obj = SchoolSettings.get_settings()
+        settings_obj.late_pickup_fee = 0
+        settings_obj.save()
+        self.client.force_login(self.parent)
+        page = self._progress().content.decode()
+        self.assertNotIn("Late fees due", page)
+        self.assertNotIn("Late fee", page)
+        self.assertIn("Minutes past", page)
+
+    def test_top_grade_is_a_plus_not_a_star(self):
+        for subject in ("Mathematics", "English"):
+            self._score(subject, "quiz", 95)
+            self._score(subject, "mid_term", 95)
+            self._score(subject, "end_of_term", 95)
+        self.client.force_login(self.parent)
+        resp = self._progress()
+        self.assertEqual(resp.context["academic"]["grade"], "A+")
+        page = resp.content.decode()
+        self.assertIn(">A+<", page)
+        self.assertNotIn("A*", page)
 
     def test_ecd_student_sees_published_progress_report_not_marks(self):
         from academics.models import ECDItem, ECDSection, ECDEvaluation
