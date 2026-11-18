@@ -9,7 +9,8 @@
     <tr>
       <td><b>Academic Year:</b> {{ report.term.academic_year.name }}</td>
       <td><b>Term:</b> {{ report.term.get_term_number_display|default:report.term.name }}</td>
-      <td><b>Date:</b> {% firstof report.signed_off_at|date:"d M Y" report.published_at|date:"d M Y" %}{% if not report.signed_off_at and not report.published_at %}{% now "d M Y" %}{% endif %}</td>
+      {# The report is dated at the end of its term, not the day it is printed. #}
+      <td><b>Date:</b> {{ report.term.end_date|date:"d M Y" }}</td>
     </tr>
   </table>
 
