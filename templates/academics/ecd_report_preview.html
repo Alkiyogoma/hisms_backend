@@ -51,7 +51,7 @@
     .ecd-key th, .ecd-key td { border: 1px solid var(--line); padding: 3px 6px; background: var(--accent); }
     .ecd-key th { background: #fff; font-weight: 700; width: 46px; white-space: nowrap; }
 
-    table.ecd-table, table.ecd-strip, table.ecd-overall { border-collapse: collapse; width: 100%; font-size: 10.5pt; margin-bottom: 8px; table-layout: fixed; }
+    table.ecd-table, table.ecd-strip, table.ecd-overall { border-collapse: collapse; width: 100%; font-size: 10.5pt; margin-bottom: 12px; table-layout: fixed; }
     .ecd-table th, .ecd-table td, .ecd-strip th, .ecd-strip td, .ecd-overall th, .ecd-overall td { border: 1px solid var(--line); padding: 3px 6px; text-align: left; vertical-align: top; }
     .ecd-table th { background: var(--navy); color: #fff; font-weight: 700; text-transform: uppercase; }
     .ecd-table th.ecd-val-h { width: 72px; text-transform: none; font-weight: 500; text-align: center; padding: 3px 2px; }
@@ -63,18 +63,20 @@
     .ecd-strip th { background: #fff; font-weight: 700; overflow-wrap: anywhere; }
     .ecd-strip td.ecd-val { width: auto; }
     .ecd-verse-text { font-weight: 700; }
-    /* The two columns sit flush, sharing one border, as in the school's template. */
-    /* Both columns are the same width and end on the same line: the last
-       table in the shorter column stretches down to meet the other. */
-    .ecd-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0; align-items: stretch; margin-bottom: 8px; }
+    /* Both columns are the same width and end on the same line. Rows keep
+       their natural height so they line up across the two columns; an empty
+       filler row at the foot of the shorter column takes up the difference. */
+    .ecd-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 12px; align-items: stretch; margin-bottom: 12px; }
     .ecd-cols > div { display: flex; flex-direction: column; min-width: 0; }
-    .ecd-cols > div > table:last-child { flex: 1 1 auto; margin-bottom: 0; }
-    .ecd-cols > div + div { margin-left: -1px; }
+    .ecd-cols > div > table { margin-bottom: 0; }
+    /* A gap between sections stacked in a column (READING, then WRITING). */
+    .ecd-cols > div > table + table { margin-top: 12px; }
+    /* The filler stays joined to the last table, so the column still ends flush. */
+    .ecd-cols > div > table.ecd-fill { flex: 1 1 auto; margin-top: -1px; }
+    .ecd-cols table.ecd-fill td { padding: 0; }
     /* Same navy header as the NUMERACY / READING section tables. */
     .ecd-overall th { font-weight: 700; background: var(--navy); color: #fff; }
     .ecd-overall td { height: 24px; font-weight: 700; }
-    .ecd-overall th:first-child, .ecd-overall td:first-child { text-align: center; vertical-align: middle; }
-
     .ecd-footer { margin-top: 10px; break-inside: avoid; page-break-inside: avoid; }
     .ecd-comment { min-height: 60px; border-bottom: 1px solid #999; padding: 2px 0 8px; font-style: normal; white-space: pre-line; text-align: justify; }
     .ecd-foot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; margin-top: 12px; }
@@ -94,8 +96,8 @@
       .ecd-sheet { padding: 16px 12px; }
       .ecd-cols, .ecd-foot-grid { grid-template-columns: 1fr; }
       .ecd-sig-wide { max-width: none; }
-      .ecd-cols > div + div { margin-left: 0; margin-top: -1px; }
-      .ecd-cols > div > table:last-child { flex: none; }
+      .ecd-cols { row-gap: 12px; }
+      .ecd-cols table.ecd-fill { display: none; }
       .ecd-strip, .ecd-overall, .ecd-meta { table-layout: auto; }
       .ecd-meta td:first-child { width: auto; }
     }
@@ -105,6 +107,8 @@
       .no-print { display: none !important; }
       .ecd-sheet { box-shadow: none; border-radius: 0; max-width: none; padding: 0; }
       .report-container + .report-container { margin-top: 0; }
+      /* Pre-Kindergarten: General Traits always start on page 2. */
+      .ecd-type-pre_k .ecd-part-traits { break-before: page; page-break-before: always; }
     }
   </style>
 </head>

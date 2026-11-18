@@ -3,11 +3,12 @@ import json
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, reverse
+from django.utils import timezone
 from django.views.generic import TemplateView, View
 
 from academics import ecd_report
 from academics.ecd_utils import ecd_template_type_from_class_name, grade_class_names_for_department
-from academics.models import Department, ECDEvaluation, GradeClass, ReportCard, ReportCardStatus, Term
+from academics.models import TERM_LOCK_GRACE_DAYS, Department, ECDEvaluation, GradeClass, ReportCard, ReportCardStatus, Term
 from academics.utils import get_current_term
 from audit.models import log_event
 from core.permissions import RoleRequiredMixin
@@ -92,9 +93,16 @@ def _ecd_class_of(request, student: Student) -> str:
     return request.GET.get("class_name", "").strip() or student.class_name
 
 
-def ecd_term_editable(term) -> bool:
-    """Only the current term is evaluated; earlier (and later) terms are read-only."""
-    return term is not None and term == get_current_term()
+def ecd_term_editable(term, today=None) -> bool:
+    """The current term can be evaluated, and so can a term that has ended but
+    is still within its lock grace period (``Term.editable_until``). Later
+    terms and terms past their lock date are read-only."""
+    if term is None or term.is_locked:
+        return False
+    if term == get_current_term():
+        return True
+    today = today or timezone.localdate()
+    return bool(term.end_date and term.end_date < today and not term.is_past_lock_date(today))
 
 
 def ecd_class_roster(class_name, term):
@@ -127,7 +135,9 @@ def ecd_class_roster(class_name, term):
     return Student.objects.filter(pk__in=ids)
 
 
-READ_ONLY_TERM_ERROR = "Earlier terms are read-only. Only the current term can be evaluated."
+READ_ONLY_TERM_ERROR = (
+    f"This term is read-only. A term can be evaluated until {TERM_LOCK_GRACE_DAYS} days after it ends."
+)
 
 
 class ECDStudentsAPIView(RoleRequiredMixin, View):

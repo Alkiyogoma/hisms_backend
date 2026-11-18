@@ -1640,8 +1640,11 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
             for ay in years:
                 ay.term_list = list(ay.terms.all())
                 ay.is_ended = bool(ay.end_date and ay.end_date < today)
+                # Read-only only once the grace period after the end date is over.
+                ay.is_read_only = ay.is_past_lock_date(today)
                 for t in ay.term_list:
                     t.is_ended = bool(t.end_date and t.end_date < today)
+                    t.is_read_only = t.is_locked or t.is_past_lock_date(today)
                     t.is_current_term = bool(current and t.pk == current.pk)
             ctx["academic_years"] = years
             ctx["is_super_admin"] = self._is_super_admin(request)
@@ -2025,8 +2028,9 @@ class SchoolSettingsUpdateView(RoleRequiredMixin, View):
                 ay = get_object_or_404(AcademicYear, pk=pk)
                 from django.utils import timezone
                 today = timezone.now().date()
-                if ay.end_date and ay.end_date < today:
-                    messages.error(request, f"Cannot edit '{ay.name}': it ended on {ay.end_date}. Past academic years are read-only.")
+                from academics.models import TERM_LOCK_GRACE_DAYS
+                if ay.is_past_lock_date(today):
+                    messages.error(request, f"Cannot edit '{ay.name}': it ended on {ay.end_date} and locked on {ay.editable_until + timedelta(days=1)}. Academic years are read-only {TERM_LOCK_GRACE_DAYS} days after they end.")
                     return redirect(f"{reverse_lazy('core:school_settings')}?tab=academic_year")
                 name = request.POST.get("name", "").strip()
                 start_date_str = request.POST.get("start_date", "").strip()

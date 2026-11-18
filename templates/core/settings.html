@@ -420,7 +420,7 @@
 </div>
 
 {% for ay in academic_years %}
-<details class="card set-year{% if ay.is_current %} is-current{% endif %}" {% if not ay.is_ended or ay.is_current %}open{% endif %}>
+<details class="card set-year{% if ay.is_current %} is-current{% endif %}" {% if not ay.is_read_only or ay.is_current %}open{% endif %}>
     <summary class="set-year-head">
         <div class="set-year-title">
             <svg class="set-year-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
@@ -428,12 +428,13 @@
             {% if ay.is_current %}<span class="chip chip-blue">Current</span>{% endif %}
             {% if ay.is_published %}<span class="chip chip-green">Published</span>{% else %}<span class="chip chip-grey">Draft</span>{% endif %}
             {% if ay.is_ended %}<span class="chip chip-grey">Ended</span>{% endif %}
+            {% if ay.is_ended and not ay.is_read_only %}<span class="chip chip-amber" title="Locks 30 days after the year ends">Editable until {{ ay.editable_until|date:"d M Y" }}</span>{% endif %}
         </div>
         <div class="set-year-meta">
             {% if ay.start_date and ay.end_date %}{{ ay.start_date|date:"d M Y" }} – {{ ay.end_date|date:"d M Y" }}{% else %}<span class="set-warn">No dates set</span>{% endif %}
             <span class="set-dot">·</span>{{ ay.term_list|length }} of {{ ay.number_of_terms }} term{{ ay.number_of_terms|pluralize }}
         </div>
-        {% if not ay.is_ended %}
+        {% if not ay.is_read_only %}
         <div class="set-year-actions" onclick="event.preventDefault()">
             {% if perms.academics.change_academicyear %}
             {% if ay.is_published %}
@@ -477,6 +478,7 @@
                             {% if term.is_current_term %}<span class="chip chip-blue">Current</span>{% endif %}
                             {% if term.is_locked %}<span class="chip chip-grey">Locked</span>{% endif %}
                             {% if term.is_ended %}<span class="chip chip-grey">Ended</span>{% endif %}
+                            {% if term.is_ended and not term.is_read_only %}<span class="chip chip-amber" title="Grading, reports and the term's settings lock 30 days after the term ends">Editable until {{ term.editable_until|date:"d M Y" }}</span>{% endif %}
                         </div>
                     </td>
                     <td>
@@ -498,7 +500,7 @@
                         {% if not term.quiz_grade_marking_end_date and not term.midterm_grade_marking_end_date and not term.endterm_grade_marking_end_date %}<span class="set-muted">–</span>{% endif %}
                     </td>
                     <td style="text-align:right;white-space:nowrap">
-                        {% if not term.is_ended %}
+                        {% if not term.is_read_only %}
                         <c-button variant="secondary" size="sm"
                             onclick="openTermDrawer({pk:'{{ term.pk }}',year:'{{ ay.pk }}',number:'{{ term.term_number|default:'' }}',name:'{{ term.name|escapejs }}',start:'{{ term.start_date|date:'Y-m-d' }}',end:'{{ term.end_date|date:'Y-m-d' }}',deadline:'{{ term.grading_deadline|date:'Y-m-d' }}',quiz_start:'{{ term.quiz_start_date|date:'Y-m-d' }}',quiz_end:'{{ term.quiz_end_date|date:'Y-m-d' }}',mt_start:'{{ term.midterm_exam_start_date|date:'Y-m-d' }}',mt_end:'{{ term.midterm_exam_end_date|date:'Y-m-d' }}',et_start:'{{ term.endterm_exam_start_date|date:'Y-m-d' }}',et_end:'{{ term.endterm_exam_end_date|date:'Y-m-d' }}',q_days:{{ term.quiz_grade_marking_days|default:5 }},mt_days:{{ term.midterm_grade_marking_days|default:10 }},et_days:{{ term.endterm_grade_marking_days|default:10 }}})">Edit</c-button>
                         <c-button variant="danger" size="sm"
@@ -509,7 +511,7 @@
                 {% empty %}
                 <tr>
                     <td colspan="5" class="set-empty-row">
-                        No terms yet.{% if not ay.is_ended %} <a href="#" onclick="openTermDrawer({year:'{{ ay.pk }}'});return false">Add the first term</a>{% endif %}
+                        No terms yet.{% if not ay.is_read_only %} <a href="#" onclick="openTermDrawer({year:'{{ ay.pk }}'});return false">Add the first term</a>{% endif %}
                     </td>
                 </tr>
                 {% endfor %}
@@ -574,7 +576,7 @@
                 <label class="form-label" for="term_year">Academic year <span class="req">*</span></label>
                 <select name="academic_year" id="term_year" class="hf-select" required>
                     <option value="">Select year</option>
-                    {% for ay in academic_years %}{% if not ay.is_ended %}<option value="{{ ay.pk }}">{{ ay.name }}</option>{% endif %}{% endfor %}
+                    {% for ay in academic_years %}{% if not ay.is_read_only %}<option value="{{ ay.pk }}">{{ ay.name }}</option>{% endif %}{% endfor %}
                 </select>
             </div>
             <div class="set-field">

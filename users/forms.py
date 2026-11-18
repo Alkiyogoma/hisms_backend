@@ -704,11 +704,11 @@ class UserUpdateForm(StaffAssignmentFieldsMixin, forms.ModelForm):
         self.fields["teaching_classes"].choices = [(str(g.id), g.name) for g in all_classes]
         all_subjects = Subject.objects.filter(is_active=True).order_by("name")
         self.fields["subjects_taught"].choices = [(s.name, s.name) for s in all_subjects]
-        # Only show current & future terms in the assignment dropdown
-        from django.utils import timezone
-        today = timezone.now().date()
+        # Only show current & future terms, plus ended terms still within
+        # their lock grace period, in the assignment dropdown
+        from academics.models import lock_cutoff
         self.fields["assignment_term"].queryset = Term.objects.filter(
-            end_date__gte=today
+            end_date__gte=lock_cutoff()
         ).order_by("-end_date")
         # Pre-select current term
         term = get_current_term()

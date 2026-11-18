@@ -150,7 +150,7 @@ app.conf.beat_schedule = {
         'task': 'finance.tasks.send_fee_reminders_task',
         'schedule': crontab(hour=5, minute=0),  # 08:00 EAT
     },
-    # FR-CAL-004 / UAT ACD-003: Auto-advance term when end_date passes.
+    # FR-CAL-004 / UAT ACD-003: Lock a term 30 days after its end_date and auto-advance.
     # Runs daily at 06:00 EAT = 03:00 UTC.
     'check-and-advance-term-daily': {
         'task': 'academics.tasks.check_and_advance_term_task',

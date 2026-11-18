@@ -5,6 +5,37 @@ from core.models import TimeStampedModel
 from academics.validators import validate_attachment_file
 
 
+# A term (and an academic year) stays open for this many days after its end
+# date, so late grading, reports, comments and attendance fixes can still be
+# made. It locks on the day after the grace period ends.
+TERM_LOCK_GRACE_DAYS = 30
+
+
+def editable_until(end_date):
+    """The last day something ending on ``end_date`` can still be edited."""
+    from datetime import timedelta
+    return end_date + timedelta(days=TERM_LOCK_GRACE_DAYS) if end_date else None
+
+
+def is_past_lock_date(end_date, today=None) -> bool:
+    """True once the grace period after ``end_date`` is over (day 31 onwards)."""
+    if not end_date:
+        return False
+    if today is None:
+        from django.utils import timezone
+        today = timezone.localdate()
+    return today > editable_until(end_date)
+
+
+def lock_cutoff(today=None):
+    """Anything that ended before this date is past its lock date (for querysets)."""
+    from datetime import timedelta
+    if today is None:
+        from django.utils import timezone
+        today = timezone.localdate()
+    return today - timedelta(days=TERM_LOCK_GRACE_DAYS)
+
+
 class RecalcStatus(models.TextChoices):
     """Persisted status for async recalculation of progression cases (Item 9)."""
     NOT_STARTED = "not_started", "Not Started"
@@ -59,23 +90,31 @@ class AcademicYear(TimeStampedModel):
     def __str__(self) -> str:
         return self.name
 
+    @property
+    def editable_until(self):
+        """Last day the year can be edited: end date + the lock grace period."""
+        return editable_until(self.end_date)
+
+    def is_past_lock_date(self, today=None) -> bool:
+        return is_past_lock_date(self.end_date, today)
+
     def clean(self):
         from django.utils import timezone
         today = timezone.now().date()
 
         if self.start_date and self.end_date and self.start_date > self.end_date:
             raise ValidationError("Start date must be before end date.")
-        # Cannot set is_current on a year that has already ended
-        if self.is_current and self.end_date and self.end_date < today:
+        # Cannot set is_current on a year that is past its lock date
+        if self.is_current and self.is_past_lock_date(today):
             raise ValidationError(
-                f"Cannot set '{self.name}' as current: it ended on {self.end_date}. "
-                f"Choose a current or future academic year."
+                f"Cannot set '{self.name}' as current: it ended on {self.end_date} and "
+                f"locked {TERM_LOCK_GRACE_DAYS} days later. Choose a current or future academic year."
             )
-        # Cannot publish a year that has already ended
-        if self.is_published and self.end_date and self.end_date < today:
+        # Cannot publish a year that is past its lock date
+        if self.is_published and self.is_past_lock_date(today):
             raise ValidationError(
-                f"Cannot publish '{self.name}': it ended on {self.end_date}. "
-                f"Past academic years cannot be published."
+                f"Cannot publish '{self.name}': it ended on {self.end_date} and "
+                f"locked {TERM_LOCK_GRACE_DAYS} days later. Locked academic years cannot be published."
             )
         if self.start_date and self.end_date:
             overlaps = AcademicYear.objects.filter(
@@ -563,6 +602,19 @@ class Term(TimeStampedModel):
             return term
 
         return None
+
+    @property
+    def editable_until(self):
+        """Last day the term can be edited: end date + ``TERM_LOCK_GRACE_DAYS``.
+
+        Grading, reports, comments and the term's settings stay open until
+        then; the term locks the day after. The term's own ``end_date`` is
+        unchanged and is still what reports print.
+        """
+        return editable_until(self.end_date)
+
+    def is_past_lock_date(self, today=None) -> bool:
+        return is_past_lock_date(self.end_date, today)
 
     def __str__(self) -> str:
         return f"{self.academic_year.name} - {self.name}"
