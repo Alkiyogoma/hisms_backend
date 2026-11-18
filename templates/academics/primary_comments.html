@@ -9,10 +9,13 @@
 
 .grading-grid {
     display: grid;
-    grid-template-columns: 320px 1fr;
+    /* minmax(0,1fr): the comment column may shrink below its content's width
+       instead of pushing itself off the right edge of the screen. */
+    grid-template-columns: 320px minmax(0, 1fr);
     gap: 24px;
     align-items: start;
 }
+.grading-grid > * { min-width: 0; }
 .student-sidebar {
     background: #fff;
     border: 1px solid #E2E8F0;
@@ -147,6 +150,43 @@
 .pill-group input[type="radio"]:checked + label { background:var(--hodari-blue); color:#fff }
 .pill-group label:hover { background:var(--hodari-blue-light); color:var(--hodari-blue) }
 .pill-group input[type="radio"]:checked + label:hover { background:var(--hodari-blue); color:#fff }
+
+.comment-textarea { box-sizing: border-box; max-width: 100%; }
+.cm-student-head, .cm-foot, .cm-foot > div { flex-wrap: wrap; gap: 10px; }
+.cm-foot > div { min-width: 0; }
+.cm-count-row { flex-wrap: wrap; gap: 4px 12px; }
+
+/* Trait rows wrap onto more lines when the column is too narrow for all
+   the E/G/S/N groups side by side. */
+.trait-table, .trait-table tbody, .trait-table tr { display: flex; flex-wrap: wrap; width: 100%; }
+.trait-table td { flex: 1 1 140px; width: auto !important; box-sizing: border-box; margin: 0 -1px -1px 0; }
+.trait-table td > div:first-child { white-space: normal !important; }
+
+/* Always two columns: the student list narrows, and on phones becomes a rail
+   of initials with a status dot, so the comment column keeps its room. */
+@media (max-width: 1024px) {
+    .grading-grid { grid-template-columns: 220px minmax(0, 1fr); gap: 16px; }
+    .student-card { padding: 12px 14px; gap: 10px; }
+    .student-card.active { padding-left: 10px; }
+}
+@media (max-width: 640px) {
+    .grading-grid { grid-template-columns: 60px minmax(0, 1fr); gap: 10px; }
+    .student-sidebar { border-radius: 12px; top: 70px; }
+    .sidebar-header { padding: 10px 4px; justify-content: center; }
+    .sidebar-header .sb-label { display: none; }
+    .student-list { max-height: calc(100vh - 140px); }
+    .student-card { position: relative; justify-content: center; padding: 10px 0; }
+    .student-card.active { padding-left: 0; border-left-width: 3px; }
+    .student-card .sc-name { display: none; }
+    .student-card .status-chip { position: absolute; top: 8px; right: 8px; width: 10px; height: 10px; padding: 0; font-size: 0; border: 2px solid #fff; }
+    .student-card .status-done { background: #10B981; }
+    .student-card .status-progress { background: #F59E0B; }
+    .student-card .status-pending { background: #CBD5E1; }
+    .comment-section { padding: 16px; border-radius: 12px; }
+    .cm-foot { padding: 16px !important; }
+    .cm-head { padding: 14px 16px; }
+    .cm-head #btn-submit-top { width: 100%; justify-content: center; }
+}
 </style>
 {% endblock %}
 
@@ -190,16 +230,16 @@ document.addEventListener("keydown", function (e) { if (e.key === "Escape") clos
 <div class="grading-grid">
     <div class="student-sidebar">
         <div class="sidebar-header">
-            <span style="font-size:12px;font-weight:700;color:#64748B;text-transform:uppercase">Students</span>
+            <span class="sb-label" style="font-size:12px;font-weight:700;color:#64748B;text-transform:uppercase">Students</span>
             <span id="student-count" class="status-chip status-pending">{{ student_reports|length }}</span>
         </div>
         <div id="student-list" class="student-list">
             {% for row in student_reports %}
-            <div class="student-card {% if forloop.first %}active{% endif %}" id="card-{{ row.report.id }}" onclick="scrollToStudent({{ row.report.id }})">
+            <div class="student-card {% if forloop.first %}active{% endif %}" id="card-{{ row.report.id }}" onclick="scrollToStudent({{ row.report.id }})" title="{{ row.student.get_full_name }}">
                 <div style="width:40px;height:40px;background:#023AA5;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0">
                     {{ row.student.first_name|first }}{{ row.student.last_name|first }}
                 </div>
-                <div style="flex:1;min-width:0">
+                <div class="sc-name" style="flex:1;min-width:0">
                     <div style="font-size:14px;font-weight:700;color:#1E293B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ row.student.get_full_name }}</div>
                     <div style="font-size:11px;color:#64748B">{{ row.student.admission_no }}</div>
                 </div>
@@ -235,7 +275,7 @@ document.addEventListener("keydown", function (e) { if (e.key === "Escape") clos
 
             {% for row in student_reports %}
             <div class="comment-section" id="student-{{ row.report.id }}">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+                <div class="cm-student-head" style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
                     <div style="display:flex;align-items:center;gap:12px">
                         <div style="width:34px;height:34px;background:linear-gradient(135deg,#023AA5,#1e5cc8);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px">
                             {{ row.student.first_name|first }}{{ row.student.last_name|first }}
@@ -262,7 +302,7 @@ document.addEventListener("keydown", function (e) { if (e.key === "Escape") clos
                           data-report-id="{{ row.report.id }}"
                           placeholder="Write a detailed narrative comment about this student's performance, behavior, and areas for improvement..."
                           {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled style="background:#F8FAFC;cursor:not-allowed;opacity:0.8"{% else %}oninput="onCommentInput({{ row.report.id }}, this)"{% endif %}>{{ row.comment }}</textarea>
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+                <div class="cm-count-row" style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
                     <div id="char-count-{{ row.report.id }}" style="font-size:12px;font-weight:600;color:{% if row.comment|length >= 50 %}#059669{% else %}#DC2626{% endif %}">
                         {{ row.comment|length }} / 50 minimum characters
                     </div>
@@ -282,7 +322,7 @@ document.addEventListener("keydown", function (e) { if (e.key === "Escape") clos
                     <!-- Work Habits -->
                     <div style="margin-bottom:12px">
                         <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:4px">Work Habits</div>
-                        <table style="width:100%;border-collapse:collapse">
+                        <table class="trait-table" style="width:100%;border-collapse:collapse">
                             <tr>
                                 {% for trait in work_habits %}
                                 <td style="text-align:center;padding:4px 6px;border:1px solid var(--border);width:{{ forloop.counter|floatformat:0 }}%;background:{% cycle 'var(--bg-metric)' 'var(--bg-card)' %}">
@@ -302,7 +342,7 @@ document.addEventListener("keydown", function (e) { if (e.key === "Escape") clos
                     <!-- Personal Traits -->
                     <div style="margin-bottom:12px">
                         <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:4px">Personal Traits</div>
-                        <table style="width:100%;border-collapse:collapse">
+                        <table class="trait-table" style="width:100%;border-collapse:collapse">
                             <tr>
                                 {% for trait in personal_traits %}
                                 <td style="text-align:center;padding:4px 6px;border:1px solid var(--border);width:{{ forloop.counter|floatformat:0 }}%;background:{% cycle 'var(--bg-metric)' 'var(--bg-card)' %}">
@@ -322,7 +362,7 @@ document.addEventListener("keydown", function (e) { if (e.key === "Escape") clos
                     <!-- Social Traits -->
                     <div style="margin-bottom:12px">
                         <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:4px">Social Traits</div>
-                        <table style="width:100%;border-collapse:collapse">
+                        <table class="trait-table" style="width:100%;border-collapse:collapse">
                             <tr>
                                 {% for trait in social_traits %}
                                 <td style="text-align:center;padding:4px 6px;border:1px solid var(--border);width:{{ forloop.counter|floatformat:0 }}%;background:{% cycle 'var(--bg-metric)' 'var(--bg-card)' %}">
@@ -342,7 +382,7 @@ document.addEventListener("keydown", function (e) { if (e.key === "Escape") clos
             </div>
             {% endfor %}
 
-            <div style="background:#fff;border:1px solid #E2E8F0;border-radius:16px;padding:24px;display:flex;justify-content:space-between;align-items:center">
+            <div class="cm-foot" style="background:#fff;border:1px solid #E2E8F0;border-radius:16px;padding:24px;display:flex;justify-content:space-between;align-items:center">
                 <div style="font-size:13px;color:#64748B;font-weight:600">
                     <span id="complete-count-bottom">0</span> of {{ student_reports|length }} comments complete
                 </div>

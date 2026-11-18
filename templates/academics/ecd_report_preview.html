@@ -55,8 +55,10 @@
     .ecd-table th, .ecd-table td, .ecd-strip th, .ecd-strip td, .ecd-overall th, .ecd-overall td { border: 1px solid var(--line); padding: 3px 6px; text-align: left; vertical-align: top; }
     .ecd-table th { background: var(--navy); color: #fff; font-weight: 700; text-transform: uppercase; }
     .ecd-table th.ecd-val-h { width: 72px; text-transform: none; font-weight: 500; text-align: center; padding: 3px 2px; }
-    .ecd-val { width: 72px; text-align: center; font-weight: 700; background: var(--accent); }
+    /* td.ecd-val outranks the generic ".ecd-table td" left/top alignment above. */
+    td.ecd-val, .ecd-table td.ecd-val, .ecd-strip td.ecd-val { width: 72px; text-align: center; vertical-align: middle; font-weight: 700; background: var(--accent); }
     .ecd-table td, .ecd-table th { overflow-wrap: anywhere; }
+    .ecd-table td, .ecd-strip td { vertical-align: middle; }
     .ecd-strip, .ecd-overall { table-layout: fixed; }
     .ecd-strip th { background: #fff; font-weight: 700; overflow-wrap: anywhere; }
     .ecd-strip td.ecd-val { width: auto; }
@@ -68,11 +70,13 @@
     .ecd-cols > div { display: flex; flex-direction: column; min-width: 0; }
     .ecd-cols > div > table:last-child { flex: 1 1 auto; margin-bottom: 0; }
     .ecd-cols > div + div { margin-left: -1px; }
-    .ecd-overall th { font-weight: 700; background: #fff; }
+    /* Same navy header as the NUMERACY / READING section tables. */
+    .ecd-overall th { font-weight: 700; background: var(--navy); color: #fff; }
     .ecd-overall td { height: 24px; font-weight: 700; }
+    .ecd-overall th:first-child, .ecd-overall td:first-child { text-align: center; vertical-align: middle; }
 
     .ecd-footer { margin-top: 10px; break-inside: avoid; page-break-inside: avoid; }
-    .ecd-comment { min-height: 60px; border-bottom: 1px solid #999; padding: 2px 0 8px; font-style: normal; white-space: pre-line; }
+    .ecd-comment { min-height: 60px; border-bottom: 1px solid #999; padding: 2px 0 8px; font-style: normal; white-space: pre-line; text-align: justify; }
     .ecd-foot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; margin-top: 12px; }
     .ecd-sig { display: flex; align-items: flex-end; gap: 6px; }
     .ecd-sig span { flex: 1; border-bottom: 1px solid #000; min-height: 20px; }

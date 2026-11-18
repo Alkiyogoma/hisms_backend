@@ -109,7 +109,9 @@ class ReportStructure:
         if avg is None:
             return ""
         labels = dict(self.academic_key)
-        value = "4" if avg >= 3.5 else "3" if avg >= 2.5 else "2" if avg >= 1.5 else "1"
+        # School-agreed bands (Nov 2026), on the one-decimal average:
+        # 3.8–4 Outstanding, 2.8–3.7 Good, 1.8–2.7 Satisfactory, 1–1.7 Not Yet.
+        value = "4" if avg >= 3.8 else "3" if avg >= 2.8 else "2" if avg >= 1.8 else "1"
         return labels.get(value, "")
 
 

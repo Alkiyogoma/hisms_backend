@@ -102,10 +102,17 @@ class ECDEntryTests(ECDFixture):
         self.assertEqual(d["values"][str(numeracy.pk)]["rating"], "4")
         self.assertEqual(d["values"][str(bible.pk)]["rating"], "3")
         self.assertEqual(d["average"], 3.5)
-        self.assertEqual(d["remarks"], "Outstanding")
+        self.assertEqual(d["remarks"], "Good")
         self.assertEqual(d["rated"], 3)
         ev = ECDEvaluation.objects.get(item=numeracy)
         self.assertEqual((ev.domain, ev.section_title), ("Number Value", "NUMERACY"))
+
+    def test_average_remarks_bands(self):
+        s = self.structure()
+        cases = {4.0: "Outstanding", 3.8: "Outstanding", 3.7: "Good", 2.8: "Good",
+                 2.7: "Satisfactory", 1.8: "Satisfactory", 1.7: "Not Yet", 1.0: "Not Yet"}
+        for avg, label in cases.items():
+            self.assertEqual(s.remarks_for(avg).lower(), label.lower(), avg)
 
     def test_wrong_scale_is_rejected_and_nothing_saved(self):
         s = self.structure()
@@ -182,6 +189,11 @@ class ECDPrintTests(ECDFixture):
         self.assertIn("Overall Academic Progress", page)
         self.assertIn("Days Absent", page)
         self.assertIn(COMMENT, page)
+
+    def test_report_is_dated_at_end_of_term_not_print_day(self):
+        page = self.client.get(reverse("academics:report_preview", args=[self.report.pk])).content.decode()
+        self.assertIn(f"<b>Date:</b> {self.term.end_date:%d %b %Y}", page)
+        self.assertNotIn(f"<b>Date:</b> {timezone.localdate():%d %b %Y}", page)
 
     def test_print_keeps_the_wording_as_rated(self):
         s = self.structure()
