@@ -592,7 +592,7 @@ class HOSDashboardView(RoleRequiredMixin, TemplateView):
         from academics.models import ScoreStatus, ExamTypeConfiguration
         from academics.utils import get_current_term
         perf_term = get_current_term()
-        from academics.grading_utils import get_pass_mark
+        from academics.grading_utils import get_grade_from_score, get_pass_mark
         pass_mark = get_pass_mark()
 
         school_avg = 0
@@ -641,7 +641,7 @@ class HOSDashboardView(RoleRequiredMixin, TemplateView):
                 passed_count = sum(1 for a in student_overall_avgs.values() if a >= pass_mark)
                 pass_rate = round(passed_count / total_with_scores * 100)
                 school_avg = round(sum(student_overall_avgs.values()) / total_with_scores, 1)
-                school_grade = "B" if school_avg >= 70 else "C" if school_avg >= 60 else "D" if school_avg >= 50 else "E"
+                school_grade = get_grade_from_score(school_avg)
 
             # ── Per-class averages ──
             class_agg = (
@@ -654,7 +654,7 @@ class HOSDashboardView(RoleRequiredMixin, TemplateView):
                 class_perf_list.append({
                     "name": row['student__class_name'],
                     "avg": avg,
-                    "grade": "B" if avg >= 70 else "C" if avg >= 60 else "D" if avg >= 50 else "E",
+                    "grade": get_grade_from_score(avg),
                     "flagged": avg < pass_mark,
                 })
             class_perf_list.sort(key=lambda x: x['avg'])
@@ -680,7 +680,7 @@ class HOSDashboardView(RoleRequiredMixin, TemplateView):
                 dept_perf_list.append({
                     "name": dept_label,
                     "avg": davg,
-                    "grade": "B" if davg >= 70 else "C" if davg >= 60 else "D" if davg >= 50 else "E" if davg > 0 else "-",
+                    "grade": get_grade_from_score(davg) if davg > 0 else "-",
                 })
 
             # ── At-risk students (per-subject D or below) ──
@@ -836,9 +836,10 @@ class PrimaryHODDashboardView(RoleRequiredMixin, TemplateView):
         else:
             trend = "—"
 
+        from academics.grading_utils import get_grade_from_score
         ctx["dept_performance"] = {
             "avg": round(dept_avg, 1) if dept_avg else 0,
-            "grade": "B" if dept_avg >= 70 else ("C" if dept_avg >= 60 else "D"),
+            "grade": get_grade_from_score(dept_avg) if dept_avg else "-",
             "trend": f"{trend} vs previous term",
             "student_count": Student.objects.filter(class_name__in=dept_classes, is_archived=False).count()
         }

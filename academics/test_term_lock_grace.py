@@ -184,3 +184,12 @@ class SettingsPageGraceTests(TestCase):
         self.assertNotIn("Editable until", page)
         self.assertNotIn(f"openTermDrawer({{pk:'{term.pk}'", page)
         self.assertIn("Read-only", page)
+
+
+class GradingDeadlineTests(TestCase):
+    def test_deadline_may_be_before_marking_window_ends(self):
+        year = AcademicYear.objects.create(name="2026/2027")
+        term = Term(academic_year=year, name="Term 1", start_date=date(2026, 8, 31),
+                    end_date=date(2026, 12, 11), endterm_exam_start_date=date(2026, 11, 23),
+                    endterm_exam_end_date=date(2026, 11, 27), grading_deadline=date(2026, 11, 13))
+        term.clean()  # no error

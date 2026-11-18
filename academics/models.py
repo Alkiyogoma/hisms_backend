@@ -505,23 +505,8 @@ class Term(TimeStampedModel):
         if self.quiz_grade_marking_days and self.quiz_grade_marking_days > 60:
             raise ValidationError("Quiz grade marking days cannot exceed 60.")
 
-        # Grading deadline must be on or after the latest marking window end date
-        if self.grading_deadline:
-            marking_dates = [
-                d for d in [
-                    self.compute_grade_marking_end_date("quiz"),
-                    self.compute_grade_marking_end_date("midterm"),
-                    self.compute_grade_marking_end_date("endterm"),
-                ] if d is not None
-            ]
-            if marking_dates:
-                latest_marking = max(marking_dates)
-                if self.grading_deadline < latest_marking:
-                    raise ValidationError(
-                        f"Grading deadline ({self.grading_deadline}) cannot be before the "
-                        f"latest grade marking window ends ({latest_marking}). "
-                        f"Adjust the marking days or set a later deadline."
-                    )
+        # The grading deadline may fall before a marking window ends; the
+        # school chooses it freely (score entry still closes after it).
 
     def save(self, *args, **kwargs):
         # Terms created without an explicit number (scripts, seeders) take it from the name.

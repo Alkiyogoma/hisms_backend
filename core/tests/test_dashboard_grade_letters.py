@@ -78,8 +78,8 @@ class DashboardGradeLetterTests(TestCase):
         self.assertEqual(depts["ECD"], (0, "-"))
         self.assertEqual(resp.context["school_grade"], "A")  # (90.9 + 83.5 + 72.9) / 3 = 82.4
         self.assertContains(resp, "87.2%")
-        self.assertContains(resp, "Grade A")
+        self.assertContains(resp, '87.2% &middot; <span class="hos-dept-word">Grade </span>A')
 
     def test_primary_hod_pulse_uses_school_scale(self):
         perf = self._get(self.hod).context["dept_performance"]
-        self.assertEqual((perf["avg"], perf["grade"]), (87.2, "A"))
+        self.assertEqual((float(perf["avg"]), perf["grade"]), (87.2, "A"))
