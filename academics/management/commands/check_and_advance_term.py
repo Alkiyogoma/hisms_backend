@@ -1,5 +1,8 @@
 """
-FR-CAL-004: Check if the current term has ended and auto-advance.
+FR-CAL-004: Lock terms whose post-term grace period is over, and auto-advance.
+
+A term stays open for academics.models.TERM_LOCK_GRACE_DAYS (30) days after
+its end_date and locks on the day after that.
 
 Run via:
   python manage.py check_and_advance_term
@@ -17,49 +20,60 @@ logger = logging.getLogger(__name__)
 
 class Command(BaseCommand):
     help = (
-        "FR-CAL-004: Detect when a term's end_date has passed, lock it, "
-        "and notify Super Admin / Admin Officer about the transition."
+        "FR-CAL-004: Lock terms once the grace period after their end_date is "
+        "over (end_date + TERM_LOCK_GRACE_DAYS) and notify Super Admin / Admin "
+        "Officer about the transition."
     )
 
     def handle(self, *args, **options):
-        today = timezone.now().date()
+        from academics.models import TERM_LOCK_GRACE_DAYS, Term, lock_cutoff
 
-        # Find the currently-active term (today is between start_date and
-        # end_date, and it is not yet locked).
-        from academics.models import Term
+        today = timezone.localdate()
 
-        active_term = Term.objects.filter(
-            start_date__lte=today,
-            end_date__gte=today,
-            is_locked=False,
-        ).order_by("start_date").first()
-
-        if not active_term:
-            self.stdout.write("No active (unlocked, in-range) term found. Nothing to advance.")
-            return
-
-        # The term is still in its date range  nothing to do.
-        if active_term.end_date >= today:
-            self.stdout.write(
-                f"Term '{active_term.name}' is still active (ends {active_term.end_date}). "
-                "No advance needed."
-            )
-            return
-
-        # ── Term end-date has passed  advance ──────────────────────────
-        self.stdout.write(
-            self.style.WARNING(
-                f"Term '{active_term.name}' ended on {active_term.end_date}. "
-                "Locking and searching for the next term..."
-            )
+        # Terms stay open for TERM_LOCK_GRACE_DAYS after they end; lock the
+        # ones whose grace period is over (day 31 after the end date onwards).
+        due = list(
+            Term.objects.filter(is_locked=False, end_date__lt=lock_cutoff(today))
+            .select_related("academic_year")
+            .order_by("end_date")
         )
+        if not due:
+            self.stdout.write(
+                f"No unlocked term is more than {TERM_LOCK_GRACE_DAYS} days past its end date. "
+                "Nothing to lock."
+            )
+            return
 
-        # Lock the finished term
-        active_term.is_locked = True
-        active_term.save(update_fields=["is_locked", "updated_at"])
+        for term in due:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Term '{term.name}' ended on {term.end_date}; its {TERM_LOCK_GRACE_DAYS}-day "
+                    f"grace period ended on {term.editable_until}. Locking."
+                )
+            )
+            term.is_locked = True
+            term.save(update_fields=["is_locked", "updated_at"])
+            try:
+                from audit.models import log_event
+                log_event(
+                    actor=None,
+                    action_type="TERM_TRANSITION",
+                    model_name="Term",
+                    object_id=term.pk,
+                    description=(
+                        f"Term '{term.name}' automatically locked {TERM_LOCK_GRACE_DAYS} days "
+                        f"after it ended on {term.end_date}."
+                    ),
+                )
+            except Exception:
+                pass
 
-        # Look for the next unlocked term in the same academic year (or
-        # any year) whose start_date is the closest upcoming date.
+        # Carry forward from the most recently ended term only; older ones in
+        # the batch were simply overdue for locking.
+        active_term = due[-1]
+
+        # Look for the next unlocked term whose start_date is the closest
+        # upcoming date after the locked term.
         next_term = (
             Term.objects.filter(
                 is_locked=False,
@@ -157,47 +171,32 @@ class Command(BaseCommand):
             is_active=True,
         )
 
+        locked_list = "\n".join(
+            f"- '{t.name}' ({t.start_date} → {t.end_date})" for t in due
+        )
+        msg = (
+            f"These terms have been automatically locked, {TERM_LOCK_GRACE_DAYS} days after "
+            f"they ended:\n{locked_list}\n\n"
+        )
         if next_term:
-            msg = (
-                f"Academic term '{active_term.name}' ({active_term.start_date} → "
-                f"{active_term.end_date}) has been automatically locked.\n\n"
+            msg += (
                 f"The next term is '{next_term.name}' "
                 f"({next_term.start_date} → {next_term.end_date})."
             )
-            link = "/settings/?tab=academic_year"
         else:
-            msg = (
-                f"Academic term '{active_term.name}' ({active_term.start_date} → "
-                f"{active_term.end_date}) has been automatically locked.\n\n"
+            msg += (
                 "No upcoming term was found. Please create the next term "
                 "in System Settings → Academic Years."
             )
-            link = "/settings/?tab=academic_year"
+        link = "/settings/?tab=academic_year"
 
         for admin in admins:
             dispatch_notification(
                 user=admin,
-                title="Term Transition - New Term Started",
+                title="Term Locked",
                 message=msg,
                 link=link,
                 actor=None,
             )
-
-        # Also log to audit trail
-        try:
-            from audit.models import log_event
-            log_event(
-                actor=None,
-                action_type="TERM_TRANSITION",
-                model_name="Term",
-                object_id=active_term.pk,
-                description=(
-                    f"Term '{active_term.name}' automatically locked (ended "
-                    f"{active_term.end_date})."
-                    + (f" Next term: '{next_term.name}'." if next_term else " No next term found.")
-                ),
-            )
-        except Exception:
-            pass
 
         self.stdout.write(self.style.SUCCESS(msg))

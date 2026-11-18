@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 @shared_task
 def check_and_advance_term_task():
     """
-    FR-CAL-004 / UAT ACD-003: Check if the current term has ended and
-    auto-advance to the next term.  Locks the finished term, notifies
+    FR-CAL-004 / UAT ACD-003: Lock terms 30 days after their end date
+    (TERM_LOCK_GRACE_DAYS) and auto-advance to the next term.  Notifies
     Super Admin / Admin Officer, and logs to the audit trail.
 
     Runs daily at 06:00 EAT (03:00 UTC).

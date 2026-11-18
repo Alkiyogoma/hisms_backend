@@ -1,5 +1,5 @@
 {# One learner's ECD progress report, laid out like the school's Word template; ecd_report_preview.html renders it once per learner for a class. #}
-<div class="report-container ecd-sheet accent-{{ ecd.layout.accent|default:'yellow' }}">
+<div class="report-container ecd-sheet ecd-type-{{ ecd.class_type }} accent-{{ ecd.layout.accent|default:'yellow' }}">
   {% include "includes/hodari_print_header.html" %}
 
   <h1 class="ecd-title">{{ ecd.layout.title }}</h1>
@@ -31,8 +31,9 @@
       {% for section in part.top %}{% include "academics/_ecd_report_section.html" %}{% endfor %}
       {% if part.left or part.right %}
       <div class="ecd-cols">
-        <div>{% for section in part.left %}{% include "academics/_ecd_report_section.html" %}{% endfor %}</div>
-        <div>{% for section in part.right %}{% include "academics/_ecd_report_section.html" %}{% endfor %}</div>
+        {# The empty .ecd-fill row stretches to even out the shorter column (it is zero-height in the longer one). #}
+        <div>{% for section in part.left %}{% include "academics/_ecd_report_section.html" %}{% endfor %}<table class="ecd-table ecd-fill" aria-hidden="true"><tr><td></td><td class="ecd-val"></td></tr></table></div>
+        <div>{% for section in part.right %}{% include "academics/_ecd_report_section.html" %}{% endfor %}<table class="ecd-table ecd-fill" aria-hidden="true"><tr><td></td><td class="ecd-val"></td></tr></table></div>
       </div>
       {% endif %}
       {% for section in part.bottom %}{% include "academics/_ecd_report_section.html" %}{% endfor %}
