@@ -203,7 +203,7 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
         if selected_class:
             ctx["selected_department_label"] = classes[selected_class].get_department_display()
         if selected_class and term:
-            students = Student.objects.filter(class_name=selected_class, is_archived=False).order_by("last_name", "first_name")
+            students = Student.objects.filter(class_name=selected_class, is_archived=False).order_by("first_name", "last_name")
             
             # Only generate missing report cards once
             if not ReportCard.objects.filter(term=term, student__in=students).exists():
@@ -211,7 +211,7 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
             
             report_cards = ReportCard.objects.filter(
                 term=term, student__in=students, is_ecd_report=False,
-            ).select_related("student", "term")
+            ).select_related("student", "term").order_by("student__first_name", "student__last_name")
             
             ctx["selected_class"] = selected_class
             ctx["work_habits"] = self.WORK_HABITS
@@ -594,7 +594,7 @@ class SubjectAssessmentEntryMixin:
         from academics.models import ScoreStatus, SubjectTermRemark
         from academics.score_progress import class_progress
 
-        students = list(Student.objects.filter(class_name=class_name, is_archived=False).order_by("last_name", "first_name"))
+        students = list(Student.objects.filter(class_name=class_name, is_archived=False).order_by("first_name", "last_name"))
         ids = [s.id for s in students]
         progress = class_progress(ids, term.id, class_name)
         editable = set(ctx["editable_subjects"]) if ctx["can_edit"] and not term.is_locked else set()
@@ -686,7 +686,7 @@ class PrimaryStudentsAPIView(RoleRequiredMixin, View):
             if class_name not in get_teacher_assigned_classes_from_tca(request.user):
                 return JsonResponse({"error": "Access denied"}, status=403)
         
-        students = Student.objects.filter(class_name=class_name, is_archived=False).order_by("last_name", "first_name")
+        students = Student.objects.filter(class_name=class_name, is_archived=False).order_by("first_name", "last_name")
         term_id = request.GET.get("term")
         student_ids = list(students.values_list("id", flat=True))
         scored_ids = set()
@@ -1166,7 +1166,7 @@ class LowerSecondaryStudentsAPIView(RoleRequiredMixin, View):
             if class_name not in get_teacher_assigned_classes_from_tca(request.user):
                 return JsonResponse({"error": "Access denied"}, status=403)
 
-        students = Student.objects.filter(class_name=class_name, is_archived=False).order_by("last_name", "first_name")
+        students = Student.objects.filter(class_name=class_name, is_archived=False).order_by("first_name", "last_name")
         term_id = request.GET.get("term")
         student_ids = list(students.values_list("id", flat=True))
         scored_ids = set()

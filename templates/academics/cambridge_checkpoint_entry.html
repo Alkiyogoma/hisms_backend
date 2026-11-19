@@ -38,7 +38,7 @@
       {% for item in students_data %}
       {% with s=item.student %}
       <tr>
-        <th class="ag-stu" scope="row"><div class="nm" title="{{ s.first_name }} {{ s.last_name }}">{{ s.last_name }}, {{ s.first_name }}</div><div class="adm">{{ s.admission_no }}</div></th>
+        <th class="ag-stu" scope="row"><div class="nm" title="{{ s.first_name }} {{ s.last_name }}">{{ s.first_name }} {{ s.last_name }}</div></th>
         {% for c in item.cells %}
         <td class="ag-cell">
           <input type="number" step="0.1" min="1" max="6" inputmode="decimal" class="ag-in cp-input"

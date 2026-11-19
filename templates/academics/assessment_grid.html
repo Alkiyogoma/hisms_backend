@@ -58,7 +58,7 @@
     {% for row in rows %}
     {% with s=row.student %}
     <tr data-student="{{ s.id }}" data-name="{{ s.first_name }} {{ s.last_name }}" data-adm="{{ s.admission_no }}" data-done="{{ row.done|yesno:'1,0' }}">
-      <th class="ag-stu" scope="row"><div class="nm" title="{{ s.first_name }} {{ s.last_name }}">{{ s.last_name }}, {{ s.first_name }}</div><div class="adm">{{ s.admission_no }}</div></th>
+      <th class="ag-stu" scope="row"><div class="nm" title="{{ s.first_name }} {{ s.last_name }}">{{ s.first_name }} {{ s.last_name }}</div></th>
       {% for c in row.cells %}
         {% if assessment_is_remarks %}
         <td class="ag-cell{% if c.readonly %} closed{% endif %}">

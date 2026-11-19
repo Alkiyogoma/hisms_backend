@@ -293,9 +293,8 @@
       var b = document.createElement('button');
       b.type = 'button'; b.className = 'ee-learner' + (current && current.id === s.id ? ' active' : '');
       if (current && current.id === s.id) b.setAttribute('aria-current', 'true');
-      b.innerHTML = '<span><span class="ee-learner-name"></span><span class="ee-warn" hidden title="Open welfare concern">&#9888;</span><br><span class="ee-learner-meta"></span></span><span class="chip"></span>';
+      b.innerHTML = '<span><span class="ee-learner-name"></span><span class="ee-warn" hidden title="Open welfare concern">&#9888;</span></span><span class="chip"></span>';
       b.querySelector('.ee-learner-name').textContent = name(s);
-      b.querySelector('.ee-learner-meta').textContent = s.admission_no || '';
       b.querySelector('.ee-warn').hidden = !WELFARE[s.id];
       var ch = b.querySelector('.chip'); ch.textContent = c[0]; ch.classList.add(c[1]);
       b.addEventListener('click', function () { open(s.id); });
@@ -379,7 +378,7 @@
       if (!current) return;
       renderList();
       $('eeName').textContent = name(current);
-      $('eeMeta').textContent = (current.admission_no ? current.admission_no + ' · ' : '') + CLASS_LABEL;
+      $('eeMeta').textContent = CLASS_LABEL;
       var w = WELFARE[current.id];
       $('eeWelfare').hidden = !w; if (w) $('eeWelfare').textContent = 'Welfare: ' + w.join('; ');
       form.classList.add('loading'); $('eeSaveState').textContent = '';

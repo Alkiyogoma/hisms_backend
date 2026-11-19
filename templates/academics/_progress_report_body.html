@@ -98,11 +98,11 @@
       <h2>Attendance <small>{{ attendance.period.label }}</small></h2>
       {% if a and a.marked %}
       <table class="t">
-        <thead><tr><th>In school</th><th>Late</th><th>Absent</th><th>Excused</th><th>Not marked</th><th class="r">Rate</th></tr></thead>
-        <tbody><tr><td class="mono">{{ a.in_school }}</td><td class="mono">{{ a.late }}</td><td class="mono">{{ a.absent }}</td><td class="mono">{{ a.excused }}</td><td class="mono">{{ a.unmarked }}</td><td class="r mono b-{{ a.band }}">{{ a.rate }}%</td></tr></tbody>
+        <thead><tr><th>In school</th><th>Late</th><th>Absent</th><th>Excused</th><th class="r">Rate</th></tr></thead>
+        <tbody><tr><td class="mono">{{ a.in_school }}</td><td class="mono">{{ a.late }}</td><td class="mono">{{ a.absent }}</td><td class="mono">{{ a.excused }}</td><td class="r mono b-{{ a.band }}">{{ a.rate }}%</td></tr></tbody>
       </table>
       <div class="days">{% for d, c in attendance.strip %}<i class="d-{{ c }}"></i>{% endfor %}</div>
-      <div class="legend"><span><i style="background:#2FA866"></i>Present</span><span><i style="background:#E39A3B"></i>Late</span><span><i style="background:#C8302A"></i>Absent</span><span><i style="background:#7E73E0"></i>Excused</span><span><i style="background:#E2E8F0"></i>Not marked</span><span>· last {{ attendance.strip|length }} school days</span></div>
+      <div class="legend"><span><i style="background:#2FA866"></i>Present</span><span><i style="background:#E39A3B"></i>Late</span><span><i style="background:#C8302A"></i>Absent</span><span><i style="background:#7E73E0"></i>Excused</span><span>· last {{ attendance.strip|length }} marked days</span></div>
       {% else %}<div class="empty">No attendance marked in this term yet.</div>{% endif %}
     </div>
 

@@ -103,6 +103,11 @@ def build_learner_report(student, term, shared=None, terms=None):
     else:
         start, end = analytics.term_range(term)
         attendance = analytics.learner_attendance(student, start, end)
+    # The printed report shows marked days only: unmarked days are already
+    # left out of the rate, so they get no column and no square in the strip.
+    attendance = {**attendance, "strip": [
+        (d, c) for d, c, _ in (attendance["row"] or {}).get("cells", []) if c in ("P", "L", "A", "E")
+    ][-30:]}
     class_name = record.get("class_name") or student.class_name
     from academics.class_position import learner_positions
     return {

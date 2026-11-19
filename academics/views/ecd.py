@@ -159,7 +159,7 @@ class ECDStudentsAPIView(RoleRequiredMixin, View):
             else Student.objects.filter(class_name=class_name, is_archived=False)
         )
         students = list(
-            roster.order_by("last_name", "first_name")
+            roster.order_by("first_name", "last_name")
             .values("id", "first_name", "last_name", "admission_no", "date_of_birth")
         )
 

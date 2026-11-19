@@ -822,7 +822,7 @@ class CambridgeCheckpointEntryView(RoleRequiredMixin, TemplateView):
 
             students = Student.objects.filter(
                 class_name=selected_class, is_archived=False
-            ).order_by("last_name", "first_name")
+            ).order_by("first_name", "last_name")
 
             # Fetch existing scores
             from academics.models import CambridgeCheckpointScore
