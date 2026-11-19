@@ -80,9 +80,9 @@
   <table class="t remarks">
     <thead><tr><th>Subject</th><th style="width:40%">Remark</th></tr></thead>
     <tbody>{% for subj, remark in remark_rows %}
-      <tr><td><b>{{ subj }}</b>{% if scripture_verse and "scripture" in subj.lower %}<span class="verse">{{ scripture_verse }}</span>{% endif %}</td><td>{% if remark %}{{ remark }}{% else %}<span class="na">Not entered</span>{% endif %}</td></tr>
+      <tr><td><b>{{ subj }}</b>{% if scripture_verse and subj == scripture_row %}<span class="verse">{% if "scripture" not in subj.lower %}<span class="verse-label">Term Scripture:</span> {% endif %}{{ scripture_verse }}</span>{% endif %}</td><td>{% if remark %}{{ remark }}{% else %}<span class="na">Not entered</span>{% endif %}</td></tr>
     {% endfor %}
-    {% if scripture_verse and not scripture_in_remarks %}
+    {% if scripture_verse and not scripture_row %}
       <tr><td><b>Term Scripture</b><span class="verse">{{ scripture_verse }}</span></td><td><span class="na">–</span></td></tr>
     {% endif %}</tbody>
   </table>
