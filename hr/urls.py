@@ -14,6 +14,11 @@ urlpatterns = [
     path("staff/<int:pk>/departure/", views.StaffDepartureView.as_view(), name="staff_departure"),
     path("staff/<int:pk>/document/upload/", views.StaffDocumentUploadView.as_view(), name="staff_document_upload"),
 
+    # Staff signatures (printed on report cards once approved)
+    path("signatures/", views.StaffSignatureListView.as_view(), name="signature_list"),
+    path("signatures/upload/", views.StaffSignatureUploadView.as_view(), name="signature_upload"),
+    path("signatures/review/", views.StaffSignatureReviewView.as_view(), name="signature_review"),
+
     # Teacher Assignments
     path("assignments/<int:pk>/edit/", views.TeacherAssignmentEditView.as_view(), name="teacher_assignment_edit"),
     path("assignments/<int:pk>/delete/", views.TeacherAssignmentDeleteView.as_view(), name="teacher_assignment_delete"),

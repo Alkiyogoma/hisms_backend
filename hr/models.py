@@ -957,3 +957,108 @@ class RolloverConflict(TimeStampedModel):
             f"{self.teacher.full_name} → {self.grade_class.name} "
             f"({self.get_conflict_type_display()}) [{self.target_term.name}]"
         )
+
+
+# ---------------------------------------------------------------------------
+# Staff signatures (printed on report cards once approved)
+# ---------------------------------------------------------------------------
+
+from django.core.files.storage import FileSystemStorage  # noqa: E402
+
+
+class PrivateMediaStorage(FileSystemStorage):
+    """Files under settings.PRIVATE_MEDIA_ROOT, read on every use (so a
+    changed setting, e.g. in tests, takes effect). No URL: nothing here is
+    served by the web server."""
+
+    @property
+    def base_location(self):
+        return settings.PRIVATE_MEDIA_ROOT
+
+    @property
+    def location(self):
+        import os
+        return os.path.abspath(self.base_location)
+
+    @property
+    def base_url(self):
+        return None
+
+
+def _private_signature_storage():
+    """Signatures are personal data: keep them outside MEDIA_ROOT, which the
+    web server publishes at /media/. They reach documents only as inline
+    data: URIs (see StaffSignature.data_uri)."""
+    return PrivateMediaStorage()
+
+
+def _signature_upload_to(instance, filename):
+    import uuid
+    return f"signatures/{instance.user_id}-{uuid.uuid4().hex[:12]}.png"
+
+
+class SignatureStatus(models.TextChoices):
+    PENDING = "pending", "Waiting for approval"
+    APPROVED = "approved", "Approved"
+    REJECTED = "rejected", "Rejected"
+
+
+class StaffSignature(TimeStampedModel):
+    """One staff member's handwritten signature (transparent PNG).
+
+    Imported from the signing kiosk export or uploaded by HR, then approved
+    by the Head of School. Only an approved signature is printed, and only on
+    documents where that person actually did their step (class teacher
+    submitted, HOD approved, Head of School signed off)."""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="signature"
+    )
+    image = models.FileField(storage=_private_signature_storage, upload_to=_signature_upload_to)
+    status = models.CharField(
+        max_length=10, choices=SignatureStatus.choices, default=SignatureStatus.PENDING, db_index=True
+    )
+    source = models.CharField(max_length=40, blank=True, default="", help_text="e.g. office tablet, HR upload")
+    signed_at = models.DateTimeField(null=True, blank=True, help_text="When the person signed")
+    consent_at = models.DateTimeField(null=True, blank=True, help_text="When the person consented to its use")
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="signatures_uploaded",
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="signatures_reviewed",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reject_reason = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        verbose_name = "Staff Signature"
+        verbose_name_plural = "Staff Signatures"
+        permissions = [("approve_staffsignature", "Can approve staff signatures")]
+
+    def __str__(self):
+        return f"Signature of {self.user} ({self.get_status_display()})"
+
+    @property
+    def is_approved(self):
+        return self.status == SignatureStatus.APPROVED
+
+    def data_uri(self):
+        """The PNG inlined as a data: URI (None if the file is missing)."""
+        import base64
+        try:
+            with self.image.open("rb") as f:
+                raw = f.read()
+        except (OSError, ValueError):
+            logger.warning("Signature file missing for user %s", self.user_id)
+            return None
+        return "data:image/png;base64," + base64.b64encode(raw).decode("ascii")
+
+
+def approved_signature_uri(user):
+    """Inline image of ``user``'s approved signature, or None."""
+    if user is None:
+        return None
+    sig = StaffSignature.objects.filter(user=user, status=SignatureStatus.APPROVED).first()
+    return sig.data_uri() if sig else None

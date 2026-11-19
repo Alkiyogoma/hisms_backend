@@ -43,6 +43,7 @@ sent_emails/
 
 # User-uploaded media (keep committed branding assets)
 /media/*
+/private_media/
 !/media/branding/
 
 # Database dumps / backups

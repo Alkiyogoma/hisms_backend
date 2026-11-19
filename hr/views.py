@@ -2215,3 +2215,135 @@ class RolloverConflictResolveView(RoleRequiredMixin, View):
             return JsonResponse({"ok": True, "action": "force"})
 
         return JsonResponse({"error": "Unknown action."}, status=400)
+
+
+# ---------------------------------------------------------------------------
+# Staff signatures: upload, review and approve
+# ---------------------------------------------------------------------------
+
+class StaffSignatureListView(RoleRequiredMixin, TemplateView):
+    """Every active staff member with their signature and its approval state.
+    The Head of School approves or rejects; HR can upload or replace one."""
+    template_name = "hr/signature_list.html"
+    required_permission = "hr.view_staffsignature"
+
+    FILTERS = (
+        ("pending", "Waiting"),
+        ("approved", "Approved"),
+        ("rejected", "Rejected"),
+        ("missing", "Not signed"),
+        ("all", "All"),
+    )
+
+    def get_context_data(self, **kwargs):
+        from academics.utils import get_current_term
+        from .models import SignatureStatus, StaffSignature, TeacherClassAssignment
+        from .signatures import can_approve
+
+        ctx = super().get_context_data(**kwargs)
+        staff = list(StaffProfile.objects.filter(is_active=True, user__is_active=True)
+                     .select_related("user").order_by("full_name"))
+        sigs = {s.user_id: s for s in StaffSignature.objects.select_related("reviewed_by")}
+        term = get_current_term()
+        class_of = {}
+        if term:
+            for a in (TeacherClassAssignment.objects.filter(term=term, is_class_teacher=True)
+                      .select_related("grade_class")):
+                class_of.setdefault(a.teacher_id, []).append(a.grade_class.name)
+        hod_roles = {UserRole.PRIMARY_HOD: "Primary HOD", UserRole.ECD_HOD: "ECD HOD",
+                     UserRole.LOWER_SECONDARY_HOD: "Lower Secondary HOD"}
+
+        rows, counts = [], {key: 0 for key, _ in self.FILTERS}
+        for p in staff:
+            sig = sigs.get(p.user_id)
+            state = sig.status if sig else "missing"
+            counts[state] += 1
+            counts["all"] += 1
+            on_reports = []
+            if p.user.role == UserRole.HEAD_OF_SCHOOL:
+                on_reports.append("Head of School")
+            if p.user.role in hod_roles:
+                on_reports.append(hod_roles[p.user.role])
+            if p.pk in class_of:
+                on_reports.append("Class teacher · " + ", ".join(sorted(class_of[p.pk])))
+            rows.append({"staff": p, "sig": sig, "state": state, "on_reports": on_reports})
+
+        current = self.request.GET.get("show") or ("pending" if counts["pending"] else "all")
+        if current not in counts:
+            current = "all"
+        shown = [r for r in rows if current == "all" or r["state"] == current]
+        for r in shown:
+            r["src"] = r["sig"].data_uri() if r["sig"] else None
+        # Staff who sign reports but have no approved signature yet.
+        gaps = [r for r in rows if r["on_reports"] and r["state"] != SignatureStatus.APPROVED]
+
+        ctx.update({
+            "rows": shown,
+            "filters": [(k, label, counts[k]) for k, label in self.FILTERS],
+            "current": current,
+            "can_approve": can_approve(self.request.user),
+            "can_upload": self.request.user.role == UserRole.SUPER_ADMIN
+                          or self.request.user.has_perm("hr.add_staffsignature"),
+            "report_gaps": gaps,
+            "upload_staff": staff,
+            "term": term,
+        })
+        return ctx
+
+
+class StaffSignatureUploadView(RoleRequiredMixin, View):
+    """Upload or replace one staff member's signature (transparent PNG).
+    It waits for the Head of School's approval like an imported one."""
+    required_permission = "hr.add_staffsignature"
+
+    def post(self, request):
+        from django.core.exceptions import ValidationError
+        from .signatures import save_signature
+
+        staff = get_object_or_404(StaffProfile, pk=request.POST.get("staff"))
+        upload = request.FILES.get("image")
+        back = reverse("hr:signature_list") + "?show=pending"
+        if not upload:
+            messages.error(request, "Choose a PNG file to upload.")
+            return redirect(back)
+        if upload.size > 2 * 1024 * 1024:
+            messages.error(request, "The signature image must be under 2 MB.")
+            return redirect(back)
+        try:
+            save_signature(staff.user, upload.read(), source="HR upload", uploaded_by=request.user)
+        except ValidationError as exc:
+            messages.error(request, " ".join(exc.messages))
+            return redirect(back)
+        messages.success(request, f"Signature for {staff.full_name} uploaded. It is waiting for approval.")
+        return redirect(back)
+
+
+class StaffSignatureReviewView(RoleRequiredMixin, View):
+    """Approve or reject signatures: one (``pk``) or several (``ids``)."""
+    required_permission = "hr.approve_staffsignature"
+
+    def post(self, request):
+        from django.core.exceptions import ValidationError
+        from .models import StaffSignature
+        from .signatures import approve_signature, reject_signature
+
+        action = request.POST.get("action")
+        ids = [i for i in request.POST.getlist("ids") if i.isdigit()]
+        sigs = list(StaffSignature.objects.filter(pk__in=ids).select_related("user"))
+        show = request.POST.get("show") or "pending"
+        back = reverse("hr:signature_list") + f"?show={show}"
+        if action not in {"approve", "reject"} or not sigs:
+            messages.error(request, "Select at least one signature.")
+            return redirect(back)
+        try:
+            for sig in sigs:
+                if action == "approve":
+                    approve_signature(sig, request.user, request=request)
+                else:
+                    reject_signature(sig, request.user, request.POST.get("reason", ""), request=request)
+        except ValidationError as exc:
+            messages.error(request, " ".join(exc.messages))
+            return redirect(back)
+        done = "Approved" if action == "approve" else "Rejected"
+        messages.success(request, f"{done} {len(sigs)} signature{'s' if len(sigs) != 1 else ''}.")
+        return redirect(back)

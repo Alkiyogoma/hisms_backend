@@ -223,6 +223,8 @@ ROLE_DEFAULT_PERMISSIONS = {
         "add_payrollentry", "change_payrollentry", "delete_payrollentry", "view_payrollentry",
         "add_payrollrun", "change_payrollrun", "delete_payrollrun", "view_payrollrun",
         "add_staffdocument", "change_staffdocument", "delete_staffdocument", "view_staffdocument",
+        "add_staffsignature", "change_staffsignature", "delete_staffsignature", "view_staffsignature",
+        "approve_staffsignature",
         "add_staffonboardingprogress", "change_staffonboardingprogress", "delete_staffonboardingprogress", "view_staffonboardingprogress",
         "add_staffprofile", "change_staffprofile", "delete_staffprofile", "view_staffprofile",
         "add_statutoryfiling", "change_statutoryfiling", "delete_statutoryfiling", "view_statutoryfiling",
@@ -296,6 +298,8 @@ ROLE_DEFAULT_PERMISSIONS = {
         # HR  read only
         "view_staffprofile", "view_teacherclassassignment",
         "view_staffdocument", "view_staffonboardingprogress",
+        # Staff signatures  upload and approve (printed on report cards)
+        "add_staffsignature", "change_staffsignature", "view_staffsignature", "approve_staffsignature",
         "view_onboardingchecklistitem", "view_inductionchecklistcompletion",
         "view_offboardingrecord", "view_leaverequest", "view_leaveallocation",
         "view_statutoryfiling",
@@ -579,6 +583,8 @@ ROLE_DEFAULT_PERMISSIONS = {
         "view_staffprofile",
         "add_teacherclassassignment", "change_teacherclassassignment", "view_teacherclassassignment",
         "add_staffdocument", "change_staffdocument", "view_staffdocument",
+        # Staff signatures  upload only; the Head of School approves
+        "add_staffsignature", "view_staffsignature",
         "add_staffonboardingprogress", "change_staffonboardingprogress", "view_staffonboardingprogress",
         "add_onboardingchecklistitem", "change_onboardingchecklistitem", "view_onboardingchecklistitem",
         "view_offboardingrecord", "view_leaverequest", "view_leaveallocation",

@@ -161,6 +161,46 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
         {"key": "st_courteous", "label": "Is courteous"},
     ]
 
+    def _scripture_lock_reason(self, class_name, term):
+        """Why the class's term verse can't be changed by this user, or ""."""
+        if term.is_locked:
+            return "This term is locked."
+        if self.request.user.role == UserRole.TEACHER and ReportCard.objects.filter(
+            term=term, student__class_name=class_name, is_ecd_report=False,
+            status__in=[ReportCardStatus.PENDING_SIGN_OFF, ReportCardStatus.PUBLISHED],
+        ).exists():
+            return "Reports for this class have gone for sign-off. Ask your HOD to change the verse."
+        return ""
+
+    def _save_scripture(self, request, data):
+        from academics.models import ClassTermScripture
+        class_name = data.get("class_name") or ""
+        if not self._comment_classes().filter(name=class_name).exists():
+            return JsonResponse({"error": "You do not have access to this class."}, status=403)
+        term = Term.objects.filter(pk=data.get("term")).first()
+        if term is None:
+            return JsonResponse({"error": "Missing term"}, status=400)
+        locked = self._scripture_lock_reason(class_name, term)
+        if locked:
+            return JsonResponse({"error": "Not saved: " + locked}, status=409)
+        verse = " ".join(str(data.get("scripture") or "").split())
+        if len(verse) > 255:
+            return JsonResponse({"error": "Not saved: keep the verse under 255 characters."}, status=400)
+        row, _ = ClassTermScripture.objects.get_or_create(term=term, class_name=class_name)
+        if row.verse != verse:
+            row.verse, row.updated_by = verse, request.user
+            row.save(update_fields=["verse", "updated_by", "updated_at"])
+            try:
+                log_event(
+                    actor=request.user, action_type="CLASS_SCRIPTURE_UPDATED",
+                    model_name="ClassTermScripture", object_id=row.pk,
+                    description=f"Term scripture for {class_name}, {term.name}: {verse or '(cleared)'}",
+                    request=request,
+                )
+            except Exception:
+                pass
+        return JsonResponse({"ok": True, "verse": verse})
+
     def get_context_data(self, **kwargs):
         from academics.progress_filters import ProgressFilters
         ctx = super().get_context_data(**kwargs)
@@ -229,6 +269,9 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
                 } for rc in report_cards
             ]
             ctx["all_submitted"] = report_cards.exists() and all(rc.comments_submitted for rc in report_cards)
+            from academics.models import ClassTermScripture
+            ctx["scripture_verse"] = ClassTermScripture.verse_for(selected_class, term)
+            ctx["scripture_locked"] = self._scripture_lock_reason(selected_class, term)
             ctx["can_edit_submitted"] = self.request.user.role != UserRole.TEACHER
             
         return ctx
@@ -241,6 +284,8 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
                 data = json.loads(request.body)
             except (json.JSONDecodeError, ValueError):
                 return JsonResponse({"error": "Invalid JSON"}, status=400)
+            if "scripture" in data:
+                return self._save_scripture(request, data)
             report_id = data.get("report_id")
             comment = data.get("comment")
             traits = data.get("traits")

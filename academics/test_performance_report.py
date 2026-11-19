@@ -281,7 +281,8 @@ class LearnerProfileAndProgressReportTests(PerformanceReportTests):
         # Term 1 is only partly assessed: no running average is printed.
         self.assertContains(resp, "Awaiting end of term")
         self.assertNotContains(resp, "58.0")
-        self.assertContains(resp, "Parent<br>")
+        self.assertContains(resp, "Head of School<br>")
+        self.assertNotContains(resp, "Parent<br>")
         # Without a PDF engine the download falls back to the print page.
         import sys
         from unittest import mock

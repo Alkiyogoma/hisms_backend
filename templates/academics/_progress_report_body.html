@@ -6,7 +6,7 @@
 <main class="sheet">
   {% include "includes/hodari_print_header.html" %}
 
-  <div class="doc-title"><h1>Student Progress Report</h1><span class="scope">{% if term %}{{ term.name }}{% if term.academic_year.name not in term.name %} · {{ term.academic_year.name }}{% endif %}{% else %}No term{% endif %}</span></div>
+  <div class="doc-title"><h1>Student Progress Report</h1><span class="scope">{% if term %}{{ term.name }}{% if term.academic_year.name not in term.name %} · {{ term.academic_year.name }}{% endif %}{% if term.end_date %} · Term ends {{ term.end_date|date:"j M Y" }}{% endif %}{% else %}No term{% endif %}</span></div>
   <div class="meta">
     <div><span>Student</span><b>{{ student.first_name }} {{ student.last_name }}</b></div>
     <div><span>Admission no.</span><b>{{ student.admission_no }}</b></div>
@@ -72,16 +72,19 @@
     </tr></tfoot>
   </table></div>
   {% else %}
-    <div class="empty">No approved marks for {{ student.first_name }} {% if term %}in {{ term.name }}, {{ term.academic_year.name }}{% endif %} yet. Marks appear once they are entered and approved.</div>
+    <div class="empty">No approved marks for {{ student.first_name }} {% if term %}in {{ term.name }}{% if term.academic_year.name not in term.name %}, {{ term.academic_year.name }}{% endif %}{% endif %} yet. Marks appear once they are entered and approved.</div>
   {% endif %}
 
-  {% if remark_rows %}
+  {% if remark_rows or scripture_verse %}
   <h2>Subjects assessed by remark <small>once per term · no marks</small></h2>
-  <table class="t">
+  <table class="t remarks">
     <thead><tr><th>Subject</th><th style="width:40%">Remark</th></tr></thead>
     <tbody>{% for subj, remark in remark_rows %}
-      <tr><td><b>{{ subj }}</b></td><td>{% if remark %}{{ remark }}{% else %}<span class="na">Not entered</span>{% endif %}</td></tr>
-    {% endfor %}</tbody>
+      <tr><td><b>{{ subj }}</b>{% if scripture_verse and "scripture" in subj.lower %}<span class="verse">{{ scripture_verse }}</span>{% endif %}</td><td>{% if remark %}{{ remark }}{% else %}<span class="na">Not entered</span>{% endif %}</td></tr>
+    {% endfor %}
+    {% if scripture_verse and not scripture_in_remarks %}
+      <tr><td><b>Term Scripture</b><span class="verse">{{ scripture_verse }}</span></td><td><span class="na">–</span></td></tr>
+    {% endif %}</tbody>
   </table>
   {% endif %}
 
@@ -122,7 +125,7 @@
     <div class="page2-learner">
       {{ student.first_name }} {{ student.last_name }}<br>
       {{ class_name }} &middot; {{ student.admission_no }}<br>
-      {{ term.name }}, {{ term.academic_year.name }}
+      {{ term.name }}{% if term.academic_year.name not in term.name %}, {{ term.academic_year.name }}{% endif %}
     </div>
   </div>
 

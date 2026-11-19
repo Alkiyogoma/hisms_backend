@@ -59,12 +59,12 @@
       </tr>
       <tr>
         <td><b>Class Teacher&rsquo;s Name:</b> {{ class_teacher|default:"" }}</td>
-        <td><b>Signature:</b> <span class="ecd-sig-line"></span></td>
+        <td><b>Signature:</b> <span class="ecd-sig-line">{% if signatures.class_teacher %}<img class="ecd-sig-img" src="{{ signatures.class_teacher }}" alt="Class teacher's signature">{% endif %}</span></td>
       </tr>
       <tr>
         <td><b>Head Teacher&rsquo;s Signature:</b>
-          <span class="ecd-sig-line">{% if report.signed_off_by %}<em class="ecd-stamp">Signed &middot; {{ report.signed_off_by.get_full_name|default:report.signed_off_by.username }}</em>{% endif %}</span></td>
-        <td></td>
+          <span class="ecd-sig-line">{% if signatures.hos %}<img class="ecd-sig-img" src="{{ signatures.hos }}" alt="Head Teacher's signature">{% elif report.signed_off_by %}<em class="ecd-stamp">Signed &middot; {{ report.signed_off_by.get_full_name|default:report.signed_off_by.username }}</em>{% endif %}</span></td>
+        <td>{% if signatures.hod_name %}<b>Head of ECD:</b> <span class="ecd-sig-line">{% if signatures.hod %}<img class="ecd-sig-img" src="{{ signatures.hod }}" alt="Head of ECD's signature">{% else %}<em class="ecd-stamp">{{ signatures.hod_name }}</em>{% endif %}</span>{% endif %}</td>
       </tr>
     </table>
   </section>

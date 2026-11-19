@@ -305,6 +305,43 @@ def _class_teacher_name(report, fallback_to_generator=True):
     return (by.get_full_name() or by.username) if by else ""
 
 
+def report_signatures(report, shared=None):
+    """Approved signature images (data: URIs) for a report card, each only
+    once that person has done their step:
+
+    * class teacher: the term's assigned class teacher, once submitted;
+    * HOD: whoever approved it (``ecd_hod_approved_by``);
+    * Head of School: whoever signed it off, once published.
+
+    ``hod_name`` is set once the HOD has approved, so the report can show
+    who approved even when that person has no approved signature yet."""
+    from hr.models import TeacherClassAssignment, approved_signature_uri
+    if shared is None:
+        shared = {}
+
+    def sig(user):
+        if user is None:
+            return None
+        return _shared(shared, ("signature", user.pk), lambda: approved_signature_uri(user))
+
+    out = {"class_teacher": None, "hod": None, "hod_name": "", "hos": None}
+    if report.status in (ReportCardStatus.PENDING_SIGN_OFF, ReportCardStatus.PUBLISHED):
+        def teacher_user():
+            a = (TeacherClassAssignment.objects.filter(
+                    is_class_teacher=True, grade_class__name=report.student.class_name, term=report.term)
+                 .select_related("teacher__user").first())
+            return a.teacher.user if a else None
+        out["class_teacher"] = sig(_shared(
+            shared, ("class_teacher_user", report.student.class_name, report.term_id), teacher_user))
+    hod = report.ecd_hod_approved_by
+    if hod is not None:
+        out["hod"] = sig(hod)
+        out["hod_name"] = hod.get_full_name() or hod.username
+    if report.status == ReportCardStatus.PUBLISHED:
+        out["hos"] = sig(report.signed_off_by)
+    return out
+
+
 def _photo_data_uri(student):
     """The learner's photo inlined as a data: URI, so the PDF engine never
     has to fetch it over HTTP (media may sit behind login). None if absent."""
@@ -424,6 +461,7 @@ def _build_report_card_context(report, shared=None):
         shared, ("class_teacher", report.student.class_name, term.pk, report.generated_by_id),
         lambda: _class_teacher_name(report),
     )
+    ctx["signatures"] = report_signatures(report, shared)
 
     if report.is_ecd_report:
         ctx["ecd"] = build_ecd_report_context(report, shared=shared)

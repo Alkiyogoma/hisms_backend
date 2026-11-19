@@ -77,8 +77,11 @@
   .pos-note { font-size:7.8pt; color:var(--muted); margin:3px 0 0; }
   table.pos td:first-child { white-space:nowrap; }
   .empty { padding:12px; border:1px dashed var(--border); border-radius:6px; color:var(--muted); font-size:9pt; text-align:center; }
-  .signatures { display:grid; grid-template-columns:1fr 1fr 1fr; gap:28px; margin-top:8px; padding-top:4px; border-top:1px solid var(--border); break-inside:avoid; page-break-inside:avoid; align-items:start; }
-  .sig-line { border-bottom:1.5px solid #474747; height:30px; }
+  .signatures { display:grid; grid-template-columns:1fr 1fr; gap:28px; margin-top:8px; padding-top:4px; border-top:1px solid var(--border); break-inside:avoid; page-break-inside:avoid; align-items:start; }
+  .signatures.three { grid-template-columns:1fr 1fr 1fr; gap:20px; }
+  .sig-line { border-bottom:1.5px solid #474747; height:30px; position:relative; }
+  /* Signature sits on the line and may rise above it, like a pen signature. */
+  .sig-img { position:absolute; left:0; bottom:-3px; height:13mm; max-width:85%; object-fit:contain; object-position:left bottom; }
   .sig-label { font-size:9pt; font-weight:700; color:#474747; margin-top:6px; line-height:1.3; }
   .sig-label span { font-weight:400; }
 
@@ -92,7 +95,7 @@
     .comments { grid-template-columns:1fr; }
     .sheet { padding:16px; } .meta { grid-template-columns:repeat(2,1fr); } .kpis { grid-template-columns:repeat(2,1fr); }
     .meta div:nth-child(4n) { border-right:1px solid var(--border); } .meta div:nth-child(2n) { border-right:none; } .meta div:nth-child(-n+2) { border-bottom:1px solid var(--border); }
-    .two, .signatures { grid-template-columns:1fr; }
+    .two, .signatures, .signatures.three { grid-template-columns:1fr; }
     .scroll { overflow-x:auto; }
   }
 
@@ -120,6 +123,7 @@
   .info-row small { display:block; font-size:7.6pt; color:var(--muted); }
   .comment.filled { color:var(--ink); white-space:pre-wrap; text-align:justify; }
   .comment + .comment { margin-top:8px; }
+  table.remarks .verse { margin-left:14px; font-style:italic; color:var(--ink); }
   .sig-hos { position:relative; }
   .stamp-container { position:absolute; top:-46px; right:0; width:110px; height:110px; text-align:center; }
   .stamp-img { width:110px; transform:rotate(-10deg); }

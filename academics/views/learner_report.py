@@ -27,10 +27,11 @@ class LearnerReportView(StudentDetailView):
         # remark, for staff who may see report cards.
         if term and self.request.user.has_perm("academics.view_reportcard"):
             from academics.models import ReportCard
-            from academics.views.reports import _class_teacher_name, _reopens_on, _trait_groups
+            from academics.views.reports import _class_teacher_name, _reopens_on, _trait_groups, report_signatures
             report = ReportCard.objects.filter(student=student, term=term, is_ecd_report=False).first()
             if report:
                 ctx.update({"report": report, "trait_groups": _trait_groups(report.general_traits or {}),
+                            "signatures": report_signatures(report),
                             "reopens_on": _reopens_on(term),
                             "class_teacher": ctx["class_teacher"] or _class_teacher_name(report)})
         ctx["is_pdf"] = self.request.GET.get("format") == "pdf"
@@ -110,10 +111,18 @@ def build_learner_report(student, term, shared=None, terms=None):
     ][-30:]}
     class_name = record.get("class_name") or student.class_name
     from academics.class_position import learner_positions
+    from academics.models import ClassTermScripture
+    remark_rows = _remark_rows(student, term, expected, remark_names) if term else []
+    scripture_verse = _shared(shared, ("scripture", class_name, getattr(term, "pk", None)),
+                              lambda: ClassTermScripture.verse_for(class_name, term))
     return {
         "positions": learner_positions(student, term, class_name, shared=shared),
         "student": student,
-        "remark_rows": _remark_rows(student, term, expected, remark_names) if term else [],
+        "remark_rows": remark_rows,
+        # The class's memory verse for the term: printed on the Term Scripture
+        # remark row, or on a row of its own when no such subject is set up.
+        "scripture_verse": scripture_verse,
+        "scripture_in_remarks": any("scripture" in name.lower() for name, _ in remark_rows),
         "photo_src": _photo_data_uri(student),
         "photo_checked": True,
         "exam": exam,

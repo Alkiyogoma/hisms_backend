@@ -66,6 +66,12 @@
     Staff
   </a>
   {% endif %}
+  {% if perms.hr.view_staffsignature %}
+  <a href="{% url 'hr:signature_list' %}" class="hr-tab {% if url_name == 'signature_list' %}active{% endif %}">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 17c3-1 4-8 6-8s0 8 2 8 3-4 5-4 2 3 5 3"/><path d="M3 21h18"/></svg>
+    Signatures
+  </a>
+  {% endif %}
   {# Leave, Payroll, Statutory  hidden for now #}
 </div>
 {% endwith %}

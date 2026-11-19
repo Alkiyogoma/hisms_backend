@@ -204,6 +204,9 @@ MEDIA_URL = "/media/"
 # Uploads should live outside the code folder on servers (e.g. /opt/hodari/media),
 # so replacing or re-cloning the code can never take them with it.
 MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT") or BASE_DIR / "media")
+# Private files (staff signatures) live beside MEDIA_ROOT, never under it, so the
+# web server never publishes them; views inline them into documents instead.
+PRIVATE_MEDIA_ROOT = Path(os.getenv("PRIVATE_MEDIA_ROOT") or MEDIA_ROOT.parent / "private_media")
 # LibreOffice binary for lesson plan previews (office files -> PDF); found on PATH when empty.
 LIBREOFFICE_BINARY = os.getenv("LIBREOFFICE_BINARY", "")
 

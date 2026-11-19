@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}Staff Signatures | {{ brand.school_name }}{% endblock %}
+{% block extra_head %}{{ block.super }}
+<style>
+  .sg-page { max-width: 1100px; margin: 0 auto; }
+  .sg-note { font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin: 0 0 16px; }
+  .sg-filters { margin: 0 0 16px; overflow-x: auto; scrollbar-width: none; }
+  .sg-filters .tab-item { white-space: nowrap; }
+  .sg-count { font-size: 11px; font-weight: 600; margin-left: 4px; opacity: .75; }
+  .sg-gaps { border: 1px solid var(--amber-bd, #FCD34D); background: var(--amber-bg, #FEF3C7); color: var(--amber, #92550A);
+    border-radius: 10px; padding: 12px 14px; font-size: 13px; margin-bottom: 16px; }
+  .sg-gaps b { color: inherit; }
+  .sg-gaps ul { margin: 6px 0 0 18px; }
+  .sg-bulk { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+  .sg-bulk label { font-size: 13px; display: inline-flex; gap: 6px; align-items: center; color: var(--text-secondary); }
+  .sg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 14px; }
+  .sg-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .sg-head { display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; }
+  .sg-name { font-weight: 600; font-size: 14px; color: var(--text-primary); overflow-wrap: anywhere; }
+  .sg-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; overflow-wrap: anywhere; }
+  .sg-roles { display: flex; flex-wrap: wrap; gap: 4px; }
+  .sg-img { height: 110px; border: 1px dashed var(--border); border-radius: 8px; display: grid; place-items: center; padding: 8px;
+    background: repeating-conic-gradient(#F4F6FA 0 25%, #fff 0 50%) 0 0 / 16px 16px; }
+  .sg-img img { display: block; width: auto; height: auto; max-height: 94px; max-width: 100%; object-fit: contain; }
+  .sg-img.empty { color: var(--text-muted); font-size: 12px; background: #FAFBFD; }
+  .sg-reason { font-size: 12px; color: var(--red, #9B1C1C); }
+  .sg-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: auto; }
+  .sg-actions input[type=text] { flex: 1 1 120px; min-width: 0; font-size: 13px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; }
+  .sg-pick { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+  .sg-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; font-size: 13px; }
+  .sg-field select, .sg-field input { font-size: 14px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; }
+  .sg-help { font-size: 12px; color: var(--text-muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sg-page">
+  {% include "hr/_top_tabs.html" %}
+  <c-page-header title="Staff signatures" subtitle="Signatures print on report cards only after the Head of School approves them.">
+    {% if can_upload %}<c-button data-hui-open="sgUpload">Upload signature</c-button>{% endif %}
+  </c-page-header>
+
+  <p class="sg-note">
+    A signature appears on a report only where that person did their step: the class teacher's once the report is submitted,
+    the HOD's once they approve it, and the Head of School's once they sign it off. Until then the report keeps a blank signature line.
+  </p>
+
+  {% if report_gaps %}
+  <div class="sg-gaps" role="status">
+    <b>{{ report_gaps|length }} {{ report_gaps|length|pluralize:"person signs,people sign" }} reports{% if term %} in {{ term.name }}{% endif %} without an approved signature:</b>
+    <ul>
+      {% for r in report_gaps %}<li>{{ r.staff.full_name }} ({{ r.on_reports|join:"; " }}): {% if r.state == "missing" %}not signed yet{% elif r.state == "pending" %}waiting for approval{% else %}rejected{% endif %}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <nav class="tabs-nav sg-filters" aria-label="Filter signatures">
+    {% for key, label, count in filters %}
+    <a href="?show={{ key }}" class="tab-item{% if key == current %} active{% endif %}">{{ label }}<span class="sg-count">{{ count }}</span></a>
+    {% endfor %}
+  </nav>
+
+  {% if rows %}
+  {% if can_approve and current == "pending" %}
+  <form id="sgBulk" method="post" action="{% url 'hr:signature_review' %}" class="sg-bulk">
+    {% csrf_token %}
+    <input type="hidden" name="show" value="{{ current }}">
+    <label><input type="checkbox" id="sgAll"> Select all</label>
+    <c-button type="submit" name="action" value="approve" variant="success" size="sm">Approve selected</c-button>
+  </form>
+  {% endif %}
+
+  <div class="sg-grid">
+    {% for r in rows %}
+    <article class="sg-card">
+      <div class="sg-head">
+        <div>
+          <div class="sg-name">{{ r.staff.full_name }}</div>
+          <div class="sg-meta">{{ r.staff.employee_id|default:"No staff ID" }} · {{ r.staff.job_title }}</div>
+        </div>
+        {% if r.state == "approved" %}<c-badge variant="green">Approved</c-badge>
+        {% elif r.state == "pending" %}<c-badge variant="amber">Waiting</c-badge>
+        {% elif r.state == "rejected" %}<c-badge variant="red">Rejected</c-badge>
+        {% else %}<c-badge>Not signed</c-badge>{% endif %}
+      </div>
+      {% if r.on_reports %}<div class="sg-roles">{% for x in r.on_reports %}<c-badge variant="blue">{{ x }}</c-badge>{% endfor %}</div>{% endif %}
+
+      {% if r.src %}
+      <div class="sg-img"><img src="{{ r.src }}" alt="Signature of {{ r.staff.full_name }}"></div>
+      {% elif r.sig %}
+      <div class="sg-img empty">Image file missing. Upload it again.</div>
+      {% else %}
+      <div class="sg-img empty">No signature yet</div>
+      {% endif %}
+
+      {% if r.sig %}
+      <div class="sg-meta">
+        {{ r.sig.source|default:"Uploaded" }}{% if r.sig.signed_at %} · signed {{ r.sig.signed_at|date:"d M Y H:i" }}{% endif %}
+        {% if r.sig.reviewed_by %}<br>{{ r.sig.get_status_display }} by {{ r.sig.reviewed_by.get_full_name|default:r.sig.reviewed_by.username }}, {{ r.sig.reviewed_at|date:"d M Y" }}{% endif %}
+      </div>
+      {% if r.sig.reject_reason %}<div class="sg-reason">Reason: {{ r.sig.reject_reason }}</div>{% endif %}
+      {% endif %}
+
+      {% if can_approve and r.sig %}
+      <form method="post" action="{% url 'hr:signature_review' %}" class="sg-actions">
+        {% csrf_token %}
+        <input type="hidden" name="ids" value="{{ r.sig.pk }}">
+        <input type="hidden" name="show" value="{{ current }}">
+        {% if r.state == "pending" %}
+        <label class="sg-pick"><input type="checkbox" name="ids" value="{{ r.sig.pk }}" form="sgBulk" class="sg-pick-box"> Select</label>
+        {% endif %}
+        {% if r.state != "approved" %}
+        <c-button type="submit" name="action" value="approve" variant="success" size="sm">Approve</c-button>
+        {% endif %}
+        {% if r.state != "rejected" %}
+        <input type="text" name="reason" maxlength="255" placeholder="Reason (if rejecting)" aria-label="Reason for rejecting {{ r.staff.full_name }}'s signature">
+        <c-button type="submit" name="action" value="reject" variant="danger" size="sm">Reject</c-button>
+        {% endif %}
+      </form>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <c-empty-state title="Nothing here" desc="No staff match this filter." icon="check" icon_color="green" />
+  {% endif %}
+</div>
+
+{% if can_upload %}
+<c-modal id="sgUpload" title="Upload signature" subtitle="Transparent PNG, under 2 MB. It waits for the Head of School's approval.">
+  <form id="sgUploadForm" method="post" enctype="multipart/form-data" action="{% url 'hr:signature_upload' %}">
+    {% csrf_token %}
+    <label class="sg-field">Staff member
+      <select name="staff" required>
+        <option value="">Choose…</option>
+        {% for p in upload_staff %}<option value="{{ p.pk }}">{{ p.full_name }}{% if p.employee_id %} ({{ p.employee_id }}){% endif %}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="sg-field">Signature image (PNG)
+      <input type="file" name="image" accept="image/png" required>
+      <span class="sg-help">Use the PNG from the signing export (png/ folder). Uploading replaces any existing signature and sends it back for approval.</span>
+    </label>
+  </form>
+  <c-slot name="footer">
+    <c-button variant="secondary" data-hui-close>Cancel</c-button>
+    <c-button type="submit" form="sgUploadForm">Upload</c-button>
+  </c-slot>
+</c-modal>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}{{ block.super }}
+<script>
+  (function () {
+    var all = document.getElementById("sgAll");
+    if (!all) return;
+    all.addEventListener("change", function () {
+      document.querySelectorAll(".sg-pick-box").forEach(function (b) { b.checked = all.checked; });
+    });
+  })();
+</script>
+{% endblock %}

@@ -963,6 +963,30 @@ class SubjectTermRemark(TimeStampedModel):
         return f"{self.student_id} | {self.subject_name} | {self.remark}"
 
 
+class ClassTermScripture(TimeStampedModel):
+    """The memory verse a Primary / Lower Secondary class learns in a term,
+    set by the class teacher and printed on the report's Term Scripture row."""
+    term = models.ForeignKey(Term, on_delete=models.PROTECT, related_name="class_scriptures")
+    class_name = models.CharField(max_length=64, db_index=True)
+    verse = models.CharField(max_length=255, blank=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="class_scriptures_updated",
+    )
+
+    class Meta:
+        unique_together = ("term", "class_name")
+
+    def __str__(self) -> str:
+        return f"{self.class_name} | {self.term_id} | {self.verse}"
+
+    @classmethod
+    def verse_for(cls, class_name, term) -> str:
+        if not (class_name and term):
+            return ""
+        return cls.objects.filter(class_name=class_name, term=term).values_list("verse", flat=True).first() or ""
+
+
 class ExamScoreAmendment(TimeStampedModel):
     """A change to a score after HOD approval, made by the Head of School or
     Super Admin. One row per change, so the full history is kept."""

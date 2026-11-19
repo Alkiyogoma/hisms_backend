@@ -272,6 +272,18 @@ document.addEventListener("keydown", function (e) { if (e.key === "Escape") clos
                 {% endif %}
             </div>
 
+            <div class="comment-section" id="scripture-card">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+                    <label for="scripture-input" style="font-size:12px;font-weight:700;color:#64748B;text-transform:uppercase">Term Scripture &middot; {{ selected_class }}</label>
+                    <span id="save-ind-scripture" class="save-indicator"></span>
+                </div>
+                <input type="text" id="scripture-input" class="hf-input" maxlength="255" autocomplete="off"
+                       value="{{ scripture_verse }}" placeholder="e.g. Romans 5:1-11, Psalm 100:1-5"
+                       style="width:100%;box-sizing:border-box"
+                       {% if scripture_locked %}disabled title="{{ scripture_locked }}"{% else %}oninput="debounceScripture()"{% endif %}>
+                <div style="font-size:12px;color:#64748B;margin-top:6px">{% if scripture_locked %}{{ scripture_locked }}{% else %}The verse this class learned this term. It prints on every student's report beside their Term Scripture remark.{% endif %}</div>
+            </div>
+
             {% for row in student_reports %}
             <div class="comment-section" id="student-{{ row.report.id }}">
                 <div class="cm-student-head" style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
@@ -435,6 +447,35 @@ function showSubmitConfirm() {
             document.getElementById('comment-form').submit();
         }
     });
+}
+
+var scriptureTimer = null;
+function debounceScripture() {
+    var ind = document.getElementById('save-ind-scripture');
+    ind.style.color = '';
+    ind.className = 'save-indicator saving visible';
+    ind.textContent = 'Saving...';
+    if (scriptureTimer) clearTimeout(scriptureTimer);
+    scriptureTimer = setTimeout(function() {
+        fetch(window.location.pathname + '?class_name=' + encodeURIComponent(CLASS_NAME), {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest'},
+            body: JSON.stringify({scripture: document.getElementById('scripture-input').value, class_name: CLASS_NAME, term: "{{ current_term.id }}"})
+        }).then(function(r) { return r.json().catch(function() { return {error: 'Not saved: the server returned an unexpected error (' + r.status + ').'}; }); }).then(function(d) {
+            ind.className = 'save-indicator visible';
+            if (d.ok) {
+                ind.textContent = 'Saved';
+                setTimeout(function() { ind.classList.remove('visible'); }, 2000);
+            } else {
+                ind.style.color = '#DC2626';
+                ind.textContent = d.error || 'Not saved: try again';
+            }
+        }).catch(function() {
+            ind.className = 'save-indicator visible';
+            ind.style.color = '#DC2626';
+            ind.textContent = 'Not saved: the server could not be reached.';
+        });
+    }, 800);
 }
 
 function onCommentInput(reportId, textarea) {
