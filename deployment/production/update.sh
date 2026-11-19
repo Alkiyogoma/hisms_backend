@@ -140,7 +140,7 @@ chown -R "$APPUSER:$APPUSER" "$APP"
 printf 'Application ownership updated.\n'
 
 step "5/8 Installing Python dependencies"
-sudo -u "$APPUSER" "$VENV/bin/pip" install --disable-pip-version-check -r "$APP/requirements.txt"
+sudo -u "$APPUSER" "$VENV/bin/pip" install -q --disable-pip-version-check -r "$APP/requirements.txt"
 printf 'Dependencies ready.\n'
 
 step "6/8 Applying database migrations"

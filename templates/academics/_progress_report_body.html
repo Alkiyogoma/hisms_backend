@@ -39,7 +39,7 @@
     <thead><tr>
       <th>Subject</th>
       {% for c in exam_columns %}<th class="ctr">{{ c }}</th>{% endfor %}
-      <th class="ctr">TOTAL/100</th><th class="ctr">Grade</th><th class="ctr">Class avg</th><th>Remarks</th>
+      <th class="ctr">TOTAL/100</th><th class="ctr">Grade</th><th class="ctr">Class avg</th><th class="ctr">Remarks</th>
     </tr></thead>
     <tbody>
     {% for row in academic_rows %}
@@ -50,10 +50,10 @@
         <td class="ctr mono"><b>{{ row.total|floatformat:"-1" }}</b></td>
         <td class="ctr"><span class="g">{{ row.grade }}</span></td>
         <td class="ctr mono">{{ row.class_average|default:"–" }}</td>
-        <td>{{ row.label }}</td>
+        <td class="ctr">{{ row.label }}</td>
         {% else %}
         <td class="ctr na">–</td><td class="ctr na">–</td><td class="ctr na">–</td>
-        <td><span class="st await">Awaiting end of term</span></td>
+        <td class="ctr"><span class="st await">Awaiting end of term</span></td>
         {% endif %}
       </tr>
     {% endfor %}
@@ -78,12 +78,12 @@
   {% if remark_rows or scripture_verse %}
   <h2>Subjects assessed by remark <small>once per term · no marks</small></h2>
   <table class="t remarks">
-    <thead><tr><th>Subject</th><th style="width:40%">Remark</th></tr></thead>
+    <thead><tr><th>Subject</th><th class="ctr" style="width:40%">Remark</th></tr></thead>
     <tbody>{% for subj, remark in remark_rows %}
-      <tr><td><b>{{ subj }}</b>{% if scripture_verse and subj == scripture_row %}<span class="verse">({% if "scripture" not in subj.lower %}Term Scripture: {% endif %}{{ scripture_verse }})</span>{% endif %}</td><td>{% if remark %}{{ remark }}{% else %}<span class="na">Not entered</span>{% endif %}</td></tr>
+      <tr><td><b>{{ subj }}</b>{% if scripture_verse and subj == scripture_row %}<span class="verse">({% if "scripture" not in subj.lower %}Term Scripture: {% endif %}{{ scripture_verse }})</span>{% endif %}</td><td class="ctr">{% if remark %}{{ remark }}{% else %}<span class="na">Not entered</span>{% endif %}</td></tr>
     {% endfor %}
     {% if scripture_verse and not scripture_row %}
-      <tr><td><b>Term Scripture</b><span class="verse">({{ scripture_verse }})</span></td><td><span class="na">–</span></td></tr>
+      <tr><td><b>Term Scripture</b><span class="verse">({{ scripture_verse }})</span></td><td class="ctr"><span class="na">–</span></td></tr>
     {% endif %}</tbody>
   </table>
   {% endif %}
