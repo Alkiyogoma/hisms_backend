@@ -63,28 +63,25 @@
     .ecd-strip th { background: #fff; font-weight: 700; overflow-wrap: anywhere; }
     .ecd-strip td.ecd-val { width: auto; }
     .ecd-verse-text { font-weight: 700; }
-    /* Both columns are the same width and end on the same line. Rows keep
-       their natural height so they line up across the two columns; an empty
-       filler row at the foot of the shorter column takes up the difference. */
-    .ecd-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 12px; align-items: stretch; margin-bottom: 24px; }
+    /* Both columns are the same width; each ends at its own last row. */
+    .ecd-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 12px; align-items: start; margin-bottom: 24px; }
     .ecd-cols > div { display: flex; flex-direction: column; min-width: 0; }
     .ecd-cols > div > table { margin-bottom: 0; }
     /* A gap between sections stacked in a column (READING, then WRITING). */
     .ecd-cols > div > table + table { margin-top: 24px; }
-    /* The filler stays joined to the last table, so the column still ends flush. */
-    .ecd-cols > div > table.ecd-fill { flex: 1 1 auto; margin-top: -1px; }
-    .ecd-cols table.ecd-fill td { padding: 0; }
     /* Same navy header as the NUMERACY / READING section tables. */
     .ecd-overall th { font-weight: 700; background: var(--navy); color: #fff; }
     .ecd-overall td { height: 24px; font-weight: 700; }
     .ecd-footer { margin-top: 10px; break-inside: avoid; page-break-inside: avoid; }
     .ecd-comment { min-height: 60px; border-bottom: 1px solid #999; padding: 2px 0 8px; font-style: normal; white-space: pre-line; text-align: justify; }
-    .ecd-foot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; margin-top: 12px; }
-    .ecd-sig { display: flex; align-items: flex-end; gap: 6px; }
+    .ecd-overall-h { margin-top: 40px; }  /* collapses with the 24px below the columns */
+    /* Footer: a borderless table, first column flush left, second flush right. */
+    table.ecd-foot { border-collapse: collapse; width: 100%; margin-top: 24px; }
+    .ecd-foot td { border: 0; padding: 0 0 12px; vertical-align: bottom; width: 50%; }
+    .ecd-foot td + td { text-align: right; }
     /* Short signing lines that stay inside their own column. */
-    .ecd-sig span { flex: 1 1 auto; max-width: 160px; border-bottom: 1px solid #000; min-height: 20px; }
-    .ecd-sig-wide { grid-column: 1; }
-    .ecd-approval { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 10px; }
+    .ecd-sig-line { display: inline-block; width: 160px; border-bottom: 1px solid #000; min-height: 20px; vertical-align: bottom; text-align: left; }
+    .ecd-approval { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 6px 10px; }
     .ecd-approved { display: inline-block; font-family: var(--font-ui); font-size: 9pt; font-weight: 700; color: #1B7B34;
       border: 1.5px solid #1B7B34; border-radius: 4px; padding: 2px 8px; }
     .ecd-stamp { font-family: var(--font-ui); font-size: 9pt; color: var(--hodari-blue); font-weight: 700; font-style: normal; }
@@ -95,9 +92,10 @@
     @media (max-width: 640px) {
       body { padding: 8px; }
       .ecd-sheet { padding: 16px 12px; }
-      .ecd-cols, .ecd-foot-grid { grid-template-columns: 1fr; }
+      .ecd-cols { grid-template-columns: 1fr; }
+      .ecd-foot td { display: block; width: auto; }
+      .ecd-foot td + td { text-align: left; }
       .ecd-cols { row-gap: 24px; }
-      .ecd-cols table.ecd-fill { display: none; }
       .ecd-strip, .ecd-overall, .ecd-meta { table-layout: auto; }
       .ecd-meta td:first-child { width: auto; }
     }

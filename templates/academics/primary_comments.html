@@ -241,7 +241,6 @@ document.addEventListener("keydown", function (e) { if (e.key === "Escape") clos
                 </div>
                 <div class="sc-name" style="flex:1;min-width:0">
                     <div style="font-size:14px;font-weight:700;color:#1E293B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ row.student.get_full_name }}</div>
-                    <div style="font-size:11px;color:#64748B">{{ row.student.admission_no }}</div>
                 </div>
                 <span id="chip-{{ row.report.id }}" class="status-chip {% if row.comment|length >= 50 %}status-done{% elif row.comment %}status-progress{% else %}status-pending{% endif %}">
                     {% if row.comment|length >= 50 %}Done{% elif row.comment %}In Progress{% else %}Pending{% endif %}
@@ -301,7 +300,7 @@ document.addEventListener("keydown", function (e) { if (e.key === "Escape") clos
                           class="comment-textarea"
                           data-report-id="{{ row.report.id }}"
                           placeholder="Write a detailed narrative comment about this student's performance, behavior, and areas for improvement..."
-                          {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled style="background:#F8FAFC;cursor:not-allowed;opacity:0.8"{% else %}oninput="onCommentInput({{ row.report.id }}, this)"{% endif %}>{{ row.comment }}</textarea>
+                          {% if row.locked %}disabled title="{{ row.locked }}" style="background:#F8FAFC;cursor:not-allowed;opacity:0.8"{% else %}oninput="onCommentInput({{ row.report.id }}, this)"{% endif %}>{{ row.comment }}</textarea>
                 <div class="cm-count-row" style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
                     <div id="char-count-{{ row.report.id }}" style="font-size:12px;font-weight:600;color:{% if row.comment|length >= 50 %}#059669{% else %}#DC2626{% endif %}">
                         {{ row.comment|length }} / 50 minimum characters
@@ -328,10 +327,10 @@ document.addEventListener("keydown", function (e) { if (e.key === "Escape") clos
                                 <td style="text-align:center;padding:4px 6px;border:1px solid var(--border);width:{{ forloop.counter|floatformat:0 }}%;background:{% cycle 'var(--bg-metric)' 'var(--bg-card)' %}">
                                     <div style="font-size:11px;font-weight:600;color:var(--text-primary);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ trait.label }}</div>
                                     <div class="pill-group">
-                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="wh_{{ row.report.id }}_{{ trait.key }}_e" value="E" {% if row.traits|dict_get:trait.key == "E" %}checked{% endif %} {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="wh_{{ row.report.id }}_{{ trait.key }}_e">E</label>
-                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="wh_{{ row.report.id }}_{{ trait.key }}_g" value="G" {% if row.traits|dict_get:trait.key == "G" %}checked{% endif %} {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="wh_{{ row.report.id }}_{{ trait.key }}_g">G</label>
-                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="wh_{{ row.report.id }}_{{ trait.key }}_s" value="S" {% if row.traits|dict_get:trait.key == "S" %}checked{% endif %} {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="wh_{{ row.report.id }}_{{ trait.key }}_s">S</label>
-                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="wh_{{ row.report.id }}_{{ trait.key }}_n" value="N" {% if row.traits|dict_get:trait.key == "N" %}checked{% endif %} {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="wh_{{ row.report.id }}_{{ trait.key }}_n">N</label>
+                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="wh_{{ row.report.id }}_{{ trait.key }}_e" value="E" {% if row.traits|dict_get:trait.key == "E" %}checked{% endif %} {% if row.locked %}disabled title="{{ row.locked }}"{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="wh_{{ row.report.id }}_{{ trait.key }}_e">E</label>
+                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="wh_{{ row.report.id }}_{{ trait.key }}_g" value="G" {% if row.traits|dict_get:trait.key == "G" %}checked{% endif %} {% if row.locked %}disabled title="{{ row.locked }}"{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="wh_{{ row.report.id }}_{{ trait.key }}_g">G</label>
+                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="wh_{{ row.report.id }}_{{ trait.key }}_s" value="S" {% if row.traits|dict_get:trait.key == "S" %}checked{% endif %} {% if row.locked %}disabled title="{{ row.locked }}"{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="wh_{{ row.report.id }}_{{ trait.key }}_s">S</label>
+                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="wh_{{ row.report.id }}_{{ trait.key }}_n" value="N" {% if row.traits|dict_get:trait.key == "N" %}checked{% endif %} {% if row.locked %}disabled title="{{ row.locked }}"{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="wh_{{ row.report.id }}_{{ trait.key }}_n">N</label>
                                     </div>
                                 </td>
                                 {% endfor %}
@@ -348,10 +347,10 @@ document.addEventListener("keydown", function (e) { if (e.key === "Escape") clos
                                 <td style="text-align:center;padding:4px 6px;border:1px solid var(--border);width:{{ forloop.counter|floatformat:0 }}%;background:{% cycle 'var(--bg-metric)' 'var(--bg-card)' %}">
                                     <div style="font-size:11px;font-weight:600;color:var(--text-primary);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ trait.label }}</div>
                                     <div class="pill-group">
-                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="pt_{{ row.report.id }}_{{ trait.key }}_e" value="E" {% if row.traits|dict_get:trait.key == "E" %}checked{% endif %} {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="pt_{{ row.report.id }}_{{ trait.key }}_e">E</label>
-                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="pt_{{ row.report.id }}_{{ trait.key }}_g" value="G" {% if row.traits|dict_get:trait.key == "G" %}checked{% endif %} {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="pt_{{ row.report.id }}_{{ trait.key }}_g">G</label>
-                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="pt_{{ row.report.id }}_{{ trait.key }}_s" value="S" {% if row.traits|dict_get:trait.key == "S" %}checked{% endif %} {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="pt_{{ row.report.id }}_{{ trait.key }}_s">S</label>
-                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="pt_{{ row.report.id }}_{{ trait.key }}_n" value="N" {% if row.traits|dict_get:trait.key == "N" %}checked{% endif %} {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="pt_{{ row.report.id }}_{{ trait.key }}_n">N</label>
+                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="pt_{{ row.report.id }}_{{ trait.key }}_e" value="E" {% if row.traits|dict_get:trait.key == "E" %}checked{% endif %} {% if row.locked %}disabled title="{{ row.locked }}"{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="pt_{{ row.report.id }}_{{ trait.key }}_e">E</label>
+                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="pt_{{ row.report.id }}_{{ trait.key }}_g" value="G" {% if row.traits|dict_get:trait.key == "G" %}checked{% endif %} {% if row.locked %}disabled title="{{ row.locked }}"{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="pt_{{ row.report.id }}_{{ trait.key }}_g">G</label>
+                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="pt_{{ row.report.id }}_{{ trait.key }}_s" value="S" {% if row.traits|dict_get:trait.key == "S" %}checked{% endif %} {% if row.locked %}disabled title="{{ row.locked }}"{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="pt_{{ row.report.id }}_{{ trait.key }}_s">S</label>
+                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="pt_{{ row.report.id }}_{{ trait.key }}_n" value="N" {% if row.traits|dict_get:trait.key == "N" %}checked{% endif %} {% if row.locked %}disabled title="{{ row.locked }}"{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="pt_{{ row.report.id }}_{{ trait.key }}_n">N</label>
                                     </div>
                                 </td>
                                 {% endfor %}
@@ -368,10 +367,10 @@ document.addEventListener("keydown", function (e) { if (e.key === "Escape") clos
                                 <td style="text-align:center;padding:4px 6px;border:1px solid var(--border);width:{{ forloop.counter|floatformat:0 }}%;background:{% cycle 'var(--bg-metric)' 'var(--bg-card)' %}">
                                     <div style="font-size:11px;font-weight:600;color:var(--text-primary);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ trait.label }}</div>
                                     <div class="pill-group">
-                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="st_{{ row.report.id }}_{{ trait.key }}_e" value="E" {% if row.traits|dict_get:trait.key == "E" %}checked{% endif %} {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="st_{{ row.report.id }}_{{ trait.key }}_e">E</label>
-                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="st_{{ row.report.id }}_{{ trait.key }}_g" value="G" {% if row.traits|dict_get:trait.key == "G" %}checked{% endif %} {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="st_{{ row.report.id }}_{{ trait.key }}_g">G</label>
-                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="st_{{ row.report.id }}_{{ trait.key }}_s" value="S" {% if row.traits|dict_get:trait.key == "S" %}checked{% endif %} {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="st_{{ row.report.id }}_{{ trait.key }}_s">S</label>
-                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="st_{{ row.report.id }}_{{ trait.key }}_n" value="N" {% if row.traits|dict_get:trait.key == "N" %}checked{% endif %} {% if row.report.comments_submitted or comment_window_status == "closed_late" %}disabled{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="st_{{ row.report.id }}_{{ trait.key }}_n">N</label>
+                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="st_{{ row.report.id }}_{{ trait.key }}_e" value="E" {% if row.traits|dict_get:trait.key == "E" %}checked{% endif %} {% if row.locked %}disabled title="{{ row.locked }}"{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="st_{{ row.report.id }}_{{ trait.key }}_e">E</label>
+                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="st_{{ row.report.id }}_{{ trait.key }}_g" value="G" {% if row.traits|dict_get:trait.key == "G" %}checked{% endif %} {% if row.locked %}disabled title="{{ row.locked }}"{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="st_{{ row.report.id }}_{{ trait.key }}_g">G</label>
+                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="st_{{ row.report.id }}_{{ trait.key }}_s" value="S" {% if row.traits|dict_get:trait.key == "S" %}checked{% endif %} {% if row.locked %}disabled title="{{ row.locked }}"{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="st_{{ row.report.id }}_{{ trait.key }}_s">S</label>
+                                        <input type="radio" name="trait_{{ row.report.id }}_{{ trait.key }}" id="st_{{ row.report.id }}_{{ trait.key }}_n" value="N" {% if row.traits|dict_get:trait.key == "N" %}checked{% endif %} {% if row.locked %}disabled title="{{ row.locked }}"{% else %}onchange="onTraitChange({{ row.report.id }})"{% endif %}><label for="st_{{ row.report.id }}_{{ trait.key }}_n">N</label>
                                     </div>
                                 </td>
                                 {% endfor %}
@@ -393,6 +392,9 @@ document.addEventListener("keydown", function (e) { if (e.key === "Escape") clos
                     </span>
                     {% if all_submitted %}
                     <span class="status-chip status-done" style="padding:8px 16px;font-size:13px">All Submitted</span>
+                    {% if can_edit_submitted and comment_window_status != "closed_late" %}
+                    <button type="submit" id="btn-save" class="hf-btn hf-btn-primary">Save All Comments</button>
+                    {% endif %}
                     {% elif comment_window_status != "open" %}
                     {% else %}
                     <button type="submit" id="btn-save" class="hf-btn hf-btn-primary">Save All Comments</button>
@@ -566,7 +568,8 @@ function scrollToStudent(reportId) {
     }
 }
 
-document.getElementById('btn-save').addEventListener('click', function() {
+var btnSave = document.getElementById('btn-save');
+if (btnSave) btnSave.addEventListener('click', function() {
     var btn = this;
     btn.disabled = true;
     btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="animation:btn-spin 1s linear infinite"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> Saving...';

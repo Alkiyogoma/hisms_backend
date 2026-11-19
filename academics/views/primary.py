@@ -209,7 +209,9 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
             if not ReportCard.objects.filter(term=term, student__in=students).exists():
                 generate_class_reports(term.id, selected_class, self.request.user)
             
-            report_cards = ReportCard.objects.filter(term=term, student__in=students, is_ecd_report=False)
+            report_cards = ReportCard.objects.filter(
+                term=term, student__in=students, is_ecd_report=False,
+            ).select_related("student", "term")
             
             ctx["selected_class"] = selected_class
             ctx["work_habits"] = self.WORK_HABITS
@@ -221,9 +223,13 @@ class PrimaryCommentEntryView(RoleRequiredMixin, TemplateView):
                     "report": rc,
                     "comment": rc.teacher_comments or "",
                     "traits": rc.general_traits or {},
+                    # Same rule the save endpoints enforce: teachers are locked out
+                    # once submitted; HOD/HOS/admin can still correct the comment.
+                    "locked": _comment_lock_reason(rc, self.request.user),
                 } for rc in report_cards
             ]
             ctx["all_submitted"] = report_cards.exists() and all(rc.comments_submitted for rc in report_cards)
+            ctx["can_edit_submitted"] = self.request.user.role != UserRole.TEACHER
             
         return ctx
 

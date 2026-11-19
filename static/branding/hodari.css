@@ -232,7 +232,10 @@ h1, h2, h3, h4, h5, h6,
   flex-direction: column;
   min-height: 100vh;
   min-width: 0;
-  overflow-x: hidden
+  /* clip, not hidden: hidden makes .main a scroll container that never
+     scrolls (the window does), which silently breaks every position:sticky
+     inside it (topbar, side lists). */
+  overflow-x: clip
 }
 
 /* ── TOPBAR ── */

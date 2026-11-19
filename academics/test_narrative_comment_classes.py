@@ -166,3 +166,37 @@ class NarrativeCommentClassTests(TestCase):
                 self.assertTrue(report.comments_submitted)
                 recipients = {call.kwargs["user"].pk for call in notify.call_args_list}
                 self.assertEqual(recipients, {self.hos.pk, head.pk})
+
+    def test_submitted_comment_locks_teacher_but_not_hod_hos_or_admin(self):
+        report = self.reports[3]
+        ReportCard.objects.filter(pk=report.pk).update(
+            comments_submitted=True, teacher_comments="Submitted comment that is long enough to pass the minimum.",
+        )
+        admin = User.objects.create_user("comments-admin", email="comments-admin@example.test", password="x", role=UserRole.SUPER_ADMIN)
+        assign_role_group(admin)
+
+        self.client.force_login(self.teachers[3])
+        response = self.client.get(self.url, {"class_name": "Grade 3"})
+        self.assertTrue(response.context["student_reports"][0]["locked"])
+        self.assertContains(response, f'name="comment_{report.pk}"')
+        self.assertNotContains(response, f'oninput="onCommentInput({report.pk}, this)"')
+        self.assertEqual(self.client.post(
+            self.url, json.dumps({"report_id": report.pk, "comment": "Teacher edit after submit"}),
+            content_type="application/json", HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        ).status_code, 409)
+
+        for reviewer in (self.primary_hod, self.hos, admin):
+            with self.subTest(reviewer=reviewer.username):
+                self.client.force_login(reviewer)
+                response = self.client.get(self.url, {"class_name": "Grade 3"})
+                self.assertEqual(response.context["student_reports"][0]["locked"], "")
+                self.assertContains(response, f'oninput="onCommentInput({report.pk}, this)"')
+                self.assertContains(response, 'id="btn-save"')
+                comment = f"Corrected by {reviewer.username}: a thoughtful learner who works well with others."
+                self.assertEqual(self.client.post(
+                    self.url, json.dumps({"report_id": report.pk, "comment": comment}),
+                    content_type="application/json", HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+                ).status_code, 200)
+                report.refresh_from_db()
+                self.assertEqual(report.teacher_comments, comment)
+                self.assertTrue(report.comments_submitted)

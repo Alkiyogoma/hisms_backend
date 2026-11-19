@@ -31,15 +31,14 @@
       {% for section in part.top %}{% include "academics/_ecd_report_section.html" %}{% endfor %}
       {% if part.left or part.right %}
       <div class="ecd-cols">
-        {# The empty .ecd-fill row stretches to even out the shorter column (it is zero-height in the longer one). #}
-        <div>{% for section in part.left %}{% include "academics/_ecd_report_section.html" %}{% endfor %}<table class="ecd-table ecd-fill" aria-hidden="true"><tr><td></td><td class="ecd-val"></td></tr></table></div>
-        <div>{% for section in part.right %}{% include "academics/_ecd_report_section.html" %}{% endfor %}<table class="ecd-table ecd-fill" aria-hidden="true"><tr><td></td><td class="ecd-val"></td></tr></table></div>
+        <div>{% for section in part.left %}{% include "academics/_ecd_report_section.html" %}{% endfor %}</div>
+        <div>{% for section in part.right %}{% include "academics/_ecd_report_section.html" %}{% endfor %}</div>
       </div>
       {% endif %}
       {% for section in part.bottom %}{% include "academics/_ecd_report_section.html" %}{% endfor %}
 
       {% if part.key == "academic" %}
-      <h3 class="ecd-h3">Student&rsquo;s Overall Academic Progress</h3>
+      <h3 class="ecd-h3 ecd-overall-h">Student&rsquo;s Overall Academic Progress</h3>
       <table class="ecd-overall">
         <tr><th>Average Point{% if ecd.avg_score is None %}:{% endif %}</th><th>Remarks</th></tr>
         <tr><td>{{ ecd.avg_score|default_if_none:"" }}</td><td>{{ ecd.remarks_label }}</td></tr>
@@ -52,20 +51,27 @@
   <section class="ecd-footer">
     <h3 class="ecd-h3">Class Teacher&rsquo;s Comment:</h3>
     <div class="ecd-comment">{{ ecd.teacher_comments|default:"" }}</div>
-    <div class="ecd-foot-grid">
-      <div><b>Days Absent:</b> {{ attendance.absent }}</div>
-      <div><b>School Reopens on:</b> {{ reopens_on|date:"d M Y"|default:"To be announced" }}</div>
-      <div><b>Class Teacher&rsquo;s Name:</b> {{ class_teacher|default:"" }}</div>
-      <div class="ecd-sig"><b>Signature:</b> <span></span></div>
-      <div class="ecd-sig ecd-sig-wide"><b>Head Teacher&rsquo;s Signature:</b>
-        <span>{% if report.signed_off_by %}<em class="ecd-stamp">Signed &middot; {{ report.signed_off_by.get_full_name|default:report.signed_off_by.username }}</em>{% endif %}</span>
-      </div>
-      {% if report.ecd_hod_approved_by or report.signed_off_by %}
+    {# A borderless table: left column flush left, right column flush right. #}
+    <table class="ecd-foot">
+      <tr>
+        <td><b>Days Absent:</b> {{ attendance.absent }}</td>
+        <td><b>School Reopens on:</b> {{ reopens_on|date:"d M Y"|default:"To be announced" }}</td>
+      </tr>
+      <tr>
+        <td><b>Class Teacher&rsquo;s Name:</b> {{ class_teacher|default:"" }}</td>
+        <td><b>Signature:</b> <span class="ecd-sig-line"></span></td>
+      </tr>
+      <tr>
+        <td><b>Head Teacher&rsquo;s Signature:</b>
+          <span class="ecd-sig-line">{% if report.signed_off_by %}<em class="ecd-stamp">Signed &middot; {{ report.signed_off_by.get_full_name|default:report.signed_off_by.username }}</em>{% endif %}</span></td>
+        <td></td>
+      </tr>
+    </table>
+    {% if report.ecd_hod_approved_by or report.signed_off_by %}
       <div class="ecd-approval">
         {% if report.ecd_hod_approved_by %}<span class="ecd-approved">&#10003; Approved by HOD &middot; {{ report.ecd_hod_approved_by.get_full_name|default:report.ecd_hod_approved_by.username }}{% if report.ecd_hod_approved_at %} &middot; {{ report.ecd_hod_approved_at|date:"d M Y" }}{% endif %}</span>{% endif %}
         {% if report.signed_off_by %}<span class="ecd-approved">&#10003; Signed off by Head of School &middot; {{ report.signed_off_by.get_full_name|default:report.signed_off_by.username }}{% if report.signed_off_at %} &middot; {{ report.signed_off_at|date:"d M Y" }}{% endif %}</span>{% endif %}
       </div>
-      {% endif %}
-    </div>
+    {% endif %}
   </section>
 </div>
