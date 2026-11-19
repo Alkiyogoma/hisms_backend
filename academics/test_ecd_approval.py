@@ -109,7 +109,7 @@ class ECDApprovalTests(ECDFixture):
         self.client.force_login(self.hos)
         page = self.client.post(reverse("academics:signoff_action"),
                                 {"class_name": "Pre-School", "term_id": self.term.pk}, follow=True)
-        self.assertContains(page, "not yet approved by the ECD HOD")
+        self.assertContains(page, "not yet approved by the HOD")
         a.refresh_from_db(); b.refresh_from_db()
         self.assertEqual(a.status, ReportCardStatus.PUBLISHED)
         self.assertEqual(b.status, ReportCardStatus.PENDING_SIGN_OFF)
@@ -168,9 +168,9 @@ class ECDApprovalTests(ECDFixture):
         page = self.client.get(reverse(QUEUE))
         self.assertEqual(page.status_code, 200)
         self.assertContains(page, 'name="report_ids"')
-        self.assertContains(page, "Awaiting ECD HOD")
+        self.assertContains(page, "Awaiting HOD")
         self.assertContains(page, reverse("academics:ecd_assessment") + "?class_name=Pre-School")
-        self.assertTrue(page.context["can_ecd_approve"])
+        self.assertTrue(page.context["can_hod_approve"])
 
 
 class ECDSetupAccessTests(ECDFixture):

@@ -10,34 +10,65 @@
     @media print { .tb-messages { display: none !important; } }
 </style>
 <div class="no-print">
-    {% is_hod_like user as can_signoff %}
+    {% is_hos_signoff user as can_publish %}
     {% if class_view %}
         <span class="tb-title">{{ class_name }} &middot; {{ report.term.name }} &middot; {{ class_total }} report{{ class_total|pluralize }}{% if class_not_started %} ({{ class_not_started }} not started, printed blank){% endif %}</span>
     {% endif %}
-    {% if can_signoff %}
-        {% if not class_view and report.status == 'pending_sign_off' or not class_view and report.status == 'draft' %}
-            {% if not signoff_blocked %}
-            <form method="POST" action="{% url 'academics:signoff_action' %}" style="margin:0">
+    {# Two steps: the HOD approves a submitted report, then the Head of School approves and publishes it. #}
+    {% if can_publish %}
+        {% if not class_view and report.status != 'published' %}
+            {% if signoff_blocked %}
+            <span class="btn btn-green" style="opacity:0.5;cursor:not-allowed" title="{{ signoff_block_reason }}">HOS Approve and Publish</span>
+            {% elif not report.ecd_hod_approved_by_id %}
+            <span class="btn btn-green" style="opacity:0.5;cursor:not-allowed" title="Waiting for HOD approval">HOS Approve and Publish</span>
+            {% else %}
+            <form method="POST" action="{% url 'academics:signoff_action' %}" style="margin:0"
+                  onsubmit="return confirm('Approve and publish this report? Parents will be able to see it and are notified.')">
                 {% csrf_token %}
                 <input type="hidden" name="report_id" value="{{ report.id }}">
-                <button type="submit" class="btn btn-green">Approve & Sign Off</button>
+                <input type="hidden" name="action" value="approve">
+                <button type="submit" class="btn btn-green">HOS Approve and Publish</button>
             </form>
-            {% else %}
-            <span class="btn btn-green" style="opacity:0.5;cursor:not-allowed" title="{{ signoff_block_reason }}">Approve & Sign Off</span>
             {% endif %}
         {% endif %}
         {% if class_unpublished %}
-            {% if not signoff_blocked %}
+            {% if signoff_blocked %}
+            <span class="btn btn-green" style="opacity:0.5;cursor:not-allowed" title="{{ signoff_block_reason }}">HOS Approve and Publish All ({{ class_ready }})</span>
+            {% elif class_ready %}
             <form method="POST" action="{% url 'academics:signoff_action' %}" style="margin:0"
-                  onsubmit="return confirm('Approve, sign off and publish {{ class_unpublished }} unpublished report{{ class_unpublished|pluralize }} in {{ class_name|escapejs }}? Parents will be able to see them.')">
+                  onsubmit="return confirm('Approve and publish {{ class_ready }} HOD-approved report{{ class_ready|pluralize }} in {{ class_name|escapejs }}? Parents will be able to see them and are notified.')">
                 {% csrf_token %}
                 <input type="hidden" name="class_name" value="{{ class_name }}">
                 <input type="hidden" name="term_id" value="{{ report.term_id }}">
-                <button type="submit" class="btn btn-green">Approve & Sign Off All ({{ class_unpublished }})</button>
+                <input type="hidden" name="action" value="approve">
+                <button type="submit" class="btn btn-green">HOS Approve and Publish All ({{ class_ready }})</button>
             </form>
             {% else %}
-            <span class="btn btn-green" style="opacity:0.5;cursor:not-allowed" title="{{ signoff_block_reason }}">Approve & Sign Off All ({{ class_unpublished }})</span>
+            <span class="btn btn-green" style="opacity:0.5;cursor:not-allowed" title="No report in {{ class_name }} has HOD approval yet">HOS Approve and Publish All (0)</span>
             {% endif %}
+        {% endif %}
+    {% elif can_hod_approve %}
+        {% if not class_view and report.status == 'pending_sign_off' %}
+            {% if report.ecd_hod_approved_by_id %}
+            <span class="btn btn-outline" style="cursor:default" title="Waiting for the Head of School to approve and publish">HOD approved</span>
+            {% else %}
+            <form method="POST" action="{% url 'academics:signoff_action' %}" style="margin:0">
+                {% csrf_token %}
+                <input type="hidden" name="report_id" value="{{ report.id }}">
+                <input type="hidden" name="action" value="hod_approve">
+                <button type="submit" class="btn btn-green">HOD Approve</button>
+            </form>
+            {% endif %}
+        {% endif %}
+        {% if class_awaiting_hod %}
+            <form method="POST" action="{% url 'academics:signoff_action' %}" style="margin:0"
+                  onsubmit="return confirm('Approve {{ class_awaiting_hod }} submitted report{{ class_awaiting_hod|pluralize }} in {{ class_name|escapejs }}? They go to the Head of School to approve and publish.')">
+                {% csrf_token %}
+                <input type="hidden" name="class_name" value="{{ class_name }}">
+                <input type="hidden" name="term_id" value="{{ report.term_id }}">
+                <input type="hidden" name="action" value="hod_approve">
+                <button type="submit" class="btn btn-green">HOD Approve All ({{ class_awaiting_hod }})</button>
+            </form>
         {% endif %}
     {% endif %}
     {% if perms.academics.view_reportcard %}

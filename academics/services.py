@@ -111,18 +111,53 @@ def ecd_report_gaps(report_card):
     return gaps
 
 
-def ecd_hod_approve_report(report_card, user):
-    """ECD HOD approval: the first gate for an ECD report, before the Head of
-    School publishes it. The report must be submitted by the class teacher,
-    fully rated and commented, and in the approver's section."""
+def exam_report_gaps(report_card):
+    """What still stops a marked (Primary / Lower Secondary) report going
+    forward ([] when complete): scores waiting for review, subjects with no
+    approved scores or term remark, and a comment under 50 characters."""
+    from academics.models import ScoreStatus
+    from academics.score_progress import student_progress
+
+    gaps = []
+    pending = (
+        ExamScore.objects.filter(
+            student=report_card.student, term=report_card.term,
+            status__in=[ScoreStatus.SUBMITTED, ScoreStatus.RETURNED],
+        ).mark_bearing().values_list("subject_name", flat=True).distinct()
+    )
+    if pending:
+        gaps.append(f"scores still waiting for review in: {', '.join(sorted(set(pending)))}")
+    progress = student_progress(report_card.student, report_card.term)
+    missing_remarks = sorted(
+        n for n, info in progress["subjects"].items()
+        if info.get("remark_only") and info["status"] != ScoreStatus.APPROVED
+    )
+    missing = sorted(
+        n for n, info in progress["subjects"].items()
+        if not info.get("remark_only")
+        and info["status"] != ScoreStatus.APPROVED and info["approved_average"] is None
+    )
+    if missing:
+        gaps.append(f"no approved scores yet for: {', '.join(missing)}")
+    if missing_remarks:
+        gaps.append(f"no term remark yet for: {', '.join(missing_remarks)}")
+    if len((report_card.teacher_comments or "").strip()) < 50:
+        gaps.append("class teacher's comment is under 50 characters")
+    return gaps
+
+
+def hod_approve_report(report_card, user):
+    """HOD approval: the first gate for every report (ECD, Primary and Lower
+    Secondary), before the Head of School approves and publishes it. The
+    report must be submitted by the class teacher, complete, and in the
+    approver's section. The approval is stored on ``ecd_hod_approved_by``
+    (named when only ECD had this step)."""
     from academics.approval_policy import approver_class_names, can_approve_grades
     from audit.models import log_event
 
     name = f"{report_card.student.first_name} {report_card.student.last_name}"
     if not can_approve_grades(user):
-        raise ValidationError("Only the ECD HOD or the Head of School can approve ECD reports.")
-    if not report_card.is_ecd_report:
-        raise ValidationError(f"{name}'s report is not an ECD report.")
+        raise ValidationError("Only a Head of Department or the Head of School can approve reports.")
     scope = approver_class_names(user)
     if scope is not None and report_card.student.class_name not in scope:
         raise ValidationError(f"{name} ({report_card.student.class_name}) is outside your section.")
@@ -132,7 +167,7 @@ def ecd_hod_approve_report(report_card, user):
         raise ValidationError(f"{name}'s report has not been submitted by the class teacher yet.")
     if report_card.ecd_hod_approved_by_id:
         raise ValidationError(f"{name}'s report is already approved.")
-    gaps = ecd_report_gaps(report_card)
+    gaps = ecd_report_gaps(report_card) if report_card.is_ecd_report else exam_report_gaps(report_card)
     if gaps:
         raise ValidationError(f"{name}'s report is incomplete: " + "; ".join(gaps) + ".")
 
@@ -140,9 +175,15 @@ def ecd_hod_approve_report(report_card, user):
     report_card.ecd_hod_approved_at = timezone.now()
     report_card.save(update_fields=["ecd_hod_approved_by", "ecd_hod_approved_at", "updated_at"])
     log_event(
-        actor=user, action_type="ECD_REPORT_APPROVED", model_name="ReportCard",
-        object_id=report_card.pk, description=f"ECD report approved by HOD: {report_card.student.admission_no}",
+        actor=user,
+        action_type="ECD_REPORT_APPROVED" if report_card.is_ecd_report else "REPORT_HOD_APPROVED",
+        model_name="ReportCard",
+        object_id=report_card.pk, description=f"Report approved by HOD: {report_card.student.admission_no}",
     )
+
+
+# Kept for callers from when only ECD reports had an HOD step.
+ecd_hod_approve_report = hod_approve_report
 
 
 def report_guardians(student):
@@ -238,7 +279,12 @@ def sign_off_report(report_card, user):
     if not report_card.is_ecd_report:
         if len((report_card.teacher_comments or "").strip()) < 50:
             raise ValidationError(f"Mandatory teacher comment (min 50 chars) is missing for {report_card.student.first_name} {report_card.student.last_name}.")
-            
+        # Every section: the HOD approves before the Head of School publishes.
+        if not report_card.ecd_hod_approved_by_id:
+            raise ValidationError(
+                f"{report_card.student.first_name} {report_card.student.last_name}'s report is waiting for HOD approval."
+            )
+
     report_card.populate_attendance_summary()
 
     # Exam average from approved, mark-bearing subjects; None while incomplete.

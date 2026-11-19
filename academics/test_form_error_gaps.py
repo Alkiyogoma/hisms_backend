@@ -117,7 +117,7 @@ class ReportActionErrorTests(TestCase):
         self.assertFalse(any("['" in m for m in msgs), msgs)
 
     def test_bulk_sign_off_names_blocked_learners(self):
-        self._report(status=ReportCardStatus.PENDING_SIGN_OFF)
+        self._report(status=ReportCardStatus.PENDING_SIGN_OFF, ecd_hod_approved_by=self.hod)
         self.client.force_login(self.hos)
         resp = self.client.post(reverse("academics:signoff_action"), {
             "class_name": "Grade 4", "term_id": self.term.id, "action": "signoff",

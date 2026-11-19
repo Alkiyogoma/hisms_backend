@@ -327,17 +327,19 @@ class SingleSourceOfPerformanceTests(PerformanceReportTests):
         page = self._get(self.hos, term=self.term1.pk).content.decode()
         self.assertNotIn(">Analytics<", page)
 
-    def test_no_pending_signoffs_panel_on_review_queue_or_hos_signoff(self):
+    def test_no_pending_signoffs_panel_on_review_queue(self):
         # Removed: it counted every unpublished report, drafts still with the
         # class teacher included, under a title that read as "awaiting sign-off".
         from academics.models import ReportCard, ReportCardStatus
         ReportCard.objects.create(student=self.amani, term=self.term1, generated_by=self.hos, status=ReportCardStatus.DRAFT)
         self.client.force_login(self.hos)
-        for name in ("academics:report_review_queue", "academics:hos_signoff_list"):
-            resp = self.client.get(reverse(name))
-            self.assertEqual(resp.status_code, 200, name)
-            self.assertNotContains(resp, "Pending sign-offs")
-            self.assertNotIn("pending_signoffs", resp.context)
+        resp = self.client.get(reverse("academics:report_review_queue"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, "Pending sign-offs")
+        self.assertNotIn("pending_signoffs", resp.context)
+        # The HOS Sign-Off page is retired: old links land on the Review Queue.
+        self.assertRedirects(self.client.get(reverse("academics:hos_signoff_list")),
+                             reverse("academics:report_review_queue"), fetch_redirect_response=False)
 
 
 class AtRiskConsistencyTests(PerformanceReportTests):

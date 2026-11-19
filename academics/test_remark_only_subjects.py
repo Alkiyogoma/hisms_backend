@@ -314,6 +314,7 @@ class RemarkOnlySubjectTests(TestCase):
             sign_off_report(rc, self.admin)
         SubjectTermRemark.objects.create(student=self.student, term=self.term, subject_name="Choir",
                                          remark="Good", entered_by=self.teacher)
+        rc.ecd_hod_approved_by = self.admin  # the HOD step comes before publishing
         sign_off_report(rc, self.admin)
         rc.refresh_from_db()
         self.assertEqual(rc.status, ReportCardStatus.PUBLISHED)

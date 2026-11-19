@@ -30,9 +30,6 @@
   {% endif %}
   {% is_hos_signoff user as can_hos_signoff %}
   {% if can_hos_signoff %}
-  <a href="{% url 'academics:hos_signoff_list' %}" class="sub-tab {% if academics_tab == 'hos_signoff' %}active{% endif %}">HOS Sign-Off</a>
-  {% endif %}
-  {% if can_hos_signoff %}
   <a href="{% url 'academics:performance_report' %}" class="sub-tab {% if academics_tab == 'performance' %}active{% endif %}">Performance Report</a>
   {% endif %}
   {% if perms.academics.view_progressionconfig %}

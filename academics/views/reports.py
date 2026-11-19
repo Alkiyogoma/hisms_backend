@@ -115,96 +115,17 @@ class ReportRouterView(RoleRequiredMixin, View):
             return redirect("/")
 
 
-class HOSSignOffListView(AllowedRolesEnforcedMixin, RoleRequiredMixin, TemplateView):
-    template_name = "academics/hos_signoff_list.html"
-    login_url = "/accounts/login/"
+class HOSSignOffListView(AllowedRolesEnforcedMixin, RoleRequiredMixin, View):
+    """Retired: the HOS Sign-Off page. Heads of School approve and publish
+    from the Review Queue; old links land there, keeping the class."""
     allowed_roles = [UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
     required_permission = "academics.view_reportcard"
 
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        if self.request.user.role not in {UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN}:
-            raise PermissionDenied()
-            
-        term = get_current_term()
-        ctx["current_term"] = term
-        
-        # Group report cards by class
-        if term:
-            classes_qs = Student.objects.filter(is_archived=False).values_list("class_name", flat=True).distinct()
-            
-            # FR-ACAD-011: HOD Scoping
-            from core.scoping import hod_class_names
-            section_classes = hod_class_names(self.request.user)
-            if section_classes is not None:
-                classes_qs = classes_qs.filter(class_name__in=section_classes)
-            classes = list(classes_qs)
-            # Batch fetch all report cards in one query instead of N*4 queries
-            from collections import defaultdict
-            all_reports = ReportCard.objects.filter(
-                term=term, student__class_name__in=classes
-            ).select_related("student")
-            reports_by_class = defaultdict(list)
-            for r in all_reports:
-                reports_by_class[r.student.class_name].append(r)
-
-            class_stats = []
-            for c in classes:
-                class_reports = reports_by_class.get(c, [])
-                total = len(class_reports)
-                if total > 0:
-                    published = sum(1 for r in class_reports if r.status == ReportCardStatus.PUBLISHED)
-                    pending = total - published
-                    unpublished = [r for r in class_reports if r.status != ReportCardStatus.PUBLISHED]
-                    # ECD reports publish only after ECD HOD approval.
-                    def _awaiting_hod(r):
-                        return (r.is_ecd_report and not r.ecd_hod_approved_by_id
-                                and r.status == ReportCardStatus.PENDING_SIGN_OFF)
-                    awaiting_hod = sum(1 for r in unpublished if _awaiting_hod(r))
-                    # Not publishable yet: ECD drafts the teacher has not
-                    # submitted, and reports missing the teacher's comment.
-                    blocked = sum(
-                        1 for r in unpublished
-                        if not _awaiting_hod(r) and (
-                            (r.is_ecd_report and not r.ecd_hod_approved_by_id)
-                            or len((r.teacher_comments or "").strip()) < 50
-                        )
-                    )
-                    ready = pending - awaiting_hod - blocked
-                    class_stats.append({
-                        "class_name": c,
-                        "total": total,
-                        "published": published,
-                        "pending": pending,
-                        "blocked": blocked,
-                        "awaiting_hod": awaiting_hod,
-                        "ready": ready,
-                        "can_sign_off_all": ready > 0,
-                    })
-            ctx["class_stats"] = class_stats
-
-        # Sign-off window gating
-        from django.utils import timezone as _tz
-        today = _tz.localdate()
-        if term:
-            grading_dl = getattr(term, "grading_deadline", None)
-            endterm_end = getattr(term, "endterm_exam_end_date", None)
-            if grading_dl and today < grading_dl:
-                ctx["signoff_blocked"] = True
-                ctx["signoff_block_reason"] = f"Grading deadline not reached ({grading_dl.strftime('%d %b %Y')})"
-            elif endterm_end and today < endterm_end:
-                ctx["signoff_blocked"] = True
-                ctx["signoff_block_reason"] = f"Endterm exams not yet ended ({endterm_end.strftime('%d %b %Y')})"
-            else:
-                ctx["signoff_blocked"] = False
-                ctx["signoff_block_reason"] = ""
-        else:
-            ctx["signoff_blocked"] = False
-            ctx["signoff_block_reason"] = ""
-                
-        ctx["academics_tab"] = "hos_signoff"
-                
-        return ctx
+    def get(self, request, *args, **kwargs):
+        url = reverse("academics:report_review_queue")
+        if request.GET.get("class_name"):
+            url += "?" + urlencode({"class_name": request.GET["class_name"]})
+        return redirect(url)
 
 
 from django.core.management import call_command
@@ -365,9 +286,10 @@ def _reopens_on(term):
     return nxt.start_date if nxt else None
 
 
-def _class_teacher_name(report):
+def _class_teacher_name(report, fallback_to_generator=True):
     """The class teacher assigned to the learner's class for the report's term,
-    else the latest class teacher of that class, else whoever generated it."""
+    else the latest class teacher of that class, else whoever generated it
+    (unless ``fallback_to_generator`` is False: then "")."""
     from hr.models import TeacherClassAssignment
     class_name = report.student.class_name
     a = (TeacherClassAssignment.objects.filter(
@@ -379,7 +301,7 @@ def _class_teacher_name(report):
     name = class_teachers().get(class_name)
     if name:
         return name
-    by = report.generated_by
+    by = report.generated_by if fallback_to_generator else None
     return (by.get_full_name() or by.username) if by else ""
 
 
@@ -617,14 +539,22 @@ class HOSReportPreviewView(RoleRequiredMixin, TemplateView):
             ctx["signoff_blocked"] = False
             ctx["signoff_block_reason"] = ""
 
-        # The learner's class this term, for "Print all" and "Approve & Sign Off All".
+        # The learner's class this term, for "Print all" and the class-wide approve buttons.
         if user.role != UserRole.PARENT:
             class_reports = self.class_report_queryset(report)
             ctx["class_name"] = report.student.class_name
             ctx["class_total"] = (
                 self.ecd_class_learners(report).count() if report.is_ecd_report else class_reports.count()
             )
-            ctx["class_unpublished"] = class_reports.exclude(status=ReportCardStatus.PUBLISHED).count()
+            unpublished = class_reports.exclude(status=ReportCardStatus.PUBLISHED)
+            ctx["class_unpublished"] = unpublished.count()
+            # HOD step: submitted reports not yet approved. HOS step: approved ones.
+            ctx["class_awaiting_hod"] = unpublished.filter(
+                status=ReportCardStatus.PENDING_SIGN_OFF, ecd_hod_approved_by__isnull=True).count()
+            ctx["class_ready"] = unpublished.filter(ecd_hod_approved_by__isnull=False).count()
+            from academics.approval_policy import approver_class_names, can_approve_grades
+            scope = approver_class_names(user) if can_approve_grades(user) else set()
+            ctx["can_hod_approve"] = scope is None or report.student.class_name in scope
 
         return ctx
 
@@ -696,306 +626,290 @@ class ClassReportPrintView(HOSReportPreviewView):
 
 
 class HOSSignOffActionView(AllowedRolesEnforcedMixin, RoleRequiredMixin, View):
+    """Report actions posted from the preview and the Reports page: HOD
+    approve (``hod_approve``), HOS approve and publish (``approve``, the
+    default) or return (``reject``), for one report (``report_id``) or a
+    whole class (``class_name`` + ``term_id``)."""
     allowed_roles = [UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD]
     required_permission = "academics.change_reportcard"
+
+    VERBS = {"hod_approve": "approved by the HOD", "reject": "returned", "approve": "approved and published"}
+
     def post(self, request, *args, **kwargs):
         if not request.user.has_role(UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN, UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD):
             raise PermissionDenied()
-            
+
         report_id = request.POST.get("report_id")
         class_name = request.POST.get("class_name")
         term_id = request.POST.get("term_id")
-        action = request.POST.get("action", "signoff") # Default to signoff for backward compatibility
+        action = request.POST.get("action", "approve")
+        if action in {"signoff", "ecd_hod_approve"}:  # older forms
+            action = "approve" if action == "signoff" else "hod_approve"
+        if action not in self.VERBS:
+            action = "approve"
         reason = request.POST.get("reason", "")
-        
-        from academics.services import sign_off_report, reject_report_for_edit
-        
+
+        from academics.services import hod_approve_report, sign_off_report, reject_report_for_edit
+        from core.scoping import hod_class_names
+        section_classes = hod_class_names(request.user)
+
+        def act(report):
+            if action == "reject":
+                reject_report_for_edit(report, request.user, reason=reason, subjects=request.POST.getlist("subjects"))
+            elif action == "hod_approve":
+                hod_approve_report(report, request.user)
+            else:
+                sign_off_report(report, request.user)
+
         if report_id:
             try:
                 report = ReportCard.objects.select_related("student").get(pk=report_id)
-                from core.scoping import hod_class_names
-                section_classes = hod_class_names(request.user)
                 if section_classes is not None and report.student.class_name not in section_classes:
                     raise PermissionDenied(f"{report.student.class_name} is outside your section.")
-                if action == "reject":
-                    reject_report_for_edit(
-                        report, request.user, reason=reason, subjects=request.POST.getlist("subjects"),
-                    )
-                    messages.success(request, f"Report for {report.student.first_name} returned to teacher for correction.")
-                else:
-                    sign_off_report(report, request.user)
-                    messages.success(request, f"Report for {report.student.first_name} signed off and published.")
+                act(report)
+                if action == "hod_approve":
+                    _notify_reports_hod_approved(request.user, [report])
+                messages.success(request, f"Report for {report.student.first_name} {self.VERBS[action]}.")
             except ReportCard.DoesNotExist:
                 messages.error(request, "That report no longer exists: it may have been deleted. Refresh the page.")
             except Exception as e:
                 messages.error(request, f"Nothing was changed: {_action_error(e)}")
         elif class_name and term_id:
-            reports = ReportCard.objects.filter(student__class_name=class_name, term_id=term_id).exclude(status=ReportCardStatus.PUBLISHED)
-            from core.scoping import hod_class_names
-            section_classes = hod_class_names(request.user)
             if section_classes is not None and class_name not in section_classes:
                 messages.error(request, f"Nothing was changed: {class_name} is outside your section.")
-                return _back_to(request, "academics:hos_signoff_list")
-            processed_count = 0
-            blocked = []
-            skipped_ecd = 0
-            if action != "reject":
-                # Publishing a class: ECD reports still waiting for the ECD HOD
-                # are left as they are rather than listed as failures.
-                skipped_ecd = reports.filter(is_ecd_report=True, ecd_hod_approved_by__isnull=True).count()
-                reports = reports.exclude(is_ecd_report=True, ecd_hod_approved_by__isnull=True)
+                return _back_to(request, "academics:report_review_queue")
+            reports = ReportCard.objects.filter(student__class_name=class_name, term_id=term_id).exclude(status=ReportCardStatus.PUBLISHED)
+            skipped = 0
+            if action == "approve":
+                # Publishing a class: reports still waiting for the HOD are
+                # left as they are rather than listed as failures.
+                skipped = reports.filter(ecd_hod_approved_by__isnull=True).count()
+                reports = reports.exclude(ecd_hod_approved_by__isnull=True)
+            elif action == "hod_approve":
+                # Only submitted reports not yet approved are the HOD's to approve.
+                reports = reports.filter(status=ReportCardStatus.PENDING_SIGN_OFF, ecd_hod_approved_by__isnull=True)
+            done, blocked = [], []
             for r in reports.select_related("student"):
                 try:
-                    if action == "reject":
-                        reject_report_for_edit(r, request.user, reason=reason)
-                    else:
-                        sign_off_report(r, request.user)
-                    processed_count += 1
+                    act(r)
+                    done.append(r)
                 except Exception as exc:
                     import logging
-                    logging.getLogger(__name__).warning(
-                        "Bulk %s failed for report %s: %s", action, r.pk, exc,
-                    )
+                    logging.getLogger(__name__).warning("Bulk %s failed for report %s: %s", action, r.pk, exc)
                     blocked.append(f"{r.student.first_name} {r.student.last_name} ({_action_error(exc)})")
 
-            verb = "returned" if action == "reject" else "signed off"
-            if skipped_ecd:
-                messages.info(
-                    request,
-                    f"{skipped_ecd} ECD report(s) in {class_name} are not yet approved by the ECD HOD and were not published.",
-                )
-            if not processed_count and not blocked:
-                if not skipped_ecd:
-                    messages.info(request, f"There were no unpublished reports in {class_name} to process.")
+            if action == "hod_approve" and done:
+                _notify_reports_hod_approved(request.user, done)
+            verb = self.VERBS[action]
+            if skipped:
+                messages.info(request, f"{skipped} report(s) in {class_name} are not yet approved by the HOD and were not published.")
+            if not done and not blocked:
+                if not skipped:
+                    messages.info(request, f"There were no reports in {class_name} to process.")
             elif not blocked:
-                messages.success(request, f"{processed_count} report(s) in {class_name} {verb}.")
+                messages.success(request, f"{len(done)} report(s) in {class_name} {verb}.")
             else:
-                level = messages.warning if processed_count else messages.error
-                level(
-                    request,
-                    f"{processed_count} report(s) {verb}; {len(blocked)} not {verb}: " + "; ".join(blocked),
-                )
+                level = messages.warning if done else messages.error
+                level(request, f"{len(done)} report(s) {verb}; {len(blocked)} not: " + "; ".join(blocked))
         else:
             messages.error(request, "Nothing was changed: no report or class was selected.")
 
-        return _back_to(request, "academics:hos_signoff_list")
+        return _back_to(request, "academics:report_review_queue")
 
 
 class ReportReviewQueueView(AllowedRolesEnforcedMixin, RoleRequiredMixin, TemplateView):
-    """HOD/HOS review queue for reports with submitted comments + approved scores."""
+    """Every section's reports for a term, filtered by year, term, class and
+    assessment type. Two gates: the HOD approves a submitted, complete
+    report; the Head of School then approves and publishes it."""
     template_name = "academics/report_review_queue.html"
     allowed_roles = [UserRole.PRIMARY_HOD, UserRole.ECD_HOD, UserRole.LOWER_SECONDARY_HOD, UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN]
     required_permission = "academics.view_reportcard"
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        from django.db.models import Q
+        from collections import defaultdict
+        from academics.progress_filters import ProgressFilters
 
-        term = get_current_term()
+        user = self.request.user
+        ctx["academics_tab"] = "review_queue"
+        pf = ProgressFilters(self.request)
+        term = pf.term
         ctx["term"] = term
+
+        # Departments the user may see; ``dept`` (old links) narrows, never widens.
+        if user.section_departments and not user.is_school_wide:
+            allowed_depts = list(user.section_departments)
+        else:
+            allowed_depts = [Department.ECD, Department.PRIMARY, Department.LOWER_SECONDARY]
+        dept_filter = self.request.GET.get("dept", "")
+        dept_map = {"primary": Department.PRIMARY, "ecd": Department.ECD, "lower_secondary": Department.LOWER_SECONDARY}
+        if dept_filter in dept_map:
+            allowed_depts = [d for d in allowed_depts if d == dept_map[dept_filter]]
+
+        class_options = list(
+            GradeClass.objects.filter(department__in=allowed_depts)
+            .order_by("sort_order", "name").values_list("name", flat=True)
+        )
+        class_name = pf.pick_class(class_options, allow_all=True)
+        pf.pick_subject([], note="All subjects")
+        exam_type = pf.pick_type(all_label="Combined term report")
+        ctx["exam_type_name"] = next((e.name for e in pf.exam_types if e.code == exam_type), "")
+        status_filter = self.request.GET.get("status", "")
+        if status_filter not in {"published", "all"}:
+            status_filter = ""
+        ctx["status_filter"] = status_filter
+        ctx["pf"] = pf.context(hidden={k: v for k, v in (("dept", dept_filter), ("status", status_filter)) if v})
+        # Links that switch the status keep the other filters.
+        keep = {k: v for k, v in (("year", pf.year.pk if pf.year else ""), ("term", term.pk if term else ""),
+                                  ("class_name", class_name), ("type", exam_type), ("dept", dept_filter)) if v}
+        ctx["status_links"] = [
+            (value, label, "?" + urlencode({**keep, **({"status": value} if value else {})}))
+            for value, label in (("", "Pending"), ("published", "Published"), ("all", "All"))
+        ]
 
         if not term:
             return ctx
 
-        user = self.request.user
-        dept_filter = self.request.GET.get("dept", "")
+        shown_classes = [class_name] if class_name else class_options
+        order = {c: i for i, c in enumerate(class_options)}
+        base_qs = ReportCard.objects.filter(term=term, student__class_name__in=shown_classes)
 
-        # Determine allowed departments
-        if user.section_departments and not user.is_school_wide:
-            allowed_depts = list(user.section_departments)
-        else:
-            allowed_depts = [Department.PRIMARY, Department.ECD, Department.LOWER_SECONDARY]
-
-        # The filter narrows within what the user may see; it never widens it.
-        if dept_filter == "primary":
-            allowed_depts = [d for d in allowed_depts if d == Department.PRIMARY]
-        elif dept_filter == "ecd":
-            allowed_depts = [d for d in allowed_depts if d == Department.ECD]
-        elif dept_filter == "lower_secondary":
-            allowed_depts = [Department.LOWER_SECONDARY]
-
-        dept_class_names = list(
-            GradeClass.objects.filter(department__in=allowed_depts).values_list("name", flat=True)
-        )
-
-        # Reports with comments submitted, not yet published -- includes ECD + Primary
-        status_filter = self.request.GET.get("status", "")
-        reports_qs = ReportCard.objects.filter(
-            term=term,
-            student__class_name__in=dept_class_names,
-        )
         if status_filter == "published":
-            reports_qs = reports_qs.filter(status=ReportCardStatus.PUBLISHED)
-        elif status_filter == "pending":
-            reports_qs = reports_qs.filter(comments_submitted=True).exclude(status=ReportCardStatus.PUBLISHED)
+            reports_qs = base_qs.filter(status=ReportCardStatus.PUBLISHED)
+        elif status_filter == "all":
+            reports_qs = base_qs
         else:
-            reports_qs = reports_qs.filter(comments_submitted=True).exclude(status=ReportCardStatus.PUBLISHED)
+            reports_qs = base_qs.filter(comments_submitted=True).exclude(status=ReportCardStatus.PUBLISHED)
+        reports = sorted(
+            reports_qs.select_related("student", "generated_by", "ecd_hod_approved_by"),
+            key=lambda rc: (order.get(rc.student.class_name, 999), rc.student.last_name, rc.student.first_name),
+        )
+        pending_reports = list(
+            base_qs.filter(comments_submitted=True).exclude(status=ReportCardStatus.PUBLISHED)
+            .select_related("student")
+        )
 
-        reports = reports_qs.select_related("student", "generated_by").order_by("student__class_name", "student__last_name")
+        from academics.models import ScoreStatus
+        from academics.score_progress import class_progress
+        from academics import ecd_report
 
-        # Separate ECD vs Primary for score-status checks
-        from academics.models import ScoreStatus, ExamScore, ECDEvaluation
-        from collections import defaultdict
-
-        primary_student_ids = [rc.student_id for rc in reports if not rc.is_ecd_report]
-        ecd_student_ids = [rc.student_id for rc in reports if rc.is_ecd_report]
-
-        # Per-subject progress for non-ECD students: a report is approved only
-        # when every class subject is approved, not just the ones with scores.
-        from academics.score_progress import build_progress, expected_subjects_for_class
+        everyone = {rc.pk: rc for rc in list(reports) + pending_reports}.values()
+        # Per-subject progress for marked reports: complete only when every
+        # class subject is approved, not just the ones with scores.
         progress_by_student = {}
-        if primary_student_ids:
-            rows_by_student = defaultdict(list)
-            for sc in ExamScore.objects.filter(student_id__in=primary_student_ids, term=term):
-                rows_by_student[sc.student_id].append(sc)
-            from academics.models import SubjectTermRemark
-            from academics.remarks import remark_subject_names
-            remark_subjects = remark_subject_names()
-            remarks_by_student = defaultdict(dict)
-            for sid, subject, remark in SubjectTermRemark.objects.filter(
-                    student_id__in=primary_student_ids, term=term).values_list("student_id", "subject_name", "remark"):
-                remarks_by_student[sid][subject] = remark
-            expected_by_class = {}
-            weights = get_exam_weights()
-            for rc in reports:
-                if rc.is_ecd_report:
-                    continue
-                cls = rc.student.class_name
-                if cls not in expected_by_class:
-                    expected_by_class[cls] = expected_subjects_for_class(cls)
-                progress_by_student[rc.student_id] = build_progress(
-                    rows_by_student.get(rc.student_id, []), expected_by_class[cls], weights,
-                    remark_subjects, remarks_by_student.get(rc.student_id),
-                )
+        by_class = defaultdict(list)
+        for rc in everyone:
+            if not rc.is_ecd_report:
+                by_class[rc.student.class_name].append(rc.student_id)
+        for cls, ids in by_class.items():
+            progress_by_student.update(class_progress(ids, term.id, cls))
 
-        # ECD reports are complete when every line of the term's report is rated
-        ecd_complete = set()
-        if ecd_student_ids:
-            from academics import ecd_report
-            structures = {}
-            for rc in reports:
-                if not rc.is_ecd_report:
-                    continue
-                class_type = rc.ecd_template_type or ecd_report.class_type_of(rc.student.class_name)
-                if not class_type:
-                    continue
-                if class_type not in structures:
-                    structures[class_type] = ecd_report.ReportStructure(class_type, ecd_report.term_number_of(term))
-                structure = structures[class_type]
-                if structure.items and not ecd_report.missing_lines(structure, ecd_report.values_for(rc)):
-                    ecd_complete.add(rc.student_id)
+        # ECD reports are complete when every line of the term's report is rated.
+        ecd_complete, structures = set(), {}
+        for rc in everyone:
+            if not rc.is_ecd_report:
+                continue
+            class_type = rc.ecd_template_type or ecd_report.class_type_of(rc.student.class_name)
+            if not class_type:
+                continue
+            if class_type not in structures:
+                structures[class_type] = ecd_report.ReportStructure(class_type, ecd_report.term_number_of(term))
+            structure = structures[class_type]
+            if structure.items and not ecd_report.missing_lines(structure, ecd_report.values_for(rc)):
+                ecd_complete.add(rc.student_id)
+
+        # Average and position for the selected assessment (or the combined term).
+        from academics.class_position import class_results
+        results = {}
+        shared = {}
+        for cls in {rc.student.class_name for rc in reports if not rc.is_ecd_report}:
+            for row in class_results(cls, term, shared=shared, exam_type=exam_type or None)["rows"]:
+                results[row["student"].pk] = row
+
+        def gates(rc):
+            if rc.is_ecd_report:
+                complete = rc.student_id in ecd_complete
+            else:
+                p = progress_by_student.get(rc.student_id)
+                complete = bool(p and p["is_complete"])
+            comment_ok = len((rc.teacher_comments or "").strip()) >= 50
+            approved = bool(rc.ecd_hod_approved_by_id)
+            unpublished = rc.status != ReportCardStatus.PUBLISHED
+            return {
+                "complete": complete,
+                "comment_ok": comment_ok,
+                "hod_approved": approved,
+                # Gate 1: submitted, complete and waiting for the HOD.
+                "awaiting_hod": (unpublished and rc.status == ReportCardStatus.PENDING_SIGN_OFF
+                                 and complete and comment_ok and not approved),
+                # Gate 2: what the Head of School may approve and publish now.
+                "ready_to_publish": unpublished and complete and comment_ok and approved,
+            }
+
+        # Class teacher as the printed report names it, looked up once per class.
+        teacher_by_class = {}
+        for rc in reports:
+            if rc.student.class_name not in teacher_by_class:
+                teacher_by_class[rc.student.class_name] = _class_teacher_name(rc, fallback_to_generator=False)
 
         rows = []
         for rc in reports:
-            comment_ok = len((rc.teacher_comments or "").strip()) >= 50
-
-            progress = None
-            if rc.is_ecd_report:
-                all_approved = rc.student_id in ecd_complete
-                pending_count = 0
-            else:
-                progress = progress_by_student.get(rc.student_id)
-                all_approved = bool(progress and progress["is_complete"])
-                pending_count = sum(
-                    1 for v in (progress["subjects"].values() if progress else [])
-                    if v["status"] in {ScoreStatus.SUBMITTED, ScoreStatus.RETURNED}
-                )
-
-            hod_approved = bool(rc.ecd_hod_approved_by_id)
-            submitted = rc.status == ReportCardStatus.PENDING_SIGN_OFF
+            g = gates(rc)
+            progress = None if rc.is_ecd_report else progress_by_student.get(rc.student_id)
+            result = results.get(rc.student_id) or {}
             rows.append({
                 "report": rc,
                 "student": rc.student,
-                "hod_approved": hod_approved,
-                # ECD gate 1: submitted, complete and waiting for the ECD HOD.
-                "awaiting_hod": rc.is_ecd_report and submitted and all_approved and comment_ok and not hod_approved,
-                # Gate 2: what the Head of School may publish now.
-                "ready_to_publish": (
-                    all_approved and comment_ok and rc.status != ReportCardStatus.PUBLISHED
-                    and (not rc.is_ecd_report or hod_approved)
+                **g,
+                "all_scores_approved": g["complete"],
+                "pending_score_count": sum(
+                    1 for v in (progress["subjects"].values() if progress else [])
+                    if v["status"] in {ScoreStatus.SUBMITTED, ScoreStatus.RETURNED}
                 ),
-                "all_scores_approved": all_approved,
-                "pending_score_count": pending_count,
-                "comment_ok": comment_ok,
-                "overall_average": rc.overall_average,
+                "average": result.get("average"),
+                "position": result.get("position"),
                 "class_name": rc.student.class_name,
-                "teacher": rc.generated_by,
+                "teacher": teacher_by_class.get(rc.student.class_name, ""),
                 "is_ecd": rc.is_ecd_report,
                 "approved_subjects": progress["approved_subjects"] if progress else 0,
                 "total_subjects": progress["total_subjects"] if progress else 0,
                 "subject_names": sorted(progress["subjects"]) if progress else [],
             })
-
         ctx["reports"] = rows
-        ctx["status_filter"] = status_filter
 
-        # Always compute pending counts regardless of current filter
-        pending_reports = ReportCard.objects.filter(
-            term=term,
-            student__class_name__in=dept_class_names,
-            comments_submitted=True,
-        ).exclude(status=ReportCardStatus.PUBLISHED).select_related("student", "generated_by")
-
-        # Progress for pending reports not already in the (filtered) list above.
-        missing_ids = [
-            rc.student_id for rc in pending_reports
-            if not rc.is_ecd_report and rc.student_id not in progress_by_student
-        ]
-        if missing_ids:
-            from academics.score_progress import class_progress
-            by_class = defaultdict(list)
-            for rc in pending_reports:
-                if rc.student_id in missing_ids:
-                    by_class[rc.student.class_name].append(rc.student_id)
-            for cls, ids in by_class.items():
-                progress_by_student.update(class_progress(ids, term.id, cls))
-
-        pending_rows = []
-        for rc in pending_reports:
-            if rc.is_ecd_report:
-                all_a = rc.student_id in ecd_complete
-            else:
-                p = progress_by_student.get(rc.student_id)
-                all_a = bool(p and p["is_complete"])
-            comment_ok = len((rc.teacher_comments or "").strip()) >= 50
-            complete = all_a and comment_ok
-            pending_rows.append({
-                "ready": complete and (not rc.is_ecd_report or bool(rc.ecd_hod_approved_by_id)),
-                "awaiting_hod": complete and rc.is_ecd_report and not rc.ecd_hod_approved_by_id
-                and rc.status == ReportCardStatus.PENDING_SIGN_OFF,
-            })
-
-        ctx["total_pending"] = len(pending_rows)
-        ctx["total_ready"] = sum(1 for r in pending_rows if r["ready"])
-        ctx["total_awaiting_hod"] = sum(1 for r in pending_rows if r["awaiting_hod"])
+        pending_gates = [gates(rc) for rc in pending_reports]
+        ctx["total_pending"] = len(pending_gates)
+        ctx["total_awaiting_hod"] = sum(1 for g in pending_gates if g["awaiting_hod"])
+        ctx["total_ready"] = sum(1 for g in pending_gates if g["ready_to_publish"])
         ctx["total_blocked"] = ctx["total_pending"] - ctx["total_ready"] - ctx["total_awaiting_hod"]
+        ctx["total_published"] = base_qs.filter(status=ReportCardStatus.PUBLISHED).count()
         from academics.approval_policy import can_approve_grades
-        ctx["can_ecd_approve"] = can_approve_grades(user) and (
-            user.is_school_wide or Department.ECD in (user.section_departments or [])
-            or user.has_role(UserRole.ECD_HOD)
-        )
+        ctx["can_hod_approve"] = can_approve_grades(user)
 
-        # Count published reports for this term+department
-        published_count = ReportCard.objects.filter(
-            term=term,
-            student__class_name__in=dept_class_names,
-            status=ReportCardStatus.PUBLISHED,
-        ).count()
-        ctx["total_published"] = published_count
-        ctx["academics_tab"] = "review_queue"
+        # Publishing waits for the grading deadline and the end of end-term exams.
+        today = timezone.localdate()
+        grading_dl = getattr(term, "grading_deadline", None)
+        endterm_end = getattr(term, "endterm_exam_end_date", None)
+        ctx["signoff_block_reason"] = (
+            f"Grading deadline not reached ({grading_dl.strftime('%d %b %Y')})" if grading_dl and today < grading_dl
+            else f"End-term exams not yet ended ({endterm_end.strftime('%d %b %Y')})" if endterm_end and today < endterm_end
+            else ""
+        )
         return ctx
 
     # Past-tense wording for the result message, per action.
     ACTION_VERBS = {
-        "ecd_hod_approve": "approved by the ECD HOD",
+        "hod_approve": "approved by the HOD",
         "reject": "returned for correction",
         "revoke": "had the sign-off revoked",
-        "approve": "signed off and published",
+        "approve": "approved and published",
     }
 
     def post(self, request, *args, **kwargs):
         """One report (``report_id``) or a selection (``report_ids``)."""
         action = request.POST.get("action", "approve")
+        if action == "ecd_hod_approve":  # older forms
+            action = "hod_approve"
         if action not in self.ACTION_VERBS:
             action = "approve"
         reason = request.POST.get("reason", "").strip()
@@ -1003,7 +917,7 @@ class ReportReviewQueueView(AllowedRolesEnforcedMixin, RoleRequiredMixin, Templa
 
         from academics.approval_policy import approver_class_names
         from academics.services import (
-            ecd_hod_approve_report, reject_report_for_edit, revoke_report_signoff, sign_off_report,
+            hod_approve_report, reject_report_for_edit, revoke_report_signoff, sign_off_report,
         )
 
         if not ids:
@@ -1017,7 +931,7 @@ class ReportReviewQueueView(AllowedRolesEnforcedMixin, RoleRequiredMixin, Templa
         try:
             # GRD-009 / GRD-016: who may do what.
             if action == "approve" and user.role not in {UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN}:
-                raise PermissionDenied("Only the Head of School or Super Admin can sign off reports.")
+                raise PermissionDenied("Only the Head of School or Super Admin can approve and publish reports.")
             if action == "revoke" and user.role not in {UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN}:
                 raise PermissionDenied("Only HOS or Super Admin can revoke a signed-off report.")
         except PermissionDenied as e:
@@ -1032,8 +946,8 @@ class ReportReviewQueueView(AllowedRolesEnforcedMixin, RoleRequiredMixin, Templa
             try:
                 if scope is not None and report.student.class_name not in scope:
                     raise PermissionDenied(f"{report.student.class_name} is outside your section.")
-                if action == "ecd_hod_approve":
-                    ecd_hod_approve_report(report, user)
+                if action == "hod_approve":
+                    hod_approve_report(report, user)
                 elif action == "reject":
                     reject_report_for_edit(report, user, reason=reason, subjects=request.POST.getlist("subjects"))
                 elif action == "revoke":
@@ -1045,8 +959,8 @@ class ReportReviewQueueView(AllowedRolesEnforcedMixin, RoleRequiredMixin, Templa
                 failed.append(f"{name}: {_action_error(e)}")
         missing = len(ids) - len(done) - len(failed)
 
-        if action == "ecd_hod_approve" and done:
-            _notify_ecd_approved(user, done)
+        if action == "hod_approve" and done:
+            _notify_reports_hod_approved(user, done)
 
         verb = self.ACTION_VERBS[action]
         if len(done) == 1 and not failed:
@@ -1062,28 +976,34 @@ class ReportReviewQueueView(AllowedRolesEnforcedMixin, RoleRequiredMixin, Templa
         return _back_to(request, "academics:report_review_queue")
 
 
-def _notify_ecd_approved(approver, reports):
-    """One message per Head of School for a batch of ECD HOD approvals."""
+def _notify_reports_hod_approved(approver, reports):
+    """One message per Head of School for a batch of HOD approvals (skipped
+    when the Head of School approved them themself)."""
+    if approver.has_role(UserRole.HEAD_OF_SCHOOL, UserRole.SUPER_ADMIN):
+        return
     try:
         from communications.email_service import dispatch_notification
         from users.models import User
         classes = sorted({r.student.class_name for r in reports})
         count = len(reports)
-        link = reverse("academics:report_review_queue") + "?dept=ecd"
+        term = reports[0].term
+        link = reverse("academics:report_review_queue") + "?" + urlencode(
+            {"year": term.academic_year_id, "term": term.pk, **({"class_name": classes[0]} if len(classes) == 1 else {})}
+        )
         for hos in User.objects.filter(role=UserRole.HEAD_OF_SCHOOL, is_active=True):
             dispatch_notification(
                 user=hos,
-                title="ECD reports ready to publish",
+                title="Reports ready to publish",
                 message=(
-                    f"{approver.get_full_name()} approved {count} ECD report{'s' if count != 1 else ''} "
-                    f"({', '.join(classes)}). They are ready for your sign-off."
+                    f"{approver.get_full_name()} approved {count} report{'s' if count != 1 else ''} "
+                    f"({', '.join(classes)}). They are ready for you to approve and publish."
                 ),
                 link=link,
                 actor=approver,
             )
     except Exception:
         import logging
-        logging.getLogger(__name__).exception("ECD approval notification failed")
+        logging.getLogger(__name__).exception("HOD approval notification failed")
 
 
 class AcademicAnalyticsView(RoleRequiredMixin, View):

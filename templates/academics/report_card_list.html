@@ -13,19 +13,17 @@
 {% if class_error %}
   <div class="card" style="padding:24px; text-align:center; color:var(--red); font-weight:600">{{ class_error }}</div>
 {% elif class_name %}
+{% is_hos_signoff user as can_publish %}
 {% is_hod_like user as can_signoff %}
 <div class="card rc-card">
   <div class="rc-head">
     <h2 class="rc-title">{% if exam_type_name %}{{ exam_type_name }} results &middot; {{ term.name }}{% else %}Results for {{ term.name }}{% endif %}</h2>
     <div class="rc-tools">
-      {% if has_pending and can_signoff and not signoff_blocked %}
-      <button type="button" class="hf-btn hf-btn-primary"
-        onclick="confirmDeleteModal({title:'Publish {{ class_name|escapejs }}?',body:'Publish every ready report for <strong>{{ class_name }}</strong>?',detail:'Parents can see them straight away and are notified. Reports that are not ready stay unpublished.',confirmText:'Publish',url:'{% url 'academics:signoff_action' %}',type:'info',extraData:[{name:'class_name',value:'{{ class_name }}'},{name:'term_id',value:'{{ term.id }}'}]})">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>
-        Publish ready reports
-      </button>
-      {% elif has_pending and can_signoff and signoff_blocked %}
-      <span class="hf-btn hf-btn-secondary" style="opacity:0.5; cursor:not-allowed" title="{{ signoff_block_reason }}">Publish report</span>
+      {% if has_pending and can_signoff %}
+      <a href="{% url 'academics:report_review_queue' %}?year={{ term.academic_year_id }}&term={{ term.id }}&class_name={{ class_name|urlencode }}" class="hf-btn hf-btn-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
+        {% if can_publish %}HOS approve and publish{% else %}HOD approve{% endif %}
+      </a>
       {% endif %}
       {% if print_all_report %}
       <a href="{% url 'academics:report_preview_class' print_all_report.pk %}" target="_blank" class="hf-btn hf-btn-secondary">
@@ -72,16 +70,26 @@
           <td class="rc-c">
             {% if not report %}<span class="chip chip-grey">Not generated</span>
             {% elif report.status == 'published' %}<span class="chip chip-green">Published</span>
-            {% elif report.status == 'pending_sign_off' %}<span class="chip chip-amber">Awaiting sign-off</span>
+            {% elif report.status == 'pending_sign_off' and report.ecd_hod_approved_by_id %}<span class="chip chip-blue">Awaiting HOS</span>
+            {% elif report.status == 'pending_sign_off' %}<span class="chip chip-amber">Awaiting HOD</span>
             {% else %}<span class="chip chip-grey">Not submitted</span>{% endif %}
           </td>
           <td class="rc-actions">
             <div class="rc-icons">
-              {% if report and report.status == 'pending_sign_off' and can_signoff and not signoff_blocked %}
-                <button type="button" class="rc-icon rc-ok" title="Sign off and publish" aria-label="Sign off {{ st.get_full_name }}"
-                  onclick="confirmDeleteModal({title:'Sign Off Report?',body:'Sign off and publish the report for <strong>{{ st.get_full_name|escapejs }}</strong>?',detail:'This report will become visible to parents immediately.',confirmText:'Sign Off',url:'{% url 'academics:signoff_action' %}',type:'info',extraData:[{name:'report_id',value:'{{ report.id }}'},{name:'action',value:'approve'}]})">
+              {% if report and report.status == 'pending_sign_off' and can_signoff %}
+                {% if can_publish %}
+                  {% if report.ecd_hod_approved_by_id and not signoff_blocked %}
+                <button type="button" class="rc-icon rc-ok" title="HOS approve and publish" aria-label="Approve and publish {{ st.get_full_name }}"
+                  onclick="confirmDeleteModal({title:'Approve and Publish?',body:'Approve and publish the report for <strong>{{ st.get_full_name|escapejs }}</strong>?',detail:'This report will become visible to parents immediately.',confirmText:'Publish',url:'{% url 'academics:signoff_action' %}',type:'info',extraData:[{name:'report_id',value:'{{ report.id }}'},{name:'action',value:'approve'}]})">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>
                 </button>
+                  {% endif %}
+                {% elif not report.ecd_hod_approved_by_id %}
+                <button type="button" class="rc-icon rc-ok" title="HOD approve" aria-label="HOD approve {{ st.get_full_name }}"
+                  onclick="confirmDeleteModal({title:'Approve Report?',body:'Approve the report for <strong>{{ st.get_full_name|escapejs }}</strong> as HOD?',detail:'It goes to the Head of School to approve and publish.',confirmText:'Approve',url:'{% url 'academics:signoff_action' %}',type:'info',extraData:[{name:'report_id',value:'{{ report.id }}'},{name:'action',value:'hod_approve'}]})">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>
+                </button>
+                {% endif %}
                 <button type="button" class="rc-icon rc-bad" title="Return for correction" aria-label="Return {{ st.get_full_name }}"
                   onclick="confirmDeleteModal({title:'Return for Correction?',body:'Return the report for <strong>{{ st.get_full_name|escapejs }}</strong> to the teacher for correction?',detail:'The report moves back to Draft. Scores are not changed: use the Review Queue to reopen specific subjects.',confirmText:'Return Report',url:'{% url 'academics:signoff_action' %}',type:'warning',extraData:[{name:'report_id',value:'{{ report.id }}'},{name:'action',value:'reject'}]})">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>

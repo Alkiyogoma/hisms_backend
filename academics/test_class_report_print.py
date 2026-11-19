@@ -1,7 +1,7 @@
 """
 The report preview offers the whole class: "Print all" opens every report in
 the learner's class for that term on one page (one learner per printed page),
-and "Approve & Sign Off All" signs off the class's unpublished reports.
+and "HOS Approve and Publish All" publishes the class's HOD-approved reports.
 """
 from datetime import timedelta
 
@@ -49,11 +49,14 @@ class ClassReportPrintTests(TestCase):
         self.addCleanup(self._media.disable)
         self.client.force_login(self.hos)
 
-    def test_preview_offers_print_all_and_sign_off_all_for_the_class(self):
+    def test_preview_offers_print_all_and_publish_all_for_the_class(self):
+        # Only HOD-approved reports count towards "HOS Approve and Publish All".
+        ReportCard.objects.filter(pk=self.zawadi.pk).update(ecd_hod_approved_by=self.hos)
         page = self.client.get(reverse("academics:report_preview", args=[self.zawadi.pk])).content.decode()
         self.assertIn(reverse("academics:report_preview_class", args=[self.zawadi.pk]), page)
         self.assertIn("Print all (3)", page)
-        self.assertIn("Approve & Sign Off All (2)", page)
+        self.assertIn("HOS Approve and Publish All (1)", page)
+        self.assertNotIn("Approve &amp; Sign Off", page)
         self.assertIn('name="class_name" value="Grade 5"', page)
         self.assertIn(f'name="term_id" value="{self.term.pk}"', page)
 
