@@ -120,9 +120,9 @@ def build_learner_report(student, term, shared=None, terms=None):
         "student": student,
         "remark_rows": remark_rows,
         # The class's memory verse for the term: printed on the Term Scripture
-        # remark row, or on a row of its own when no such subject is set up.
+        # remark row, else on the Bible Studies row, else on a row of its own.
         "scripture_verse": scripture_verse,
-        "scripture_in_remarks": any("scripture" in name.lower() for name, _ in remark_rows),
+        "scripture_row": _scripture_row(remark_rows),
         "photo_src": _photo_data_uri(student),
         "photo_checked": True,
         "exam": exam,
@@ -140,3 +140,14 @@ def build_learner_report(student, term, shared=None, terms=None):
         "scale": [("A+", "90–100", "Outstanding"), ("A", "80–89", "High"), ("B", "70–79", "Good"),
                   ("C", "60–69", "Aspiring"), ("D", "50–59", "Basic"), ("E", "0–49", "Needs Improvement")],
     }
+
+
+def _scripture_row(remark_rows):
+    """The remark subject the term's memory verse is printed beside: a
+    Term Scripture subject if the class has one, else Bible Studies."""
+    names = [name for name, _ in remark_rows]
+    for key in ("scripture", "bible"):
+        for name in names:
+            if key in name.lower():
+                return name
+    return None
