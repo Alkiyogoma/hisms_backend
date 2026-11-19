@@ -16,18 +16,13 @@
   </ul>
 </div>
 
-{# Signature images: approved only, once that person did their step (report_signatures). #}
-<div class="signatures{% if signatures.hod_name %} three{% endif %}">
+{# Every report shows the same two slots, class teacher and Head of School (no
+   HOD signature); each image appears only once that person did their step. #}
+<div class="signatures">
   <div>
     <div class="sig-line">{% if signatures.class_teacher %}<img class="sig-img" src="{{ signatures.class_teacher }}" alt="Class teacher's signature">{% endif %}</div>
     <div class="sig-label">Class teacher<br><span>{{ class_teacher|default:"Signature and date" }}</span></div>
   </div>
-  {% if signatures.hod_name %}
-  <div>
-    <div class="sig-line">{% if signatures.hod %}<img class="sig-img" src="{{ signatures.hod }}" alt="Head of Department's signature">{% endif %}</div>
-    <div class="sig-label">Head of Department<br><span>{{ signatures.hod_name }}</span></div>
-  </div>
-  {% endif %}
   <div class="sig-hos">
     <div class="sig-line">{% if signatures.hos %}<img class="sig-img" src="{{ signatures.hos }}" alt="Head of School's signature">{% endif %}</div>
     <div class="sig-label">Head of School<br><span>{% if report.signed_off_by %}{{ report.signed_off_by.get_full_name|default:report.signed_off_by.username }}{% else %}Signature and date{% endif %}</span></div>
