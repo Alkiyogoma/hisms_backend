@@ -1,5 +1,5 @@
-{# Optional PDPA consent (method and version are recorded with it, FR-PAR-004). Parents need no portal
-   set-up: anyone on record signs in at /parent/login/ with their phone or email. #}
+{% comment %}Optional PDPA consent (method and version are recorded with it, FR-PAR-004). Parents need no portal
+   set-up: anyone on record signs in at /parent/login/ with their phone or email.{% endcomment %}
 <input type="hidden" name="pdpa_consent_shown" value="1">
 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px; margin-top:16px">
   <div style="padding:14px; background:#FEF3C7; border:{% if errors.pdpa %}1.5px solid #DC2626{% else %}1px solid #FCD34D{% endif %}; border-radius:8px">
