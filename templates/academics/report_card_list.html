@@ -72,7 +72,7 @@
             {% elif report.status == 'published' %}<span class="chip chip-green">Published</span>
             {% elif report.status == 'pending_sign_off' and report.ecd_hod_approved_by_id %}<span class="chip chip-blue">Awaiting HOS</span>
             {% elif report.status == 'pending_sign_off' %}<span class="chip chip-amber">Awaiting HOD</span>
-            {% else %}<span class="chip chip-grey">Not submitted</span>{% endif %}
+            {% else %}<span class="chip chip-grey"{% if row.outstanding %} title="Waiting on: {{ row.outstanding|join:'; ' }}" style="cursor:help"{% endif %}>Not submitted</span>{% endif %}
           </td>
           <td class="rc-actions">
             <div class="rc-icons">

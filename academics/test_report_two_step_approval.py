@@ -146,3 +146,44 @@ class TwoStepApprovalTests(TestCase):
         self.assertRedirects(resp, reverse(QUEUE), fetch_redirect_response=False)
         page = self.client.get(reverse(QUEUE)).content.decode()
         self.assertNotIn("HOS Sign-Off", page)
+
+
+class ReportListStatusHealTests(TestCase):
+    """The Reports list brings a draft report whose subjects are all
+    submitted/approved up to pending sign-off, and says what the rest wait on."""
+
+    @classmethod
+    def setUpTestData(cls):
+        base.PerSubjectApprovalTests.setUpTestData.__func__(cls)
+
+    _save = base.PerSubjectApprovalTests._save
+    _submit = base.PerSubjectApprovalTests._submit
+    _approve = base.PerSubjectApprovalTests._approve
+
+    def _list(self):
+        self.client.force_login(self.hos)
+        return self.client.get(reverse("academics:report_card_list"),
+                               {"class_name": "Grade 4", "term": self.term.id})
+
+    def test_stuck_draft_with_every_subject_approved_moves_to_pending(self):
+        for subject in base.SUBJECTS:
+            self._save(subject, 70)
+            self._submit(subject)
+            self._approve(subject)
+        # Left behind as draft, as when readiness changed without a re-check.
+        ReportCard.objects.filter(student=self.student, term=self.term).update(status=ReportCardStatus.DRAFT)
+        resp = self._list()
+        self.assertEqual(resp.status_code, 200)
+        rc = ReportCard.objects.get(student=self.student, term=self.term)
+        self.assertEqual(rc.status, ReportCardStatus.PENDING_SIGN_OFF)
+        self.assertContains(resp, "Awaiting HOD")
+        self.assertNotContains(resp, ">Not submitted<")
+
+    def test_incomplete_draft_stays_and_names_what_is_missing(self):
+        self._save("English", 70)
+        self._submit("English")
+        ReportCard.objects.filter(student=self.student, term=self.term).update(status=ReportCardStatus.DRAFT)
+        resp = self._list()
+        rc = ReportCard.objects.get(student=self.student, term=self.term)
+        self.assertEqual(rc.status, ReportCardStatus.DRAFT)
+        self.assertContains(resp, "Waiting on: Bible Studies: no marks entered")

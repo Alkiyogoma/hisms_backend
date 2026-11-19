@@ -33,7 +33,7 @@
     <div class="sig-label">Head of School<br><span>{% if report.signed_off_by %}{{ report.signed_off_by.get_full_name|default:report.signed_off_by.username }}{% else %}Signature and date{% endif %}</span></div>
     {% if report.status == 'published' and report.signed_off_at %}
     <div class="stamp-container">
-      <img src="{% static 'branding/hodari_school_stamp.png' %}" alt="School stamp" class="stamp-img">
+      <img src="{% static 'branding/hodari_school_stamp_v2.png' %}" alt="School stamp" class="stamp-img">
       <div class="stamp-date">{{ term.end_date|default:report.signed_off_at|date:"d M Y"|upper }}</div>
     </div>
     {% endif %}
