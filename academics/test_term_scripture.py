@@ -94,7 +94,7 @@ class TermScriptureTests(TestCase):
                                          remark="High", entered_by=self.hos)
         ClassTermScripture.objects.create(term=self.term, class_name="Grade 2", verse="Psalm 100:1-5")
         page = self._preview()
-        self.assertIn('<b>Term Scripture</b><span class="verse">Psalm 100:1-5</span></td><td>High</td>', page)
+        self.assertIn('<b>Term Scripture</b><span class="verse">(Psalm 100:1-5)</span></td><td>High</td>', page)
 
     def test_verse_goes_on_the_bible_studies_row_without_a_scripture_subject(self):
         subject = Subject.objects.create(name="Bible Studies", department=Department.PRIMARY,
@@ -104,13 +104,13 @@ class TermScriptureTests(TestCase):
                                          remark="Outstanding", entered_by=self.hos)
         ClassTermScripture.objects.create(term=self.term, class_name="Grade 2", verse="Psalm 100:1-5")
         page = self._preview()
-        self.assertIn('<b>Bible Studies</b><span class="verse"><span class="verse-label">Term Scripture:</span> '
-                      'Psalm 100:1-5</span></td><td>Outstanding</td>', page)
+        self.assertIn('<b>Bible Studies</b><span class="verse">(Term Scripture: '
+                      'Psalm 100:1-5)</span></td><td>Outstanding</td>', page)
         self.assertNotIn("<b>Term Scripture</b>", page)
 
     def test_verse_gets_its_own_row_without_a_scripture_subject(self):
         ClassTermScripture.objects.create(term=self.term, class_name="Grade 2", verse="Psalm 100:1-5")
-        self.assertIn('<b>Term Scripture</b><span class="verse">Psalm 100:1-5</span>', self._preview())
+        self.assertIn('<b>Term Scripture</b><span class="verse">(Psalm 100:1-5)</span>', self._preview())
 
     def test_term_pill_page_two_header_and_stamp(self):
         ReportCard.objects.filter(pk=self.report.pk).update(
