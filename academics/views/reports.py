@@ -176,8 +176,13 @@ class ReportCardListView(RoleRequiredMixin, TemplateView):
                 student__class_name=class_name, 
                 term=term
             ).select_related("student").order_by("student__last_name", "student__first_name")
+            # Bring stuck drafts in step with their marks, and say what the
+            # rest are waiting on.
+            from academics.score_progress import heal_class_report_statuses
+            reports = list(reports)
+            outstanding = heal_class_report_statuses(reports, term, class_name)
             ctx["reports"] = reports
-            ctx["has_pending"] = reports.filter(status=ReportCardStatus.PENDING_SIGN_OFF).exists()
+            ctx["has_pending"] = any(r.status == ReportCardStatus.PENDING_SIGN_OFF for r in reports)
             # Results sheet: every learner's subject marks, total, average and
             # position (same figures as the report card), with their report.
             from academics.class_position import class_results
@@ -185,6 +190,7 @@ class ReportCardListView(RoleRequiredMixin, TemplateView):
             by_student = {r.student_id: r for r in reports}
             for row in results["rows"]:
                 row["report"] = by_student.get(row["student"].pk)
+                row["outstanding"] = outstanding.get(row["student"].pk, [])
             ctx["results"] = results
             ctx["print_all_report"] = next(iter(reports), None)
 

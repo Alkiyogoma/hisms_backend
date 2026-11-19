@@ -162,6 +162,45 @@ def sync_report_status(student, term):
     return rc
 
 
+_OUTSTANDING_LABELS = {
+    "not_started": "no marks entered",
+    ScoreStatus.DRAFT: "marks not submitted",
+    ScoreStatus.RETURNED: "returned for correction",
+}
+
+
+def heal_class_report_statuses(reports, term, class_name):
+    """
+    Move a class's draft reports to pending sign-off when every subject is
+    already submitted/approved (the rule sync_report_status applies on each
+    save). Catches reports left behind when readiness changed without a save
+    that re-checks it, e.g. a subject switched to remark-only or removed from
+    the class. Never demotes, and leaves ECD and published reports alone.
+
+    Returns {student_id: ["Subject: why", ...]} for reports still in draft.
+    """
+    from academics.models import ReportCardStatus
+
+    drafts = [rc for rc in reports if rc.status == ReportCardStatus.DRAFT and not rc.is_ecd_report]
+    if not drafts:
+        return {}
+    progress = class_progress([rc.student_id for rc in drafts], term.id, class_name)
+    outstanding = {}
+    for rc in drafts:
+        p = progress.get(rc.student_id) or {"subjects": {}, "total_subjects": 0}
+        missing = [
+            f"{name}: {'no remark entered' if v.get('remark_only') else _OUTSTANDING_LABELS.get(v['status'], v['status'])}"
+            for name, v in sorted(p["subjects"].items())
+            if v["status"] not in (ScoreStatus.SUBMITTED, ScoreStatus.APPROVED)
+        ]
+        if p["total_subjects"] and not missing:
+            rc.status = ReportCardStatus.PENDING_SIGN_OFF
+            rc.save(update_fields=["status", "updated_at"])
+        else:
+            outstanding[rc.student_id] = missing or ["No subjects are set up for this class"]
+    return outstanding
+
+
 def is_ready_for_sign_off(student, term):
     """Every expected subject has scores and none are draft/returned/missing."""
     progress = student_progress(student, term)
