@@ -118,6 +118,21 @@ class TermScriptureTests(TestCase):
         self.assertIn("Class teacher<br>", page)
         self.assertIn("Head of School<br>", page)
         self.assertNotIn("Head of Department", page)
+        self.assertNotIn("{#", page)  # a template comment must never print
+
+    def test_no_template_has_a_multi_line_hash_comment(self):
+        """Django's {# #} comments are single-line: one that spans lines is
+        printed on the page as text. Use {% comment %} for longer notes."""
+        from pathlib import Path
+        from django.conf import settings
+        bad = []
+        for root in settings.TEMPLATES[0]["DIRS"]:
+            for path in Path(root).rglob("*.html"):
+                for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+                    i = line.find("{#")
+                    if i != -1 and "#}" not in line[i:]:
+                        bad.append(f"{path}:{n}")
+        self.assertEqual(bad, [])
 
     def test_term_pill_page_two_header_and_stamp(self):
         ReportCard.objects.filter(pk=self.report.pk).update(
