@@ -11,6 +11,7 @@ from unittest import mock
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.urls import reverse
+from django.utils import timezone
 
 from academics.models import Department, GradeClass, ReportCard, ReportCardStatus
 from academics.services import sign_off_report
@@ -149,6 +150,17 @@ class ECDApprovalTests(ECDFixture):
         self.assertTrue(next(s for s in roster if s["id"] == self.learner.pk)["approved"])
         page = self.client.get(reverse("academics:report_preview", args=[report.pk]))
         self.assertContains(page, "Approved by HOD")
+
+    def test_published_report_carries_the_school_stamp(self):
+        report = self.submit(self.learner)
+        self.client.force_login(self.hos)
+        self.assertNotContains(self.client.get(reverse("academics:report_preview", args=[report.pk])),
+                               "hodari_school_stamp")
+        ReportCard.objects.filter(pk=report.pk).update(
+            status=ReportCardStatus.PUBLISHED, signed_off_by=self.hos, signed_off_at=timezone.now())
+        page = self.client.get(reverse("academics:report_preview", args=[report.pk]))
+        self.assertContains(page, "branding/hodari_school_stamp_v2.png")
+        self.assertContains(page, 'class="ecd-stamp-date"')
 
     def test_print_all_has_one_sheet_per_child_in_the_class(self):
         report = self.submit(self.learner)  # the other two learners are not started

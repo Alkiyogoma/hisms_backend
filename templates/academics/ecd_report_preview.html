@@ -87,6 +87,11 @@
     .ecd-stamp { font-family: var(--font-ui); font-size: 9pt; color: var(--hodari-blue); font-weight: 700; font-style: normal; }
     .ecd-sig-line { position: relative; }
     .ecd-sig-img { position: absolute; left: 4px; bottom: -2px; height: 12mm; max-width: 150px; object-fit: contain; object-position: left bottom; }
+    /* Oval school stamp over the right end of the Head Teacher's line, tilted as one piece. */
+    .ecd-stamp-container { position: absolute; left: 115px; bottom: -30px; width: 130px; transform: rotate(-8deg); pointer-events: none; }
+    .ecd-stamp-img { display: block; width: 130px; height: auto; }
+    .ecd-stamp-date { position: absolute; top: 53%; left: 0; right: 0; transform: translateY(-50%); text-align: center;
+      font-family: var(--font-ui); font-size: 9.5pt; font-weight: 700; letter-spacing: .5px; color: #2A2440; white-space: nowrap; }
 
     .ecd-part, .ecd-table, .ecd-strip, .ecd-overall { break-inside: avoid; page-break-inside: avoid; }
     .ecd-part-traits { break-before: auto; }

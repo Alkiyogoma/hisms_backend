@@ -112,6 +112,13 @@ class TermScriptureTests(TestCase):
         ClassTermScripture.objects.create(term=self.term, class_name="Grade 2", verse="Psalm 100:1-5")
         self.assertIn('<b>Term Scripture</b><span class="verse">(Psalm 100:1-5)</span>', self._preview())
 
+    def test_report_has_only_class_teacher_and_head_of_school_signatures(self):
+        page = self._preview()
+        self.assertIn('<div class="signatures">', page)
+        self.assertIn("Class teacher<br>", page)
+        self.assertIn("Head of School<br>", page)
+        self.assertNotIn("Head of Department", page)
+
     def test_term_pill_page_two_header_and_stamp(self):
         ReportCard.objects.filter(pk=self.report.pk).update(
             status=ReportCardStatus.PUBLISHED, signed_off_by=self.hos,
