@@ -2956,7 +2956,7 @@ class SessionCheckView(RoleRequiredMixin, View):
 
     def get(self, request):
         from django.conf import settings as django_settings
-        idle_timeout = getattr(django_settings, "SESSION_IDLE_TIMEOUT", 1800)
+        idle_timeout = getattr(django_settings, "SESSION_IDLE_TIMEOUT", 10800)
         last_activity = request.session.get("_last_activity")
         now_ts = timezone.now().timestamp()
         if not last_activity:

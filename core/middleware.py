@@ -11,7 +11,7 @@ from core.redirects import (
 )
 from core.threadlocal import reset_current_request, set_current_request
 
-SESSION_IDLE_TIMEOUT = getattr(settings, "SESSION_IDLE_TIMEOUT", 1800)  # 30 min (matches settings.py default)
+SESSION_IDLE_TIMEOUT = getattr(settings, "SESSION_IDLE_TIMEOUT", 10800)  # 3 h (matches settings.py default)
 
 
 class RequestContextMiddleware:
