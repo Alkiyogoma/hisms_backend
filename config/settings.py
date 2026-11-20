@@ -195,7 +195,7 @@ if os.getenv("REDIS_URL"):
 # Security  FRD NFR-SEC-003 / NFR-SEC-005
 SESSION_COOKIE_AGE = 28800  # 8 hours absolute max (idle timeout controls actual expiry)
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
-SESSION_IDLE_TIMEOUT = int(os.getenv("SESSION_IDLE_TIMEOUT", "1800"))  # 30 min total; warning at 28 min via WARNING_BEFORE_SECONDS=120 (FRD NFR-SEC-003)
+SESSION_IDLE_TIMEOUT = int(os.getenv("SESSION_IDLE_TIMEOUT", "10800"))  # 3 h total; warning at 2 h 58 min via WARNING_BEFORE_SECONDS=120 (FRD NFR-SEC-003)
 LOGIN_MAX_ATTEMPTS = int(os.getenv("LOGIN_MAX_ATTEMPTS", "5"))
 LOGIN_LOCKOUT_DURATION = int(os.getenv("LOGIN_LOCKOUT_DURATION", "900"))  # 15 min in seconds
 
