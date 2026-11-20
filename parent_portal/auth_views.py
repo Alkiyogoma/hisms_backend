@@ -45,7 +45,9 @@ def _school_settings():
 
 
 def _school_phone():
-    return (getattr(_school_settings(), "admissions_phone", "") or "").strip() or "0767 016 940"
+    settings_obj = _school_settings()
+    phone = settings_obj.get_parent_contact_phone() if settings_obj else ""
+    return phone or "+255 767 016 940"
 
 
 def _client_ip(request):
