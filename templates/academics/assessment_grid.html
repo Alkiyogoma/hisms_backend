@@ -17,7 +17,8 @@
   <div class="ag-empty"><c-empty-state title="No subjects" desc="{% if assessment_is_remarks %}No remark-only subjects are available for this class and your teaching assignment.{% else %}No mark-bearing subjects are available for this class and your teaching assignment.{% endif %}" icon="doc" /></div>
 {% else %}
 
-{% if term.is_locked %}<div class="alert alert-warning" style="margin-bottom:12px">{{ term.name }} is locked, so marks and remarks can only be viewed.</div>{% endif %}
+{% if term.is_locked and override_locks %}<div class="alert alert-warning" style="margin-bottom:12px">{{ term.name }} is locked. As Super Admin you can still enter and correct marks; approved marks change through the amend dialog.</div>
+{% elif term.is_locked %}<div class="alert alert-warning" style="margin-bottom:12px">{{ term.name }} is locked, so marks and remarks can only be viewed.</div>{% endif %}
 
 <div class="ag-legend">
   {% if assessment_is_remarks %}
@@ -126,7 +127,7 @@
 
 {% if rows and not editable_subjects %}
 <div class="ag-savebar"><span class="ag-dirty-count">View only &middot; marks in this class are entered by each subject's teacher.</span></div>
-{% elif can_edit and not term.is_locked and rows %}
+{% elif can_edit and rows and not term.is_locked or can_edit and rows and override_locks %}
 <div class="ag-savebar">
   <span class="ag-dirty-count" id="ag-dirty">No unsaved changes</span>
   <div style="display:flex;gap:8px;flex-wrap:wrap">

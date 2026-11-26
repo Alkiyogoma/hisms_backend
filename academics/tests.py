@@ -1775,7 +1775,14 @@ class TermLockedRejectionTests(TestCase):
     # ── PrimaryScoreAPIView ──────────────────────────────────────────
 
     def test_primary_score_post_rejects_locked_term(self):
-        self.client.force_login(self.super_admin)
+        # Super Admin may override a locked term (test_super_admin_score_override);
+        # everyone else is rejected.
+        hod = User.objects.create_user(
+            username="term_lock_hod", email="term_lock_hod@test.com", password="secret123",
+            role=UserRole.PRIMARY_HOD,
+        )
+        assign_role_group(hod)
+        self.client.force_login(hod)
         resp = self.client.post(
             reverse("academics:api_primary_scores", args=[self.student.id]),
             data=json.dumps({

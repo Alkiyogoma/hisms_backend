@@ -605,6 +605,8 @@ class SubjectAssessmentEntryMixin:
         )
 
         ctx["can_edit"] = user.role == UserRole.SUPER_ADMIN or user.has_perm("academics.change_examscore")
+        from academics.approval_policy import can_override_score_locks
+        ctx["override_locks"] = can_override_score_locks(user)
         if selected_class and term:
             ctx["rows"] = self._grid_rows(ctx, selected_class, term)
             ctx["students_done"] = sum(1 for r in ctx["rows"] if r["done"])
@@ -642,7 +644,9 @@ class SubjectAssessmentEntryMixin:
         students = list(Student.objects.filter(class_name=class_name, is_archived=False).order_by("first_name", "last_name"))
         ids = [s.id for s in students]
         progress = class_progress(ids, term.id, class_name)
-        editable = set(ctx["editable_subjects"]) if ctx["can_edit"] and not term.is_locked else set()
+        override = ctx["override_locks"]
+        editable = (set(ctx["editable_subjects"]) if ctx["can_edit"] and (override or not term.is_locked)
+                    else set())
         is_remarks = ctx["assessment_is_remarks"]
         ctx["can_amend"] = not is_remarks and can_amend_approved_grades(self.request.user)
 
@@ -681,6 +685,8 @@ class SubjectAssessmentEntryMixin:
                         reason = "Read only"
                     elif status == ScoreStatus.APPROVED:
                         reason = "Approved"
+                    elif override:
+                        reason = ""
                     elif sc and sc.is_locked and not returned:
                         reason = "Submitted to the HOD"
                     elif et.code in closed_codes and not returned:
@@ -868,8 +874,10 @@ class PrimaryScoreAPIView(ScoreEntryAccessMixin, RoleRequiredMixin, View):
         if not self._student_in_teacher_classes(request, student):
             return JsonResponse({"error": "Access denied"}, status=403)
         term = get_object_or_404(Term, id=term_id)
+        from academics.approval_policy import can_override_score_locks
+        override = can_override_score_locks(request.user)
 
-        if term.is_locked:
+        if term.is_locked and not override:
             return JsonResponse(
                 {"error": "This term is locked and cannot accept score entry."},
                 status=403,
@@ -926,7 +934,7 @@ class PrimaryScoreAPIView(ScoreEntryAccessMixin, RoleRequiredMixin, View):
                 if val == "" or val is None: continue
 
                 allowed, msg = check_score_entry_allowed(term, code, today)
-                if not allowed:
+                if not allowed and not override:
                     from academics.models import ScoreStatus
                     existing_returned = ExamScore.objects.filter(
                         student=student, term=term, subject_name=subject_name,
@@ -953,7 +961,8 @@ class PrimaryScoreAPIView(ScoreEntryAccessMixin, RoleRequiredMixin, View):
                     subject_name=subject_name, 
                     exam_type=code
                 ).first()
-                if existing and existing.is_locked and existing.status != "returned":
+                if existing and existing.is_locked and existing.status != "returned" and not (
+                        override and existing.status != ScoreStatus.APPROVED):
                     if existing.score != score_val:
                         locked_cells.append(f"{subject_name} – {active_configs[code].name}")
                     continue
@@ -1343,8 +1352,10 @@ class LowerSecondaryScoreAPIView(ScoreEntryAccessMixin, RoleRequiredMixin, View)
         if not self._student_in_teacher_classes(request, student):
             return JsonResponse({"error": "Access denied"}, status=403)
         term = get_object_or_404(Term, id=term_id)
+        from academics.approval_policy import can_override_score_locks
+        override = can_override_score_locks(request.user)
 
-        if term.is_locked:
+        if term.is_locked and not override:
             return JsonResponse({"error": "This term is locked and cannot accept score entry."}, status=403)
 
         from academics.utils import check_score_entry_allowed
@@ -1399,7 +1410,7 @@ class LowerSecondaryScoreAPIView(ScoreEntryAccessMixin, RoleRequiredMixin, View)
                     continue
 
                 allowed, msg = check_score_entry_allowed(term, code, today)
-                if not allowed:
+                if not allowed and not override:
                     existing_returned = ExamScore.objects.filter(
                         student=student, term=term, subject_name=subject_name,
                         exam_type=code, status=ScoreStatus.RETURNED
@@ -1421,7 +1432,8 @@ class LowerSecondaryScoreAPIView(ScoreEntryAccessMixin, RoleRequiredMixin, View)
                 existing = ExamScore.objects.filter(
                     student=student, term=term, subject_name=subject_name, exam_type=code
                 ).first()
-                if existing and existing.is_locked and existing.status != "returned":
+                if existing and existing.is_locked and existing.status != "returned" and not (
+                        override and existing.status != ScoreStatus.APPROVED):
                     if existing.score != score_val:
                         locked_cells.append(f"{subject_name} – {active_configs[code].name}")
                     continue
