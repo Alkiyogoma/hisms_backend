@@ -35,6 +35,16 @@ def can_amend_approved_grades(user) -> bool:
     )
 
 
+def can_override_score_locks(user) -> bool:
+    """Super Admin may enter or correct marks after the exam window has
+    closed, after submission to the HOD, and on a locked term (e.g. a student
+    who sat a late exam after school closed). Approved marks still change
+    only through the amendment flow, which records a reason."""
+    return bool(user and user.is_authenticated) and (
+        user.is_superuser or user.has_role(UserRole.SUPER_ADMIN)
+    )
+
+
 def approver_class_names(user):
     """Class names whose scores ``user`` may approve, or None for every class."""
     if user.is_school_wide:
